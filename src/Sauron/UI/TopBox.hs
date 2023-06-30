@@ -27,93 +27,45 @@ topBox app = hBox [columnPadding settingsColumn
                                    , keyIndicator (unKChar nextFailureKey : '/' : [unKChar previousFailureKey]) "Next/previous failure"
                                    ]
 
-    actionsColumn = keybindingBox []
+    actionsColumn = keybindingBox [hBox [str "["
+                                         , highlightKeyIfPredicate someRepoSelected app (str $ showKey openSelectedFolderInFileExplorer)
+                                         , str "/"
+                                         , highlightKeyIfPredicate (const True) app (str $ showKey openTestRootKey)
+                                         , str "] "
+                                         , withAttr hotkeyMessageAttr $ str "Open "
+                                         , highlightMessageIfPredicate someRepoSelected app (str "selected")
+                                         , str "/"
+                                         , highlightMessageIfPredicate (const True) app (str "root")
+                                         , withAttr hotkeyMessageAttr $ str " folder"
+                                         ]
+                                  ]
 
-    otherActionsColumn = keybindingBox []
+    otherActionsColumn = keybindingBox [-- keyIndicator' (showKey cycleVisibilityThresholdKey) (visibilityThresholdWidget app)
+                                       -- , hBox [str "["
+                                       --        , str $ showKey toggleShowRunTimesKey
+                                       --        , str "/"
+                                       --        , str $ showKey toggleFileLocationsKey
+                                       --        , str "/"
+                                       --        , str $ showKey toggleVisibilityThresholdsKey
+                                       --        , str "] "
+                                       --        , highlightMessageIfPredicate (^. appShowRunTimes) app (str "Times")
+                                       --        , str "/"
+                                       --        , highlightMessageIfPredicate (^. appShowFileLocations) app (str "locations")
+                                       --        , str "/"
+                                       --        , highlightMessageIfPredicate (^. appShowVisibilityThresholds) app (str "thresholds")
+                                       --   ]
+                                       -- , hBox [str "["
+                                       --        , highlightIfLogLevel app LevelDebug [unKChar debugKey]
+                                       --        , str "/"
+                                       --        , highlightIfLogLevel app LevelInfo [unKChar infoKey]
+                                       --        , str "/"
+                                       --        , highlightIfLogLevel app LevelWarn [unKChar warnKey]
+                                       --        , str "/"
+                                       --        , highlightIfLogLevel app LevelError [unKChar errorKey]
+                                       --        , str "] "
+                                       --        , str "Log level"]
 
---     actionsColumn = keybindingBox [hBox [str "["
---                                          , highlightKeyIfPredicate selectedRepoRunning app (str $ showKey cancelSelectedKey)
---                                          , str "/"
---                                          , highlightKeyIfPredicate someTestRunning app (str $ showKey cancelAllKey)
---                                          , str "] "
---                                          , withAttr hotkeyMessageAttr $ str "Cancel "
---                                          , highlightMessageIfPredicate selectedRepoRunning app (str "selected")
---                                          , str "/"
---                                          , highlightMessageIfPredicate someTestRunning app (str "all")
---                                          ]
---                                   , hBox [str "["
---                                          , highlightKeyIfPredicate selectedRepoDone app (str $ showKey runSelectedKey)
---                                          , str "/"
---                                          , highlightKeyIfPredicate noTestsRunning app (str $ showKey runAllKey)
---                                          , str "] "
---                                          , withAttr hotkeyMessageAttr $ str "Run "
---                                          , highlightMessageIfPredicate selectedRepoDone app (str "selected")
---                                          , str "/"
---                                          , highlightMessageIfPredicate noTestsRunning app (str "all")
---                                          ]
---                                   , hBox [str "["
---                                          , highlightKeyIfPredicate selectedRepoDone app (str $ showKey clearSelectedKey)
---                                          , str "/"
---                                          , highlightKeyIfPredicate allTestsDone app (str $ showKey clearAllKey)
---                                          , str "] "
---                                          , withAttr hotkeyMessageAttr $ str "Clear "
---                                          , highlightMessageIfPredicate selectedRepoDone app (str "selected")
---                                          , str "/"
---                                          , highlightMessageIfPredicate allTestsDone app (str "all")
---                                          ]
---                                   , hBox [str "["
---                                          , highlightKeyIfPredicate someRepoSelected app (str $ showKey openSelectedFolderInFileExplorer)
---                                          , str "/"
---                                          , highlightKeyIfPredicate (const True) app (str $ showKey openTestRootKey)
---                                          , str "] "
---                                          , withAttr hotkeyMessageAttr $ str "Open "
---                                          , highlightMessageIfPredicate someRepoSelected app (str "selected")
---                                          , str "/"
---                                          , highlightMessageIfPredicate (const True) app (str "root")
---                                          , withAttr hotkeyMessageAttr $ str " folder"
---                                          ]
---                                   , hBox [str "["
---                                          , highlightKeyIfPredicate someRepoSelected app (str $ showKey openTestInEditorKey)
---                                          , str "/"
---                                          , highlightKeyIfPredicate someRepoSelected app (str $ showKey openLogsInEditorKey)
---                                          , str "/"
---                                          , highlightKeyIfPredicate someRepoSelected app (str $ showKey openFailureInEditorKey)
---                                          , str "] "
---                                          , withAttr hotkeyMessageAttr $ str "Edit "
---                                          , highlightMessageIfPredicate someRepoSelected app (str "test")
---                                          , str "/"
---                                          , highlightMessageIfPredicate someRepoSelected app (str "logs")
---                                          , str "/"
---                                          , highlightMessageIfPredicate selectedRepoHasCallStack app (str "failure")
---                                          ]
---                                   ]
-
---     otherActionsColumn = keybindingBox [keyIndicator' (showKey cycleVisibilityThresholdKey) (visibilityThresholdWidget app)
---                                        , hBox [str "["
---                                               , str $ showKey toggleShowRunTimesKey
---                                               , str "/"
---                                               , str $ showKey toggleFileLocationsKey
---                                               , str "/"
---                                               , str $ showKey toggleVisibilityThresholdsKey
---                                               , str "] "
---                                               , highlightMessageIfPredicate (^. appShowRunTimes) app (str "Times")
---                                               , str "/"
---                                               , highlightMessageIfPredicate (^. appShowFileLocations) app (str "locations")
---                                               , str "/"
---                                               , highlightMessageIfPredicate (^. appShowVisibilityThresholds) app (str "thresholds")
---                                          ]
---                                        , hBox [str "["
---                                               , highlightIfLogLevel app LevelDebug [unKChar debugKey]
---                                               , str "/"
---                                               , highlightIfLogLevel app LevelInfo [unKChar infoKey]
---                                               , str "/"
---                                               , highlightIfLogLevel app LevelWarn [unKChar warnKey]
---                                               , str "/"
---                                               , highlightIfLogLevel app LevelError [unKChar errorKey]
---                                               , str "] "
---                                               , str "Log level"]
-
---                                        , keyIndicator "q" "Exit"]
+                                       keyIndicator "q" "Exit"]
 
 -- visibilityThresholdWidget app = hBox $
 --   [withAttr hotkeyMessageAttr $ str "Visibility threshold ("]
@@ -128,13 +80,13 @@ keybindingBox = vBox
 --   if | app ^. appLogLevel == Just desiredLevel -> withAttr visibilityThresholdSelectedAttr $ str thing
 --      | otherwise -> withAttr hotkeyAttr $ str thing
 
--- highlightKeyIfPredicate p app x = case p app of
---   True -> withAttr hotkeyAttr x
---   False -> withAttr disabledHotkeyAttr x
+highlightKeyIfPredicate p app x = case p app of
+  True -> withAttr hotkeyAttr x
+  False -> withAttr disabledHotkeyAttr x
 
--- highlightMessageIfPredicate p app x = case p app of
---   True -> withAttr hotkeyMessageAttr x
---   False -> withAttr disabledHotkeyMessageAttr x
+highlightMessageIfPredicate p app x = case p app of
+  True -> withAttr hotkeyMessageAttr x
+  False -> withAttr disabledHotkeyMessageAttr x
 
 keyIndicator key msg = keyIndicator' key (withAttr hotkeyMessageAttr $ str msg)
 

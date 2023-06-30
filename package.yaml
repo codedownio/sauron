@@ -28,6 +28,7 @@ dependencies:
 - stm
 - string-interpolate
 - text
+- unliftio-core
 - unliftio
 - vty
 

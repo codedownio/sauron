@@ -8,14 +8,17 @@ import Brick.Widgets.List
 import Control.Concurrent.STM (retry)
 import Control.Monad
 import Data.Bifunctor
+import Data.Function
 import Data.String.Interpolate
 import GitHub
 import qualified Graphics.Vty as V
+import Lens.Micro
 import Sauron.Filter
 import Sauron.Fix
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Draw
+import Sauron.UI.Keys
 import UnliftIO.Async
 import UnliftIO.Concurrent
 import UnliftIO.Exception
@@ -37,12 +40,20 @@ app = App {
   }
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
--- appEvent s (AppEvent (RunTreeUpdated newTree)) = do
---   now <- liftIO getCurrentTime
---   continue $ s
---     & appRunTree .~ newTree
---     & appTimeSinceStart .~ (diffUTCTime now (s ^. appStartTime))
---     & updateFilteredTree
+appEvent s (AppEvent (TreeUpdated newTree)) = do
+  put $ s
+    & appTree .~ newTree
+    & updateFilteredTree
+
+appEvent s (VtyEvent e) = case e of
+  -- Column 3
+  V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
+    -- Cancel everything and wait for cleanups
+    -- liftIO $ mapM_ cancelNode (s ^. appRunTreeBase)
+    -- forM_ (s ^. appRunTreeBase) (liftIO . waitForTree)
+    halt
+
+  ev -> zoom appMainList $ handleListEvent ev
 appEvent _ _ = return ()
 
 main :: IO ()
