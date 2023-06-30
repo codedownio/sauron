@@ -26,6 +26,8 @@ source-repository head
 library
   exposed-modules:
       Lib
+      Sauron.Filter
+      Sauron.Fix
       Sauron.Types
       Sauron.UI.AttrMap
       Sauron.UI.Draw
@@ -43,17 +45,21 @@ library
       OverloadedStrings
       QuasiQuotes
       RecordWildCards
+      ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
     , brick
+    , containers
     , github
     , microlens
     , microlens-th
     , stm
     , string-interpolate
     , text
+    , time
     , unliftio
+    , vector
     , vty
   default-language: Haskell2010
 
@@ -69,10 +75,12 @@ executable sauron
       OverloadedStrings
       QuasiQuotes
       RecordWildCards
+      ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , brick
+    , containers
     , github
     , microlens
     , sauron
@@ -96,10 +104,12 @@ test-suite test
       OverloadedStrings
       QuasiQuotes
       RecordWildCards
+      ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , brick
+    , containers
     , github
     , microlens
     , sauron

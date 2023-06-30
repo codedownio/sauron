@@ -22,6 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - brick
+- containers
 - github
 - microlens
 - stm
@@ -36,6 +37,7 @@ default-extensions:
 - OverloadedStrings
 - QuasiQuotes
 - RecordWildCards
+- ScopedTypeVariables
 
 ghc-options:
 - -Wall
@@ -52,6 +54,8 @@ library:
   source-dirs: src
   dependencies:
   - microlens-th
+  - time
+  - vector
 
 executables:
   sauron:
