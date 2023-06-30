@@ -12,6 +12,7 @@
       in
         rec {
           packages = rec {
+            inherit (pkgs) cabal2nix;
             inherit default;
           };
 
