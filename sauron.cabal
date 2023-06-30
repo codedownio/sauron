@@ -1,0 +1,111 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.2.
+--
+-- see: https://github.com/sol/hpack
+
+name:           sauron
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/sauron#readme>
+homepage:       https://github.com/codedownio/sauron#readme
+bug-reports:    https://github.com/codedownio/sauron/issues
+author:         Tom McLaughlin
+maintainer:     tom@codedown.io
+copyright:      2023 Tom McLaughlin
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/codedownio/sauron
+
+library
+  exposed-modules:
+      Lib
+      Sauron.Types
+      Sauron.UI.AttrMap
+      Sauron.UI.Draw
+      Sauron.UI.Keys
+      Sauron.UI.TopBox
+      Sauron.UI.Util
+      Sauron.Util
+  other-modules:
+      Paths_sauron
+  hs-source-dirs:
+      src
+  default-extensions:
+      FlexibleContexts
+      MultiWayIf
+      OverloadedStrings
+      QuasiQuotes
+      RecordWildCards
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      base >=4.7 && <5
+    , brick
+    , github
+    , microlens
+    , microlens-th
+    , stm
+    , string-interpolate
+    , text
+    , unliftio
+    , vty
+  default-language: Haskell2010
+
+executable sauron
+  main-is: Main.hs
+  other-modules:
+      Paths_sauron
+  hs-source-dirs:
+      app
+  default-extensions:
+      FlexibleContexts
+      MultiWayIf
+      OverloadedStrings
+      QuasiQuotes
+      RecordWildCards
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , brick
+    , github
+    , microlens
+    , sauron
+    , stm
+    , string-interpolate
+    , text
+    , unliftio
+    , vty
+  default-language: Haskell2010
+
+test-suite test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_sauron
+  hs-source-dirs:
+      test
+  default-extensions:
+      FlexibleContexts
+      MultiWayIf
+      OverloadedStrings
+      QuasiQuotes
+      RecordWildCards
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , brick
+    , github
+    , microlens
+    , sauron
+    , stm
+    , string-interpolate
+    , text
+    , unliftio
+    , vty
+  default-language: Haskell2010
