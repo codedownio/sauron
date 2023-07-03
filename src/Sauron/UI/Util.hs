@@ -5,6 +5,7 @@ module Sauron.UI.Util where
 import Brick
 import Graphics.Vty.Image
 import Lens.Micro
+import Relude
 
 
 fixedHeightOrViewportPercent :: (Ord n, Show n) => n -> Int -> Widget n -> Widget n

@@ -13,8 +13,11 @@ import Data.String.Interpolate
 import GitHub
 import qualified Graphics.Vty as V
 import Lens.Micro
+import Relude
+import Sauron.Auth
 import Sauron.Filter
 import Sauron.Fix
+import Sauron.Options
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Draw
@@ -22,7 +25,6 @@ import Sauron.UI.Keys
 import UnliftIO.Async
 import UnliftIO.Concurrent
 import UnliftIO.Exception
-import UnliftIO.STM
 
 -- import Data.Time
 
@@ -58,6 +60,16 @@ appEvent _ _ = return ()
 
 main :: IO ()
 main = do
+  args@(CliArgs {..}) <- parseCliArgs
+
+  putStrLn [i|Got args: #{args}|]
+
+  auth <- case cliOAuthToken of
+    Just t -> pure $ Just $ OAuth (encodeUtf8 t)
+    Nothing -> tryDiscoverAuth
+
+  putStrLn [i|Got auth: #{auth}|]
+
   user <- github' userInfoForR "thomasjm"
   putStrLn [i|user: #{user}|]
 

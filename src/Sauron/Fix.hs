@@ -4,6 +4,7 @@ module Sauron.Fix (
   , unFixTree
   ) where
 
+import Relude
 import Sauron.Types
 import UnliftIO.STM
 

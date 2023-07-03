@@ -25,6 +25,8 @@ dependencies:
 - containers
 - github
 - microlens
+- process
+- relude
 - stm
 - string-interpolate
 - text
@@ -34,6 +36,8 @@ dependencies:
 
 default-extensions:
 - FlexibleContexts
+- NoImplicitPrelude
+- LambdaCase
 - MultiWayIf
 - OverloadedStrings
 - QuasiQuotes
@@ -67,6 +71,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - optparse-applicative
     - sauron
 
 tests:

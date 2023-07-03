@@ -25,7 +25,6 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
       Sauron.Filter
       Sauron.Fix
       Sauron.Types
@@ -41,6 +40,8 @@ library
       src
   default-extensions:
       FlexibleContexts
+      NoImplicitPrelude
+      LambdaCase
       MultiWayIf
       OverloadedStrings
       QuasiQuotes
@@ -54,6 +55,8 @@ library
     , github
     , microlens
     , microlens-th
+    , process
+    , relude
     , stm
     , string-interpolate
     , text
@@ -67,11 +70,15 @@ library
 executable sauron
   main-is: Main.hs
   other-modules:
+      Sauron.Auth
+      Sauron.Options
       Paths_sauron
   hs-source-dirs:
       app
   default-extensions:
       FlexibleContexts
+      NoImplicitPrelude
+      LambdaCase
       MultiWayIf
       OverloadedStrings
       QuasiQuotes
@@ -84,6 +91,9 @@ executable sauron
     , containers
     , github
     , microlens
+    , optparse-applicative
+    , process
+    , relude
     , sauron
     , stm
     , string-interpolate
@@ -102,6 +112,8 @@ test-suite test
       test
   default-extensions:
       FlexibleContexts
+      NoImplicitPrelude
+      LambdaCase
       MultiWayIf
       OverloadedStrings
       QuasiQuotes
@@ -114,6 +126,8 @@ test-suite test
     , containers
     , github
     , microlens
+    , process
+    , relude
     , sauron
     , stm
     , string-interpolate

@@ -5,6 +5,7 @@ module Sauron.UI.Keys where
 
 import qualified Data.List as L
 import qualified Graphics.Vty as V
+import Relude
 
 -- Column 1
 nextKey = V.KChar 'n'

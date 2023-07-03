@@ -4,6 +4,7 @@ module Sauron.Util where
 
 import Data.Either
 import qualified Graphics.Vty as V
+import Relude
 import UnliftIO.Exception
 
 

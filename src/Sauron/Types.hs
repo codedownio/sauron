@@ -11,6 +11,7 @@ import Data.Sequence
 import Data.Text
 import GitHub ()
 import Lens.Micro.TH
+import Relude
 
 data SortBy = SortByStars | SortByPushed | SortByUpdated
 

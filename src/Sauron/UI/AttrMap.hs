@@ -7,6 +7,7 @@ module Sauron.UI.AttrMap where
 import Brick
 import Brick.Widgets.ProgressBar
 import qualified Graphics.Vty as V
+import Relude
 import Sauron.Types
 
 

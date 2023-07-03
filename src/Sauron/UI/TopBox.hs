@@ -6,6 +6,7 @@ module Sauron.UI.TopBox (
 
 import Brick
 import qualified Data.List as L
+import Relude
 import Sauron.UI.AttrMap
 import Sauron.UI.Keys
 
