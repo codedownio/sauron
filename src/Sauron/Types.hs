@@ -6,10 +6,9 @@ module Sauron.Types where
 
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
-import Control.Concurrent.STM (TVar)
 import Data.Sequence
 import Data.Text
-import GitHub ()
+import GitHub (Repo, User)
 import Lens.Micro.TH
 import Relude
 
@@ -52,7 +51,7 @@ data ClickableName = ListRow Int | MainList | InnerViewport Text | InfoBar
   deriving (Show, Ord, Eq)
 
 data MainListElem = MainListElem {
-  label :: String
+  repo :: Repo
   , depth :: Int
   , toggled :: Bool
   , open :: Bool
@@ -63,6 +62,7 @@ data MainListElem = MainListElem {
 data AppState = AppState {
   _appTreeBase :: [Node BaseContext]
   , _appTree :: [NodeFixed BaseContext]
+  , _appUser :: User
   , _appMainList :: L.List ClickableName MainListElem
 
   , _appSortBy :: SortBy

@@ -1,5 +1,9 @@
 
-module Sauron.Options where
+module Sauron.Options (
+  CliArgs(..)
+  , cliArgsParser
+  , parseCliArgs
+  ) where
 
 import Data.Text
 import Options.Applicative

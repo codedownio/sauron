@@ -11,6 +11,8 @@ import Control.Monad
 import qualified Data.List as L
 import Data.Maybe
 import Data.String.Interpolate
+import GitHub
+import GitHub.Data.Name
 import Lens.Micro hiding (ix)
 import Relude
 import Sauron.Types
@@ -43,49 +45,42 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
               vBox infoWidgets
       ]
 
-    renderLine _isSelected (MainListElem {..}) = hBox $ catMaybes [
+    renderLine _isSelected (MainListElem {repo=repo@(Repo {repoName=(N name)}), ..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if open then "[-] " else "[+] ")
-      , Just $ withAttr (chooseAttr status) (str label)
-      -- , if not (app ^. appShowFileLocations) then Nothing else
-      --     case runTreeLoc node of
-      --       Nothing -> Nothing
-      --       Just loc ->
-      --         Just $ hBox [str " ["
-      --                     , withAttr logFilenameAttr $ str $ srcLocFile loc
-      --                     , str ":"
-      --                     , withAttr logLineAttr $ str $ show $ srcLocStartLine loc
-      --                     , str "]"]
-      -- , if not (app ^. appShowVisibilityThresholds) then Nothing else
-      --     Just $ hBox [str " ["
-      --                 , withAttr visibilityThresholdIndicatorMutedAttr $ str "V="
-      --                 , withAttr visibilityThresholdIndicatorAttr $ str $ show visibilityLevel
-      --                 , str "]"]
-      , Just $ padRight Max $ withAttr toggleMarkerAttr $ str (if toggled then " [-]" else " [+]")
-      , Nothing -- if not (app ^. appShowRunTimes) then Nothing else case status of
-          -- Running {..} -> Just $ str $ show statusStartTime
-          -- Done {..} -> Just $ raw $ V.string attr $ formatNominalDiffTime (diffUTCTime statusEndTime statusStartTime)
-          --   where totalElapsed = realToFrac (max (app ^. appTimeSinceStart) (diffUTCTime statusEndTime (app ^. appStartTime)))
-          --         duration = realToFrac (diffUTCTime statusEndTime statusStartTime)
-          --         intensity :: Double = logBase (totalElapsed + 1) (duration + 1)
-          --         minGray :: Int = 50
-          --         maxGray :: Int = 255
-          --         level :: Int = min maxGray $ max minGray $ round (fromIntegral minGray + (intensity * (fromIntegral (maxGray - minGray))))
-          --         attr = V.Attr {
-          --           V.attrStyle = V.Default
-          --           , V.attrForeColor = V.SetTo (grayAt level)
-          --           , V.attrBackColor = V.Default
-          --           , V.attrURL = V.Default
-          --           }
-          -- _ -> Nothing
+      , Just ((withAttr (chooseAttr status) (str (toString name))))
+      , Just (padLeft Max (statsBox repo))
       ]
 
-    getInfoWidgets mle@(MainListElem {..}) = [] -- catMaybes [Just $ runReader (toBrickWidget status) (app ^. appCustomExceptionFormatters)]
+    getInfoWidgets (MainListElem {}) = [] -- catMaybes [Just $ runReader (toBrickWidget status) (app ^. appCustomExceptionFormatters)]
 
 
 borderWithCounts :: AppState -> Widget n
-borderWithCounts _app = hBorderWithLabel $ padLeftRight 1 $ hBox [str "asdf"]
+borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]
 
 infoBar :: AppState -> Widget n
 infoBar _app = Widget Greedy Fixed $ do
-  c <- getContext
-  render $ hBox [str "asdf"]
+  _c <- getContext
+  render $ hBox [str "Info bar"]
+
+statsBox :: Repo -> Widget n
+statsBox (Repo {..}) = hBox $ catMaybes [
+  guarding (repoWatchersCount > 0) $ padLeft (Pad 1) (
+      padRight (Pad 2) (withAttr infoAttr (str "👁️"))
+      <+> str (show repoWatchersCount)
+      )
+
+  , guarding (repoForksCount > 0) $ padLeft (Pad 1) (
+      padRight (Pad 1) (withAttr infoAttr (str "⑂"))
+      <+> str (show repoForksCount)
+      )
+
+  , guarding (repoStargazersCount > 0) $ padLeft (Pad 1) (
+      padRight (Pad 1) (withAttr infoAttr (str "★"))
+      <+> str (show repoStargazersCount)
+      )
+  ]
+
+guarding :: (Monad m, Alternative m) => Bool -> b -> m b
+guarding p widget = do
+  guard p
+  return widget

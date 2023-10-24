@@ -7,10 +7,11 @@ import Brick.BChan
 import Brick.Widgets.List
 import Control.Concurrent.STM (retry)
 import Control.Monad
-import Data.Bifunctor
 import Data.Function
 import Data.String.Interpolate
+import qualified Data.Vector as V
 import GitHub
+import GitHub.Data.Name
 import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude
@@ -22,6 +23,7 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Draw
 import Sauron.UI.Keys
+import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
 import UnliftIO.Exception
@@ -47,7 +49,7 @@ appEvent s (AppEvent (TreeUpdated newTree)) = do
     & appTree .~ newTree
     & updateFilteredTree
 
-appEvent s (VtyEvent e) = case e of
+appEvent _s (VtyEvent e) = case e of
   -- Column 3
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
@@ -64,34 +66,54 @@ main = do
 
   putStrLn [i|Got args: #{args}|]
 
-  auth <- case cliOAuthToken of
+  maybeAuth <- case cliOAuthToken of
     Just t -> pure $ Just $ OAuth (encodeUtf8 t)
     Nothing -> tryDiscoverAuth
 
+  auth <- case maybeAuth of
+    Nothing -> throwIO $ userError [i|Couldn't figure out authentication.|]
+    Just x -> pure x
+
   putStrLn [i|Got auth: #{auth}|]
 
-  user <- github' userInfoForR "thomasjm"
-  putStrLn [i|user: #{user}|]
+  currentUser@(User {userLogin=(N userLoginUnwrapped)}) <- github auth userInfoCurrentR >>= \case
+    Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
+    Right x -> pure x
+
+  putStrLn [i|currentUser: #{currentUser}|]
 
   -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
   -- putStrLn [i|repos: #{second (fmap repoName) repos}|]
 
-  repos <- github' $ userReposR "thomasjm" RepoPublicityAll FetchAll
-  putStrLn [i|thomasjm repos: #{second (fmap repoName) repos}|]
-
-  -- startTime <- getCurrentTime
-
-  -- setInitialFolding terminalUIInitialFolding rts
+  repos <- github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll) >>= \case
+    Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
+    Right x -> return x
+  putStrLn [i|#{userLoginUnwrapped} repos: #{(fmap repoName) repos}|]
 
   let rts = []
 
   rtsFixed <- atomically $ mapM fixTree rts
 
+  let listElems = [
+        (MainListElem {
+            repo = r
+            , depth = 0
+            , toggled = False
+            , open = False
+            , status = NotStarted
+            , ident = 0
+            })
+        | r <- V.toList repos
+        ]
+        & sortBy (comparing (negate . repoStargazersCount . repo))
+        & V.fromList
+
   let initialState = updateFilteredTree $
         AppState {
           _appTreeBase = rts
           , _appTree = rtsFixed
-          , _appMainList = list MainList mempty 1
+          , _appUser = currentUser
+          , _appMainList = list MainList listElems 1
 
           , _appSortBy = SortByStars
         }

@@ -1,10 +1,7 @@
 
-module Sauron.Filter where
+module Sauron.Filter (updateFilteredTree) where
 
-import Relude
 import Sauron.Types
-
--- import qualified Data.Vector as V
 
 
 updateFilteredTree :: AppState -> AppState

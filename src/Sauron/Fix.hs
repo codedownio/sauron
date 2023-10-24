@@ -6,7 +6,6 @@ module Sauron.Fix (
 
 import Relude
 import Sauron.Types
-import UnliftIO.STM
 
 
 fixTree :: Node context -> STM (NodeFixed context)

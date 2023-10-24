@@ -32,6 +32,7 @@ dependencies:
 - text
 - unliftio-core
 - unliftio
+- vector
 - vty
 
 default-extensions:

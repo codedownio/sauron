@@ -137,10 +137,10 @@ chooseAttr _ = notStartedAttr
 -- * Logging and callstacks
 
 debugAttr, infoAttr, warnAttr, errorAttr, otherAttr :: AttrName
-debugAttr = attrName"log_debug"
-infoAttr = attrName"log_info"
-warnAttr = attrName"log_warn"
-errorAttr = attrName"log_error"
+debugAttr = attrName "log_debug"
+infoAttr = attrName "log_info"
+warnAttr = attrName "log_warn"
+errorAttr = attrName "log_error"
 otherAttr = mkAttrName "log_other"
 
 logTimestampAttr :: AttrName
