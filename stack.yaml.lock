@@ -3,11 +3,31 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: vty-6.0@sha256:3c4ee4ffd6e38720e227c45e85eb91ff611125dbff178e9f2fadc993160e1464,3661
+    pantry-tree:
+      sha256: 3475a1ae91d416fb39a65789519af72fe257398d2a5dde3775d28c3effaaac25
+      size: 2104
+  original:
+    hackage: vty-6.0
+- completed:
+    hackage: vty-crossplatform-0.1.0.0@sha256:e07531db732ee44a40e8ef3a2fd3b3db6d2615a9f8f83b87de574e204f19be7c,3178
+    pantry-tree:
+      sha256: db3f1dd6fb6881bcc73eeb4e60ba10aff518aa099adacceefc345be5e4f6a3f9
+      size: 581
+  original:
+    hackage: vty-crossplatform-0.1.0.0
+- completed:
+    hackage: brick-2.0@sha256:194ac889676e11849139577a78ee82906802a0beed5db877d721e854e0fd10c1,17986
+    pantry-tree:
+      sha256: 9a1cd1f3bbf6c3c54dc3a3179b81a150b19d31cad4e249f7baa15ad4b2d21018
+      size: 4671
+  original:
+    hackage: brick-2.0
 snapshots:
 - completed:
-    sha256: 1867d84255dff8c87373f5dd03e5a5cb1c10a99587e26c8793e750c54e83ffdc
-    size: 639139
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/0.yaml
-  original:
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/0.yaml
+    sha256: fb482b8e2d5d061cdda4ba1da2957c012740c893a5ee1c1b99001adae7b1fbe7
+    size: 640046
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/19.yaml
+  original: lts-21.19
