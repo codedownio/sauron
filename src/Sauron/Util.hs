@@ -3,6 +3,7 @@
 module Sauron.Util where
 
 import Data.Either
+import qualified Graphics.Vty.CrossPlatform as V
 import qualified Graphics.Vty as V
 import Relude
 import UnliftIO.Exception

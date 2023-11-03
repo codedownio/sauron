@@ -12,6 +12,7 @@ import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
+import qualified Graphics.Vty.CrossPlatform as V
 import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude
