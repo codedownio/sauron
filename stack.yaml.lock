@@ -19,6 +19,13 @@ packages:
   original:
     hackage: vty-crossplatform-0.1.0.0
 - completed:
+    hackage: vty-unix-0.1.0.0@sha256:8d1dd971d49b4d3575ec76994a8dd5d330d7b81a30ece40344ee170d73a28ac3,2932
+    pantry-tree:
+      sha256: 4d19b54f88bbd031f2f764c23daef5f30a61ef9be23b11a5825657fd42468fb7
+      size: 1925
+  original:
+    hackage: vty-unix-0.1.0.0
+- completed:
     hackage: vty-windows-0.1.0.1@sha256:b1dbfeffe62a9504384e65fc01bbea1ebd08d7715c6e159e349962b50c2aa048,3173
     pantry-tree:
       sha256: ba4d2508d97c535f390a600683768cace73702669e2b51d0595bacd47fc4aba4
