@@ -14,7 +14,7 @@ sections:
   - codedownio/servant-typescript
 - display_name: "Maintaining"
   repos:
-  - fsnotify/fsnotify
+  - haskell-fswatch/fsnotify
   - haskell-webdriver/haskell-webdriver
 - display_name: "No tests"
   open: false

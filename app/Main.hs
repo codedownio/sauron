@@ -95,18 +95,23 @@ main = do
       -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
       -- putStrLn [i|repos: #{second (fmap repoName) repos}|]
 
-      github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll) >>= \case
+      (V.toList <$>) $ github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll) >>= \case
         Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
         Right x -> return x
 
 
     Just configFile -> do
       Yaml.decodeFileEither configFile >>= \case
-        Left err -> throwIO $ userError [i|Failed to decode config file '${configFile}': #{err}|]
-        Right (config :: Config) -> do
+        Left err -> throwIO $ userError [i|Failed to decode config file '#{configFile}': #{err}|]
+        Right (config@(Config {..}) :: Config) -> do
           putStrLn [i|Got config: #{config}|]
 
-          undefined
+          (mconcat <$>) $ forM (fromMaybe [] configSections) $ \(ConfigSection {..}) ->
+            forM sectionRepos $ \case
+              (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
+                Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
+                Right repo -> pure repo
+              (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
 
   forM_ repos print
 
@@ -125,7 +130,7 @@ main = do
             , status = NotStarted
             , ident = 0
             })
-        | r <- V.toList repos
+        | r <- repos
         ]
         & sortBy (comparing (negate . repoStargazersCount . repo))
         & V.fromList

@@ -13,11 +13,14 @@ module Sauron.Options (
 
 import Data.Aeson as A
 import Data.Aeson.TH
-import Data.Text
+import Data.String.Interpolate
+import Data.Text as T
 import Options.Applicative
 import Relude
 import Sauron.Aeson
 
+
+-- * CLI
 
 data CliArgs = CliArgs {
   cliOAuthToken :: Maybe Text
@@ -38,17 +41,29 @@ parseCliArgs = execParser opts
       <> header "hello - a test for optparse-applicative"
       )
 
+-- * Config file
 
-newtype ConfigRepo = ConfigRepo Text
-  deriving (Show, ToJSON, FromJSON)
+data ConfigRepo = ConfigRepoSingle {
+  configRepoOwner :: Text
+  , configRepoName :: Text
+  } | ConfigRepoWildcard {
+        configRepoOwner :: Text
+      }
+  deriving (Show)
+instance FromJSON ConfigRepo where
+  parseJSON (A.String x) = case T.splitOn "/" x of
+    [owner, "*"] -> pure (ConfigRepoWildcard owner)
+    [owner, name] -> pure (ConfigRepoSingle owner name)
+    xs -> fail [i|Expected repo format to be "owner/name" or "owner/*". Got: "#{x}"|]
+  parseJSON _ = fail "Failed to read IP"
 
 data ConfigSection = ConfigSection {
   sectionDisplayName :: Maybe Text
   , sectionRepos :: [ConfigRepo]
   } deriving (Show)
-$(deriveJSON toSnake1 ''ConfigSection)
+$(deriveFromJSON toSnake1 ''ConfigSection)
 
 data Config = Config {
   configSections :: Maybe [ConfigSection]
   } deriving (Show)
-$(deriveJSON toSnake1 ''Config)
+$(deriveFromJSON toSnake1 ''Config)
