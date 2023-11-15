@@ -5,6 +5,7 @@ module Main (main) where
 import Brick as B
 import Brick.BChan
 import Brick.Widgets.List
+import Control.Concurrent.QSem
 import Control.Concurrent.STM (retry)
 import Control.Monad
 import Data.Function
@@ -68,6 +69,10 @@ main = do
 
   putStrLn [i|Got args: #{args}|]
 
+  githubApiSemaphore <- newQSem cliConcurrentGithubApiLimit
+  let withGithubApiSemaphore :: IO a -> IO a
+      withGithubApiSemaphore = bracket_ (waitQSem githubApiSemaphore) (signalQSem githubApiSemaphore)
+
   -------------------------------------------------------------
 
   maybeAuth <- case cliOAuthToken of
@@ -80,7 +85,7 @@ main = do
 
   putStrLn [i|Got auth: #{auth}|]
 
-  currentUser@(User {userLogin=(N userLoginUnwrapped)}) <- github auth userInfoCurrentR >>= \case
+  currentUser@(User {userLogin=(N userLoginUnwrapped)}) <- withGithubApiSemaphore (github auth userInfoCurrentR) >>= \case
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
 
@@ -95,7 +100,7 @@ main = do
       -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
       -- putStrLn [i|repos: #{second (fmap repoName) repos}|]
 
-      (V.toList <$>) $ github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll) >>= \case
+      (V.toList <$>) $ withGithubApiSemaphore (github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll)) >>= \case
         Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
         Right x -> return x
 
@@ -107,11 +112,12 @@ main = do
           putStrLn [i|Got config: #{config}|]
 
           (mconcat <$>) $ forM (fromMaybe [] configSections) $ \(ConfigSection {..}) ->
-            forM sectionRepos $ \case
-              (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
-                Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
-                Right repo -> pure repo
-              (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
+            forConcurrently sectionRepos $ \repo ->
+              withGithubApiSemaphore $ case repo of
+                (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
+                  Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
+                  Right repo -> pure repo
+                (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
 
   forM_ repos print
 
