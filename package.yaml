@@ -38,9 +38,10 @@ dependencies:
 
 default-extensions:
 - FlexibleContexts
-- NoImplicitPrelude
 - LambdaCase
 - MultiWayIf
+- NamedFieldPuns
+- NoImplicitPrelude
 - OverloadedStrings
 - QuasiQuotes
 - RecordWildCards
@@ -73,8 +74,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - aeson
     - optparse-applicative
     - sauron
+    - yaml
 
 tests:
   test:

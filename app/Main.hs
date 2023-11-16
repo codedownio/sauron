@@ -10,6 +10,7 @@ import Control.Monad
 import Data.Function
 import Data.String.Interpolate
 import qualified Data.Vector as V
+import qualified Data.Yaml as Yaml
 import GitHub
 import GitHub.Data.Name
 import qualified Graphics.Vty.CrossPlatform as V
@@ -67,6 +68,8 @@ main = do
 
   putStrLn [i|Got args: #{args}|]
 
+  -------------------------------------------------------------
+
   maybeAuth <- case cliOAuthToken of
     Just t -> pure $ Just $ OAuth (encodeUtf8 t)
     Nothing -> tryDiscoverAuth
@@ -83,13 +86,31 @@ main = do
 
   putStrLn [i|currentUser: #{currentUser}|]
 
-  -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
-  -- putStrLn [i|repos: #{second (fmap repoName) repos}|]
+  -------------------------------------------------------------
 
-  repos <- github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll) >>= \case
-    Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
-    Right x -> return x
-  putStrLn [i|#{userLoginUnwrapped} repos: #{(fmap repoName) repos}|]
+  repos <- case cliConfigFile of
+    Nothing -> do
+      -- Autodetect repos for user
+
+      -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
+      -- putStrLn [i|repos: #{second (fmap repoName) repos}|]
+
+      github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll) >>= \case
+        Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
+        Right x -> return x
+
+
+    Just configFile -> do
+      Yaml.decodeFileEither configFile >>= \case
+        Left err -> throwIO $ userError [i|Failed to decode config file '${configFile}': #{err}|]
+        Right (config :: Config) -> do
+          putStrLn [i|Got config: #{config}|]
+
+          undefined
+
+  forM_ repos print
+
+  -------------------------------------------------------------
 
   let rts = []
 

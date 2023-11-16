@@ -11,7 +11,7 @@ import Control.Monad
 import qualified Data.List as L
 import Data.Maybe
 import Data.String.Interpolate
-import GitHub
+import GitHub hiding (Status)
 import GitHub.Data.Name
 import Lens.Micro hiding (ix)
 import Relude
@@ -45,9 +45,9 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
               vBox infoWidgets
       ]
 
-    renderLine _isSelected (MainListElem {repo=repo@(Repo {repoName=(N name)}), ..}) = hBox $ catMaybes [
+    renderLine _isSelected (MainListElem {repo, ..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if open then "[-] " else "[+] ")
-      , Just ((withAttr (chooseAttr status) (str (toString name))))
+      , Just (renderName repo status)
       , Just (padLeft Max (statsBox repo))
       ]
 
@@ -61,6 +61,14 @@ infoBar :: AppState -> Widget n
 infoBar _app = Widget Greedy Fixed $ do
   _c <- getContext
   render $ hBox [str "Info bar"]
+
+renderName :: Repo -> Status -> Widget n
+renderName (Repo {repoName=(N name), repoOwner}) status = hBox [
+  case repoOwner of
+    SimpleOwner {simpleOwnerLogin=(N ownerName)} -> withAttr (chooseAttr status) (str (toString ownerName))
+  , withAttr toggleMarkerAttr $ str " / "
+  , withAttr (chooseAttr status) (str (toString name))
+  ]
 
 statsBox :: Repo -> Widget n
 statsBox (Repo {..}) = hBox $ catMaybes [

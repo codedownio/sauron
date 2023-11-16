@@ -1,0 +1,31 @@
+sections:
+- display_name: "Core"
+  repos:
+  - codedownio/codedown
+  - codedownio/codedown-languages
+- display_name: "Languages ecosystem"
+  repos:
+  - codedownio/haskell-notebook-language-server
+  - codedownio/rust-notebook-language-server
+- display_name: "Open source"
+  repos:
+  - codedownio/sandwich
+  - codedownio/aeson-typescript
+  - codedownio/servant-typescript
+- display_name: "Maintaining"
+  repos:
+  - fsnotify/fsnotify
+  - haskell-webdriver/haskell-webdriver
+- display_name: "No tests"
+  open: false
+  repos:
+  - codedownio/immutability-helper-rfc6902
+  - codedownio/julia2nix
+# - display_name: "thomasjm"
+#   open: false
+#   repos:
+#   - "thomasjm/*"
+# - display_name: "codedownio"
+#   open: false
+#   repos:
+#   - "codedownio/*"
