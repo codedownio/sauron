@@ -14,10 +14,11 @@ import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import GitHub
 import GitHub.Data.Name
-import qualified Graphics.Vty.CrossPlatform as V
 import qualified Graphics.Vty as V
+import qualified Graphics.Vty.CrossPlatform as V
 import Lens.Micro
-import Relude
+import Relude hiding (Down)
+import Sauron.Actions
 import Sauron.Auth
 import Sauron.Filter
 import Sauron.Fix
@@ -26,6 +27,7 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Draw
 import Sauron.UI.Keys
+import System.FilePath
 import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
@@ -52,7 +54,55 @@ appEvent s (AppEvent (TreeUpdated newTree)) = do
     & appTree .~ newTree
     & updateFilteredTree
 
-appEvent _s (VtyEvent e) = case e of
+appEvent s (VtyEvent e) = case e of
+  -- Column 1
+  V.EvKey c [] | c == nextKey -> put (s & appMainList %~ (listMoveBy 1))
+  V.EvKey c [] | c == previousKey -> put (s & appMainList %~ (listMoveBy (-1)))
+  -- V.EvKey c [] | c == nextFailureKey -> do
+  --   let ls = Vec.toList $ listElements (s ^. appMainList)
+  --   let listToSearch = case listSelectedElement (s ^. appMainList) of
+  --         Just (i, MainListElem {}) -> let (front, back) = L.splitAt (i + 1) (zip [0..] ls) in back <> front
+  --         Nothing -> zip [0..] ls
+  --   case L.find (isFailureStatus . status . snd) listToSearch of
+  --     Nothing -> put s
+  --     Just (i', _) -> put (s & appMainList %~ (listMoveTo i'))
+  -- V.EvKey c [] | c == previousFailureKey -> do
+  --   let ls = Vec.toList $ listElements (s ^. appMainList)
+  --   let listToSearch = case listSelectedElement (s ^. appMainList) of
+  --         Just (i, MainListElem {}) -> let (front, back) = L.splitAt i (zip [0..] ls) in (L.reverse front) <> (L.reverse back)
+  --         Nothing -> L.reverse (zip [0..] ls)
+  --   case L.find (isFailureStatus . status . snd) listToSearch of
+  --     Nothing -> put s
+  --     Just (i', _) -> put (s & appMainList %~ (listMoveTo i'))
+  V.EvKey c [] | c == closeNodeKey -> modifyOpen s (const False)
+  V.EvKey c [] | c == openNodeKey -> modifyOpen s (const True)
+  V.EvKey c [] | c `elem` toggleKeys -> modifyToggled s not
+
+  -- Scrolling in toggled items
+  -- Wanted to make these uniformly Ctrl+whatever, but Ctrl+PageUp/PageDown was causing it to get KEsc and exit (?)
+  V.EvKey V.KUp [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
+  V.EvKey (V.KChar 'p') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
+  V.EvKey V.KDown [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp 1
+  V.EvKey (V.KChar 'n') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp 1
+  V.EvKey (V.KChar 'v') [V.MMeta] -> withScroll s $ \vp -> vScrollPage vp Up
+  V.EvKey (V.KChar 'v') [V.MCtrl] -> withScroll s $ \vp -> vScrollPage vp Down
+  V.EvKey V.KHome [V.MCtrl] -> withScroll s $ \vp -> vScrollToBeginning vp
+  V.EvKey V.KEnd [V.MCtrl] -> withScroll s $ \vp -> vScrollToEnd vp
+
+  -- Column 2
+  V.EvKey c [] | c == browserToHomeKey -> do
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
+      openBrowserToUrl (toString url)
+  V.EvKey c [] | c == browserToIssuesKey -> do
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
+      openBrowserToUrl (toString url </> "issues")
+  V.EvKey c [] | c == browserToPullsKey -> do
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
+      openBrowserToUrl (toString url </> "pulls")
+  V.EvKey c [] | c == browserToActionsKey -> do
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
+      openBrowserToUrl (toString url </> "actions")
+
   -- Column 3
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups

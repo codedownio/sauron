@@ -29,15 +29,22 @@ topBox app = hBox [columnPadding settingsColumn
                                    ]
 
     actionsColumn = keybindingBox [hBox [str "["
-                                         , highlightKeyIfPredicate someRepoSelected app (str $ showKey openSelectedFolderInFileExplorer)
+                                         , highlightKeyIfPredicate someRepoSelected app (str $ showKey browserToHomeKey)
                                          , str "/"
-                                         , highlightKeyIfPredicate (const True) app (str $ showKey openTestRootKey)
+                                         , highlightKeyIfPredicate someRepoSelected app (str $ showKey browserToIssuesKey)
+                                         , str "/"
+                                         , highlightKeyIfPredicate someRepoSelected app (str $ showKey browserToPullsKey)
+                                         , str "/"
+                                         , highlightKeyIfPredicate someRepoSelected app (str $ showKey browserToActionsKey)
                                          , str "] "
                                          , withAttr hotkeyMessageAttr $ str "Open "
-                                         , highlightMessageIfPredicate someRepoSelected app (str "selected")
+                                         , highlightMessageIfPredicate someRepoSelected app (str "home")
                                          , str "/"
-                                         , highlightMessageIfPredicate (const True) app (str "root")
-                                         , withAttr hotkeyMessageAttr $ str " folder"
+                                         , highlightMessageIfPredicate someRepoSelected app (str "issues")
+                                         , str "/"
+                                         , highlightMessageIfPredicate someRepoSelected app (str "pulls")
+                                         , str "/"
+                                         , highlightMessageIfPredicate someRepoSelected app (str "actions")
                                          ]
                                   ]
 

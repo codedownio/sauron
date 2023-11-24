@@ -17,21 +17,17 @@ openNodeKey = V.KRight
 toggleKeys = [V.KEnter, V.KChar '\t']
 
 -- Column 2
-cancelAllKey = V.KChar 'C'
-cancelSelectedKey = V.KChar 'c'
-runAllKey = V.KChar 'R'
-runSelectedKey = V.KChar 'r'
-clearAllKey = V.KChar 'K'
-clearSelectedKey = V.KChar 'k'
+refreshAllKey = V.KChar 'R'
+refreshSelectedKey = V.KChar 'r'
+
 openSelectedFolderInFileExplorer = V.KChar 'o'
-openTestRootKey = V.KChar 'O'
-openTestInEditorKey = V.KChar 't'
-openFailureInEditorKey = V.KChar 'f'
-openLogsInEditorKey = V.KChar 'l'
+
+browserToHomeKey = V.KChar 'h'
+browserToIssuesKey = V.KChar 'i'
+browserToPullsKey = V.KChar 'P'
+browserToActionsKey = V.KChar 'a'
 
 -- Column 3
-cycleVisibilityThresholdKey = V.KChar 'v'
-toggleShowRunTimesKey = V.KChar 'T'
 toggleFileLocationsKey = V.KChar 'F'
 toggleVisibilityThresholdsKey = V.KChar 'V'
 debugKey = V.KChar 'd'
