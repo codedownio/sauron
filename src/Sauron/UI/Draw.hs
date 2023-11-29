@@ -46,12 +46,14 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       ]
 
     renderLine _isSelected (MainListElem {_repo, ..}) = hBox $ catMaybes [
-      Just $ withAttr openMarkerAttr $ str (if _open then "[-] " else "[+] ")
+      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
       , Just (renderName _repo _status)
       , Just (padLeft Max (statsBox _repo))
       ]
 
-    getInfoWidgets (MainListElem {}) = [] -- catMaybes [Just $ runReader (toBrickWidget status) (app ^. appCustomExceptionFormatters)]
+    getInfoWidgets (MainListElem {}) = [
+      str "HI I'M THE WORKFLOW INFO"
+      ]
 
 
 borderWithCounts :: AppState -> Widget n

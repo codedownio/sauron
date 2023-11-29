@@ -55,7 +55,6 @@ data MainListElem = MainListElem {
   _repo :: Repo
   , _depth :: Int
   , _toggled :: Bool
-  , _open :: Bool
   , _status :: Status
   , _ident :: Int
   }

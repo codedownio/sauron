@@ -187,7 +187,6 @@ main = do
             _repo = r
             , _depth = 0
             , _toggled = False
-            , _open = False
             , _status = NotStarted
             , _ident = 0
             })
