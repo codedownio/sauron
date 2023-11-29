@@ -3,9 +3,6 @@
 module Sauron.Actions (
   openBrowserToUrl
 
-  , modifyOpen
-  , modifyToggled
-
   , withScroll
 
   , refreshSelected
@@ -13,6 +10,8 @@ module Sauron.Actions (
 
   , withGithubApiSemaphore
   , withGithubApiSemaphore'
+
+  , whenRepoSelected
   ) where
 
 import Brick as B
@@ -33,28 +32,13 @@ openBrowserToUrl :: MonadIO m => String -> m ()
 openBrowserToUrl url =
   void $ readCreateProcessWithExitCode (proc "xdg-open" [url]) ""
 
-
-modifyToggled :: Monad m => AppState -> (Bool -> Bool) -> m ()
-modifyToggled s f = case listSelectedElement (s ^. appMainList) of
-  Nothing -> return ()
-  Just (_i, MainListElem {..}) -> do
-    -- liftIO $ atomically $ modifyTVar' (runTreeToggled node) f
-    return ()
-
-modifyOpen :: Monad m => AppState -> (Bool -> Bool) -> m ()
-modifyOpen s f = case listSelectedElement (s ^. appMainList) of
-  Nothing -> return ()
-  Just (_i, MainListElem {..}) -> do
-    -- liftIO $ atomically $ modifyTVar' (runTreeOpen node) f
-    return ()
-
 withScroll :: AppState -> (forall s. ViewportScroll ClickableName -> EventM n s ()) -> EventM n AppState ()
 withScroll s action = do
   case listSelectedElement (s ^. appMainList) of
-    Nothing -> return ()
-    Just (_, MainListElem {..}) -> do
+    Just (_, MainListElemRepo {..}) -> do
       let scroll = viewportScroll (InnerViewport [i|viewport_#{_ident}|])
       action scroll
+    _ -> return ()
 
 refreshSelected :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => Repo -> m ()
 refreshSelected (Repo {..}) = do
@@ -63,7 +47,7 @@ refreshSelected (Repo {..}) = do
     Left err -> putStrLn [i|Got err: #{err}|]
     Right x -> putStrLn [i|Got ret: #{x}|]
 
-refreshAll :: MonadIO m => m ()
+refreshAll :: (MonadIO m) => m ()
 refreshAll = undefined
 
 withGithubApiSemaphore :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => m a -> m a
@@ -73,3 +57,8 @@ withGithubApiSemaphore action = do
 
 withGithubApiSemaphore' :: (MonadIO m, MonadMask m) => QSem -> m a -> m a
 withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQSem sem)
+
+whenRepoSelected :: Monad f => AppState -> (Repo -> f ()) -> f ()
+whenRepoSelected s cb = whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
+  MainListElemRepo {_repo} -> cb _repo
+  MainListElemHeading {} -> return ()

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-partial-fields #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -56,7 +57,7 @@ instance FromJSON ConfigRepo where
   parseJSON (A.String x) = case T.splitOn "/" x of
     [owner, "*"] -> pure (ConfigRepoWildcard owner)
     [owner, name] -> pure (ConfigRepoSingle owner name)
-    xs -> fail [i|Expected repo format to be "owner/name" or "owner/*". Got: "#{x}"|]
+    _ -> fail [i|Expected repo format to be "owner/name" or "owner/*". Got: "#{x}"|]
   parseJSON _ = fail "Failed to read IP"
 
 data ConfigSection = ConfigSection {

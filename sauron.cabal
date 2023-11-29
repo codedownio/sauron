@@ -26,7 +26,6 @@ source-repository head
 library
   exposed-modules:
       Sauron.Filter
-      Sauron.Fix
       Sauron.Types
       Sauron.UI.AttrMap
       Sauron.UI.Draw
@@ -56,6 +55,7 @@ library
     , github
     , microlens
     , microlens-th
+    , mtl
     , process
     , relude
     , stm
@@ -99,6 +99,7 @@ executable sauron
     , filepath
     , github
     , microlens
+    , mtl
     , optparse-applicative
     , process
     , relude
@@ -139,6 +140,7 @@ test-suite test
     , containers
     , github
     , microlens
+    , mtl
     , process
     , relude
     , sauron

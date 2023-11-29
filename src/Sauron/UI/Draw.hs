@@ -39,7 +39,10 @@ drawUI app = [ui]
 mainList :: AppState -> Widget ClickableName
 mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (app ^. appMainList)
   where
-    listDrawElement ix isSelected x@(MainListElem {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+    listDrawElement ix isSelected x@(MainListElemHeading {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+      Just $ renderLine isSelected x
+      ]
+    listDrawElement ix isSelected x@(MainListElemRepo {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
       Just $ renderLine isSelected x
       , do
           guard _toggled
@@ -50,13 +53,20 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
               vBox infoWidgets
       ]
 
-    renderLine _isSelected (MainListElem {_repo, ..}) = hBox $ catMaybes [
+    renderLine _isSelected (MainListElemHeading {..}) = hBox $ catMaybes [
+      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+      , Just (renderHeadingName _label _status)
+      ]
+    renderLine _isSelected (MainListElemRepo {_repo, ..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
       , Just (renderName _repo _status)
       , Just (padLeft Max (statsBox _repo))
       ]
 
-    getInfoWidgets (MainListElem {}) = [
+    getInfoWidgets (MainListElemHeading {}) = [
+      str "HI I'M THE HEADING INFO"
+      ]
+    getInfoWidgets (MainListElemRepo {}) = [
       str "HI I'M THE WORKFLOW INFO"
       ]
 
@@ -69,7 +79,8 @@ infoBar s = Widget Greedy Fixed $ do
   _c <- getContext
   case listSelectedElement (s ^. appMainList) of
     Nothing -> render $ hBox [str ""]
-    Just (_, MainListElem {_repo}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
+    Just (_, MainListElemHeading {}) -> render $ hBox [str ""]
+    Just (_, MainListElemRepo {_repo}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
       where
         issuesPhrase = case repoOpenIssuesCount _repo of
           0 -> Nothing
@@ -78,12 +89,17 @@ infoBar s = Widget Greedy Fixed $ do
 
         phrases = catMaybes [issuesPhrase]
 
+renderHeadingName :: Text -> Status -> Widget n
+renderHeadingName l _stat = hBox [
+  str (toString l)
+  ]
+
 renderName :: Repo -> Status -> Widget n
-renderName (Repo {repoName=(N name), repoOwner}) status = hBox [
+renderName (Repo {repoName=(N name), repoOwner}) stat = hBox [
   case repoOwner of
-    SimpleOwner {simpleOwnerLogin=(N ownerName)} -> withAttr (chooseAttr status) (str (toString ownerName))
+    SimpleOwner {simpleOwnerLogin=(N ownerName)} -> withAttr (chooseAttr stat) (str (toString ownerName))
   , withAttr toggleMarkerAttr $ str " / "
-  , withAttr (chooseAttr status) (str (toString name))
+  , withAttr (chooseAttr stat) (str (toString name))
   ]
 
 statsBox :: Repo -> Widget n

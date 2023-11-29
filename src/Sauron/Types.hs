@@ -51,19 +51,24 @@ data BaseContext = BaseContext {
 data ClickableName = ListRow Int | MainList | InnerViewport Text | InfoBar
   deriving (Show, Ord, Eq)
 
-data MainListElem = MainListElem {
+data MainListElem = MainListElemHeading {
+  _label :: Text
+  , _depth :: Int
+  , _toggled :: Bool
+  , _status :: Status
+  , _ident :: Int
+  } | MainListElemRepo {
   _repo :: Repo
   , _depth :: Int
   , _toggled :: Bool
   , _status :: Status
   , _ident :: Int
   }
+
 makeLenses ''MainListElem
 
 data AppState = AppState {
-  _appTreeBase :: [Node BaseContext]
-  , _appTree :: [NodeFixed BaseContext]
-  , _appUser :: User
+  _appUser :: User
   , _appBaseContext :: BaseContext
 
   , _appMainList :: L.List ClickableName MainListElem
@@ -73,6 +78,3 @@ data AppState = AppState {
 makeLenses ''AppState
 
 newtype AppEvent = TreeUpdated [NodeFixed BaseContext]
-
-getCommons :: NodeWithStatus context s t -> [NodeCommonWithStatus s t]
-getCommons = undefined -- extractValues runNodeCommon

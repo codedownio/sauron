@@ -6,9 +6,9 @@ import Brick as B
 import Brick.BChan
 import Brick.Widgets.List
 import Control.Concurrent.QSem
-import Control.Concurrent.STM (retry)
 import Control.Monad
 import Control.Monad.IO.Unlift
+import Control.Monad.Writer
 import Data.Function
 import Data.String.Interpolate
 import qualified Data.Vector as V
@@ -22,7 +22,6 @@ import Relude hiding (Down)
 import Sauron.Actions
 import Sauron.Auth
 import Sauron.Filter
-import Sauron.Fix
 import Sauron.Options
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -31,14 +30,10 @@ import Sauron.UI.Keys
 import System.FilePath
 import System.IO.Error (userError)
 import UnliftIO.Async
-import UnliftIO.Concurrent
 import UnliftIO.Exception
 
 -- import Data.Time
 
-
-terminalUIRefreshPeriod :: Int
-terminalUIRefreshPeriod = 100000
 
 app :: App AppState AppEvent ClickableName
 app = App {
@@ -50,10 +45,10 @@ app = App {
   }
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
-appEvent s (AppEvent (TreeUpdated newTree)) = do
-  put $ s
-    & appTree .~ newTree
-    & updateFilteredTree
+-- appEvent s (AppEvent (TreeUpdated newTree)) = do
+--   put $ s
+--     & appTree .~ newTree
+--     & updateFilteredTree
 
 appEvent s (VtyEvent e) = case e of
   -- Column 1
@@ -91,22 +86,19 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey V.KEnd [V.MCtrl] -> withScroll s $ \vp -> vScrollToEnd vp
 
   -- Column 2
-  V.EvKey c [] | c == browserToHomeKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo=(Repo {repoHtmlUrl=(URL url)})}) ->
-      openBrowserToUrl (toString url)
-  V.EvKey c [] | c == browserToIssuesKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo=(Repo {repoHtmlUrl=(URL url)})}) ->
-      openBrowserToUrl (toString url </> "issues")
-  V.EvKey c [] | c == browserToPullsKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo=(Repo {repoHtmlUrl=(URL url)})}) ->
-      openBrowserToUrl (toString url </> "pulls")
-  V.EvKey c [] | c == browserToActionsKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo=(Repo {repoHtmlUrl=(URL url)})}) ->
-      openBrowserToUrl (toString url </> "actions")
+  V.EvKey c [] | c == browserToHomeKey ->
+    whenRepoSelected s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url)
+  V.EvKey c [] | c == browserToIssuesKey ->
+    whenRepoSelected s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "issues")
+  V.EvKey c [] | c == browserToPullsKey ->
+    whenRepoSelected s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "pulls")
+  V.EvKey c [] | c == browserToActionsKey ->
+    whenRepoSelected s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo}) ->
-      liftIO $ flip runReaderT (s ^. appBaseContext) (refreshSelected _repo)
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
+      MainListElemRepo {_repo} -> liftIO $ flip runReaderT (s ^. appBaseContext) (refreshSelected _repo)
+      MainListElemHeading {} -> return () -- TODO
   V.EvKey c [] | c == refreshAllKey -> do
     refreshAll
 
@@ -148,17 +140,27 @@ main = do
 
   -------------------------------------------------------------
 
-  repos <- case cliConfigFile of
+  listElems <- case cliConfigFile of
     Nothing -> do
       -- Autodetect repos for user
 
       -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
       -- putStrLn [i|repos: #{second (fmap repoName) repos}|]
 
-      (V.toList <$>) $ withGithubApiSemaphore' githubApiSemaphore (github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll)) >>= \case
+      repos <- withGithubApiSemaphore' githubApiSemaphore (github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll)) >>= \case
         Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
         Right x -> return x
 
+      return $ V.fromList [
+        (MainListElemRepo {
+            _repo = r
+            , _depth = 0
+            , _toggled = False
+            , _status = NotStarted
+            , _ident = 0
+            })
+        | r <- V.toList repos
+        ]
 
     Just configFile -> do
       Yaml.decodeFileEither configFile >>= \case
@@ -166,40 +168,40 @@ main = do
         Right (config@(Config {..}) :: Config) -> do
           putStrLn [i|Got config: #{config}|]
 
-          (mconcat <$>) $ forM (fromMaybe [] configSections) $ \(ConfigSection {..}) ->
-            forConcurrently sectionRepos $ \repo ->
-              withGithubApiSemaphore' githubApiSemaphore $ case repo of
+          (V.fromList <$>) $ execWriterT $ forM (fromMaybe [] configSections) $ \(ConfigSection {..}) -> do
+            repoDepth <- case sectionDisplayName of
+              Nothing -> pure 0
+              Just l -> do
+                tell [MainListElemHeading {
+                  _label = l
+                  , _depth = 0
+                  , _toggled = True
+                  , _status = NotStarted
+                  , _ident = 0
+                  }]
+                pure 1
+
+            repos <- lift $ forConcurrently sectionRepos $ \r ->
+              withGithubApiSemaphore' githubApiSemaphore $ case r of
                 (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
                   Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
-                  Right repo -> pure repo
+                  Right r' -> pure r'
                 (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
 
-  forM_ repos print
+            forM_ repos $ \r ->
+              tell [MainListElemRepo {
+                _repo = r
+                , _depth = repoDepth
+                , _toggled = False
+                , _status = NotStarted
+                , _ident = 0
+                }]
 
   -------------------------------------------------------------
 
-  let rts = []
-
-  rtsFixed <- atomically $ mapM fixTree rts
-
-  let listElems = [
-        (MainListElem {
-            _repo = r
-            , _depth = 0
-            , _toggled = False
-            , _status = NotStarted
-            , _ident = 0
-            })
-        | r <- repos
-        ]
-        & sortBy (comparing (negate . repoStargazersCount . _repo))
-        & V.fromList
-
   let initialState = updateFilteredTree $
         AppState {
-          _appTreeBase = rts
-          , _appTree = rtsFixed
-          , _appUser = currentUser
+          _appUser = currentUser
           , _appBaseContext = BaseContext {
               requestSemaphore = githubApiSemaphore
               , auth = auth
@@ -211,19 +213,6 @@ main = do
 
   eventChan <- newBChan 10
 
-  currentFixedTree <- newTVarIO rtsFixed
-  eventAsync <- async $
-    forever $ do
-      handleAny (\e -> putStrLn [i|Got exception in event async: #{e}|] >> threadDelay terminalUIRefreshPeriod) $ do
-        newFixedTree <- atomically $ do
-          currentFixed <- readTVar currentFixedTree
-          newFixed <- mapM fixTree rts
-          when (fmap getCommons newFixed == fmap getCommons currentFixed) retry
-          writeTVar currentFixedTree newFixed
-          return newFixed
-        writeBChan eventChan (TreeUpdated newFixedTree)
-        threadDelay terminalUIRefreshPeriod
-
   let buildVty = do
         v <- V.mkVty V.defaultConfig
         let output = V.outputIface v
@@ -231,5 +220,4 @@ main = do
           V.setMode output V.Mouse True
         return v
   initialVty <- buildVty
-  flip onException (cancel eventAsync) $
-    void $ customMain initialVty buildVty (Just eventChan) app initialState
+  void $ customMain initialVty buildVty (Just eventChan) app initialState
