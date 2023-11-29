@@ -18,3 +18,5 @@ extra-deps:
 - vty-unix-0.1.0.0
 - vty-windows-0.1.0.1
 - brick-2.0
+
+- github-0.29

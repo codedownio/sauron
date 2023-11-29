@@ -95,12 +95,14 @@ executable sauron
     , base >=4.7 && <5
     , brick
     , containers
+    , exceptions
     , filepath
     , github
     , microlens
     , optparse-applicative
     , process
     , relude
+    , safe-exceptions
     , sauron
     , stm
     , string-interpolate

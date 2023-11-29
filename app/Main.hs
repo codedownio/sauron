@@ -8,6 +8,7 @@ import Brick.Widgets.List
 import Control.Concurrent.QSem
 import Control.Concurrent.STM (retry)
 import Control.Monad
+import Control.Monad.IO.Unlift
 import Data.Function
 import Data.String.Interpolate
 import qualified Data.Vector as V
@@ -103,6 +104,12 @@ appEvent s (VtyEvent e) = case e of
     whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
       openBrowserToUrl (toString url </> "actions")
 
+  V.EvKey c [] | c == refreshSelectedKey -> do
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo}) ->
+      liftIO $ flip runReaderT (s ^. appBaseContext) (refreshSelected repo)
+  V.EvKey c [] | c == refreshAllKey -> do
+    refreshAll
+
   -- Column 3
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
@@ -120,8 +127,6 @@ main = do
   putStrLn [i|Got args: #{args}|]
 
   githubApiSemaphore <- newQSem cliConcurrentGithubApiLimit
-  let withGithubApiSemaphore :: IO a -> IO a
-      withGithubApiSemaphore = bracket_ (waitQSem githubApiSemaphore) (signalQSem githubApiSemaphore)
 
   -------------------------------------------------------------
 
@@ -135,7 +140,7 @@ main = do
 
   putStrLn [i|Got auth: #{auth}|]
 
-  currentUser@(User {userLogin=(N userLoginUnwrapped)}) <- withGithubApiSemaphore (github auth userInfoCurrentR) >>= \case
+  currentUser@(User {userLogin=(N userLoginUnwrapped)}) <- withGithubApiSemaphore' githubApiSemaphore (github auth userInfoCurrentR) >>= \case
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
 
@@ -150,7 +155,7 @@ main = do
       -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
       -- putStrLn [i|repos: #{second (fmap repoName) repos}|]
 
-      (V.toList <$>) $ withGithubApiSemaphore (github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll)) >>= \case
+      (V.toList <$>) $ withGithubApiSemaphore' githubApiSemaphore (github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll)) >>= \case
         Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
         Right x -> return x
 
@@ -163,7 +168,7 @@ main = do
 
           (mconcat <$>) $ forM (fromMaybe [] configSections) $ \(ConfigSection {..}) ->
             forConcurrently sectionRepos $ \repo ->
-              withGithubApiSemaphore $ case repo of
+              withGithubApiSemaphore' githubApiSemaphore $ case repo of
                 (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
                   Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
                   Right repo -> pure repo
@@ -196,6 +201,10 @@ main = do
           _appTreeBase = rts
           , _appTree = rtsFixed
           , _appUser = currentUser
+          , _appBaseContext = BaseContext {
+              requestSemaphore = githubApiSemaphore
+              , auth = auth
+              }
           , _appMainList = list MainList listElems 1
 
           , _appSortBy = SortByStars

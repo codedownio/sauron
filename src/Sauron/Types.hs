@@ -8,7 +8,7 @@ import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Data.Sequence
 import Data.Text
-import GitHub (Repo, User)
+import GitHub (Auth, Repo, User)
 import Lens.Micro.TH
 import Relude
 
@@ -45,6 +45,7 @@ type NodeFixed context = NodeWithStatus context Status Bool
 
 data BaseContext = BaseContext {
   requestSemaphore :: QSem
+  , auth :: Auth
   }
 
 data ClickableName = ListRow Int | MainList | InnerViewport Text | InfoBar
@@ -63,6 +64,8 @@ data AppState = AppState {
   _appTreeBase :: [Node BaseContext]
   , _appTree :: [NodeFixed BaseContext]
   , _appUser :: User
+  , _appBaseContext :: BaseContext
+
   , _appMainList :: L.List ClickableName MainListElem
 
   , _appSortBy :: SortBy

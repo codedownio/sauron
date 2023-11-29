@@ -39,6 +39,13 @@ packages:
       size: 4671
   original:
     hackage: brick-2.0
+- completed:
+    hackage: github-0.29@sha256:1a6f082a24df02e38a2de548ce72654537b3aee5383cb57dce5d3ef6386c6752,7939
+    pantry-tree:
+      sha256: 84286a49354095da536c1ab267f77976c1bc69c6e55f43070f4c588ea461fe86
+      size: 10172
+  original:
+    hackage: github-0.29
 snapshots:
 - completed:
     sha256: fb482b8e2d5d061cdda4ba1da2957c012740c893a5ee1c1b99001adae7b1fbe7

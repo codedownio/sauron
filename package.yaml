@@ -75,8 +75,10 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - aeson
+    - exceptions
     - filepath
     - optparse-applicative
+    - safe-exceptions
     - sauron
     - yaml
 

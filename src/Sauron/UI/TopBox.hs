@@ -46,6 +46,16 @@ topBox app = hBox [columnPadding settingsColumn
                                          , str "/"
                                          , highlightMessageIfPredicate someRepoSelected app (str "actions")
                                          ]
+                                  , hBox [str "["
+                                         , highlightKeyIfPredicate someRepoSelected app (str $ showKey refreshSelectedKey)
+                                         , str "/"
+                                         , highlightKeyIfPredicate (const True) app (str $ showKey refreshAllKey)
+                                         , str "] "
+                                         , withAttr hotkeyMessageAttr $ str "Refresh "
+                                         , highlightMessageIfPredicate someRepoSelected app (str "selected")
+                                         , str "/"
+                                         , highlightMessageIfPredicate (const True) app (str "all")
+                                         ]
                                   ]
 
     otherActionsColumn = keybindingBox [-- keyIndicator' (showKey cycleVisibilityThresholdKey) (visibilityThresholdWidget app)
