@@ -53,7 +53,7 @@ withScroll s action = do
   case listSelectedElement (s ^. appMainList) of
     Nothing -> return ()
     Just (_, MainListElem {..}) -> do
-      let scroll = viewportScroll (InnerViewport [i|viewport_#{ident}|])
+      let scroll = viewportScroll (InnerViewport [i|viewport_#{_ident}|])
       action scroll
 
 refreshSelected :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => Repo -> m ()

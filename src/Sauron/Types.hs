@@ -52,13 +52,14 @@ data ClickableName = ListRow Int | MainList | InnerViewport Text | InfoBar
   deriving (Show, Ord, Eq)
 
 data MainListElem = MainListElem {
-  repo :: Repo
-  , depth :: Int
-  , toggled :: Bool
-  , open :: Bool
-  , status :: Status
-  , ident :: Int
+  _repo :: Repo
+  , _depth :: Int
+  , _toggled :: Bool
+  , _open :: Bool
+  , _status :: Status
+  , _ident :: Int
   }
+makeLenses ''MainListElem
 
 data AppState = AppState {
   _appTreeBase :: [Node BaseContext]

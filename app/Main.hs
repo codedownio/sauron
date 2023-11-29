@@ -77,7 +77,7 @@ appEvent s (VtyEvent e) = case e of
   --     Just (i', _) -> put (s & appMainList %~ (listMoveTo i'))
   V.EvKey c [] | c `elem` toggleKeys ->
     put $ s
-        & over appMainList (listModify (\elem -> elem { toggled = not (toggled elem) }))
+        & over appMainList (listModify (over toggled not))
 
   -- Scrolling in toggled items
   -- Wanted to make these uniformly Ctrl+whatever, but Ctrl+PageUp/PageDown was causing it to get KEsc and exit (?)
@@ -92,21 +92,21 @@ appEvent s (VtyEvent e) = case e of
 
   -- Column 2
   V.EvKey c [] | c == browserToHomeKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo=(Repo {repoHtmlUrl=(URL url)})}) ->
       openBrowserToUrl (toString url)
   V.EvKey c [] | c == browserToIssuesKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo=(Repo {repoHtmlUrl=(URL url)})}) ->
       openBrowserToUrl (toString url </> "issues")
   V.EvKey c [] | c == browserToPullsKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo=(Repo {repoHtmlUrl=(URL url)})}) ->
       openBrowserToUrl (toString url </> "pulls")
   V.EvKey c [] | c == browserToActionsKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo=(Repo {repoHtmlUrl=(URL url)})}) ->
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo=(Repo {repoHtmlUrl=(URL url)})}) ->
       openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {repo}) ->
-      liftIO $ flip runReaderT (s ^. appBaseContext) (refreshSelected repo)
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, MainListElem {_repo}) ->
+      liftIO $ flip runReaderT (s ^. appBaseContext) (refreshSelected _repo)
   V.EvKey c [] | c == refreshAllKey -> do
     refreshAll
 
@@ -184,16 +184,16 @@ main = do
 
   let listElems = [
         (MainListElem {
-            repo = r
-            , depth = 0
-            , toggled = False
-            , open = False
-            , status = NotStarted
-            , ident = 0
+            _repo = r
+            , _depth = 0
+            , _toggled = False
+            , _open = False
+            , _status = NotStarted
+            , _ident = 0
             })
         | r <- repos
         ]
-        & sortBy (comparing (negate . repoStargazersCount . repo))
+        & sortBy (comparing (negate . repoStargazersCount . _repo))
         & V.fromList
 
   let initialState = updateFilteredTree $

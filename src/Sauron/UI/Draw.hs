@@ -34,21 +34,21 @@ drawUI app = [ui]
 mainList :: AppState -> Widget ClickableName
 mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (app ^. appMainList)
   where
-    listDrawElement ix isSelected x@(MainListElem {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+    listDrawElement ix isSelected x@(MainListElem {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
       Just $ renderLine isSelected x
       , do
-          guard toggled
+          guard _toggled
           let infoWidgets = getInfoWidgets x
           guard (not $ L.null infoWidgets)
           return $ padLeft (Pad 4) $
-            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{ident}|]) 33 $
+            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
               vBox infoWidgets
       ]
 
-    renderLine _isSelected (MainListElem {repo, ..}) = hBox $ catMaybes [
-      Just $ withAttr openMarkerAttr $ str (if open then "[-] " else "[+] ")
-      , Just (renderName repo status)
-      , Just (padLeft Max (statsBox repo))
+    renderLine _isSelected (MainListElem {_repo, ..}) = hBox $ catMaybes [
+      Just $ withAttr openMarkerAttr $ str (if _open then "[-] " else "[+] ")
+      , Just (renderName _repo _status)
+      , Just (padLeft Max (statsBox _repo))
       ]
 
     getInfoWidgets (MainListElem {}) = [] -- catMaybes [Just $ runReader (toBrickWidget status) (app ^. appCustomExceptionFormatters)]
