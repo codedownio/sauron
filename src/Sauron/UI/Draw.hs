@@ -6,11 +6,13 @@ module Sauron.UI.Draw (
 import Brick
 import Brick.Widgets.Border
 import Brick.Widgets.Center
+import Brick.Widgets.List
 import qualified Brick.Widgets.List as L
 import Control.Monad
 import qualified Data.List as L
 import Data.Maybe
 import Data.String.Interpolate
+import qualified Data.Text as T
 import GitHub hiding (Status)
 import GitHub.Data.Name
 import Lens.Micro hiding (ix)
@@ -29,6 +31,9 @@ drawUI app = [ui]
       , borderWithCounts app
       , mainList app
       , clickable InfoBar $ infoBar app
+      -- , do
+      --     guarding (isJust (app ^. (listSelectedElement (app ^. appMainList))))
+      --       (clickable InfoBar $ infoBar app)
       ]
 
 mainList :: AppState -> Widget ClickableName
@@ -60,9 +65,18 @@ borderWithCounts :: AppState -> Widget n
 borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]
 
 infoBar :: AppState -> Widget n
-infoBar _app = Widget Greedy Fixed $ do
+infoBar s = Widget Greedy Fixed $ do
   _c <- getContext
-  render $ hBox [str "Info bar"]
+  case listSelectedElement (s ^. appMainList) of
+    Nothing -> render $ hBox [str ""]
+    Just (_, MainListElem {_repo}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
+      where
+        issuesPhrase = case repoOpenIssuesCount _repo of
+          0 -> Nothing
+          1 -> Just [i|1 issue|]
+          n -> Just [i|#{n} issues|]
+
+        phrases = catMaybes [issuesPhrase]
 
 renderName :: Repo -> Status -> Widget n
 renderName (Repo {repoName=(N name), repoOwner}) status = hBox [
