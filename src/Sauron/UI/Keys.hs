@@ -12,8 +12,6 @@ nextKey = V.KChar 'n'
 previousKey = V.KChar 'p'
 nextFailureKey = V.KChar 'N'
 previousFailureKey = V.KChar 'P'
-closeNodeKey = V.KLeft
-openNodeKey = V.KRight
 toggleKeys = [V.KEnter, V.KChar '\t']
 
 -- Column 2

@@ -23,8 +23,6 @@ topBox app = hBox [columnPadding settingsColumn
     settingsColumn = keybindingBox [keyIndicator (L.intersperse '/' [unKChar nextKey, unKChar previousKey, '↑', '↓']) "Navigate"
                                    , keyIndicatorHasSelected app (showKeys toggleKeys) "Open/close node"
                                    , keyIndicatorHasSelectedOpen app "Control-v/Meta-v" "Scroll node"
-                                   , keyIndicatorHasSelected app (unKChar closeNodeKey : '/' : [unKChar openNodeKey]) "Fold/unfold node"
-                                   , keyIndicator "Meta + [0-9]" "Unfold top # nodes"
                                    , keyIndicator (unKChar nextFailureKey : '/' : [unKChar previousFailureKey]) "Next/previous failure"
                                    ]
 

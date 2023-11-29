@@ -75,9 +75,9 @@ appEvent s (VtyEvent e) = case e of
   --   case L.find (isFailureStatus . status . snd) listToSearch of
   --     Nothing -> put s
   --     Just (i', _) -> put (s & appMainList %~ (listMoveTo i'))
-  V.EvKey c [] | c == closeNodeKey -> modifyOpen s (const False)
-  V.EvKey c [] | c == openNodeKey -> modifyOpen s (const True)
-  V.EvKey c [] | c `elem` toggleKeys -> modifyToggled s not
+  V.EvKey c [] | c `elem` toggleKeys ->
+    put $ s
+        & over appMainList (listModify (\elem -> elem { toggled = not (toggled elem) }))
 
   -- Scrolling in toggled items
   -- Wanted to make these uniformly Ctrl+whatever, but Ctrl+PageUp/PageDown was causing it to get KEsc and exit (?)
