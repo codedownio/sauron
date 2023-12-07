@@ -8,7 +8,7 @@ import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Data.Sequence
 import Data.Text
-import GitHub (Auth, Repo, User)
+import GitHub (Auth, Repo, User, WithTotalCount, WorkflowRun)
 import Lens.Micro.TH
 import Relude
 
@@ -37,7 +37,7 @@ type NodeCommon = NodeCommonWithStatus (Var Status) (Var Bool)
 
 type Var = TVar
 
-data Status = NotStarted | Running | Done () | Failure ()
+data Status = Fetching | Ready
   deriving (Show, Eq)
 
 type Node context = NodeWithStatus context (Var Status) (Var Bool)
@@ -59,6 +59,7 @@ data MainListElem = MainListElemHeading {
   , _ident :: Int
   } | MainListElemRepo {
   _repo :: Repo
+  , _workflows :: Maybe (WithTotalCount WorkflowRun)
   , _depth :: Int
   , _toggled :: Bool
   , _status :: Status

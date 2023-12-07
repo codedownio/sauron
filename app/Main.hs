@@ -97,7 +97,7 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == refreshSelectedKey -> do
     whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
-      MainListElemRepo {_repo} -> liftIO $ flip runReaderT (s ^. appBaseContext) (refreshSelected _repo)
+      MainListElemRepo {_repo} -> liftIO $ runReaderT (refreshSelected _repo) (s ^. appBaseContext)
       MainListElemHeading {} -> return () -- TODO
   V.EvKey c [] | c == refreshAllKey -> do
     refreshAll
@@ -154,9 +154,10 @@ main = do
       return $ V.fromList [
         (MainListElemRepo {
             _repo = r
+            , _workflows = Nothing
             , _depth = 0
             , _toggled = False
-            , _status = NotStarted
+            , _status = Ready
             , _ident = 0
             })
         | r <- V.toList repos
@@ -176,7 +177,7 @@ main = do
                   _label = l
                   , _depth = 0
                   , _toggled = True
-                  , _status = NotStarted
+                  , _status = Ready
                   , _ident = 0
                   }]
                 pure 1
@@ -191,9 +192,10 @@ main = do
             forM_ repos $ \r ->
               tell [MainListElemRepo {
                 _repo = r
+                , _workflows = Nothing
                 , _depth = repoDepth
                 , _toggled = False
-                , _status = NotStarted
+                , _status = Ready
                 , _ident = 0
                 }]
 

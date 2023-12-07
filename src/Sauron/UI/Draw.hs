@@ -56,6 +56,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
     renderLine _isSelected (MainListElemHeading {..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
       , Just (renderHeadingName _label _status)
+      , Just (padLeft Max (str "⠀"))
       ]
     renderLine _isSelected (MainListElemRepo {_repo, ..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
