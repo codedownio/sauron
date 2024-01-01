@@ -39,6 +39,7 @@ drawUI app = [ui]
 mainList :: AppState -> Widget ClickableName
 mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (app ^. appMainList)
   where
+    listDrawElement :: Int -> Bool -> MainListElem -> Widget ClickableName
     listDrawElement ix isSelected x@(MainListElemHeading {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
       Just $ renderLine isSelected x
       ]
@@ -53,6 +54,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
               vBox infoWidgets
       ]
 
+    renderLine :: Bool -> MainListElem -> Widget ClickableName
     renderLine _isSelected (MainListElemHeading {..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
       , Just (renderHeadingName _label _status)

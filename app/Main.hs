@@ -6,6 +6,7 @@ import Brick as B
 import Brick.BChan
 import Brick.Widgets.List
 import Control.Concurrent.QSem
+import Control.Concurrent.STM (retry)
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Control.Monad.Writer
@@ -21,7 +22,6 @@ import Lens.Micro
 import Relude hiding (Down)
 import Sauron.Actions
 import Sauron.Auth
-import Sauron.Filter
 import Sauron.Options
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -30,9 +30,14 @@ import Sauron.UI.Keys
 import System.FilePath
 import System.IO.Error (userError)
 import UnliftIO.Async
+import UnliftIO.Concurrent
 import UnliftIO.Exception
 
 -- import Data.Time
+
+
+refreshPeriod :: Int
+refreshPeriod = 100000
 
 
 app :: App AppState AppEvent ClickableName
@@ -45,10 +50,8 @@ app = App {
   }
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
--- appEvent s (AppEvent (TreeUpdated newTree)) = do
---   put $ s
---     & appTree .~ newTree
---     & updateFilteredTree
+appEvent _s (AppEvent (FullUpdate s')) = do
+  put s'
 
 appEvent s (VtyEvent e) = case e of
   -- Column 1
@@ -140,7 +143,7 @@ main = do
 
   -------------------------------------------------------------
 
-  listElems <- case cliConfigFile of
+  listElems :: V.Vector MainListElemVariable <- case cliConfigFile of
     Nothing -> do
       -- Autodetect repos for user
 
@@ -151,17 +154,17 @@ main = do
         Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
         Right x -> return x
 
-      return $ V.fromList [
-        (MainListElemRepo {
-            _repo = r
-            , _workflows = Nothing
-            , _depth = 0
-            , _toggled = False
-            , _status = Ready
-            , _ident = 0
-            })
-        | r <- V.toList repos
-        ]
+      (V.fromList <$>) $ forM (V.toList repos) $ \r -> do
+        workflowsVar <- newTVarIO Nothing
+        statusVar <- newTVarIO Ready
+        return $ MainListElemRepo {
+          _repo = r,
+          _workflows = workflowsVar,
+          _depth = 0,
+          _toggled = False,
+          _status = statusVar,
+          _ident = 0
+          }
 
     Just configFile -> do
       Yaml.decodeFileEither configFile >>= \case
@@ -173,11 +176,12 @@ main = do
             repoDepth <- case sectionDisplayName of
               Nothing -> pure 0
               Just l -> do
+                statusVar <- newTVarIO Ready
                 tell [MainListElemHeading {
                   _label = l
                   , _depth = 0
                   , _toggled = True
-                  , _status = Ready
+                  , _status = statusVar
                   , _ident = 0
                   }]
                 pure 1
@@ -189,31 +193,52 @@ main = do
                   Right r' -> pure r'
                 (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
 
-            forM_ repos $ \r ->
+            forM_ repos $ \r -> do
+              workflowsVar <- newTVarIO Nothing
+              statusVar <- newTVarIO Ready
               tell [MainListElemRepo {
                 _repo = r
-                , _workflows = Nothing
+                , _workflows = workflowsVar
                 , _depth = repoDepth
                 , _toggled = False
-                , _status = Ready
+                , _status = statusVar
                 , _ident = 0
                 }]
 
   -------------------------------------------------------------
 
-  let initialState = updateFilteredTree $
+  listElemsFixed :: V.Vector MainListElem <- atomically $ mapM fixMainListElem listElems
+
+  let initialState =
         AppState {
           _appUser = currentUser
           , _appBaseContext = BaseContext {
               requestSemaphore = githubApiSemaphore
               , auth = auth
               }
-          , _appMainList = list MainList listElems 1
+          , _appMainListVariable = listElems
+          , _appMainList = list MainList listElemsFixed 1
 
           , _appSortBy = SortByStars
         }
 
+
   eventChan <- newBChan 10
+
+  listElemsVar <- newTVarIO listElemsFixed
+
+  eventAsync <- async $
+    forever $ do
+      handleAny (\e -> putStrLn [i|Got exception in event async: #{e}|] >> threadDelay refreshPeriod) $ do
+        newFixed <- atomically $ do
+          currentFixed <- readTVar listElemsVar
+          newFixed <- mapM fixMainListElem listElems
+          when (newFixed == currentFixed) retry
+
+          writeTVar listElemsVar newFixed
+          return newFixed
+        writeBChan eventChan (ListUpdate newFixed)
+        threadDelay refreshPeriod
 
   let buildVty = do
         v <- V.mkVty V.defaultConfig
@@ -222,4 +247,30 @@ main = do
           V.setMode output V.Mouse True
         return v
   initialVty <- buildVty
-  void $ customMain initialVty buildVty (Just eventChan) app initialState
+  flip onException (cancel eventAsync) $
+    void $ customMain initialVty buildVty (Just eventChan) app initialState
+
+
+fixMainListElem :: MainListElemVariable -> STM MainListElem
+fixMainListElem (MainListElemHeading {..}) = do
+  statusFixed <- readTVar _status
+
+  return $ MainListElemHeading {
+    _label = _label
+    , _depth = _depth
+    , _toggled = _toggled
+    , _status = statusFixed
+    , _ident = _ident
+    }
+fixMainListElem (MainListElemRepo {..}) = do
+  workflowsFixed <- readTVar _workflows
+  statusFixed <- readTVar _status
+
+  return $ MainListElemRepo {
+    _repo = _repo
+    , _workflows = workflowsFixed
+    , _depth = _depth
+    , _toggled = _toggled
+    , _status = statusFixed
+    , _ident = _ident
+    }
