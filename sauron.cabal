@@ -75,6 +75,7 @@ executable sauron
       Sauron.Actions
       Sauron.Aeson
       Sauron.Auth
+      Sauron.Event
       Sauron.Fix
       Sauron.Options
       Paths_sauron

@@ -47,11 +47,11 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       Just $ renderLine isSelected x
       , do
           guard _toggled
-          let infoWidgets = getInfoWidgets x
-          guard (not $ L.null infoWidgets)
+          let unfoldWidgets = getUnfoldWigets x
+          guard (not $ L.null unfoldWidgets)
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
-              vBox infoWidgets
+              vBox unfoldWidgets
       ]
 
     renderLine :: Bool -> MainListElem -> Widget ClickableName
@@ -66,13 +66,17 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       , Just (padLeft Max (statsBox _repo))
       ]
 
-    getInfoWidgets (MainListElemHeading {}) = [
-      str "HI I'M THE HEADING INFO"
+getUnfoldWigets :: MainListElem -> [Widget n]
+getUnfoldWigets (MainListElemHeading {}) = [
+  str "HI I'M THE HEADING INFO"
+  ]
+getUnfoldWigets (MainListElemRepo {_workflows=Nothing}) = []
+getUnfoldWigets (MainListElemRepo {_workflows=(Just (WithTotalCount items count))}) = [borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|]) $ vBox $ toList $ fmap workflowWidget (toList items)]
+  where
+    workflowWidget (WorkflowRun {..}) = hBox [
+      withAttr logTimestampAttr $ str $ toString $ untagName workflowRunName
+      , str " "
       ]
-    getInfoWidgets (MainListElemRepo {}) = [
-      str "HI I'M THE WORKFLOW INFO"
-      ]
-
 
 borderWithCounts :: AppState -> Widget n
 borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]

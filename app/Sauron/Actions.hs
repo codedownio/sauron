@@ -40,12 +40,12 @@ withScroll s action = do
       action scroll
     _ -> return ()
 
-refreshSelected :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => Repo -> m ()
-refreshSelected (Repo {..}) = do
+refreshSelected :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => Repo -> TVar (Maybe (WithTotalCount WorkflowRun)) -> m ()
+refreshSelected (Repo {..}) workflowsVar = do
   BaseContext {auth} <- ask
   withGithubApiSemaphore (liftIO $ github auth (workflowRunsR (simpleOwnerLogin repoOwner) repoName mempty (FetchAtLeast 10))) >>= \case
     Left err -> putStrLn [i|Got err: #{err}|]
-    Right x -> putStrLn [i|Got ret: #{x}|]
+    Right x -> atomically $ writeTVar workflowsVar (Just x)
 
 refreshAll :: (MonadIO m) => m ()
 refreshAll = undefined

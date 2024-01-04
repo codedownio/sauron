@@ -2,7 +2,7 @@
 # Couldn't get GHC 9.6.3 to work on NixOS:
 # /nix/store/4wfz025h47qsbph2hb9y1wx2gshhk36g-stack-2.9.1/bin/stack: /nix/store/whypqfa83z4bsn43n4byvmw80n4mg3r8-glibc-2.37-45/lib/libc.so.6: version `GLIBC_2.38' not found (required by /nix/store/bsb4z6yw6v3kz7vmf1m4gh4flf9kj1ck-gmp-with-cxx-6.3.0/lib/libgmp.so.10)
 # resolver: nightly-2023-11-02
-resolver: lts-21.19
+resolver: lts-21.25
 
 packages:
 - .
