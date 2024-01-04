@@ -73,9 +73,12 @@ getUnfoldWigets (MainListElemHeading {}) = [
 getUnfoldWigets (MainListElemRepo {_workflows=Nothing}) = []
 getUnfoldWigets (MainListElemRepo {_workflows=(Just (WithTotalCount items count))}) = [borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|]) $ vBox $ toList $ fmap workflowWidget (toList items)]
   where
-    workflowWidget (WorkflowRun {..}) = hBox [
+    workflowWidget run@(WorkflowRun {..}) = hBox [
       withAttr logTimestampAttr $ str $ toString $ untagName workflowRunName
-      , str " "
+      , str ": "
+      , str $ toString $ workflowRunDisplayTitle
+      , str "----"
+      , str (show run)
       ]
 
 borderWithCounts :: AppState -> Widget n
