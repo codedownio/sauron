@@ -52,7 +52,7 @@ data ConfigRepo = ConfigRepoSingle {
   } | ConfigRepoWildcard {
         configRepoOwner :: Text
       }
-  deriving (Show)
+  deriving (Show, Eq)
 instance FromJSON ConfigRepo where
   parseJSON (A.String x) = case T.splitOn "/" x of
     [owner, "*"] -> pure (ConfigRepoWildcard owner)

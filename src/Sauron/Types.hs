@@ -14,9 +14,10 @@ import Control.Concurrent.QSem
 import Data.Sequence
 import Data.Text
 import qualified Data.Vector as V
-import GitHub (Auth, Repo, User, WithTotalCount, WorkflowRun)
+import GitHub hiding (Status)
 import Lens.Micro.TH
 import Relude
+
 
 data SortBy = SortByStars | SortByPushed | SortByUpdated
   deriving (Eq)
@@ -68,14 +69,15 @@ type family Switchable (f :: Type -> Type) x where
 data MainListElem' f = MainListElemHeading {
   _label :: Text
   , _depth :: Int
-  , _toggled :: Bool
+  , _toggled :: Switchable f Bool
   , _status :: Switchable f Status
   , _ident :: Int
   } | MainListElemRepo {
-  _repo :: Repo
+  _namespaceName :: (Name Owner, Name Repo)
+  , _repo :: Switchable f (Maybe Repo)
   , _workflows :: Switchable f (Maybe (WithTotalCount WorkflowRun))
   , _depth :: Int
-  , _toggled :: Bool
+  , _toggled :: Switchable f Bool
   , _status :: Switchable f Status
   , _ident :: Int
   }

@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
 
@@ -86,15 +87,18 @@ main = do
         Right x -> return x
 
       (V.fromList <$>) $ forM (V.toList repos) $ \r -> do
+        repoVar <- newTVarIO (Just r)
         workflowsVar <- newTVarIO Nothing
         statusVar <- newTVarIO Ready
+        toggledVar <- newTVarIO False
         return $ MainListElemRepo {
-          _repo = r,
-          _workflows = workflowsVar,
-          _depth = 0,
-          _toggled = False,
-          _status = statusVar,
-          _ident = 0
+          _namespaceName = (simpleOwnerLogin $ repoOwner r, repoName r)
+          , _repo = repoVar
+          , _workflows = workflowsVar
+          , _depth = 0
+          , _toggled = toggledVar
+          , _status = statusVar
+          , _ident = 0
           }
 
     Just configFile -> do
@@ -107,34 +111,43 @@ main = do
             repoDepth <- case sectionDisplayName of
               Nothing -> pure 0
               Just l -> do
+                toggledVar <- newTVarIO False
                 statusVar <- newTVarIO Ready
                 tell [MainListElemHeading {
                   _label = l
                   , _depth = 0
-                  , _toggled = True
+                  , _toggled = toggledVar
                   , _status = statusVar
                   , _ident = 0
                   }]
                 pure 1
 
-            repos <- lift $ forConcurrently sectionRepos $ \r ->
-              withGithubApiSemaphore' githubApiSemaphore $ case r of
-                (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
-                  Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
-                  Right r' -> pure r'
-                (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
-
-            forM_ repos $ \r -> do
+            repoVars <- forM sectionRepos $ \r -> do
+              repoVar <- newTVarIO Nothing
               workflowsVar <- newTVarIO Nothing
+              toggledVar <- newTVarIO False
               statusVar <- newTVarIO Ready
               tell [MainListElemRepo {
-                _repo = r
+                _namespaceName = case r of
+                    ConfigRepoSingle owner name -> (mkName (Proxy @Owner) owner, mkName (Proxy @Repo) name)
+                    ConfigRepoWildcard {} -> error "No"
+
+                , _repo = repoVar
                 , _workflows = workflowsVar
                 , _depth = repoDepth
-                , _toggled = False
+                , _toggled = toggledVar
                 , _status = statusVar
                 , _ident = 0
                 }]
+              pure (r, repoVar)
+
+            -- Asynchronously fetch everything
+            lift $ async $ forConcurrently repoVars $ \(r, repoVar) ->
+              withGithubApiSemaphore' githubApiSemaphore $ case r of
+                (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
+                  Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
+                  Right r' -> atomically $ writeTVar repoVar (Just r')
+                (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
 
   -------------------------------------------------------------
 

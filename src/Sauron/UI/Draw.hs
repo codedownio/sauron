@@ -60,25 +60,30 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       , Just (renderHeadingName _label _status)
       , Just (padLeft Max (str "⠀"))
       ]
-    renderLine _isSelected (MainListElemRepo {_repo, ..}) = hBox $ catMaybes [
+    renderLine _isSelected (MainListElemRepo {_repo=(Just repo), ..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , Just (renderName _repo _status)
-      , Just (padLeft Max (statsBox _repo))
+      , Just (renderName repo _status)
+      , Just (padLeft Max (statsBox repo))
       ]
 
 getUnfoldWigets :: MainListElem -> [Widget n]
 getUnfoldWigets (MainListElemHeading {}) = [
   str "HI I'M THE HEADING INFO"
   ]
-getUnfoldWigets (MainListElemRepo {_workflows=Nothing}) = []
+getUnfoldWigets (MainListElemRepo {_workflows=Nothing}) = [hBox [
+                                                              str "Workflows not fetched."
+                                                              ]]
+
+-- WorkflowRun {workflowRunWorkflowRunId = Id 7403805672, workflowRunName = N "ci", workflowRunHeadBranch = migrate-debug, workflowRunHeadSha = "1367fa30fc409d198e18afa95bda04d26387925e", workflowRunPath = ".github/workflows/ci.yml", workflowRunDisplayTitle = More database stuff noci, workflowRunRunNumber = 2208, workflowRunEvent = "push", workflowRunStatus = "completed", workflowRunConclusion = Just skipped, workflowRunWorkflowId = 6848152, workflowRunUrl = URL https://api.github.com/repos/codedownio/codedown/actions/runs/7403805672, workflowRunHtmlUrl = URL https://github.com/codedownio/codedown/actions/runs/7403805672, workflowRunCreatedAt = 2024-01-04 00:10:06 UTC, workflowRunUpdatedAt = 2024-01-04 00:10:10 UTC, workflowRunActor = SimpleUser simpleUserId = Id 1634990, simpleUserLogin = N thomasjm, simpleUserAvatarUrl = URL "https://avatars.githubusercontent.com/u/1634990?v=4", simpleUserUrl = URL "https://api.github.com/users/thomasjm", workflowRunAttempt = 1, workflowRunStartedAt = 2024-01-04 00:10:06 UTC}
 getUnfoldWigets (MainListElemRepo {_workflows=(Just (WithTotalCount items count))}) = [borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|]) $ vBox $ toList $ fmap workflowWidget (toList items)]
   where
     workflowWidget run@(WorkflowRun {..}) = hBox [
-      withAttr logTimestampAttr $ str $ toString $ untagName workflowRunName
+      str ("#" <> show workflowRunRunNumber <> " ")
+      , withAttr logTimestampAttr $ str $ toString $ untagName workflowRunName
       , str ": "
       , str $ toString $ workflowRunDisplayTitle
       , str "----"
-      , str (show run)
+      , strWrap (show run)
       ]
 
 borderWithCounts :: AppState -> Widget n
@@ -90,9 +95,9 @@ infoBar s = Widget Greedy Fixed $ do
   case listSelectedElement (s ^. appMainList) of
     Nothing -> render $ hBox [str ""]
     Just (_, MainListElemHeading {}) -> render $ hBox [str ""]
-    Just (_, MainListElemRepo {_repo}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
+    Just (_, MainListElemRepo {_repo=(Just repo)}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
       where
-        issuesPhrase = case repoOpenIssuesCount _repo of
+        issuesPhrase = case repoOpenIssuesCount repo of
           0 -> Nothing
           1 -> Just [i|1 issue|]
           n -> Just [i|#{n} issues|]
