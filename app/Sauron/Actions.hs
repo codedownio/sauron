@@ -60,5 +60,5 @@ withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQ
 
 whenRepoSelected :: Monad f => AppState -> (Repo -> f ()) -> f ()
 whenRepoSelected s cb = whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
-  MainListElemRepo {_repo=(Just repo)} -> cb repo
+  MainListElemRepo {_repo=(Just r)} -> cb r
   _ -> return ()
