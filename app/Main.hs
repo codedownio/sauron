@@ -67,6 +67,11 @@ main = do
 
   putStrLn [i|Got auth: #{auth}|]
 
+  let baseContext = BaseContext {
+        requestSemaphore = githubApiSemaphore
+        , auth = auth
+        }
+
   currentUser@(User {userLogin=(N userLoginUnwrapped)}) <- withGithubApiSemaphore' githubApiSemaphore (github auth userInfoCurrentR) >>= \case
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
@@ -120,7 +125,7 @@ main = do
                   }]
                 pure 1
 
-            repoVars <- forM sectionRepos $ \r -> do
+            forM sectionRepos $ \r -> do
               repoVar <- newTVarIO NotFetched
               workflowsVar <- newTVarIO NotFetched
               toggledVar <- newTVarIO False
@@ -135,15 +140,11 @@ main = do
                 , _toggled = toggledVar
                 , _ident = 0
                 }]
-              pure (r, repoVar)
 
-            -- Asynchronously fetch everything
-            lift $ async $ forConcurrently repoVars $ \(r, repoVar) ->
-              withGithubApiSemaphore' githubApiSemaphore $ case r of
-                (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
-                  Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
-                  Right r' -> atomically $ writeTVar repoVar (Fetched r')
-                (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
+  -------------------------------------------------------------
+
+  -- Kick off fetches for repos, workflows
+  runReaderT (refreshAll listElems) baseContext
 
   -------------------------------------------------------------
 
@@ -152,10 +153,7 @@ main = do
   let initialState =
         AppState {
           _appUser = currentUser
-          , _appBaseContext = BaseContext {
-              requestSemaphore = githubApiSemaphore
-              , auth = auth
-              }
+          , _appBaseContext = baseContext
           , _appMainListVariable = listElems
           , _appMainList = list MainList listElemsFixed 1
 

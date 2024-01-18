@@ -69,13 +69,15 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == refreshSelectedKey -> do
     whenJust (listSelectedElement (s ^. appMainList)) $ \(j, el) -> case el of
-      MainListElemRepo {_repo=(Fetched r)} -> case (s ^. appMainListVariable) V.!? j of
-        Just (MainListElemRepo {_workflows}) -> liftIO $ runReaderT (refreshSelected r _workflows) (s ^. appBaseContext)
-        _ -> return ()
       MainListElemHeading {} -> return () -- TODO
-      _ -> return ()
+
+      MainListElemRepo {_workflows=Fetching} -> return ()
+      MainListElemRepo {_workflows=_, _namespaceName=(owner, name)} ->
+        case (s ^. appMainListVariable) V.!? j of
+          Just (MainListElemRepo {_workflows}) -> liftIO $ runReaderT (fetchWorkflows owner name _workflows) (s ^. appBaseContext)
+          _ -> return ()
   V.EvKey c [] | c == refreshAllKey -> do
-    refreshAll
+    liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 
   -- Column 3
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do

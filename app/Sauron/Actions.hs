@@ -5,7 +5,9 @@ module Sauron.Actions (
 
   , withScroll
 
-  , refreshSelected
+  , fetchRepo
+  , fetchWorkflows
+
   , refreshAll
 
   , withGithubApiSemaphore
@@ -21,11 +23,12 @@ import Control.Exception.Safe (bracket_, bracketOnError_)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import Data.String.Interpolate
+import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude
 import Sauron.Types
--- import UnliftIO.Exception (bracketOnError_)
+import UnliftIO.Async
 import UnliftIO.Process
 
 
@@ -41,17 +44,43 @@ withScroll s action = do
       action scroll
     _ -> return ()
 
-refreshSelected :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => Repo -> TVar (Fetchable (WithTotalCount WorkflowRun)) -> m ()
-refreshSelected (Repo {..}) workflowsVar = do
+fetchRepo :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> TVar (Fetchable Repo) -> m ()
+fetchRepo owner name repoVar = do
+  BaseContext {auth} <- ask
+  bracketOnError_ (atomically $ writeTVar repoVar Fetching)
+                  (atomically $ writeTVar repoVar (Errored "Repo fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ github auth (repositoryR owner name)) >>= \case
+      Left err -> atomically $ writeTVar repoVar (Errored (show err))
+      Right x -> atomically $ writeTVar repoVar (Fetched x)
+
+fetchWorkflows :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> TVar (Fetchable (WithTotalCount WorkflowRun)) -> m ()
+fetchWorkflows owner name workflowsVar = do
   BaseContext {auth} <- ask
   bracketOnError_ (atomically $ writeTVar workflowsVar Fetching)
-                  (atomically $ writeTVar workflowsVar (Errored "Workflows fetch failed.")) $
-    withGithubApiSemaphore (liftIO $ github auth (workflowRunsR (simpleOwnerLogin repoOwner) repoName mempty (FetchAtLeast 10))) >>= \case
-      Left err -> putStrLn [i|Got err: #{err}|]
+                  (atomically $ writeTVar workflowsVar (Errored "Workflows fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ github auth (workflowRunsR owner name mempty (FetchAtLeast 10))) >>= \case
+      Left err -> atomically $ writeTVar workflowsVar (Errored (show err))
       Right x -> atomically $ writeTVar workflowsVar (Fetched x)
 
-refreshAll :: (MonadIO m) => m ()
-refreshAll = undefined
+refreshAll :: (
+  MonadReader BaseContext m, MonadIO m
+  ) => V.Vector MainListElemVariable -> m ()
+refreshAll elems = do
+  baseContext <- ask
+
+  liftIO $ flip runReaderT baseContext $
+    void $ async $ forConcurrently (V.toList elems) $ \case
+      MainListElemHeading {} -> return ()
+      MainListElemRepo {_namespaceName=(owner, name), ..} -> do
+        withGithubApiSemaphore $
+          fetchRepo owner name _repo
+
+        withGithubApiSemaphore $
+          fetchWorkflows owner name _workflows
 
 withGithubApiSemaphore :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => m a -> m a
 withGithubApiSemaphore action = do
