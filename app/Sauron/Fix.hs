@@ -21,7 +21,6 @@ fixMainListElem (MainListElemHeading {..}) = do
     }
 fixMainListElem (MainListElemRepo {..}) = do
   workflowsFixed <- readTVar _workflows
-  statusFixed <- readTVar _status
   toggledFixed <- readTVar _toggled
   repoFixed <- readTVar _repo
 
@@ -31,6 +30,5 @@ fixMainListElem (MainListElemRepo {..}) = do
     , _workflows = workflowsFixed
     , _depth = _depth
     , _toggled = toggledFixed
-    , _status = statusFixed
     , _ident = _ident
     }

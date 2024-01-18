@@ -17,7 +17,7 @@ module Sauron.Actions (
 import Brick as B
 import Brick.Widgets.List
 import Control.Concurrent.QSem
-import Control.Exception.Safe (bracket_)
+import Control.Exception.Safe (bracket_, bracketOnError_)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import Data.String.Interpolate
@@ -25,6 +25,7 @@ import GitHub
 import Lens.Micro
 import Relude
 import Sauron.Types
+-- import UnliftIO.Exception (bracketOnError_)
 import UnliftIO.Process
 
 
@@ -40,12 +41,14 @@ withScroll s action = do
       action scroll
     _ -> return ()
 
-refreshSelected :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => Repo -> TVar (Maybe (WithTotalCount WorkflowRun)) -> m ()
+refreshSelected :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => Repo -> TVar (Fetchable (WithTotalCount WorkflowRun)) -> m ()
 refreshSelected (Repo {..}) workflowsVar = do
   BaseContext {auth} <- ask
-  withGithubApiSemaphore (liftIO $ github auth (workflowRunsR (simpleOwnerLogin repoOwner) repoName mempty (FetchAtLeast 10))) >>= \case
-    Left err -> putStrLn [i|Got err: #{err}|]
-    Right x -> atomically $ writeTVar workflowsVar (Just x)
+  bracketOnError_ (atomically $ writeTVar workflowsVar Fetching)
+                  (atomically $ writeTVar workflowsVar (Errored "Workflows fetch failed.")) $
+    withGithubApiSemaphore (liftIO $ github auth (workflowRunsR (simpleOwnerLogin repoOwner) repoName mempty (FetchAtLeast 10))) >>= \case
+      Left err -> putStrLn [i|Got err: #{err}|]
+      Right x -> atomically $ writeTVar workflowsVar (Fetched x)
 
 refreshAll :: (MonadIO m) => m ()
 refreshAll = undefined
@@ -60,5 +63,5 @@ withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQ
 
 whenRepoSelected :: Monad f => AppState -> (Repo -> f ()) -> f ()
 whenRepoSelected s cb = whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
-  MainListElemRepo {_repo=(Just r)} -> cb r
+  MainListElemRepo {_repo=(Fetched r)} -> cb r
   _ -> return ()

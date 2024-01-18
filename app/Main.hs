@@ -87,9 +87,8 @@ main = do
         Right x -> return x
 
       (V.fromList <$>) $ forM (V.toList repos) $ \r -> do
-        repoVar <- newTVarIO (Just r)
-        workflowsVar <- newTVarIO Nothing
-        statusVar <- newTVarIO Ready
+        repoVar <- newTVarIO (Fetched r)
+        workflowsVar <- newTVarIO NotFetched
         toggledVar <- newTVarIO False
         return $ MainListElemRepo {
           _namespaceName = (simpleOwnerLogin $ repoOwner r, repoName r)
@@ -97,7 +96,6 @@ main = do
           , _workflows = workflowsVar
           , _depth = 0
           , _toggled = toggledVar
-          , _status = statusVar
           , _ident = 0
           }
 
@@ -111,8 +109,8 @@ main = do
             repoDepth <- case sectionDisplayName of
               Nothing -> pure 0
               Just l -> do
-                toggledVar <- newTVarIO False
-                statusVar <- newTVarIO Ready
+                toggledVar <- newTVarIO True
+                statusVar <- newTVarIO NotFetched
                 tell [MainListElemHeading {
                   _label = l
                   , _depth = 0
@@ -123,10 +121,9 @@ main = do
                 pure 1
 
             repoVars <- forM sectionRepos $ \r -> do
-              repoVar <- newTVarIO Nothing
-              workflowsVar <- newTVarIO Nothing
+              repoVar <- newTVarIO NotFetched
+              workflowsVar <- newTVarIO NotFetched
               toggledVar <- newTVarIO False
-              statusVar <- newTVarIO Ready
               tell [MainListElemRepo {
                 _namespaceName = case r of
                     ConfigRepoSingle owner name -> (mkName (Proxy @Owner) owner, mkName (Proxy @Repo) name)
@@ -136,7 +133,6 @@ main = do
                 , _workflows = workflowsVar
                 , _depth = repoDepth
                 , _toggled = toggledVar
-                , _status = statusVar
                 , _ident = 0
                 }]
               pure (r, repoVar)
@@ -146,7 +142,7 @@ main = do
               withGithubApiSemaphore' githubApiSemaphore $ case r of
                 (ConfigRepoSingle owner name) -> github auth (repositoryR (N owner) (N name)) >>= \case
                   Left err -> throwIO $ userError [i|Failed to fetch repo '#{owner}/#{name}': #{err}|]
-                  Right r' -> atomically $ writeTVar repoVar (Just r')
+                  Right r' -> atomically $ writeTVar repoVar (Fetched r')
                 (ConfigRepoWildcard owner) -> throwIO $ userError [i|Wildcard repos not supported yet (#{owner}/*)|]
 
   -------------------------------------------------------------

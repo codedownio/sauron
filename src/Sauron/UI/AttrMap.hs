@@ -8,7 +8,6 @@ import Brick
 import Brick.Widgets.ProgressBar
 import qualified Graphics.Vty as V
 import Relude
-import Sauron.Types
 
 
 mkAttrName :: String -> AttrName
@@ -21,12 +20,14 @@ mainAttrMap = attrMap V.defAttr [
   -- (listSelectedAttr, bg (V.Color240 $ V.rgbColorToColor240 0 1 0))
   -- (selectedAttr, bg (V.Color240 $ V.rgbColorToColor240 0 1 0))
 
-  -- Top bar
-  (visibilityThresholdNotSelectedAttr, fg midGray)
-  , (visibilityThresholdSelectedAttr, fg solarizedBase2)
-
   -- Statuses
   -- , (notStartedAttr, fg V.)
+  (iconAttr, fg V.white)
+  , (normalAttr, fg V.white)
+  , (notFetchedAttr, fg midGray)
+  , (fetchingAttr, fg V.blue)
+  , (erroredAttr, fg V.red)
+
   , (runningAttr, fg V.blue)
   , (pendingAttr, fg V.yellow)
   , (successAttr, fg V.green)
@@ -34,7 +35,6 @@ mainAttrMap = attrMap V.defAttr [
   , (totalAttr, fg solarizedCyan)
 
   -- Logging
-  , (debugAttr, fg V.blue), (infoAttr, fg V.yellow), (warnAttr, fg V.red), (errorAttr, fg V.red), (otherAttr, V.defAttr)
   , (logTimestampAttr, fg midGray)
   , (logFilenameAttr, fg solarizedViolet)
   , (logModuleAttr, fg solarizedMagenta)
@@ -83,11 +83,20 @@ mainAttrMap = attrMap V.defAttr [
 -- selectedAttr :: AttrName
 -- selectedAttr = "list_line_selected"
 
-visibilityThresholdNotSelectedAttr :: AttrName
-visibilityThresholdNotSelectedAttr = mkAttrName "visibility_threshold_not_selected"
+iconAttr :: AttrName
+iconAttr = mkAttrName "icon"
 
-visibilityThresholdSelectedAttr :: AttrName
-visibilityThresholdSelectedAttr = mkAttrName "visibility_threshold_selected"
+normalAttr :: AttrName
+normalAttr = mkAttrName "normal"
+
+notFetchedAttr :: AttrName
+notFetchedAttr = mkAttrName "not_fetched"
+
+fetchingAttr :: AttrName
+fetchingAttr = mkAttrName "fetching"
+
+erroredAttr :: AttrName
+erroredAttr = mkAttrName "errored"
 
 runningAttr :: AttrName
 runningAttr = mkAttrName "running"
@@ -125,23 +134,7 @@ disabledHotkeyAttr = mkAttrName "disableHotkey"
 hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
 
-chooseAttr :: Status -> AttrName
-chooseAttr _ = notStartedAttr
--- chooseAttr (Running {}) = runningAttr
--- chooseAttr (Done _ _ (Success {})) = successAttr
--- chooseAttr (Done _ _ (Failure (Pending {}))) = pendingAttr
--- chooseAttr (Done _ _ (Failure {})) = failureAttr
--- chooseAttr (Done _ _ DryRun) = notStartedAttr
--- chooseAttr (Done _ _ Cancelled) = failureAttr
-
 -- * Logging and callstacks
-
-debugAttr, infoAttr, warnAttr, errorAttr, otherAttr :: AttrName
-debugAttr = attrName "log_debug"
-infoAttr = attrName "log_info"
-warnAttr = attrName "log_warn"
-errorAttr = attrName "log_error"
-otherAttr = mkAttrName "log_other"
 
 logTimestampAttr :: AttrName
 logTimestampAttr = mkAttrName "log_timestamp"

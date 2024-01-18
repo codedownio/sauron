@@ -60,28 +60,51 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       , Just (renderHeadingName _label _status)
       , Just (padLeft Max (str "⠀"))
       ]
-    renderLine _isSelected (MainListElemRepo {_repo=Nothing, _namespaceName=(owner, name), ..}) = hBox $ catMaybes [
-      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , Just $ renderName owner name _status
-      ]
-    renderLine _isSelected (MainListElemRepo {_repo=(Just r), ..}) = hBox $ catMaybes [
+    renderLine _isSelected (MainListElemRepo {_repo=NotFetched, _namespaceName=(owner, name), ..}) =
+      renderRepoLine _toggled owner name notFetchedAttr
+    renderLine _isSelected (MainListElemRepo {_repo=Fetching, _namespaceName=(owner, name), ..}) =
+      renderRepoLine _toggled owner name fetchingAttr
+    renderLine _isSelected (MainListElemRepo {_repo=(Errored {}), _namespaceName=(owner, name), ..}) =
+      renderRepoLine _toggled owner name erroredAttr
+    renderLine _isSelected (MainListElemRepo {_repo=(Fetched r), ..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
       , Just (case repoOwner r of
-                SimpleOwner {simpleOwnerLogin} -> renderName simpleOwnerLogin (repoName r) _status
+                SimpleOwner {simpleOwnerLogin} -> hBox [
+                  withAttr normalAttr (str (toString (untagName simpleOwnerLogin)))
+                  , withAttr toggleMarkerAttr $ str " / "
+                  , withAttr normalAttr (str (toString (untagName (repoName r))))
+                  ]
              )
       , Just (padLeft Max (statsBox r))
       ]
+
+renderRepoLine :: Bool -> Name Owner -> Name Repo -> AttrName -> Widget n
+renderRepoLine isToggled owner name attr = hBox $ catMaybes [
+  Just $ withAttr openMarkerAttr $ str (if isToggled then "[-] " else "[+] ")
+  , Just $ hBox [
+      withAttr attr (str (toString (untagName owner)))
+      , withAttr toggleMarkerAttr $ str " / "
+      , withAttr attr (str (toString (untagName name)))
+      ]
+  , Just (padLeft Max (str "⠀"))
+  ]
 
 getUnfoldWigets :: MainListElem -> [Widget n]
 getUnfoldWigets (MainListElemHeading {}) = [
   str "HI I'M THE HEADING INFO"
   ]
-getUnfoldWigets (MainListElemRepo {_workflows=Nothing}) = [
+getUnfoldWigets (MainListElemRepo {_workflows=NotFetched}) = [
   hBox [str "Workflows not fetched."]
+  ]
+getUnfoldWigets (MainListElemRepo {_workflows=Fetching}) = [
+  hBox [str "Fetching workflows..."]
+  ]
+getUnfoldWigets (MainListElemRepo {_workflows=(Errored msg)}) = [
+  hBox [str [i|Failed to fetch workflows: #{msg}|]]
   ]
 
 -- WorkflowRun {workflowRunWorkflowRunId = Id 7403805672, workflowRunName = N "ci", workflowRunHeadBranch = migrate-debug, workflowRunHeadSha = "1367fa30fc409d198e18afa95bda04d26387925e", workflowRunPath = ".github/workflows/ci.yml", workflowRunDisplayTitle = More database stuff noci, workflowRunRunNumber = 2208, workflowRunEvent = "push", workflowRunStatus = "completed", workflowRunConclusion = Just skipped, workflowRunWorkflowId = 6848152, workflowRunUrl = URL https://api.github.com/repos/codedownio/codedown/actions/runs/7403805672, workflowRunHtmlUrl = URL https://github.com/codedownio/codedown/actions/runs/7403805672, workflowRunCreatedAt = 2024-01-04 00:10:06 UTC, workflowRunUpdatedAt = 2024-01-04 00:10:10 UTC, workflowRunActor = SimpleUser simpleUserId = Id 1634990, simpleUserLogin = N thomasjm, simpleUserAvatarUrl = URL "https://avatars.githubusercontent.com/u/1634990?v=4", simpleUserUrl = URL "https://api.github.com/users/thomasjm", workflowRunAttempt = 1, workflowRunStartedAt = 2024-01-04 00:10:06 UTC}
-getUnfoldWigets (MainListElemRepo {_workflows=(Just (WithTotalCount items count))}) = [borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|]) $ vBox $ toList $ fmap workflowWidget (toList items)]
+getUnfoldWigets (MainListElemRepo {_workflows=(Fetched (WithTotalCount items count))}) = [borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|]) $ vBox $ toList $ fmap workflowWidget (toList items)]
   where
     workflowWidget run@(WorkflowRun {..}) = hBox [
       str ("#" <> show workflowRunRunNumber <> " ")
@@ -101,42 +124,41 @@ infoBar s = Widget Greedy Fixed $ do
   case listSelectedElement (s ^. appMainList) of
     Nothing -> render $ hBox [str ""]
     Just (_, MainListElemHeading {}) -> render $ hBox [str ""]
-    Just (_, MainListElemRepo {_repo=Nothing}) -> render $ hBox [str ""]
-    Just (_, MainListElemRepo {_repo=(Just r)}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
+
+    Just (_, MainListElemRepo {_repo=(Fetched r)}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
       where
         issuesPhrase = case repoOpenIssuesCount r of
           0 -> Nothing
           1 -> Just [i|1 issue|]
           n -> Just [i|#{n} issues|]
 
-        phrases = catMaybes [issuesPhrase]
+        -- prsPhrase = case ? r of
+        --   0 -> Nothing
+        --   1 -> Just [i|1 PR|]
+        --   n -> Just [i|#{n} PRs|]
 
-renderHeadingName :: Text -> Status -> Widget n
+        phrases = catMaybes [issuesPhrase]
+    Just (_, MainListElemRepo {_repo=_}) -> render $ hBox [str ""]
+
+renderHeadingName :: Text -> Fetchable () -> Widget n
 renderHeadingName l _stat = hBox [
   str (toString l)
-  ]
-
-renderName :: Name Owner -> Name Repo -> Status -> Widget n
-renderName (N ownerName) (N name) stat = hBox [
-  withAttr (chooseAttr stat) (str (toString ownerName))
-  , withAttr toggleMarkerAttr $ str " / "
-  , withAttr (chooseAttr stat) (str (toString name))
   ]
 
 statsBox :: Repo -> Widget n
 statsBox (Repo {..}) = hBox $ catMaybes [
   guarding (repoWatchersCount > 0) $ padLeft (Pad 1) (
-      padRight (Pad 2) (withAttr infoAttr (str "👁️"))
+      padRight (Pad 2) (withAttr iconAttr (str "👁️"))
       <+> str (show repoWatchersCount)
       )
 
   , guarding (repoForksCount > 0) $ padLeft (Pad 1) (
-      padRight (Pad 1) (withAttr infoAttr (str "⑂"))
+      padRight (Pad 1) (withAttr iconAttr (str "⑂"))
       <+> str (show repoForksCount)
       )
 
   , guarding (repoStargazersCount > 0) $ padLeft (Pad 1) (
-      padRight (Pad 1) (withAttr infoAttr (str "★"))
+      padRight (Pad 1) (withAttr iconAttr (str "★"))
       <+> str (show repoStargazersCount)
       )
   ]
