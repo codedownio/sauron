@@ -103,5 +103,4 @@ makeLenses ''AppState
 --     && _appSortBy x == _appSortBy y
 
 data AppEvent =
-  FullUpdate AppState
-  | ListUpdate (V.Vector MainListElem)
+  ListUpdate (V.Vector MainListElem)

@@ -19,8 +19,8 @@ import System.FilePath
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
-appEvent _s (AppEvent (FullUpdate s')) = put s'
-appEvent s (AppEvent (ListUpdate l')) = put (set appMainList (list MainList l' 1) s)
+appEvent s (AppEvent (ListUpdate l')) = put $ s
+  & appMainList %~ listReplace l' (listSelected $ s ^. appMainList)
 
 appEvent s (VtyEvent e) = case e of
   -- Column 1
