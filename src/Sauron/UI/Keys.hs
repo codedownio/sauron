@@ -18,23 +18,13 @@ toggleKeys = [V.KEnter, V.KChar '\t']
 refreshAllKey = V.KChar 'R'
 refreshSelectedKey = V.KChar 'r'
 
-openSelectedFolderInFileExplorer = V.KChar 'o'
-
 browserToHomeKey = V.KChar 'h'
 browserToIssuesKey = V.KChar 'i'
 browserToPullsKey = V.KChar 'P'
 browserToActionsKey = V.KChar 'a'
 
 -- Column 3
-toggleFileLocationsKey = V.KChar 'F'
-toggleVisibilityThresholdsKey = V.KChar 'V'
-debugKey = V.KChar 'd'
-infoKey = V.KChar 'i'
-warnKey = V.KChar 'w'
-errorKey = V.KChar 'e'
 exitKey = V.KChar 'q'
-
-
 
 -- Other
 

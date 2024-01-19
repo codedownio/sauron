@@ -16,32 +16,16 @@ mkAttrName = attrName
 mainAttrMap :: AttrMap
 mainAttrMap = attrMap V.defAttr [
   -- (listAttr, V.white `on` V.blue)
-   -- (listSelectedAttr, V.blue `on` V.white)
+  -- (listSelectedAttr, V.blue `on` V.white)
   -- (listSelectedAttr, bg (V.Color240 $ V.rgbColorToColor240 0 1 0))
   -- (selectedAttr, bg (V.Color240 $ V.rgbColorToColor240 0 1 0))
 
   -- Statuses
-  -- , (notStartedAttr, fg V.)
   (iconAttr, fg V.white)
   , (normalAttr, fg V.white)
   , (notFetchedAttr, fg midGray)
   , (fetchingAttr, fg V.blue)
   , (erroredAttr, fg V.red)
-
-  , (runningAttr, fg V.blue)
-  , (pendingAttr, fg V.yellow)
-  , (successAttr, fg V.green)
-  , (failureAttr, fg V.red)
-  , (totalAttr, fg solarizedCyan)
-
-  -- Logging
-  , (logTimestampAttr, fg midGray)
-  , (logFilenameAttr, fg solarizedViolet)
-  , (logModuleAttr, fg solarizedMagenta)
-  , (logPackageAttr, fg solarizedGreen)
-  , (logLineAttr, fg solarizedCyan)
-  , (logChAttr, fg solarizedOrange)
-  , (logFunctionAttr, fg solarizedMagenta)
 
   -- Progress bar
   , (progressCompleteAttr, bg (V.Color240 235))
@@ -50,38 +34,13 @@ mainAttrMap = attrMap V.defAttr [
   -- Main list
   , (toggleMarkerAttr, fg midGray)
   , (openMarkerAttr, fg midGray)
-  , (visibilityThresholdIndicatorMutedAttr, fg $ grayAt (50 :: Int))
-  , (visibilityThresholdIndicatorAttr, fg $ grayAt (150 :: Int))
 
   -- Hotkey stuff
   , (hotkeyAttr, fg V.blue)
   , (disabledHotkeyAttr, fg midGray)
   , (hotkeyMessageAttr, fg brightWhite)
   , (disabledHotkeyMessageAttr, fg brightGray)
-
-  -- Exceptions and pretty printing
-  , (expectedAttr, fg midWhite)
-  , (sawAttr, fg midWhite)
-  , (integerAttr, fg solarizedMagenta)
-  , (floatAttr, fg solarizedMagenta)
-  , (charAttr, fg solarizedCyan)
-  , (stringAttr, fg solarizedYellow)
-  , (dateAttr, fg solarizedBase2)
-  , (timeAttr, fg solarizedBase1)
-  , (quoteAttr, fg solarizedBase1)
-  , (slashAttr, fg solarizedViolet)
-  , (negAttr, fg solarizedViolet)
-  , (listBracketAttr, fg solarizedOrange) -- TODO: make green?
-  , (tupleBracketAttr, fg solarizedGreen)
-  , (braceAttr, fg solarizedGreen)
-  , (ellipsesAttr, fg solarizedBase0)
-  , (recordNameAttr, fg solarizedRed)
-  , (fieldNameAttr, fg solarizedYellow)
-  , (constructorNameAttr, fg solarizedViolet)
   ]
-
--- selectedAttr :: AttrName
--- selectedAttr = "list_line_selected"
 
 iconAttr :: AttrName
 iconAttr = mkAttrName "icon"
@@ -98,79 +57,17 @@ fetchingAttr = mkAttrName "fetching"
 erroredAttr :: AttrName
 erroredAttr = mkAttrName "errored"
 
-runningAttr :: AttrName
-runningAttr = mkAttrName "running"
-
-notStartedAttr :: AttrName
-notStartedAttr = mkAttrName "not_started"
-
-pendingAttr :: AttrName
-pendingAttr = mkAttrName "pending"
-
-totalAttr :: AttrName
-totalAttr = mkAttrName "total"
-
-successAttr :: AttrName
-successAttr = mkAttrName "success"
-
-failureAttr :: AttrName
-failureAttr = mkAttrName "failure"
-
 toggleMarkerAttr :: AttrName
 toggleMarkerAttr = mkAttrName "toggleMarker"
 
 openMarkerAttr :: AttrName
 openMarkerAttr = mkAttrName "openMarker"
 
-visibilityThresholdIndicatorAttr :: AttrName
-visibilityThresholdIndicatorAttr = mkAttrName "visibilityThresholdIndicator"
-
-visibilityThresholdIndicatorMutedAttr :: AttrName
-visibilityThresholdIndicatorMutedAttr = mkAttrName "visibilityThresholdMutedIndicator"
-
 hotkeyAttr, disabledHotkeyAttr, hotkeyMessageAttr, disabledHotkeyMessageAttr :: AttrName
 hotkeyAttr = mkAttrName "hotkey"
 disabledHotkeyAttr = mkAttrName "disableHotkey"
 hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
-
--- * Logging and callstacks
-
-logTimestampAttr :: AttrName
-logTimestampAttr = mkAttrName "log_timestamp"
-
-logFilenameAttr, logModuleAttr, logPackageAttr, logLineAttr, logChAttr, logFunctionAttr :: AttrName
-logFilenameAttr = mkAttrName "logFilename"
-logModuleAttr = mkAttrName "logModule"
-logPackageAttr = mkAttrName "logPackage"
-logLineAttr = mkAttrName "logLine"
-logChAttr = mkAttrName "logCh"
-logFunctionAttr = mkAttrName "logFunction"
-
--- * Exceptions and pretty printing
-
-expectedAttr, sawAttr :: AttrName
-expectedAttr = mkAttrName "expected"
-sawAttr = mkAttrName "saw"
-
-integerAttr, timeAttr, dateAttr, stringAttr, charAttr, floatAttr, quoteAttr, slashAttr, negAttr :: AttrName
-listBracketAttr, tupleBracketAttr, braceAttr, ellipsesAttr, recordNameAttr, fieldNameAttr, constructorNameAttr :: AttrName
-integerAttr = mkAttrName "integer"
-floatAttr = mkAttrName "float"
-charAttr = mkAttrName "char"
-stringAttr = mkAttrName "string"
-dateAttr = mkAttrName "date"
-timeAttr = mkAttrName "time"
-quoteAttr = mkAttrName "quote"
-slashAttr = mkAttrName "slash"
-negAttr = mkAttrName "neg"
-listBracketAttr = mkAttrName "listBracket"
-tupleBracketAttr = mkAttrName "tupleBracket"
-braceAttr = mkAttrName "brace"
-ellipsesAttr = mkAttrName "ellipses"
-recordNameAttr = mkAttrName "recordName"
-fieldNameAttr = mkAttrName "fieldName"
-constructorNameAttr = mkAttrName "fieldName"
 
 -- * Colors
 

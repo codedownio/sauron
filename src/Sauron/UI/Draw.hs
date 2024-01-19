@@ -108,7 +108,7 @@ getUnfoldWigets (MainListElemRepo {_workflows=(Fetched (WithTotalCount items cou
   where
     workflowWidget run@(WorkflowRun {..}) = hBox [
       str ("#" <> show workflowRunRunNumber <> " ")
-      , withAttr logTimestampAttr $ str $ toString $ untagName workflowRunName
+      , withAttr normalAttr $ str $ toString $ untagName workflowRunName
       , str ": "
       , str $ toString $ workflowRunDisplayTitle
       , str "----"
