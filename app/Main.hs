@@ -131,7 +131,7 @@ main = do
               toggledVar <- newTVarIO False
               tell [MainListElemRepo {
                 _namespaceName = case r of
-                    ConfigRepoSingle owner name -> (mkName (Proxy @Owner) owner, mkName (Proxy @Repo) name)
+                    ConfigRepoSingle owner name _repoSettings -> (mkName (Proxy @Owner) owner, mkName (Proxy @Repo) name)
                     ConfigRepoWildcard {} -> error "No"
 
                 , _repo = repoVar

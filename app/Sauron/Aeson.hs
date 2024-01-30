@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 module Sauron.Aeson (
   toSnake0
@@ -6,12 +7,22 @@ module Sauron.Aeson (
   , toSnake3
   , toSnake4
   , toSnake5
+
+  , aesonLookup
   ) where
 
 import Data.Aeson as A
 import Data.Char
 import qualified Data.List as L
 import Relude
+
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key             as A
+import qualified Data.Aeson.KeyMap          as HM
+#else
+import Data.Hashable
+import qualified Data.HashMap.Strict        as HM
+#endif
 
 
 baseOptions :: A.Options
@@ -65,3 +76,11 @@ splitR p s =
 dropLeadingUnderscore :: [Char] -> [Char]
 dropLeadingUnderscore ('_':xs) = xs
 dropLeadingUnderscore xs = xs
+
+#if MIN_VERSION_aeson(2,0,0)
+aesonLookup :: Text -> HM.KeyMap v -> Maybe v
+aesonLookup = HM.lookup . A.fromText
+#else
+aesonLookup :: (Eq k, Hashable k) => k -> HM.HashMap k v -> Maybe v
+aesonLookup = HM.lookup
+#endif

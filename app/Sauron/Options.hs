@@ -1,6 +1,7 @@
-{-# OPTIONS_GHC -fno-warn-partial-fields #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -fno-warn-partial-fields #-}
 
 module Sauron.Options (
   CliArgs(..)
@@ -46,9 +47,21 @@ parseCliArgs = execParser opts
 
 -- * Config file
 
+data RepoSettings = RepoSettings {
+  repoSettingsCheckFrequency :: ()
+  } deriving (Show, Eq)
+$(deriveFromJSON toSnake2 ''RepoSettings)
+
+data RepoSettingsResult =
+  NoSettings
+  | HasSettings RepoSettings
+  | ParseError Text
+  deriving (Show, Eq)
+
 data ConfigRepo = ConfigRepoSingle {
   configRepoOwner :: Text
   , configRepoName :: Text
+  , configRepoSettings :: RepoSettingsResult
   } | ConfigRepoWildcard {
         configRepoOwner :: Text
       }
@@ -56,9 +69,21 @@ data ConfigRepo = ConfigRepoSingle {
 instance FromJSON ConfigRepo where
   parseJSON (A.String x) = case T.splitOn "/" x of
     [owner, "*"] -> pure (ConfigRepoWildcard owner)
-    [owner, name] -> pure (ConfigRepoSingle owner name)
+    [owner, name] -> pure (ConfigRepoSingle owner name NoSettings)
     _ -> fail [i|Expected repo format to be "owner/name" or "owner/*". Got: "#{x}"|]
-  parseJSON _ = fail "Failed to read IP"
+  parseJSON (A.Object obj@(aesonLookup "name" -> Just (A.String x))) = case T.splitOn "/" x of
+    [owner, "*"] -> pure (ConfigRepoWildcard owner)
+    [owner, name] -> pure (ConfigRepoSingle owner name settingsResult)
+      where
+        settingsResult = case aesonLookup "settings" obj of
+          Nothing -> NoSettings
+          Just settingsObj@(A.Object _) -> case A.fromJSON settingsObj of
+            Error err -> ParseError [i|Error parsing settings: #{err}|]
+            A.Success y -> HasSettings y
+          Just y -> ParseError [i|Error parsing settings: expected object but got '#{A.encode y}'|]
+    _ -> fail [i|Expected repo format to be "owner/name" or "owner/*". Got: "#{x}"|]
+
+  parseJSON _ = fail "Failed to read repo"
 
 data ConfigSection = ConfigSection {
   sectionDisplayName :: Maybe Text

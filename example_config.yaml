@@ -1,7 +1,14 @@
+
+check_frequency:
+  is_green: 10m
+
+
 sections:
 - display_name: "Core"
   repos:
-  - codedownio/codedown
+  - name: codedownio/codedown
+    settings:
+      check_frequency: 5m
   - codedownio/codedown-languages
   - codedownio/matheditable
 - display_name: "Languages ecosystem"
