@@ -14,6 +14,8 @@
           packages = rec {
             inherit (pkgs) cabal2nix;
             inherit default;
+
+            print-nixpkgs = pkgs.writeShellScriptBin "print-nixpkgs.sh" "echo ${pkgs.path}";
           };
 
           defaultPackage = packages.default;
