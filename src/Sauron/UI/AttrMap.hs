@@ -27,6 +27,14 @@ mainAttrMap = attrMap V.defAttr [
   , (fetchingAttr, fg V.blue)
   , (erroredAttr, fg V.red)
 
+  -- Workflow icons
+  , (cancelledAttr, fg V.red)
+  , (greenCheckAttr, fg V.green)
+  , (redXAttr, fg V.red)
+  , (ellipsesAttr, fg midGray)
+  , (neutralAttr, fg midGray)
+  , (unknownAttr, fg V.white)
+
   -- Progress bar
   , (progressCompleteAttr, bg (V.Color240 235))
   , (progressIncompleteAttr, bg (V.Color240 225))
@@ -68,6 +76,17 @@ hotkeyAttr = mkAttrName "hotkey"
 disabledHotkeyAttr = mkAttrName "disableHotkey"
 hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
+
+-- * Workflow icons
+
+cancelledAttr, greenCheckAttr, redXAttr, ellipsesAttr, neutralAttr, unknownAttr :: AttrName
+cancelledAttr = mkAttrName "cancelled"
+greenCheckAttr = mkAttrName "greenCheck"
+redXAttr = mkAttrName "redX"
+ellipsesAttr = mkAttrName "ellipses"
+neutralAttr = mkAttrName "neutral"
+unknownAttr = mkAttrName "neutral"
+
 
 -- * Colors
 

@@ -19,6 +19,7 @@ import Lens.Micro hiding (ix)
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Draw.WorkflowLine
 import Sauron.UI.TopBox
 import Sauron.UI.Util
 
@@ -103,17 +104,10 @@ getUnfoldWigets (MainListElemRepo {_workflows=(Errored msg)}) = [
   hBox [str [i|Failed to fetch workflows: #{msg}|]]
   ]
 
--- WorkflowRun {workflowRunWorkflowRunId = Id 7403805672, workflowRunName = N "ci", workflowRunHeadBranch = migrate-debug, workflowRunHeadSha = "1367fa30fc409d198e18afa95bda04d26387925e", workflowRunPath = ".github/workflows/ci.yml", workflowRunDisplayTitle = More database stuff noci, workflowRunRunNumber = 2208, workflowRunEvent = "push", workflowRunStatus = "completed", workflowRunConclusion = Just skipped, workflowRunWorkflowId = 6848152, workflowRunUrl = URL https://api.github.com/repos/codedownio/codedown/actions/runs/7403805672, workflowRunHtmlUrl = URL https://github.com/codedownio/codedown/actions/runs/7403805672, workflowRunCreatedAt = 2024-01-04 00:10:06 UTC, workflowRunUpdatedAt = 2024-01-04 00:10:10 UTC, workflowRunActor = SimpleUser simpleUserId = Id 1634990, simpleUserLogin = N thomasjm, simpleUserAvatarUrl = URL "https://avatars.githubusercontent.com/u/1634990?v=4", simpleUserUrl = URL "https://api.github.com/users/thomasjm", workflowRunAttempt = 1, workflowRunStartedAt = 2024-01-04 00:10:06 UTC}
-getUnfoldWigets (MainListElemRepo {_workflows=(Fetched (WithTotalCount items count))}) = [borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|]) $ vBox $ toList $ fmap workflowWidget (toList items)]
-  where
-    workflowWidget run@(WorkflowRun {..}) = hBox [
-      str ("#" <> show workflowRunRunNumber <> " ")
-      , withAttr normalAttr $ str $ toString $ untagName workflowRunName
-      , str ": "
-      , str $ toString $ workflowRunDisplayTitle
-      , str "----"
-      , strWrap (show run)
-      ]
+getUnfoldWigets (MainListElemRepo {_workflows=(Fetched (WithTotalCount items count))}) = [
+  borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|])
+                  (vBox $ toList $ fmap workflowWidget (toList items))
+  ]
 
 borderWithCounts :: AppState -> Widget n
 borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]

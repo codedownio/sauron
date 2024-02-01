@@ -2,7 +2,6 @@
 check_frequency:
   is_green: 10m
 
-
 sections:
 - display_name: "Core"
   repos:
@@ -17,8 +16,9 @@ sections:
   - codedownio/rust-notebook-language-server
 - display_name: "Open source"
   repos:
-  - codedownio/sandwich
   - codedownio/aeson-typescript
+  - codedownio/myers-diff
+  - codedownio/sandwich
   - codedownio/servant-typescript
 - display_name: "Maintaining"
   repos:
