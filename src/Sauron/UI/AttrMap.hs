@@ -28,7 +28,7 @@ mainAttrMap = attrMap V.defAttr [
   , (erroredAttr, fg V.red)
 
   -- Workflow icons
-  , (cancelledAttr, fg V.red)
+  , (cancelledAttr, fg midGray)
   , (greenCheckAttr, fg V.green)
   , (redXAttr, fg V.red)
   , (ellipsesAttr, fg midGray)

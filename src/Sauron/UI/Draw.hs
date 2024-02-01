@@ -61,34 +61,34 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       , Just (renderHeadingName _label _status)
       , Just (padLeft Max (str " "))
       ]
-    renderLine _isSelected (MainListElemRepo {_repo=NotFetched, _namespaceName=(owner, name), ..}) =
-      renderRepoLine _toggled owner name notFetchedAttr
-    renderLine _isSelected (MainListElemRepo {_repo=Fetching, _namespaceName=(owner, name), ..}) =
-      renderRepoLine _toggled owner name fetchingAttr
-    renderLine _isSelected (MainListElemRepo {_repo=(Errored {}), _namespaceName=(owner, name), ..}) =
-      renderRepoLine _toggled owner name erroredAttr
-    renderLine _isSelected (MainListElemRepo {_repo=(Fetched r), ..}) = hBox $ catMaybes [
-      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , Just (case repoOwner r of
-                SimpleOwner {simpleOwnerLogin} -> hBox [
-                  withAttr normalAttr (str (toString (untagName simpleOwnerLogin)))
-                  , withAttr toggleMarkerAttr $ str " / "
-                  , withAttr normalAttr (str (toString (untagName (repoName r))))
-                  ]
-             )
-      , Just (padLeft Max (statsBox r))
-      ]
+    renderLine _isSelected (MainListElemRepo {_repo, ..}) =
+      renderRepoLine _toggled _namespaceName (repoAttr _repo) (healthIndicator _healthCheck) (fetchableStatsBox _repo)
 
-renderRepoLine :: Bool -> Name Owner -> Name Repo -> AttrName -> Widget n
-renderRepoLine isToggled owner name attr = hBox $ catMaybes [
+renderRepoLine :: Bool -> (Name Owner, Name Repo) -> AttrName -> Maybe (Widget n) -> Widget n -> Widget n
+renderRepoLine isToggled (owner, name) attr maybeHealth rightSide = hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if isToggled then "[-] " else "[+] ")
   , Just $ hBox [
       withAttr attr (str (toString (untagName owner)))
       , withAttr toggleMarkerAttr $ str " / "
       , withAttr attr (str (toString (untagName name)))
       ]
-  , Just (padLeft Max (str " "))
+  , maybeHealth
+  , Just (padLeft Max rightSide)
   ]
+
+healthIndicator :: Fetchable HealthCheckResult -> Maybe (Widget n)
+healthIndicator (Fetched (HealthCheckWorkflowResult ws)) = Just (padLeft (Pad 1) (workflowStatusToIcon ws))
+healthIndicator _ = Nothing
+
+repoAttr :: Fetchable Repo -> AttrName
+repoAttr NotFetched = notFetchedAttr
+repoAttr Fetching = fetchingAttr
+repoAttr (Errored {}) = erroredAttr
+repoAttr (Fetched {}) = normalAttr
+
+fetchableStatsBox :: Fetchable Repo -> Widget n
+fetchableStatsBox (Fetched r) = statsBox r
+fetchableStatsBox _ = str " "
 
 getUnfoldWigets :: MainListElem -> [Widget n]
 getUnfoldWigets (MainListElemHeading {}) = [
