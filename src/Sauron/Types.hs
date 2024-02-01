@@ -44,8 +44,34 @@ data Fetchable a =
   | Fetched a
   deriving (Show, Eq)
 
+data WorkflowStatus =
+  WorkflowSuccess
+  | WorkflowPending
+  | WorkflowFailed
+  | WorkflowCancelled
+  | WorkflowNeutral
+  | WorkflowUnknown
+  deriving (Show, Eq)
+
+chooseWorkflowStatus :: Text -> WorkflowStatus
+chooseWorkflowStatus "completed" = WorkflowSuccess
+chooseWorkflowStatus "action_required" = WorkflowPending
+chooseWorkflowStatus "cancelled" = WorkflowCancelled
+chooseWorkflowStatus "failure" = WorkflowFailed
+chooseWorkflowStatus "neutral" = WorkflowNeutral
+chooseWorkflowStatus "skipped" = WorkflowCancelled
+chooseWorkflowStatus "stale" = WorkflowNeutral
+chooseWorkflowStatus "success" = WorkflowSuccess
+chooseWorkflowStatus "timed_out" = WorkflowFailed
+chooseWorkflowStatus "in_progress" = WorkflowPending
+chooseWorkflowStatus "queued" = WorkflowPending
+chooseWorkflowStatus "requested" = WorkflowPending
+chooseWorkflowStatus "waiting" = WorkflowPending
+chooseWorkflowStatus "pending" = WorkflowPending
+chooseWorkflowStatus _ = WorkflowUnknown
+
 data HealthCheckResult =
-  HealthCheckHealthy
+  HealthCheckWorkflowResult WorkflowStatus
   | HealthCheckNoData
   | HealthCheckUnhealthy Text
   deriving (Show, Eq)

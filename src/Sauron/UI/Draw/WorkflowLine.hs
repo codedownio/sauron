@@ -7,6 +7,7 @@ module Sauron.UI.Draw.WorkflowLine (
 import Brick
 import GitHub hiding (Status)
 import Relude
+import Sauron.Types
 import Sauron.UI.AttrMap
 
 
@@ -18,29 +19,19 @@ workflowWidget (WorkflowRun {..}) = hBox [
   , withAttr normalAttr $ str $ toString $ untagName workflowRunName
   , str ": "
   , str $ toString workflowRunDisplayTitle
-  , padLeft (Pad 1) $ getWorkflowIcon workflowRunStatus workflowRunConclusion
+  , padLeft (Pad 1) $ getIcon $ fromMaybe workflowRunStatus workflowRunConclusion
   ]
 
-getWorkflowIcon _ (Just conclusion) = getIcon conclusion
-getWorkflowIcon status Nothing = getIcon status
-
+workflowStatusToIcon :: WorkflowStatus -> Widget n
+workflowStatusToIcon WorkflowSuccess = greenCheck
+workflowStatusToIcon WorkflowPending = ellipses
+workflowStatusToIcon WorkflowFailed = redX
+workflowStatusToIcon WorkflowCancelled = cancelled
+workflowStatusToIcon WorkflowNeutral = neutral
+workflowStatusToIcon WorkflowUnknown = unknown
 
 getIcon :: Text -> Widget n
-getIcon "completed" = greenCheck
-getIcon "action_required" = ellipses
-getIcon "cancelled" = cancelled
-getIcon "failure" = redX
-getIcon "neutral" = neutral
-getIcon "skipped" = cancelled
-getIcon "stale" = neutral
-getIcon "success" = greenCheck
-getIcon "timed_out" = redX
-getIcon "in_progress" = ellipses
-getIcon "queued" = ellipses
-getIcon "requested" = ellipses
-getIcon "waiting" = ellipses
-getIcon "pending" = ellipses
-getIcon _ = unknown
+getIcon = workflowStatusToIcon . chooseWorkflowStatus
 
 cancelled = withAttr cancelledAttr (str "⃠")
 greenCheck = withAttr greenCheckAttr (str "✓")

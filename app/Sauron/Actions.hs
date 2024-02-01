@@ -94,8 +94,9 @@ newHealthCheckThread ::
   -> TVar (Fetchable HealthCheckResult)
   -> PeriodSpec
   -> IO (Async ())
-newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar healthCheckVar (PeriodSpec period) = do
+newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $ do
   forever $ do
+    -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?
     defaultBranch <- atomically $ do
       readTVar repoVar >>= \case
         Fetched (Repo {repoDefaultBranch=(Just branch)}) -> pure branch
@@ -107,8 +108,9 @@ newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar heal
         let search = optionsWorkflowRunBranch defaultBranch
         withGithubApiSemaphore (liftIO $ github auth (workflowRunsR owner name search (FetchAtLeast 1))) >>= \case
           Left err -> atomically $ writeTVar healthCheckVar (Errored (show err))
-          Right (WithTotalCount {withTotalCountItems=(V.toList -> ((WorkflowRun {..}):_))}) ->
-            atomically $ writeTVar healthCheckVar undefined
+          Right (WithTotalCount {withTotalCountItems=(V.toList -> ((WorkflowRun {..}):_))}) -> do
+            let result = HealthCheckWorkflowResult (chooseWorkflowStatus (fromMaybe workflowRunStatus workflowRunConclusion))
+            atomically $ writeTVar healthCheckVar (Fetched result)
           Right _ -> atomically $ writeTVar healthCheckVar (Fetched HealthCheckNoData)
 
     threadDelay period

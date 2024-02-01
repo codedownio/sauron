@@ -94,15 +94,17 @@ main = do
         Right x -> return x
 
       (V.fromList <$>) $ forM (V.toList repos) $ \r -> do
+        let nsName = (simpleOwnerLogin $ repoOwner r, repoName r)
         repoVar <- newTVarIO (Fetched r)
         healthCheckVar <- newTVarIO NotFetched
+        hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar defaultHealthCheckPeriodUs
         workflowsVar <- newTVarIO NotFetched
         toggledVar <- newTVarIO False
         return $ MainListElemRepo {
-          _namespaceName = (simpleOwnerLogin $ repoOwner r, repoName r)
+          _namespaceName = nsName
           , _repo = repoVar
           , _healthCheck = healthCheckVar
-          , _healthCheckThread = undefined
+          , _healthCheckThread = Just hcThread
           , _workflows = workflowsVar
           , _toggled = toggledVar
           , _depth = 0

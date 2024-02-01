@@ -1,15 +1,17 @@
 
 settings:
   green_if: ci_green_on_default_branch
-  check_period:
-    is_green: 10m
+  check_period: 60000000
+    # is_green: 60000000
+    # is_green: 10m
 
 sections:
 - display_name: "Core"
   repos:
   - name: codedownio/codedown
     settings:
-      check_period: 5m
+      check_period: 30000000
+      # check_period: 5m
   - codedownio/codedown-languages
   - codedownio/matheditable
 - display_name: "Languages ecosystem"

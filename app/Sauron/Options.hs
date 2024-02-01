@@ -55,7 +55,9 @@ parseCliArgs = execParser opts
 newtype PeriodSpec = PeriodSpec Int
   deriving (Show, Eq)
 instance FromJSON PeriodSpec where
-  parseJSON _ = undefined
+  parseJSON (A.Number n) = pure (PeriodSpec (round n))
+  -- TODO: parse k8s-style time specs like 5m
+  parseJSON x = fail [i|Can't parse period spec: #{x}|]
 
 data RepoSettings = RepoSettings {
   repoSettingsCheckPeriod :: Maybe PeriodSpec

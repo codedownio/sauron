@@ -59,7 +59,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
     renderLine _isSelected (MainListElemHeading {..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
       , Just (renderHeadingName _label _status)
-      , Just (padLeft Max (str "⠀"))
+      , Just (padLeft Max (str " "))
       ]
     renderLine _isSelected (MainListElemRepo {_repo=NotFetched, _namespaceName=(owner, name), ..}) =
       renderRepoLine _toggled owner name notFetchedAttr
@@ -87,7 +87,7 @@ renderRepoLine isToggled owner name attr = hBox $ catMaybes [
       , withAttr toggleMarkerAttr $ str " / "
       , withAttr attr (str (toString (untagName name)))
       ]
-  , Just (padLeft Max (str "⠀"))
+  , Just (padLeft Max (str " "))
   ]
 
 getUnfoldWigets :: MainListElem -> [Widget n]
@@ -161,3 +161,6 @@ guarding :: (Monad m, Alternative m) => Bool -> b -> m b
 guarding p widget = do
   guard p
   return widget
+
+progressThing :: String
+progressThing = "⠀"
