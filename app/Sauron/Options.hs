@@ -8,6 +8,11 @@ module Sauron.Options (
   , cliArgsParser
   , parseCliArgs
 
+  , RepoSettings(..)
+  , RepoSettingsResult(..)
+
+  , PeriodSpec(..)
+
   , Config(..)
   , ConfigSection(..)
   , ConfigRepo(..)
@@ -47,8 +52,13 @@ parseCliArgs = execParser opts
 
 -- * Config file
 
+newtype PeriodSpec = PeriodSpec Int
+  deriving (Show, Eq)
+instance FromJSON PeriodSpec where
+  parseJSON _ = undefined
+
 data RepoSettings = RepoSettings {
-  repoSettingsCheckFrequency :: ()
+  repoSettingsCheckPeriod :: Maybe PeriodSpec
   } deriving (Show, Eq)
 $(deriveFromJSON toSnake2 ''RepoSettings)
 
@@ -92,6 +102,7 @@ data ConfigSection = ConfigSection {
 $(deriveFromJSON toSnake1 ''ConfigSection)
 
 data Config = Config {
-  configSections :: Maybe [ConfigSection]
+  configSettings :: Maybe RepoSettings
+  , configSections :: Maybe [ConfigSection]
   } deriving (Show)
 $(deriveFromJSON toSnake1 ''Config)

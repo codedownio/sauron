@@ -44,6 +44,7 @@ library
       MultiWayIf
       NamedFieldPuns
       NoImplicitPrelude
+      NumericUnderscores
       OverloadedStrings
       QuasiQuotes
       RecordWildCards
@@ -88,6 +89,7 @@ executable sauron
       MultiWayIf
       NamedFieldPuns
       NoImplicitPrelude
+      NumericUnderscores
       OverloadedStrings
       QuasiQuotes
       RecordWildCards
@@ -132,6 +134,7 @@ test-suite test
       MultiWayIf
       NamedFieldPuns
       NoImplicitPrelude
+      NumericUnderscores
       OverloadedStrings
       QuasiQuotes
       RecordWildCards

@@ -14,36 +14,13 @@ import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro.TH
 import Relude
+import UnliftIO.Async
 
 
 data SortBy = SortByStars | SortByPushed | SortByUpdated
   deriving (Eq)
 
--- data NodeWithStatus context s t where
---   NodeOwner :: {
---     nodeInfo :: ()
---     } -> NodeWithStatus context s t
---   NodeRepo :: {
---     nodeInfo :: ()
---     } -> NodeWithStatus context s t
-
--- data NodeCommonWithStatus s t = NodeCommonWithStatus {
---   commonLabel :: String
---   , commonId :: Int
---   , commonAncestors :: Seq Int
---   , commonToggled :: t
---   , commonOpen :: t
---   , commonStatus :: s
---   , commonVisible :: Bool
---   } deriving (Show, Eq)
-
--- type NodeCommonFixed = NodeCommonWithStatus Status Bool
--- type NodeCommon = NodeCommonWithStatus (Var Status) (Var Bool)
-
 type Var = TVar
-
--- type Node context = NodeWithStatus context (Var Status) (Var Bool)
--- type NodeFixed context = NodeWithStatus context Status Bool
 
 data BaseContext = BaseContext {
   requestSemaphore :: QSem
@@ -67,6 +44,12 @@ data Fetchable a =
   | Fetched a
   deriving (Show, Eq)
 
+data HealthCheckResult =
+  HealthCheckHealthy
+  | HealthCheckNoData
+  | HealthCheckUnhealthy Text
+  deriving (Show, Eq)
+
 data MainListElem' f = MainListElemHeading {
   _label :: Text
   , _depth :: Int
@@ -76,9 +59,11 @@ data MainListElem' f = MainListElemHeading {
   } | MainListElemRepo {
   _namespaceName :: (Name Owner, Name Repo)
   , _repo :: Switchable f (Fetchable Repo)
+  , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
+  , _healthCheckThread :: Maybe (Async ())
   , _workflows :: Switchable f (Fetchable (WithTotalCount WorkflowRun))
-  , _depth :: Int
   , _toggled :: Switchable f Bool
+  , _depth :: Int
   , _ident :: Int
   }
 makeLenses ''MainListElem'
@@ -94,13 +79,6 @@ data AppState = AppState {
   , _appSortBy :: SortBy
   }
 makeLenses ''AppState
--- type AppState = AppState' Fixed
--- type AppStateVariable = AppState' Variable
--- instance Eq AppState where
---   x == y =
---     _appUser x == _appUser y
---     && L.listElements (_appMainList x) == L.listElements (_appMainList y)
---     && _appSortBy x == _appSortBy y
 
 data AppEvent =
   ListUpdate (V.Vector MainListElem)

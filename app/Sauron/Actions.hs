@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Sauron.Actions (
   openBrowserToUrl
@@ -10,6 +11,8 @@ module Sauron.Actions (
 
   , refreshAll
 
+  , newHealthCheckThread
+
   , withGithubApiSemaphore
   , withGithubApiSemaphore'
 
@@ -19,6 +22,7 @@ module Sauron.Actions (
 import Brick as B
 import Brick.Widgets.List
 import Control.Concurrent.QSem
+import Control.Concurrent.STM (retry)
 import Control.Exception.Safe (bracket_, bracketOnError_)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
@@ -27,8 +31,10 @@ import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude
+import Sauron.Options
 import Sauron.Types
 import UnliftIO.Async
+import UnliftIO.Concurrent
 import UnliftIO.Process
 
 
@@ -79,8 +85,33 @@ refreshAll elems = do
         withGithubApiSemaphore $
           fetchRepo owner name _repo
 
-        withGithubApiSemaphore $
-          fetchWorkflows owner name _workflows
+        -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
+
+newHealthCheckThread ::
+  BaseContext
+  -> (Name Owner, Name Repo)
+  -> TVar (Fetchable Repo)
+  -> TVar (Fetchable HealthCheckResult)
+  -> PeriodSpec
+  -> IO (Async ())
+newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar healthCheckVar (PeriodSpec period) = do
+  forever $ do
+    defaultBranch <- atomically $ do
+      readTVar repoVar >>= \case
+        Fetched (Repo {repoDefaultBranch=(Just branch)}) -> pure branch
+        _ -> retry
+
+    liftIO $ flip runReaderT baseContext $
+      bracketOnError_ (atomically $ writeTVar healthCheckVar Fetching)
+                      (atomically $ writeTVar healthCheckVar (Errored "Health check fetch failed with exception.")) $ do
+        let search = optionsWorkflowRunBranch defaultBranch
+        withGithubApiSemaphore (liftIO $ github auth (workflowRunsR owner name search (FetchAtLeast 1))) >>= \case
+          Left err -> atomically $ writeTVar healthCheckVar (Errored (show err))
+          Right (WithTotalCount {withTotalCountItems=(V.toList -> ((WorkflowRun {..}):_))}) ->
+            atomically $ writeTVar healthCheckVar undefined
+          Right _ -> atomically $ writeTVar healthCheckVar (Fetched HealthCheckNoData)
+
+    threadDelay period
 
 withGithubApiSemaphore :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => m a -> m a
 withGithubApiSemaphore action = do

@@ -43,6 +43,7 @@ default-extensions:
 - MultiWayIf
 - NamedFieldPuns
 - NoImplicitPrelude
+- NumericUnderscores
 - OverloadedStrings
 - QuasiQuotes
 - RecordWildCards

@@ -36,6 +36,8 @@ import UnliftIO.Exception
 refreshPeriod :: Int
 refreshPeriod = 100000
 
+defaultHealthCheckPeriodUs :: PeriodSpec
+defaultHealthCheckPeriodUs = PeriodSpec (1_000_000 * 60 * 10)
 
 app :: App AppState AppEvent ClickableName
 app = App {
@@ -93,14 +95,17 @@ main = do
 
       (V.fromList <$>) $ forM (V.toList repos) $ \r -> do
         repoVar <- newTVarIO (Fetched r)
+        healthCheckVar <- newTVarIO NotFetched
         workflowsVar <- newTVarIO NotFetched
         toggledVar <- newTVarIO False
         return $ MainListElemRepo {
           _namespaceName = (simpleOwnerLogin $ repoOwner r, repoName r)
           , _repo = repoVar
+          , _healthCheck = healthCheckVar
+          , _healthCheckThread = undefined
           , _workflows = workflowsVar
-          , _depth = 0
           , _toggled = toggledVar
+          , _depth = 0
           , _ident = 0
           }
 
@@ -126,18 +131,29 @@ main = do
                 pure 1
 
             forM sectionRepos $ \r -> do
+              let nsName = case r of
+                    ConfigRepoSingle owner name _repoSettings -> (mkName (Proxy @Owner) owner, mkName (Proxy @Repo) name)
+                    ConfigRepoWildcard {} -> error "No"
               repoVar <- newTVarIO NotFetched
+              healthCheckVar <- newTVarIO NotFetched
+              hcThread <- case r of
+                ConfigRepoSingle _ _ (HasSettings (RepoSettings {repoSettingsCheckPeriod=localPeriod})) -> do
+                  let period = fromMaybe defaultHealthCheckPeriodUs (localPeriod <|> join (repoSettingsCheckPeriod <$> configSettings))
+                  Just <$> lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar period)
+                ConfigRepoSingle _ _ _ -> do
+                  let period = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
+                  Just <$> lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar period)
+                ConfigRepoWildcard {} -> pure Nothing
               workflowsVar <- newTVarIO NotFetched
               toggledVar <- newTVarIO False
               tell [MainListElemRepo {
-                _namespaceName = case r of
-                    ConfigRepoSingle owner name _repoSettings -> (mkName (Proxy @Owner) owner, mkName (Proxy @Repo) name)
-                    ConfigRepoWildcard {} -> error "No"
-
+                _namespaceName = nsName
                 , _repo = repoVar
+                , _healthCheck = healthCheckVar
+                , _healthCheckThread = hcThread
                 , _workflows = workflowsVar
-                , _depth = repoDepth
                 , _toggled = toggledVar
+                , _depth = repoDepth
                 , _ident = 0
                 }]
 

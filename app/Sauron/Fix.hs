@@ -20,6 +20,7 @@ fixMainListElem (MainListElemHeading {..}) = do
     , _ident = _ident
     }
 fixMainListElem (MainListElemRepo {..}) = do
+  healthCheckFixed <- readTVar _healthCheck
   workflowsFixed <- readTVar _workflows
   toggledFixed <- readTVar _toggled
   repoFixed <- readTVar _repo
@@ -27,8 +28,10 @@ fixMainListElem (MainListElemRepo {..}) = do
   return $ MainListElemRepo {
     _namespaceName = _namespaceName
     , _repo = repoFixed
+    , _healthCheck = healthCheckFixed
+    , _healthCheckThread = _healthCheckThread
     , _workflows = workflowsFixed
-    , _depth = _depth
     , _toggled = toggledFixed
+    , _depth = _depth
     , _ident = _ident
     }
