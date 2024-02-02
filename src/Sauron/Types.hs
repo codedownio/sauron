@@ -85,6 +85,8 @@ data MainListElem' f = MainListElemHeading {
   } | MainListElemRepo {
   _namespaceName :: (Name Owner, Name Repo)
   , _repo :: Switchable f (Fetchable Repo)
+  -- TODO: move the healthCheck thread inside the _repo?
+  -- kill it and restart when the repo is refreshed?
   , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
   , _healthCheckThread :: Maybe (Async ())
   , _workflows :: Switchable f (Fetchable (WithTotalCount WorkflowRun))

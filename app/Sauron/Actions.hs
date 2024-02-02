@@ -23,7 +23,7 @@ import Brick as B
 import Brick.Widgets.List
 import Control.Concurrent.QSem
 import Control.Concurrent.STM (retry)
-import Control.Exception.Safe (bracket_, bracketOnError_)
+import Control.Exception.Safe (bracket_, bracketOnError_, handleAny)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import Data.String.Interpolate
@@ -82,8 +82,7 @@ refreshAll elems = do
     void $ async $ forConcurrently (V.toList elems) $ \case
       MainListElemHeading {} -> return ()
       MainListElemRepo {_namespaceName=(owner, name), ..} -> do
-        withGithubApiSemaphore $
-          fetchRepo owner name _repo
+        fetchRepo owner name _repo
 
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
 
@@ -94,7 +93,8 @@ newHealthCheckThread ::
   -> TVar (Fetchable HealthCheckResult)
   -> PeriodSpec
   -> IO (Async ())
-newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $ do
+newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $
+  handleAny (\e -> putStrLn [i|Health check thread crashed: #{e}|]) $
   forever $ do
     -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?
     defaultBranch <- atomically $ do
@@ -120,6 +120,7 @@ withGithubApiSemaphore action = do
   sem <- asks requestSemaphore
   withGithubApiSemaphore' sem action
 
+-- TODO: add timeout here?
 withGithubApiSemaphore' :: (MonadIO m, MonadMask m) => QSem -> m a -> m a
 withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQSem sem)
 
