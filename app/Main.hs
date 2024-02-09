@@ -98,18 +98,7 @@ main = do
         repoVar <- newTVarIO (Fetched r)
         healthCheckVar <- newTVarIO NotFetched
         hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar defaultHealthCheckPeriodUs
-        workflowsVar <- newTVarIO NotFetched
-        toggledVar <- newTVarIO False
-        return $ MainListElemRepo {
-          _namespaceName = nsName
-          , _repo = repoVar
-          , _healthCheck = healthCheckVar
-          , _healthCheckThread = Just hcThread
-          , _workflows = workflowsVar
-          , _toggled = toggledVar
-          , _depth = 0
-          , _ident = 0
-          }
+        newRepoNode nsName repoVar healthCheckVar (Just hcThread) 0
 
     Just configFile -> do
       Yaml.decodeFileEither configFile >>= \case
@@ -146,18 +135,8 @@ main = do
                   let period = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
                   Just <$> lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar period)
                 ConfigRepoWildcard {} -> pure Nothing
-              workflowsVar <- newTVarIO NotFetched
-              toggledVar <- newTVarIO False
-              tell [MainListElemRepo {
-                _namespaceName = nsName
-                , _repo = repoVar
-                , _healthCheck = healthCheckVar
-                , _healthCheckThread = hcThread
-                , _workflows = workflowsVar
-                , _toggled = toggledVar
-                , _depth = repoDepth
-                , _ident = 0
-                }]
+              node <- newRepoNode nsName repoVar healthCheckVar hcThread repoDepth
+              tell [node]
 
   -------------------------------------------------------------
 
@@ -205,3 +184,32 @@ main = do
   initialVty <- buildVty
   flip onException (cancel eventAsync) $
     void $ customMain initialVty buildVty (Just eventChan) app initialState
+
+
+newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
+  workflowsVar <- newTVarIO NotFetched
+
+  issuesSearchVar <- newTVarIO "is:issue"
+  issuesPageVar <- newTVarIO 0
+  issuesVar <- newTVarIO NotFetched
+
+  toggledVar <- newTVarIO False
+
+  return $ MainListElemRepo {
+    _namespaceName = nsName
+    , _repo = repoVar
+
+    , _healthCheck = healthCheckVar
+    , _healthCheckThread = hcThread
+
+    , _workflows = workflowsVar
+
+    , _issuesSearch = issuesSearchVar
+    , _issuesPage = issuesPageVar
+    , _issues = issuesVar
+
+    , _toggled = toggledVar
+
+    , _depth = repoDepth
+    , _ident = 0
+    }
