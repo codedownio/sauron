@@ -76,32 +76,52 @@ data HealthCheckResult =
   | HealthCheckUnhealthy Text
   deriving (Show, Eq)
 
-data MainListElem' f = MainListElemHeading {
-  _label :: Text
-  , _depth :: Int
-  , _toggled :: Switchable f Bool
-  , _status :: Switchable f (Fetchable ())
-  , _ident :: Int
-  } | MainListElemRepo {
-  _namespaceName :: (Name Owner, Name Repo)
-  , _repo :: Switchable f (Fetchable Repo)
+data MainListElem' f =
+  MainListElemHeading {
+      _label :: Text
+      , _depth :: Int
+      , _toggled :: Switchable f Bool
+      , _status :: Switchable f (Fetchable ())
+      , _ident :: Int
+      }
+  | MainListElemRepo {
+      _namespaceName :: (Name Owner, Name Repo)
+      , _repo :: Switchable f (Fetchable Repo)
 
-  -- TODO: move the healthCheck thread inside the _repo?
-  -- kill it and restart when the repo is refreshed?
-  , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
-  , _healthCheckThread :: Maybe (Async ())
+      -- TODO: move the healthCheck thread inside the _repo?
+      -- kill it and restart when the repo is refreshed?
+      , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
+      , _healthCheckThread :: Maybe (Async ())
 
-  , _workflows :: Switchable f (Fetchable (WithTotalCount WorkflowRun))
+      , _workflows :: Switchable f (Fetchable (WithTotalCount WorkflowRun))
 
-  , _issuesSearch :: Switchable f Text
-  , _issuesPage :: Switchable f Int
-  , _issues :: Switchable f (Fetchable (V.Vector Issue))
+      , _issuesSearch :: Switchable f Text
+      , _issuesPage :: Switchable f Int
+      , _issues :: Switchable f (Fetchable (V.Vector Issue))
 
-  , _toggled :: Switchable f Bool
+      , _toggled :: Switchable f Bool
+      , _children :: Switchable f [MainListElem' f]
 
-  , _depth :: Int
-  , _ident :: Int
-  }
+      , _depth :: Int
+      , _ident :: Int
+      }
+  | MainListElemIssues {
+      _issues :: Switchable f (Fetchable (V.Vector Issue))
+
+      , _toggled :: Switchable f Bool
+      , _children :: Switchable f [MainListElem' f]
+
+      , _depth :: Int
+      , _ident :: Int
+      }
+  | MainListElemIssue {
+      _issue :: Switchable f (Fetchable Issue)
+
+      , _toggled :: Switchable f Bool
+
+      , _depth :: Int
+      , _ident :: Int
+      }
 makeLenses ''MainListElem'
 type MainListElem = MainListElem' Fixed
 deriving instance Eq MainListElem

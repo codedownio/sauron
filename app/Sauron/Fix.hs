@@ -31,6 +31,7 @@ fixMainListElem (MainListElemRepo {..}) = do
   workflowsFixed <- readTVar _workflows
 
   toggledFixed <- readTVar _toggled
+  childrenFixed <- readTVar _children >>= mapM fixMainListElem
 
   return $ MainListElemRepo {
     _namespaceName = _namespaceName
@@ -44,6 +45,35 @@ fixMainListElem (MainListElemRepo {..}) = do
     , _issuesSearch = issuesSearchFixed
     , _issuesPage = issuesPageFixed
     , _issues = issuesFixed
+
+    , _toggled = toggledFixed
+    , _children = childrenFixed
+
+    , _depth = _depth
+    , _ident = _ident
+    }
+fixMainListElem (MainListElemIssues {..}) = do
+  issuesFixed <- readTVar _issues
+
+  toggledFixed <- readTVar _toggled
+  childrenFixed <- readTVar _children >>= mapM fixMainListElem
+
+  return $ MainListElemIssues {
+    _issues = issuesFixed
+
+    , _toggled = toggledFixed
+    , _children = childrenFixed
+
+    , _depth = _depth
+    , _ident = _ident
+    }
+fixMainListElem (MainListElemIssue {..}) = do
+  issueFixed <- readTVar _issue
+
+  toggledFixed <- readTVar _toggled
+
+  return $ MainListElemIssue {
+    _issue = issueFixed
 
     , _toggled = toggledFixed
 

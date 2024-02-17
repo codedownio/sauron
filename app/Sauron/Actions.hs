@@ -75,15 +75,38 @@ fetchWorkflows owner name workflowsVar = do
 
 fetchIssues :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> TVar Text -> TVar Int -> TVar (Fetchable (V.Vector Issue)) -> m ()
-fetchIssues owner name issueSearchVar issuePageVar issuesVar = do
+  ) => Name Owner -> Name Repo -> TVar Text -> TVar Int -> TVar (Fetchable (V.Vector Issue)) -> TVar [MainListElemVariable] -> m ()
+fetchIssues owner name issueSearchVar issuePageVar issuesVar childrenVar = do
   BaseContext {auth} <- ask
   let search = mempty
   bracketOnError_ (atomically $ writeTVar issuesVar Fetching)
                   (atomically $ writeTVar issuesVar (Errored "Workflows fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ github auth (issuesForRepoR owner name search (FetchAtLeast 10))) >>= \case
-      Left err -> atomically $ writeTVar issuesVar (Errored (show err))
-      Right x -> atomically $ writeTVar issuesVar (Fetched x)
+      Left err -> atomically $ do
+        writeTVar issuesVar (Errored (show err))
+        writeTVar childrenVar []
+      Right x -> atomically $ do
+        writeTVar issuesVar (Fetched x)
+
+        toggledVar <- newTVar True
+        issueChildren <- forM (V.toList x) $ \iss -> do
+          issueVar <- newTVar (Fetched iss)
+          toggledVar' <- newTVar False
+          pure $ MainListElemIssue {
+            _issue = issueVar
+            , _toggled = toggledVar'
+            , _depth = 3
+            , _ident = 0
+            }
+        issueChildrenVar <- newTVar issueChildren
+
+        writeTVar childrenVar [MainListElemIssues {
+                                  _issues = issuesVar
+                                  , _toggled = toggledVar -- TODO: inherit from previous value
+                                  , _children = issueChildrenVar
+                                  , _depth = 2
+                                  , _ident = 0
+                                  }]
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m
@@ -94,6 +117,8 @@ refreshAll elems = do
   liftIO $ flip runReaderT baseContext $
     void $ async $ forConcurrently (V.toList elems) $ \case
       MainListElemHeading {} -> return ()
+      MainListElemIssue {} -> return ()
+      MainListElemIssues {} -> return ()
       MainListElemRepo {_namespaceName=(owner, name), ..} -> do
         fetchRepo owner name _repo
 

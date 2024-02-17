@@ -172,7 +172,7 @@ main = do
 
           writeTVar listElemsVar newFixed
           return newFixed
-        writeBChan eventChan (ListUpdate newFixed)
+        writeBChan eventChan (ListUpdate (getExpandedList newFixed))
         threadDelay refreshPeriod
 
   let buildVty = do
@@ -186,6 +186,14 @@ main = do
     void $ customMain initialVty buildVty (Just eventChan) app initialState
 
 
+newRepoNode ::
+  (MonadIO m)
+  => (Name Owner, Name Repo)
+  -> TVar (Fetchable Repo)
+  -> TVar (Fetchable HealthCheckResult)
+  -> Maybe (Async ())
+  -> Int
+  -> m MainListElemVariable
 newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   workflowsVar <- newTVarIO NotFetched
 
@@ -194,6 +202,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   issuesVar <- newTVarIO NotFetched
 
   toggledVar <- newTVarIO False
+  childrenVar <- newTVarIO []
 
   return $ MainListElemRepo {
     _namespaceName = nsName
@@ -209,7 +218,20 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _issues = issuesVar
 
     , _toggled = toggledVar
+    , _children = childrenVar
 
     , _depth = repoDepth
     , _ident = 0
     }
+
+getExpandedList :: V.Vector MainListElem -> V.Vector MainListElem
+getExpandedList = V.fromList . concatMap expandNodes . V.toList
+  where
+    expandNodes x@(MainListElemHeading {}) = [x]
+    expandNodes x@(MainListElemIssues {..}) = execWriter $ do
+      tell [x]
+      when _toggled $ tell _children
+    expandNodes x@(MainListElemIssue {}) = [x]
+    expandNodes x@(MainListElemRepo {..}) = execWriter $ do
+      tell [x]
+      when _toggled $ tell _children

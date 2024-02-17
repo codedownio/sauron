@@ -13,12 +13,14 @@ import qualified Data.List as L
 import Data.Maybe
 import Data.String.Interpolate
 import qualified Data.Text as T
+import qualified Data.Vector as V
 import GitHub hiding (Status)
 import GitHub.Data.Name
 import Lens.Micro hiding (ix)
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Draw.IssueLine
 import Sauron.UI.Draw.WorkflowLine
 import Sauron.UI.TopBox
 import Sauron.UI.Util
@@ -46,9 +48,22 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       ]
     listDrawElement ix isSelected x@(MainListElemRepo {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
       Just $ renderLine isSelected x
+      -- , do
+      --     guard _toggled
+      --     let unfoldWidgets = getWorkflowWigets x <> getIssuesWidgets x
+      --     guard (not $ L.null unfoldWidgets)
+      --     return $ padLeft (Pad 4) $
+      --       fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
+      --         vBox unfoldWidgets
+      ]
+    listDrawElement ix isSelected x@(MainListElemIssues {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+      Just $ renderLine isSelected x
+      ]
+    listDrawElement ix isSelected x@(MainListElemIssue {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+      Just $ renderLine isSelected x
       , do
           guard _toggled
-          let unfoldWidgets = getUnfoldWigets x
+          let unfoldWidgets = getWorkflowWigets x <> getIssuesWidgets x
           guard (not $ L.null unfoldWidgets)
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
@@ -63,6 +78,18 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       ]
     renderLine _isSelected (MainListElemRepo {_repo, ..}) =
       renderRepoLine _toggled _namespaceName (repoAttr _repo) (healthIndicator _healthCheck) (fetchableStatsBox _repo)
+    renderLine _isSelected (MainListElemIssue {..}) =
+      str "asdf"
+    renderLine _isSelected (MainListElemIssues {..}) = hBox $ catMaybes [
+      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+      , Just (str "Issues")
+      , Just $ case _issues of
+          NotFetched -> str "(Not fetched)"
+          Fetching -> str "(Fetching)"
+          Errored msg -> str [i|Errored: #{msg}|]
+          Fetched xs -> str [i|(#{V.length xs})|]
+      , Just (padLeft Max (str " "))
+      ]
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> AttrName -> Maybe (Widget n) -> Widget n -> Widget n
 renderRepoLine isToggled (owner, name) attr maybeHealth rightSide = hBox $ catMaybes [
@@ -90,23 +117,28 @@ fetchableStatsBox :: Fetchable Repo -> Widget n
 fetchableStatsBox (Fetched r) = statsBox r
 fetchableStatsBox _ = str " "
 
-getUnfoldWigets :: MainListElem -> [Widget n]
-getUnfoldWigets (MainListElemHeading {}) = [
-  str "HI I'M THE HEADING INFO"
-  ]
-getUnfoldWigets (MainListElemRepo {_workflows=NotFetched}) = [
-  hBox [str "Workflows not fetched."]
-  ]
-getUnfoldWigets (MainListElemRepo {_workflows=Fetching}) = [
-  hBox [str "Fetching workflows..."]
-  ]
-getUnfoldWigets (MainListElemRepo {_workflows=(Errored msg)}) = [
-  hBox [str [i|Failed to fetch workflows: #{msg}|]]
-  ]
-
-getUnfoldWigets (MainListElemRepo {_workflows=(Fetched (WithTotalCount items count))}) = [
+getWorkflowWigets :: MainListElem -> [Widget n]
+getWorkflowWigets (MainListElemHeading {}) = []
+getWorkflowWigets (MainListElemIssues {}) = []
+getWorkflowWigets (MainListElemIssue {}) = []
+getWorkflowWigets (MainListElemRepo {_workflows=NotFetched}) = [hBox [str "Workflows not fetched."]]
+getWorkflowWigets (MainListElemRepo {_workflows=Fetching}) = [hBox [str "Fetching workflows..."]]
+getWorkflowWigets (MainListElemRepo {_workflows=(Errored msg)}) = [hBox [str [i|Failed to fetch workflows: #{msg}|]]]
+getWorkflowWigets (MainListElemRepo {_workflows=(Fetched (WithTotalCount items count))}) = [
   borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|])
                   (vBox $ toList $ fmap workflowWidget (toList items))
+  ]
+
+getIssuesWidgets :: MainListElem -> [Widget n]
+getIssuesWidgets (MainListElemHeading {}) = []
+getIssuesWidgets (MainListElemIssues {}) = []
+getIssuesWidgets (MainListElemIssue {}) = []
+getIssuesWidgets (MainListElemRepo {_issues=NotFetched}) = [hBox [str "Issues not fetched."]]
+getIssuesWidgets (MainListElemRepo {_issues=Fetching}) = [hBox [str "Fetching issues..."]]
+getIssuesWidgets (MainListElemRepo {_issues=(Errored msg)}) = [hBox [str [i|Failed to fetch issues: #{msg}|]]]
+getIssuesWidgets (MainListElemRepo {_issues=(Fetched items)}) = [
+  borderWithLabel (padLeftRight 1 $ str [i|Issues|])
+                  (vBox $ toList $ fmap issueWidget (toList items))
   ]
 
 borderWithCounts :: AppState -> Widget n
@@ -117,7 +149,12 @@ infoBar s = Widget Greedy Fixed $ do
   _c <- getContext
   case listSelectedElement (s ^. appMainList) of
     Nothing -> render $ hBox [str ""]
+
     Just (_, MainListElemHeading {}) -> render $ hBox [str ""]
+
+    Just (_, MainListElemIssues {}) -> render $ hBox [str ""]
+
+    Just (_, MainListElemIssue {}) -> render $ hBox [str ""]
 
     Just (_, MainListElemRepo {_repo=(Fetched r)}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
       where
@@ -140,22 +177,24 @@ renderHeadingName l _stat = hBox [
   ]
 
 statsBox :: Repo -> Widget n
-statsBox (Repo {..}) = hBox $ catMaybes [
-  guarding (repoWatchersCount > 0) $ padLeft (Pad 1) (
-      padRight (Pad 2) (withAttr iconAttr (str "👁️"))
-      <+> str (show repoWatchersCount)
-      )
+statsBox (Repo {..}) = if L.null items then str " " else hBox items
+  where
+    items = catMaybes [
+      guarding (repoWatchersCount > 0) $ padLeft (Pad 1) (
+          padRight (Pad 2) (withAttr iconAttr (str "👁️"))
+          <+> str (show repoWatchersCount)
+          )
 
-  , guarding (repoForksCount > 0) $ padLeft (Pad 1) (
-      padRight (Pad 1) (withAttr iconAttr (str "⑂"))
-      <+> str (show repoForksCount)
-      )
+      , guarding (repoForksCount > 0) $ padLeft (Pad 1) (
+          padRight (Pad 1) (withAttr iconAttr (str "⑂"))
+          <+> str (show repoForksCount)
+          )
 
-  , guarding (repoStargazersCount > 0) $ padLeft (Pad 1) (
-      padRight (Pad 1) (withAttr iconAttr (str "★"))
-      <+> str (show repoStargazersCount)
-      )
-  ]
+      , guarding (repoStargazersCount > 0) $ padLeft (Pad 1) (
+          padRight (Pad 1) (withAttr iconAttr (str "★"))
+          <+> str (show repoStargazersCount)
+          )
+      ]
 
 guarding :: (Monad m, Alternative m) => Bool -> b -> m b
 guarding p widget = do
