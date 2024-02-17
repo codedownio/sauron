@@ -20,7 +20,6 @@ import Lens.Micro hiding (ix)
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Draw.IssueLine
 import Sauron.UI.Draw.WorkflowLine
 import Sauron.UI.TopBox
 import Sauron.UI.Util
@@ -50,7 +49,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       Just $ renderLine isSelected x
       -- , do
       --     guard _toggled
-      --     let unfoldWidgets = getWorkflowWigets x <> getIssuesWidgets x
+      --     let unfoldWidgets = getWorkflowWigets x
       --     guard (not $ L.null unfoldWidgets)
       --     return $ padLeft (Pad 4) $
       --       fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
@@ -63,7 +62,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       Just $ renderLine isSelected x
       , do
           guard _toggled
-          let unfoldWidgets = getWorkflowWigets x <> getIssuesWidgets x
+          let unfoldWidgets = getWorkflowWigets x
           guard (not $ L.null unfoldWidgets)
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
@@ -96,7 +95,11 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       , Just (padLeft Max (str " "))
       ]
     renderLine _isSelected (MainListElemIssue {..}) = case _issue of
-      Fetched x -> issueWidget x
+      Fetched (Issue {issueNumber=(IssueNumber number), ..}) -> hBox [
+        withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+        , str ("#" <> show number <> " ")
+        , withAttr normalAttr $ str $ toString issueTitle
+        ]
       _ -> str "AAAA"
 
     renderLine _isSelected (MainListElemWorkflows {..}) = hBox $ catMaybes [
@@ -151,20 +154,6 @@ getWorkflowWigets (MainListElemIssues {}) = []
 getWorkflowWigets (MainListElemIssue {}) = []
 getWorkflowWigets (MainListElemWorkflows {}) = []
 getWorkflowWigets (MainListElemWorkflow {}) = []
-
-getIssuesWidgets :: MainListElem -> [Widget n]
-getIssuesWidgets (MainListElemHeading {}) = []
-getIssuesWidgets (MainListElemRepo {_issues=NotFetched}) = [hBox [str "Issues not fetched."]]
-getIssuesWidgets (MainListElemRepo {_issues=Fetching}) = [hBox [str "Fetching issues..."]]
-getIssuesWidgets (MainListElemRepo {_issues=(Errored msg)}) = [hBox [str [i|Failed to fetch issues: #{msg}|]]]
-getIssuesWidgets (MainListElemRepo {_issues=(Fetched items)}) = [
-  borderWithLabel (padLeftRight 1 $ str [i|Issues|])
-                  (vBox $ toList $ fmap issueWidget (toList items))
-  ]
-getIssuesWidgets (MainListElemIssues {}) = []
-getIssuesWidgets (MainListElemIssue {}) = []
-getIssuesWidgets (MainListElemWorkflows {}) = []
-getIssuesWidgets (MainListElemWorkflow {}) = []
 
 borderWithCounts :: AppState -> Widget n
 borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]

@@ -29,7 +29,6 @@ library
       Sauron.Types
       Sauron.UI.AttrMap
       Sauron.UI.Draw
-      Sauron.UI.Draw.IssueLine
       Sauron.UI.Draw.WorkflowLine
       Sauron.UI.Keys
       Sauron.UI.TopBox
