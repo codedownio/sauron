@@ -100,7 +100,8 @@ data MainListElem' f =
       , _issues :: Switchable f (Fetchable (V.Vector Issue))
 
       , _toggled :: Switchable f Bool
-      , _children :: Switchable f [MainListElem' f]
+      , _issuesChild :: Switchable f (MainListElem' f)
+      , _workflowsChild :: Switchable f (MainListElem' f)
 
       , _depth :: Int
       , _ident :: Int
@@ -122,6 +123,24 @@ data MainListElem' f =
       , _depth :: Int
       , _ident :: Int
       }
+  | MainListElemWorkflows {
+      _workflows :: Switchable f (Fetchable (WithTotalCount WorkflowRun))
+
+      , _toggled :: Switchable f Bool
+      , _children :: Switchable f [MainListElem' f]
+
+      , _depth :: Int
+      , _ident :: Int
+      }
+  | MainListElemWorkflow {
+      _workflow :: Switchable f (Fetchable WorkflowRun)
+
+      , _toggled :: Switchable f Bool
+
+      , _depth :: Int
+      , _ident :: Int
+      }
+
 makeLenses ''MainListElem'
 type MainListElem = MainListElem' Fixed
 deriving instance Eq MainListElem

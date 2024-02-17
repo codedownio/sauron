@@ -74,17 +74,20 @@ appEvent s (VtyEvent e) = case e of
     whenJust (listSelectedElement (s ^. appMainList)) $ \(j, el) -> case el of
       MainListElemHeading {} -> return () -- TODO
 
-      MainListElemIssues {} -> return () -- TODO
-      MainListElemIssue {} -> return () -- TODO
-
       MainListElemRepo {_workflows=Fetching} -> return ()
       MainListElemRepo {_workflows=_, _namespaceName=(owner, name)} ->
         case (s ^. appMainListVariable) V.!? j of
           Just (MainListElemRepo {..}) -> do
             -- TODO: do these concurrently
             liftIO $ runReaderT (fetchWorkflows owner name _workflows) (s ^. appBaseContext)
-            liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _children) (s ^. appBaseContext)
+            liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _issuesChild) (s ^. appBaseContext)
           _ -> return ()
+
+      MainListElemIssues {} -> return () -- TODO
+      MainListElemIssue {} -> return () -- TODO
+
+      MainListElemWorkflows {} -> return () -- TODO
+      MainListElemWorkflow {} -> return () -- TODO
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 

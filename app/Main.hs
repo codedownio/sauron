@@ -202,7 +202,26 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   issuesVar <- newTVarIO NotFetched
 
   toggledVar <- newTVarIO False
-  childrenVar <- newTVarIO []
+
+  issuesToggledVar <- newTVarIO False
+  issuesChildrenVar <- newTVarIO []
+  issuesChildVar <- newTVarIO $ MainListElemIssues {
+    _issues = issuesVar
+    , _toggled = issuesToggledVar
+    , _children = issuesChildrenVar
+    , _depth = 2
+    , _ident = 0
+    }
+
+  workflowsToggledVar <- newTVarIO False
+  workflowsChildrenVar <- newTVarIO []
+  workflowsChildVar <- newTVarIO $ MainListElemWorkflows {
+    _workflows = workflowsVar
+    , _toggled = workflowsToggledVar
+    , _children = workflowsChildrenVar
+    , _depth = 2
+    , _ident = 0
+    }
 
   return $ MainListElemRepo {
     _namespaceName = nsName
@@ -218,7 +237,8 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _issues = issuesVar
 
     , _toggled = toggledVar
-    , _children = childrenVar
+    , _issuesChild = issuesChildVar
+    , _workflowsChild = workflowsChildVar
 
     , _depth = repoDepth
     , _ident = 0
@@ -228,10 +248,16 @@ getExpandedList :: V.Vector MainListElem -> V.Vector MainListElem
 getExpandedList = V.fromList . concatMap expandNodes . V.toList
   where
     expandNodes x@(MainListElemHeading {}) = [x]
+    expandNodes x@(MainListElemRepo {..}) = execWriter $ do
+      tell [x]
+      when _toggled $ do
+        tell ([_issuesChild] <> concatMap expandNodes (_children _issuesChild))
+        tell ([_workflowsChild] <> concatMap expandNodes (_children _workflowsChild))
     expandNodes x@(MainListElemIssues {..}) = execWriter $ do
       tell [x]
       when _toggled $ tell _children
     expandNodes x@(MainListElemIssue {}) = [x]
-    expandNodes x@(MainListElemRepo {..}) = execWriter $ do
+    expandNodes x@(MainListElemWorkflows {..}) = execWriter $ do
       tell [x]
       when _toggled $ tell _children
+    expandNodes x@(MainListElemWorkflow {}) = [x]

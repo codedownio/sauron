@@ -69,6 +69,12 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
               vBox unfoldWidgets
       ]
+    listDrawElement ix isSelected x@(MainListElemWorkflows {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+      Just $ renderLine isSelected x
+      ]
+    listDrawElement ix isSelected x@(MainListElemWorkflow {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+      Just $ renderLine isSelected x
+      ]
 
     renderLine :: Bool -> MainListElem -> Widget ClickableName
     renderLine _isSelected (MainListElemHeading {..}) = hBox $ catMaybes [
@@ -78,8 +84,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       ]
     renderLine _isSelected (MainListElemRepo {_repo, ..}) =
       renderRepoLine _toggled _namespaceName (repoAttr _repo) (healthIndicator _healthCheck) (fetchableStatsBox _repo)
-    renderLine _isSelected (MainListElemIssue {..}) =
-      str "asdf"
+
     renderLine _isSelected (MainListElemIssues {..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
       , Just (str "Issues")
@@ -90,6 +95,22 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
           Fetched xs -> str [i|(#{V.length xs})|]
       , Just (padLeft Max (str " "))
       ]
+    renderLine _isSelected (MainListElemIssue {..}) = case _issue of
+      Fetched x -> issueWidget x
+      _ -> str "AAAA"
+
+    renderLine _isSelected (MainListElemWorkflows {..}) = hBox $ catMaybes [
+      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+      , Just (str "Workflows")
+      , Just $ case _workflows of
+          NotFetched -> str "(Not fetched)"
+          Fetching -> str "(Fetching)"
+          Errored msg -> str [i|Errored: #{msg}|]
+          Fetched xs -> str [i|(COUNT)|]
+      , Just (padLeft Max (str " "))
+      ]
+    renderLine _isSelected (MainListElemWorkflow {..}) =
+      str "Workflow: "
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> AttrName -> Maybe (Widget n) -> Widget n -> Widget n
 renderRepoLine isToggled (owner, name) attr maybeHealth rightSide = hBox $ catMaybes [
@@ -119,8 +140,6 @@ fetchableStatsBox _ = str " "
 
 getWorkflowWigets :: MainListElem -> [Widget n]
 getWorkflowWigets (MainListElemHeading {}) = []
-getWorkflowWigets (MainListElemIssues {}) = []
-getWorkflowWigets (MainListElemIssue {}) = []
 getWorkflowWigets (MainListElemRepo {_workflows=NotFetched}) = [hBox [str "Workflows not fetched."]]
 getWorkflowWigets (MainListElemRepo {_workflows=Fetching}) = [hBox [str "Fetching workflows..."]]
 getWorkflowWigets (MainListElemRepo {_workflows=(Errored msg)}) = [hBox [str [i|Failed to fetch workflows: #{msg}|]]]
@@ -128,11 +147,13 @@ getWorkflowWigets (MainListElemRepo {_workflows=(Fetched (WithTotalCount items c
   borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|])
                   (vBox $ toList $ fmap workflowWidget (toList items))
   ]
+getWorkflowWigets (MainListElemIssues {}) = []
+getWorkflowWigets (MainListElemIssue {}) = []
+getWorkflowWigets (MainListElemWorkflows {}) = []
+getWorkflowWigets (MainListElemWorkflow {}) = []
 
 getIssuesWidgets :: MainListElem -> [Widget n]
 getIssuesWidgets (MainListElemHeading {}) = []
-getIssuesWidgets (MainListElemIssues {}) = []
-getIssuesWidgets (MainListElemIssue {}) = []
 getIssuesWidgets (MainListElemRepo {_issues=NotFetched}) = [hBox [str "Issues not fetched."]]
 getIssuesWidgets (MainListElemRepo {_issues=Fetching}) = [hBox [str "Fetching issues..."]]
 getIssuesWidgets (MainListElemRepo {_issues=(Errored msg)}) = [hBox [str [i|Failed to fetch issues: #{msg}|]]]
@@ -140,6 +161,10 @@ getIssuesWidgets (MainListElemRepo {_issues=(Fetched items)}) = [
   borderWithLabel (padLeftRight 1 $ str [i|Issues|])
                   (vBox $ toList $ fmap issueWidget (toList items))
   ]
+getIssuesWidgets (MainListElemIssues {}) = []
+getIssuesWidgets (MainListElemIssue {}) = []
+getIssuesWidgets (MainListElemWorkflows {}) = []
+getIssuesWidgets (MainListElemWorkflow {}) = []
 
 borderWithCounts :: AppState -> Widget n
 borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]
@@ -151,10 +176,6 @@ infoBar s = Widget Greedy Fixed $ do
     Nothing -> render $ hBox [str ""]
 
     Just (_, MainListElemHeading {}) -> render $ hBox [str ""]
-
-    Just (_, MainListElemIssues {}) -> render $ hBox [str ""]
-
-    Just (_, MainListElemIssue {}) -> render $ hBox [str ""]
 
     Just (_, MainListElemRepo {_repo=(Fetched r)}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
       where
@@ -170,6 +191,12 @@ infoBar s = Widget Greedy Fixed $ do
 
         phrases = catMaybes [issuesPhrase]
     Just (_, MainListElemRepo {_repo=_}) -> render $ hBox [str ""]
+
+    Just (_, MainListElemIssues {}) -> render $ hBox [str ""]
+    Just (_, MainListElemIssue {}) -> render $ hBox [str ""]
+
+    Just (_, MainListElemWorkflows {}) -> render $ hBox [str ""]
+    Just (_, MainListElemWorkflow {}) -> render $ hBox [str ""]
 
 renderHeadingName :: Text -> Fetchable () -> Widget n
 renderHeadingName l _stat = hBox [
