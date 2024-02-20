@@ -39,6 +39,7 @@ dependencies:
 
 default-extensions:
 - FlexibleContexts
+- FlexibleInstances
 - LambdaCase
 - MultiWayIf
 - NamedFieldPuns

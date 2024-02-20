@@ -41,6 +41,7 @@ library
       src
   default-extensions:
       FlexibleContexts
+      FlexibleInstances
       LambdaCase
       MultiWayIf
       NamedFieldPuns
@@ -86,6 +87,7 @@ executable sauron
       app
   default-extensions:
       FlexibleContexts
+      FlexibleInstances
       LambdaCase
       MultiWayIf
       NamedFieldPuns
@@ -131,6 +133,7 @@ test-suite test
       test
   default-extensions:
       FlexibleContexts
+      FlexibleInstances
       LambdaCase
       MultiWayIf
       NamedFieldPuns
