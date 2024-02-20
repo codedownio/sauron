@@ -7,7 +7,6 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
-import qualified Data.Vector as V
 import GitHub
 import qualified Graphics.Vty as V
 import Lens.Micro
@@ -47,7 +46,11 @@ appEvent s (VtyEvent e) = case e of
     Nothing -> return ()
     Just (n, _) -> do
       atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
-        Just mle -> liftIO $ atomically $ modifyTVar' (_toggled mle) not
+        Just mle -> do
+          isOpen <- liftIO $ atomically $ do
+            modifyTVar' (_toggled mle) not
+            readTVar (_toggled mle)
+          when isOpen (refresh (s ^. appBaseContext) mle)
         _ -> return ()
 
   -- Scrolling in toggled items
@@ -72,23 +75,10 @@ appEvent s (VtyEvent e) = case e of
     whenRepoSelected s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(j, el) -> case el of
-      MainListElemHeading {} -> return () -- TODO
-
-      MainListElemRepo {_workflows=Fetching} -> return ()
-      MainListElemRepo {_workflows=_, _namespaceName=(owner, name)} ->
-        case (s ^. appMainListVariable) V.!? j of
-          Just (MainListElemRepo {..}) -> do
-            -- TODO: do these concurrently
-            liftIO $ runReaderT (fetchWorkflows owner name _workflows) (s ^. appBaseContext)
-            liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _issuesChild) (s ^. appBaseContext)
-          _ -> return ()
-
-      MainListElemIssues {} -> return () -- TODO
-      MainListElemIssue {} -> return () -- TODO
-
-      MainListElemWorkflows {} -> return () -- TODO
-      MainListElemWorkflow {} -> return () -- TODO
+    whenJust (listSelectedElement (s ^. appMainList)) $ \(n, _el) ->
+      atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
+        Nothing -> return ()
+        Just el -> refresh (s ^. appBaseContext) el
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 

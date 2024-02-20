@@ -10,6 +10,7 @@ module Sauron.Actions (
   , fetchWorkflows
   , fetchIssues
 
+  , refresh
   , refreshAll
 
   , newHealthCheckThread
@@ -116,6 +117,17 @@ fetchIssues owner name issueSearchVar issuePageVar issuesVar childrenVar = do
                                   , _depth = 2
                                   , _ident = 0
                                   })
+
+
+refresh _ (MainListElemHeading {}) = return () -- TODO
+refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) = liftIO $ void $ async $ do
+  -- TODO: do these concurrently
+  async $ liftIO $ runReaderT (fetchWorkflows owner name _workflows) bc
+  async $ liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _issuesChild) bc
+refresh _ (MainListElemIssues {}) = return () -- TODO
+refresh _ (MainListElemIssue{}) = return () -- TODO
+refresh _ (MainListElemWorkflows {}) = return () -- TODO
+refresh _ (MainListElemWorkflow {}) = return () -- TODO
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m
