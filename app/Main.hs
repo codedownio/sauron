@@ -23,6 +23,7 @@ import Sauron.Actions
 import Sauron.Auth
 import Sauron.Event
 import Sauron.Fix
+import Sauron.Expanding
 import Sauron.Options
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -243,21 +244,3 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _depth = repoDepth
     , _ident = 0
     }
-
-getExpandedList :: V.Vector MainListElem -> V.Vector MainListElem
-getExpandedList = V.fromList . concatMap expandNodes . V.toList
-  where
-    expandNodes x@(MainListElemHeading {}) = [x]
-    expandNodes x@(MainListElemRepo {..}) = execWriter $ do
-      tell [x]
-      when _toggled $ do
-        tell ([_issuesChild] <> concatMap expandNodes (_children _issuesChild))
-        tell ([_workflowsChild] <> concatMap expandNodes (_children _workflowsChild))
-    expandNodes x@(MainListElemIssues {..}) = execWriter $ do
-      tell [x]
-      when _toggled $ tell _children
-    expandNodes x@(MainListElemIssue {}) = [x]
-    expandNodes x@(MainListElemWorkflows {..}) = execWriter $ do
-      tell [x]
-      when _toggled $ tell _children
-    expandNodes x@(MainListElemWorkflow {}) = [x]

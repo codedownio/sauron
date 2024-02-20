@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      Sauron.Expanding
       Sauron.Filter
       Sauron.Types
       Sauron.UI.AttrMap

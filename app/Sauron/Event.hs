@@ -13,6 +13,7 @@ import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude hiding (Down)
 import Sauron.Actions
+import Sauron.Expanding
 import Sauron.Types
 import Sauron.UI.Keys
 import System.FilePath
@@ -44,8 +45,8 @@ appEvent s (VtyEvent e) = case e of
   --     Just (i', _) -> put (s & appMainList %~ (listMoveTo i'))
   V.EvKey c [] | c `elem` toggleKeys -> case listSelectedElement (s ^. appMainList) of
     Nothing -> return ()
-    Just (j, _) -> do
-      case (s ^. appMainListVariable) V.!? j of
+    Just (n, _) -> do
+      atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
         Just mle -> liftIO $ atomically $ modifyTVar' (_toggled mle) not
         _ -> return ()
 
