@@ -15,8 +15,8 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
     expandNodes x@(MainListElemRepo {..}) = execWriter $ do
       tell [x]
       when _toggled $ do
-        tell ([_issuesChild] <> concatMap expandNodes (_children _issuesChild))
-        tell ([_workflowsChild] <> concatMap expandNodes (_children _workflowsChild))
+        tell (expandNodes _issuesChild)
+        tell (expandNodes _workflowsChild)
     expandNodes x@(MainListElemIssues {..}) = execWriter $ do
       tell [x]
       when _toggled $ tell _children
