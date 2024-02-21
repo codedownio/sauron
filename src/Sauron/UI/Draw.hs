@@ -42,72 +42,62 @@ mainList :: AppState -> Widget ClickableName
 mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (app ^. appMainList)
   where
     listDrawElement :: Int -> Bool -> MainListElem -> Widget ClickableName
-    listDrawElement ix isSelected x@(MainListElemHeading {}) = render ix isSelected x [
-      Just $ renderLine isSelected x
+    listDrawElement ix isSelected x@(MainListElemHeading {..}) = render ix isSelected x [
+      Just $ hBox $ catMaybes [
+        Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+        , Just (renderHeadingName _label _status)
+        , Just (padLeft Max (str " "))
+        ]
       ]
-    listDrawElement ix isSelected x@(MainListElemRepo {}) = render ix isSelected x [
-      Just $ renderLine isSelected x
+    listDrawElement ix isSelected x@(MainListElemRepo {..}) = render ix isSelected x [
+      Just $ renderRepoLine _toggled _namespaceName (repoAttr _repo) (healthIndicator _healthCheck) (fetchableStatsBox _repo)
       ]
-    listDrawElement ix isSelected x@(MainListElemIssues {}) = render ix isSelected x [
-      Just $ renderLine isSelected x
+    listDrawElement ix isSelected x@(MainListElemIssues {..}) = render ix isSelected x [
+      Just $ hBox $ catMaybes [
+        Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+        , Just (str "Issues ")
+        , Just $ case _issues of
+            NotFetched -> str "(Not fetched)"
+            Fetching -> str "(Fetching)"
+            Errored msg -> str [i|Errored: #{msg}|]
+            Fetched xs -> str [i|(#{V.length xs})|]
+        , Just (padLeft Max (str " "))
+        ]
       ]
     listDrawElement ix isSelected x@(MainListElemIssue {..}) = render ix isSelected x [
-      Just $ renderLine isSelected x
+      Just $ case _issue of
+        Fetched (Issue {issueNumber=(IssueNumber number), ..}) -> hBox [
+          withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+          , str ("#" <> show number <> " ")
+          , withAttr normalAttr $ str $ toString issueTitle
+          , padLeft Max (str [i|#{issueCreatedAt} by #{untagName $ simpleUserLogin issueUser}|])
+          ]
+        _ -> str ""
       , do
           guard _toggled
-          return $ padLeft (Pad 4) $
-            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              vBox [strWrap (show _issue)]
+          guardFetched _issue $ \(Issue {..}) -> guardJust issueBody $ \body ->
+            return $ padLeft (Pad 4) $
+              fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+                vBox [strWrap (toString body)]
       ]
-    listDrawElement ix isSelected x@(MainListElemWorkflows {}) = render ix isSelected x [
-      Just $ renderLine isSelected x
+    listDrawElement ix isSelected x@(MainListElemWorkflows {..}) = render ix isSelected x [
+      Just $ hBox $ catMaybes [
+        Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+        , Just (str "Workflows ")
+        , Just $ case _workflows of
+            NotFetched -> str "(Not fetched)"
+            Fetching -> str "(Fetching)"
+            Errored msg -> str [i|Errored: #{msg}|]
+            Fetched xs -> str [i|(#{withTotalCountTotalCount xs})|]
+        , Just (padLeft Max (str " "))
+        ]
       ]
     listDrawElement ix isSelected x@(MainListElemWorkflow {}) = render ix isSelected x [
-      Just $ renderLine isSelected x
+      Just $ str "Workflow: "
       ]
 
     render ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes
 
-    renderLine :: Bool -> MainListElem -> Widget ClickableName
-    renderLine _isSelected (MainListElemHeading {..}) = hBox $ catMaybes [
-      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , Just (renderHeadingName _label _status)
-      , Just (padLeft Max (str " "))
-      ]
-    renderLine _isSelected (MainListElemRepo {_repo, ..}) =
-      renderRepoLine _toggled _namespaceName (repoAttr _repo) (healthIndicator _healthCheck) (fetchableStatsBox _repo)
-
-    renderLine _isSelected (MainListElemIssues {..}) = hBox $ catMaybes [
-      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , Just (str "Issues ")
-      , Just $ case _issues of
-          NotFetched -> str "(Not fetched)"
-          Fetching -> str "(Fetching)"
-          Errored msg -> str [i|Errored: #{msg}|]
-          Fetched xs -> str [i|(#{V.length xs})|]
-      , Just (padLeft Max (str " "))
-      ]
-    renderLine _isSelected (MainListElemIssue {..}) = case _issue of
-      Fetched (Issue {issueNumber=(IssueNumber number), ..}) -> hBox [
-        withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-        , str ("#" <> show number <> " ")
-        , withAttr normalAttr $ str $ toString issueTitle
-        , padLeft Max (str [i|#{issueCreatedAt} by #{untagName $ simpleUserLogin issueUser}|])
-        ]
-      _ -> str ""
-
-    renderLine _isSelected (MainListElemWorkflows {..}) = hBox $ catMaybes [
-      Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , Just (str "Workflows ")
-      , Just $ case _workflows of
-          NotFetched -> str "(Not fetched)"
-          Fetching -> str "(Fetching)"
-          Errored msg -> str [i|Errored: #{msg}|]
-          Fetched xs -> str [i|(#{withTotalCountTotalCount xs})|]
-      , Just (padLeft Max (str " "))
-      ]
-    renderLine _isSelected (MainListElemWorkflow {}) =
-      str "Workflow: "
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> AttrName -> Maybe (Widget n) -> Widget n -> Widget n
 renderRepoLine isToggled (owner, name) attr maybeHealth rightSide = hBox $ catMaybes [
@@ -196,6 +186,24 @@ guarding :: (Monad m, Alternative m) => Bool -> b -> m b
 guarding p widget = do
   guard p
   return widget
+
+guardJust :: (Monad m, Alternative m) => Maybe a -> (a -> m b) -> m b
+guardJust val fn = do
+  guard (isJust val)
+  case val of
+    Just x -> fn x
+    _ -> error "impossible"
+
+guardFetched :: (Monad m, Alternative m) => Fetchable a -> (a -> m b) -> m b
+guardFetched fetchable fn = do
+  guard (isFetched fetchable)
+  case fetchable of
+    Fetched x -> fn x
+    _ -> error "impossible"
+
+isFetched :: Fetchable a -> Bool
+isFetched (Fetched _) = True
+isFetched _ = False
 
 progressThing :: String
 progressThing = "⠀"
