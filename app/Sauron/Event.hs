@@ -90,4 +90,13 @@ appEvent s (VtyEvent e) = case e of
     halt
 
   ev -> zoom appMainList $ handleListEvent ev
+
+-- Mouse events
+appEvent _s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
+  vScrollBy (viewportScroll MainList) (-1)
+appEvent _s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
+  vScrollBy (viewportScroll MainList) 1
+appEvent s (MouseDown (ListRow i) V.BLeft _ _) = do
+  put (s & appMainList %~ (listMoveTo i))
+
 appEvent _ _ = return ()

@@ -42,10 +42,10 @@ mainList :: AppState -> Widget ClickableName
 mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (app ^. appMainList)
   where
     listDrawElement :: Int -> Bool -> MainListElem -> Widget ClickableName
-    listDrawElement ix isSelected x@(MainListElemHeading {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+    listDrawElement ix isSelected x@(MainListElemHeading {}) = render ix isSelected x [
       Just $ renderLine isSelected x
       ]
-    listDrawElement ix isSelected x@(MainListElemRepo {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+    listDrawElement ix isSelected x@(MainListElemRepo {}) = render ix isSelected x [
       Just $ renderLine isSelected x
       -- , do
       --     guard _toggled
@@ -55,10 +55,10 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       --       fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
       --         vBox unfoldWidgets
       ]
-    listDrawElement ix isSelected x@(MainListElemIssues {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+    listDrawElement ix isSelected x@(MainListElemIssues {}) = render ix isSelected x [
       Just $ renderLine isSelected x
       ]
-    listDrawElement ix isSelected x@(MainListElemIssue {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+    listDrawElement ix isSelected x@(MainListElemIssue {..}) = render ix isSelected x [
       Just $ renderLine isSelected x
       , do
           guard _toggled
@@ -68,12 +68,14 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
               vBox unfoldWidgets
       ]
-    listDrawElement ix isSelected x@(MainListElemWorkflows {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+    listDrawElement ix isSelected x@(MainListElemWorkflows {}) = render ix isSelected x [
       Just $ renderLine isSelected x
       ]
-    listDrawElement ix isSelected x@(MainListElemWorkflow {..}) = clickable (ListRow ix) $ padLeft (Pad (4 * _depth)) $ (if isSelected then border else id) $ vBox $ catMaybes [
+    listDrawElement ix isSelected x@(MainListElemWorkflow {}) = render ix isSelected x [
       Just $ renderLine isSelected x
       ]
+
+    render ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes
 
     renderLine :: Bool -> MainListElem -> Widget ClickableName
     renderLine _isSelected (MainListElemHeading {..}) = hBox $ catMaybes [
@@ -86,7 +88,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
 
     renderLine _isSelected (MainListElemIssues {..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , Just (str "Issues")
+      , Just (str "Issues ")
       , Just $ case _issues of
           NotFetched -> str "(Not fetched)"
           Fetching -> str "(Fetching)"
@@ -99,20 +101,21 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
         withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
         , str ("#" <> show number <> " ")
         , withAttr normalAttr $ str $ toString issueTitle
+        , padLeft Max (str " ")
         ]
       _ -> str "AAAA"
 
     renderLine _isSelected (MainListElemWorkflows {..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , Just (str "Workflows")
+      , Just (str "Workflows ")
       , Just $ case _workflows of
           NotFetched -> str "(Not fetched)"
           Fetching -> str "(Fetching)"
           Errored msg -> str [i|Errored: #{msg}|]
-          Fetched xs -> str [i|(COUNT)|]
+          Fetched xs -> str [i|(#{withTotalCountTotalCount xs})|]
       , Just (padLeft Max (str " "))
       ]
-    renderLine _isSelected (MainListElemWorkflow {..}) =
+    renderLine _isSelected (MainListElemWorkflow {}) =
       str "Workflow: "
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> AttrName -> Maybe (Widget n) -> Widget n -> Widget n

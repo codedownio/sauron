@@ -119,13 +119,28 @@ fetchIssues owner name issueSearchVar issuePageVar issuesVar childrenVar = do
                                   })
 
 
+fetchIssue :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable Issue) -> m ()
+fetchIssue owner name issueNumber issueVar = do
+  BaseContext {auth} <- ask
+  bracketOnError_ (atomically $ writeTVar issueVar Fetching)
+                  (atomically $ writeTVar issueVar (Errored "Workflows fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ github auth (issueR owner name issueNumber)) >>= \case
+      Left err -> atomically $ do
+        writeTVar issueVar (Errored (show err))
+        undefined
+      Right x -> atomically $ do
+        writeTVar issueVar (Fetched x)
+        undefined
+
+refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> m ()
 refresh _ (MainListElemHeading {}) = return () -- TODO
-refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) = liftIO $ void $ async $ do
-  -- TODO: do these concurrently
-  async $ liftIO $ runReaderT (fetchWorkflows owner name _workflows) bc
-  async $ liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _issuesChild) bc
+refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) = liftIO $ do
+  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflows) bc
+  void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _issuesChild) bc
 refresh _ (MainListElemIssues {}) = return () -- TODO
-refresh _ (MainListElemIssue{}) = return () -- TODO
+refresh _ (MainListElemIssue {..}) = return () -- TODO
 refresh _ (MainListElemWorkflows {}) = return () -- TODO
 refresh _ (MainListElemWorkflow {}) = return () -- TODO
 
