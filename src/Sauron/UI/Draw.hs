@@ -47,13 +47,6 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       ]
     listDrawElement ix isSelected x@(MainListElemRepo {}) = render ix isSelected x [
       Just $ renderLine isSelected x
-      -- , do
-      --     guard _toggled
-      --     let unfoldWidgets = getWorkflowWigets x
-      --     guard (not $ L.null unfoldWidgets)
-      --     return $ padLeft (Pad 4) $
-      --       fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
-      --         vBox unfoldWidgets
       ]
     listDrawElement ix isSelected x@(MainListElemIssues {}) = render ix isSelected x [
       Just $ renderLine isSelected x
@@ -62,11 +55,9 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
       Just $ renderLine isSelected x
       , do
           guard _toggled
-          let unfoldWidgets = getWorkflowWigets x
-          guard (not $ L.null unfoldWidgets)
           return $ padLeft (Pad 4) $
-            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 33 $
-              vBox unfoldWidgets
+            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+              vBox [strWrap (show _issue)]
       ]
     listDrawElement ix isSelected x@(MainListElemWorkflows {}) = render ix isSelected x [
       Just $ renderLine isSelected x
@@ -101,9 +92,9 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
         withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
         , str ("#" <> show number <> " ")
         , withAttr normalAttr $ str $ toString issueTitle
-        , padLeft Max (str " ")
+        , padLeft Max (str [i|#{issueCreatedAt} by #{untagName $ simpleUserLogin issueUser}|])
         ]
-      _ -> str "AAAA"
+      _ -> str ""
 
     renderLine _isSelected (MainListElemWorkflows {..}) = hBox $ catMaybes [
       Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
@@ -143,20 +134,6 @@ repoAttr (Fetched {}) = normalAttr
 fetchableStatsBox :: Fetchable Repo -> Widget n
 fetchableStatsBox (Fetched r) = statsBox r
 fetchableStatsBox _ = str " "
-
-getWorkflowWigets :: MainListElem -> [Widget n]
-getWorkflowWigets (MainListElemHeading {}) = []
-getWorkflowWigets (MainListElemRepo {_workflows=NotFetched}) = [hBox [str "Workflows not fetched."]]
-getWorkflowWigets (MainListElemRepo {_workflows=Fetching}) = [hBox [str "Fetching workflows..."]]
-getWorkflowWigets (MainListElemRepo {_workflows=(Errored msg)}) = [hBox [str [i|Failed to fetch workflows: #{msg}|]]]
-getWorkflowWigets (MainListElemRepo {_workflows=(Fetched (WithTotalCount items count))}) = [
-  borderWithLabel (padLeftRight 1 $ str [i|Workflows (#{count})|])
-                  (vBox $ toList $ fmap workflowWidget (toList items))
-  ]
-getWorkflowWigets (MainListElemIssues {}) = []
-getWorkflowWigets (MainListElemIssue {}) = []
-getWorkflowWigets (MainListElemWorkflows {}) = []
-getWorkflowWigets (MainListElemWorkflow {}) = []
 
 borderWithCounts :: AppState -> Widget n
 borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]
