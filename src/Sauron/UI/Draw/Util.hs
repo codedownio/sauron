@@ -32,3 +32,6 @@ guardFetched fetchable fn = do
 isFetched :: Fetchable a -> Bool
 isFetched (Fetched _) = True
 isFetched _ = False
+
+-- unicodeBlank :: String
+-- unicodeBlank = "⠀"
