@@ -65,14 +65,47 @@ fetchRepo owner name repoVar = do
 
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> TVar (Fetchable (WithTotalCount WorkflowRun)) -> m ()
-fetchWorkflows owner name workflowsVar = do
+  ) => Name Owner -> Name Repo -> TVar (Fetchable (WithTotalCount WorkflowRun)) -> TVar MainListElemVariable -> m ()
+fetchWorkflows owner name workflowsVar childrenVar = do
   BaseContext {auth} <- ask
   bracketOnError_ (atomically $ writeTVar workflowsVar Fetching)
                   (atomically $ writeTVar workflowsVar (Errored "Workflows fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ github auth (workflowRunsR owner name mempty (FetchAtLeast 10))) >>= \case
-      Left err -> atomically $ writeTVar workflowsVar (Errored (show err))
-      Right x -> atomically $ writeTVar workflowsVar (Fetched x)
+      Left err -> atomically $ do
+        writeTVar workflowsVar (Errored (show err))
+
+        toggledVar <- newTVar False
+        workflowChildrenVar <- newTVar []
+        writeTVar childrenVar $ MainListElemWorkflows {
+          _workflows = workflowsVar
+          , _toggled = toggledVar
+          , _children = workflowChildrenVar
+          , _depth = 2
+          , _ident = 0
+          }
+
+      Right wtc@(WithTotalCount x _count) -> atomically $ do
+        writeTVar workflowsVar (Fetched wtc)
+
+        toggledVar <- newTVar True
+        workflowChildren <- forM (V.toList x) $ \iss -> do
+          workflowVar <- newTVar (Fetched iss)
+          toggledVar' <- newTVar False
+          pure $ MainListElemWorkflow {
+            _workflow = workflowVar
+            , _toggled = toggledVar'
+            , _depth = 3
+            , _ident = 0
+            }
+        workflowChildrenVar <- newTVar workflowChildren
+
+        writeTVar childrenVar (MainListElemWorkflows {
+                                  _workflows = workflowsVar
+                                  , _toggled = toggledVar -- TODO: inherit from previous value
+                                  , _children = workflowChildrenVar
+                                  , _depth = 2
+                                  , _ident = 0
+                                  })
 
 fetchIssues :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -137,7 +170,7 @@ fetchIssue owner name issueNumber issueVar = do
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> m ()
 refresh _ (MainListElemHeading {}) = return () -- TODO
 refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) = liftIO $ do
-  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflows) bc
+  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflows _workflowsChild) bc
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _issuesChild) bc
 refresh _ (MainListElemIssues {}) = return () -- TODO
 refresh _ (MainListElemIssue {..}) = return () -- TODO

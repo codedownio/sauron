@@ -21,6 +21,7 @@ workflowWidget (WorkflowRun {..}) = hBox [
   , str ": "
   , str $ toString workflowRunDisplayTitle
   , padLeft (Pad 1) $ getIcon $ fromMaybe workflowRunStatus workflowRunConclusion
+  , padLeft Max (str " ")
   ]
 
 workflowStatusToIcon :: WorkflowStatus -> Widget n

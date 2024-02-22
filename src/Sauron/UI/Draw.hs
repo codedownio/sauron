@@ -92,8 +92,10 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
         , Just (padLeft Max (str " "))
         ]
       ]
-    listDrawElement ix isSelected x@(MainListElemWorkflow {}) = render ix isSelected x [
-      Just $ str "Workflow: "
+    listDrawElement ix isSelected x@(MainListElemWorkflow {..}) = render ix isSelected x [
+      Just $ case _workflow of
+        Fetched wf -> workflowWidget wf
+        _ -> str ""
       ]
 
     render ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes
