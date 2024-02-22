@@ -30,6 +30,8 @@ library
       Sauron.Types
       Sauron.UI.AttrMap
       Sauron.UI.Draw
+      Sauron.UI.Draw.Repo
+      Sauron.UI.Draw.Util
       Sauron.UI.Draw.WorkflowLine
       Sauron.UI.Keys
       Sauron.UI.TopBox

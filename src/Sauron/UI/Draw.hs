@@ -9,7 +9,6 @@ import Brick.Widgets.Center
 import Brick.Widgets.List
 import qualified Brick.Widgets.List as L
 import Control.Monad
-import qualified Data.List as L
 import Data.Maybe
 import Data.String.Interpolate
 import qualified Data.Text as T
@@ -21,6 +20,7 @@ import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Draw.Repo
+import Sauron.UI.Draw.Util
 import Sauron.UI.Draw.WorkflowLine
 import Sauron.UI.TopBox
 import Sauron.UI.Util
@@ -51,7 +51,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
         ]
       ]
     listDrawElement ix isSelected x@(MainListElemRepo {..}) = render ix isSelected x [
-      Just $ renderRepoLine _toggled _namespaceName (repoAttr _repo) _healthCheck (fetchableStatsBox _repo)
+      Just $ renderRepoLine _toggled _namespaceName _repo _healthCheck
       ]
     listDrawElement ix isSelected x@(MainListElemIssues {..}) = render ix isSelected x [
       Just $ hBox $ catMaybes [
@@ -102,16 +102,6 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
     render ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes
 
 
-repoAttr :: Fetchable Repo -> AttrName
-repoAttr NotFetched = notFetchedAttr
-repoAttr Fetching = fetchingAttr
-repoAttr (Errored {}) = erroredAttr
-repoAttr (Fetched {}) = normalAttr
-
-fetchableStatsBox :: Fetchable Repo -> Widget n
-fetchableStatsBox (Fetched r) = statsBox r
-fetchableStatsBox _ = str " "
-
 borderWithCounts :: AppState -> Widget n
 borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]
 
@@ -148,49 +138,6 @@ renderHeadingName :: Text -> Fetchable () -> Widget n
 renderHeadingName l _stat = hBox [
   str (toString l)
   ]
-
-statsBox :: Repo -> Widget n
-statsBox (Repo {..}) = if L.null items then str " " else hBox items
-  where
-    items = catMaybes [
-      guarding (repoWatchersCount > 0) $ padLeft (Pad 1) (
-          padRight (Pad 2) (withAttr iconAttr (str "👁️"))
-          <+> str (show repoWatchersCount)
-          )
-
-      , guarding (repoForksCount > 0) $ padLeft (Pad 1) (
-          padRight (Pad 1) (withAttr iconAttr (str "⑂"))
-          <+> str (show repoForksCount)
-          )
-
-      , guarding (repoStargazersCount > 0) $ padLeft (Pad 1) (
-          padRight (Pad 1) (withAttr iconAttr (str "★"))
-          <+> str (show repoStargazersCount)
-          )
-      ]
-
-guarding :: (Monad m, Alternative m) => Bool -> b -> m b
-guarding p widget = do
-  guard p
-  return widget
-
-guardJust :: (Monad m, Alternative m) => Maybe a -> (a -> m b) -> m b
-guardJust val fn = do
-  guard (isJust val)
-  case val of
-    Just x -> fn x
-    _ -> error "impossible"
-
-guardFetched :: (Monad m, Alternative m) => Fetchable a -> (a -> m b) -> m b
-guardFetched fetchable fn = do
-  guard (isFetched fetchable)
-  case fetchable of
-    Fetched x -> fn x
-    _ -> error "impossible"
-
-isFetched :: Fetchable a -> Bool
-isFetched (Fetched _) = True
-isFetched _ = False
 
 progressThing :: String
 progressThing = "⠀"
