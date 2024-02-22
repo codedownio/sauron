@@ -20,6 +20,7 @@ import Lens.Micro hiding (ix)
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Draw.Repo
 import Sauron.UI.Draw.WorkflowLine
 import Sauron.UI.TopBox
 import Sauron.UI.Util
@@ -50,7 +51,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
         ]
       ]
     listDrawElement ix isSelected x@(MainListElemRepo {..}) = render ix isSelected x [
-      Just $ renderRepoLine _toggled _namespaceName (repoAttr _repo) (healthIndicator _healthCheck) (fetchableStatsBox _repo)
+      Just $ renderRepoLine _toggled _namespaceName (repoAttr _repo) _healthCheck (fetchableStatsBox _repo)
       ]
     listDrawElement ix isSelected x@(MainListElemIssues {..}) = render ix isSelected x [
       Just $ hBox $ catMaybes [
@@ -100,22 +101,6 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
 
     render ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes
 
-
-renderRepoLine :: Bool -> (Name Owner, Name Repo) -> AttrName -> Maybe (Widget n) -> Widget n -> Widget n
-renderRepoLine isToggled (owner, name) attr maybeHealth rightSide = hBox $ catMaybes [
-  Just $ withAttr openMarkerAttr $ str (if isToggled then "[-] " else "[+] ")
-  , Just $ hBox [
-      withAttr attr (str (toString (untagName owner)))
-      , withAttr toggleMarkerAttr $ str " / "
-      , withAttr attr (str (toString (untagName name)))
-      ]
-  , maybeHealth
-  , Just (padLeft Max rightSide)
-  ]
-
-healthIndicator :: Fetchable HealthCheckResult -> Maybe (Widget n)
-healthIndicator (Fetched (HealthCheckWorkflowResult ws)) = Just (padLeft (Pad 1) (workflowStatusToIcon ws))
-healthIndicator _ = Nothing
 
 repoAttr :: Fetchable Repo -> AttrName
 repoAttr NotFetched = notFetchedAttr
