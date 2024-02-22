@@ -7,8 +7,11 @@ module Sauron.Actions (
   , withScroll
 
   , fetchRepo
+
   , fetchWorkflows
+
   , fetchIssues
+  , fetchIssue
 
   , refresh
   , refreshAll
@@ -173,7 +176,7 @@ refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) = liftIO $ do
   void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflows _workflowsChild) bc
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _issuesChild) bc
 refresh _ (MainListElemIssues {}) = return () -- TODO
-refresh _ (MainListElemIssue {..}) = return () -- TODO
+refresh _ (MainListElemIssue {}) = return () -- TODO
 refresh _ (MainListElemWorkflows {}) = return () -- TODO
 refresh _ (MainListElemWorkflow {}) = return () -- TODO
 
