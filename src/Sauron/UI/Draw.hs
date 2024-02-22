@@ -70,7 +70,7 @@ mainList app = hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (
           withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
           , str ("#" <> show number <> " ")
           , withAttr normalAttr $ str $ toString issueTitle
-          , padLeft Max (str [i|#{issueCreatedAt} by #{untagName $ simpleUserLogin issueUser}|])
+          , padLeft Max (str [i|#{issueCreatedAt} by #{untagName $ simpleUserLogin issueUser}, #{issueComments}|])
           ]
         _ -> str ""
       , do
