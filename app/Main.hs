@@ -12,6 +12,7 @@ import Control.Monad
 import Control.Monad.Writer
 import Data.Function
 import Data.String.Interpolate
+import qualified Data.Text.IO as T
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import GitHub
@@ -22,8 +23,8 @@ import Relude hiding (Down)
 import Sauron.Actions
 import Sauron.Auth
 import Sauron.Event
-import Sauron.Fix
 import Sauron.Expanding
+import Sauron.Fix
 import Sauron.Options
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -32,6 +33,7 @@ import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
 import UnliftIO.Exception
+import UnliftIO.IO
 
 
 refreshPeriod :: Int
@@ -70,9 +72,16 @@ main = do
 
   putStrLn [i|Got auth: #{auth}|]
 
+  debugFn <- case cliDebugFile of
+    Nothing -> return $ const $ return ()
+    Just fp -> do
+      h <- openFile fp AppendMode
+      return (T.hPutStrLn h)
+
   let baseContext = BaseContext {
         requestSemaphore = githubApiSemaphore
         , auth = auth
+        , debugFn = debugFn
         }
 
   currentUser@(User {userLogin=(N userLoginUnwrapped)}) <- withGithubApiSemaphore' githubApiSemaphore (github auth userInfoCurrentR) >>= \case

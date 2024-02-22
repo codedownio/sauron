@@ -33,6 +33,7 @@ data CliArgs = CliArgs {
   cliOAuthToken :: Maybe Text
   , cliConfigFile :: Maybe FilePath
   , cliConcurrentGithubApiLimit :: Int
+  , cliDebugFile :: Maybe FilePath
   } deriving (Show)
 
 cliArgsParser :: Parser CliArgs
@@ -40,6 +41,7 @@ cliArgsParser = CliArgs
   <$> optional (strOption (long "token" <> help "OAuth token to auth to GitHub" <> metavar "STRING"))
   <*> optional (strOption (long "config" <> short 'c' <> help "Config file path" <> metavar "STRING"))
   <*> option auto (long "github-concurrent-requests" <> short 'r' <> showDefault <> help "Maximum number of concurrent requests to GitHub" <> value 10 <> metavar "INT")
+  <*> optional (strOption (long "debug-file" <> help "Debug file path (for optional logging)" <> metavar "STRING"))
 
 parseCliArgs :: IO CliArgs
 parseCliArgs = execParser opts

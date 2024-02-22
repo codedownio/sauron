@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -24,6 +25,7 @@ type Var = TVar
 data BaseContext = BaseContext {
   requestSemaphore :: QSem
   , auth :: Auth
+  , debugFn :: Text -> IO ()
   }
 
 data ClickableName = ListRow Int | MainList | InnerViewport Text | InfoBar
