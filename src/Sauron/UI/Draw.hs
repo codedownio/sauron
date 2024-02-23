@@ -18,6 +18,7 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Draw.Border
 import Sauron.UI.Draw.BottomBar
+import Sauron.UI.Draw.Issue
 import Sauron.UI.Draw.Repo
 import Sauron.UI.Draw.Util
 import Sauron.UI.Draw.WorkflowLine
@@ -71,7 +72,7 @@ listDrawElement ix isSelected x@(MainListElemIssue {..}) = wrapper ix isSelected
       guardFetched _issue $ \(Issue {..}) -> guardJust issueBody $ \body ->
         return $ padLeft (Pad 4) $
           fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-            vBox [strWrap (toString body)]
+            issueInner body
   ]
 listDrawElement ix isSelected x@(MainListElemWorkflows {..}) = wrapper ix isSelected x [
   Just $ hBox $ catMaybes [
