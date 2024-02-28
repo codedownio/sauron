@@ -68,7 +68,7 @@ listDrawElement ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected 
       , withAttr normalAttr $ str $ toString issueTitle
       , padLeft Max (str [i|#{issueCreatedAt} by #{untagName $ simpleUserLogin issueUser}, #{issueComments}|])
       ]
-    Fetched (PaginatedItemWorkflow wf) -> workflowWidget wf
+    Fetched (PaginatedItemWorkflow wf) -> workflowLine _toggled wf
     _ -> str ""
   , do
       guard _toggled
