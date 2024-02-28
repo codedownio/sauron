@@ -21,9 +21,8 @@ topBox app = hBox [columnPadding settingsColumn
                   , columnPadding otherActionsColumn]
   where
     settingsColumn = keybindingBox [keyIndicator (L.intersperse '/' [unKChar nextKey, unKChar previousKey, '↑', '↓']) "Navigate"
-                                   , keyIndicatorHasSelected app (showKeys toggleKeys) "Open/close node"
+                                   , keyIndicatorHasSelected app (showKeys toggleKeys <> "/←/→") "Open/close node"
                                    , keyIndicatorHasSelectedOpen app "Control-v/Meta-v" "Scroll node"
-                                   , keyIndicator (unKChar nextFailureKey : '/' : [unKChar previousFailureKey]) "Next/previous failure"
                                    ]
 
     actionsColumn = keybindingBox [hBox [str "["
@@ -36,7 +35,7 @@ topBox app = hBox [columnPadding settingsColumn
                                          , highlightKeyIfPredicate someRepoSelected app (str $ showKey browserToActionsKey)
                                          , str "] "
                                          , withAttr hotkeyMessageAttr $ str "Open "
-                                         , highlightMessageIfPredicate someRepoSelected app (str "home")
+                                         , highlightMessageIfPredicate someRepoSelected app (str "repo")
                                          , str "/"
                                          , highlightMessageIfPredicate someRepoSelected app (str "issues")
                                          , str "/"
@@ -53,6 +52,12 @@ topBox app = hBox [columnPadding settingsColumn
                                          , highlightMessageIfPredicate someRepoSelected app (str "selected")
                                          , str "/"
                                          , highlightMessageIfPredicate (const True) app (str "all")
+                                         ]
+                                  , hBox [str "["
+                                         , highlightKeyIfPredicate someRepoSelected app (str $ showKey openSelectedKey)
+                                         , str "] "
+                                         , withAttr hotkeyMessageAttr $ str "Open "
+                                         , highlightMessageIfPredicate someRepoSelected app (str "selected")
                                          ]
                                   ]
 

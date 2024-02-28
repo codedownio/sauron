@@ -26,32 +26,10 @@ appEvent s (VtyEvent e) = case e of
   -- Column 1
   V.EvKey c [] | c == nextKey -> put (s & appMainList %~ (listMoveBy 1))
   V.EvKey c [] | c == previousKey -> put (s & appMainList %~ (listMoveBy (-1)))
-  -- V.EvKey c [] | c == nextFailureKey -> do
-  --   let ls = Vec.toList $ listElements (s ^. appMainList)
-  --   let listToSearch = case listSelectedElement (s ^. appMainList) of
-  --         Just (i, MainListElem {}) -> let (front, back) = L.splitAt (i + 1) (zip [0..] ls) in back <> front
-  --         Nothing -> zip [0..] ls
-  --   case L.find (isFailureStatus . status . snd) listToSearch of
-  --     Nothing -> put s
-  --     Just (i', _) -> put (s & appMainList %~ (listMoveTo i'))
-  -- V.EvKey c [] | c == previousFailureKey -> do
-  --   let ls = Vec.toList $ listElements (s ^. appMainList)
-  --   let listToSearch = case listSelectedElement (s ^. appMainList) of
-  --         Just (i, MainListElem {}) -> let (front, back) = L.splitAt i (zip [0..] ls) in (L.reverse front) <> (L.reverse back)
-  --         Nothing -> L.reverse (zip [0..] ls)
-  --   case L.find (isFailureStatus . status . snd) listToSearch of
-  --     Nothing -> put s
-  --     Just (i', _) -> put (s & appMainList %~ (listMoveTo i'))
-  V.EvKey c [] | c `elem` toggleKeys -> case listSelectedElement (s ^. appMainList) of
-    Nothing -> return ()
-    Just (n, _) -> do
-      atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
-        Just mle -> do
-          isOpen <- liftIO $ atomically $ do
-            modifyTVar' (_toggled mle) not
-            readTVar (_toggled mle)
-          when isOpen (refresh (s ^. appBaseContext) mle)
-        _ -> return ()
+
+  V.EvKey c [] | c `elem` toggleKeys -> modifyToggled s not
+  V.EvKey V.KLeft [] -> modifyToggled s (const False)
+  V.EvKey V.KRight [] -> modifyToggled s (const True)
 
   -- Scrolling in toggled items
   -- Wanted to make these uniformly Ctrl+whatever, but Ctrl+PageUp/PageDown was causing it to get KEsc and exit (?)
@@ -82,6 +60,11 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 
+  V.EvKey c [] | c == openSelectedKey -> whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
+    MainListElemRepo {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)}))} -> openBrowserToUrl (toString url)
+    MainListElemItem {_item=(Fetched x)} -> openBrowserToItem x
+    _ -> return ()
+
   -- Column 3
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
@@ -100,3 +83,22 @@ appEvent s (MouseDown (ListRow i) V.BLeft _ _) = do
   put (s & appMainList %~ (listMoveTo i))
 
 appEvent _ _ = return ()
+
+
+
+modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
+modifyToggled s cb = case listSelectedElement (s ^. appMainList) of
+  Nothing -> return ()
+  Just (n, _) -> do
+    atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
+      Just mle -> do
+        isOpen <- liftIO $ atomically $ do
+          modifyTVar' (_toggled mle) cb
+          readTVar (_toggled mle)
+        when isOpen (refresh (s ^. appBaseContext) mle)
+      _ -> return ()
+
+openBrowserToItem :: MonadIO m => PaginatedItem -> m ()
+openBrowserToItem (PaginatedItemIssue (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
+openBrowserToItem (PaginatedItemWorkflow (WorkflowRun {workflowRunHtmlUrl=url})) = openBrowserToUrl (toString (getUrl url))
+openBrowserToItem _ = return ()

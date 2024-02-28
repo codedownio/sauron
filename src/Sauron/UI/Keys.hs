@@ -10,18 +10,18 @@ import Relude
 -- Column 1
 nextKey = V.KChar 'n'
 previousKey = V.KChar 'p'
-nextFailureKey = V.KChar 'N'
-previousFailureKey = V.KChar 'P'
 toggleKeys = [V.KEnter, V.KChar '\t']
 
 -- Column 2
 refreshAllKey = V.KChar 'R'
 refreshSelectedKey = V.KChar 'r'
 
-browserToHomeKey = V.KChar 'h'
-browserToIssuesKey = V.KChar 'i'
+browserToHomeKey = V.KChar 'H'
+browserToIssuesKey = V.KChar 'I'
 browserToPullsKey = V.KChar 'P'
-browserToActionsKey = V.KChar 'a'
+browserToActionsKey = V.KChar 'A'
+
+openSelectedKey = V.KChar 'o'
 
 -- Column 3
 exitKey = V.KChar 'q'

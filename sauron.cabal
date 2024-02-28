@@ -36,7 +36,6 @@ library
       Sauron.UI.Draw.Repo
       Sauron.UI.Draw.Util
       Sauron.UI.Draw.Workflow
-      Sauron.UI.Draw.WorkflowLine
       Sauron.UI.Keys
       Sauron.UI.TopBox
       Sauron.UI.Util
