@@ -19,6 +19,7 @@ sections:
   repos:
   - codedownio/haskell-notebook-language-server
   - codedownio/rust-notebook-language-server
+  - codedownio/General
 - display_name: "Open source"
   repos:
   - codedownio/aeson-typescript
