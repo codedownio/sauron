@@ -11,7 +11,7 @@ import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Draw.Util
-import Sauron.UI.Draw.WorkflowLine
+import Sauron.UI.Draw.Workflow
 
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> Fetchable Repo -> Fetchable HealthCheckResult -> Widget n

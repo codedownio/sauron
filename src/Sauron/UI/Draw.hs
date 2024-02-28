@@ -22,7 +22,6 @@ import Sauron.UI.Draw.Issue
 import Sauron.UI.Draw.Repo
 import Sauron.UI.Draw.Util
 import Sauron.UI.Draw.Workflow
-import Sauron.UI.Draw.WorkflowLine
 import Sauron.UI.TopBox
 import Sauron.UI.Util
 
@@ -62,12 +61,7 @@ listDrawElement ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSele
   ]
 listDrawElement ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
   Just $ case _item of
-    Fetched (PaginatedItemIssue (Issue {issueNumber=(IssueNumber number), ..})) -> hBox [
-      withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , str ("#" <> show number <> " ")
-      , withAttr normalAttr $ str $ toString issueTitle
-      , padLeft Max (str [i|#{issueCreatedAt} by #{untagName $ simpleUserLogin issueUser}, #{issueComments}|])
-      ]
+    Fetched (PaginatedItemIssue issue) -> issueLine _toggled issue
     Fetched (PaginatedItemWorkflow wf) -> workflowLine _toggled wf
     _ -> str ""
   , do
