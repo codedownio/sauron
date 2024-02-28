@@ -209,28 +209,26 @@ newRepoNode ::
   -> Int
   -> m MainListElemVariable
 newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
-  workflowsVar <- newTVarIO NotFetched
-
-  issuesSearchVar <- newTVarIO "is:issue"
-  issuesPageVar <- newTVarIO 0
-  issuesVar <- newTVarIO NotFetched
-
   toggledVar <- newTVarIO False
 
+  issuesVar <- newTVarIO NotFetched
   issuesToggledVar <- newTVarIO False
   issuesChildrenVar <- newTVarIO []
-  issuesChildVar <- newTVarIO $ MainListElemIssues {
-    _issues = issuesVar
+  issuesChildVar <- newTVarIO $ MainListElemPaginated {
+    _items = issuesVar
+    , _label = "Issues"
     , _toggled = issuesToggledVar
     , _children = issuesChildrenVar
     , _depth = 2
     , _ident = 0
     }
 
+  workflowsVar <- newTVarIO NotFetched
   workflowsToggledVar <- newTVarIO False
   workflowsChildrenVar <- newTVarIO []
-  workflowsChildVar <- newTVarIO $ MainListElemWorkflows {
-    _workflows = workflowsVar
+  workflowsChildVar <- newTVarIO $ MainListElemPaginated {
+    _items = workflowsVar
+    , _label = "Workflows"
     , _toggled = workflowsToggledVar
     , _children = workflowsChildrenVar
     , _depth = 2
@@ -243,12 +241,6 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
 
     , _healthCheck = healthCheckVar
     , _healthCheckThread = hcThread
-
-    , _workflows = workflowsVar
-
-    , _issuesSearch = issuesSearchVar
-    , _issuesPage = issuesPageVar
-    , _issues = issuesVar
 
     , _toggled = toggledVar
     , _issuesChild = issuesChildVar

@@ -43,9 +43,9 @@ fetchableStatsBox (Fetched r) = statsBox r
 fetchableStatsBox _ = str " "
 
 statsBox :: Repo -> Widget n
-statsBox (Repo {..}) = if L.null items then str " " else hBox items
+statsBox (Repo {..}) = if L.null cells then str " " else hBox cells
   where
-    items = catMaybes [
+    cells = catMaybes [
       guarding (repoWatchersCount > 0) $ padLeft (Pad 1) (
           padRight (Pad 2) (withAttr iconAttr (str "👁️"))
           <+> str (show repoWatchersCount)

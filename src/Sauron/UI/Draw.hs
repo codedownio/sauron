@@ -21,6 +21,7 @@ import Sauron.UI.Draw.BottomBar
 import Sauron.UI.Draw.Issue
 import Sauron.UI.Draw.Repo
 import Sauron.UI.Draw.Util
+import Sauron.UI.Draw.Workflow
 import Sauron.UI.Draw.WorkflowLine
 import Sauron.UI.TopBox
 import Sauron.UI.Util
@@ -46,50 +47,40 @@ listDrawElement ix isSelected x@(MainListElemHeading {..}) = wrapper ix isSelect
 listDrawElement ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled _namespaceName _repo _healthCheck
   ]
-listDrawElement ix isSelected x@(MainListElemIssues {..}) = wrapper ix isSelected x [
+listDrawElement ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSelected x [
   Just $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-    , Just (str "Issues ")
-    , Just $ case _issues of
+    , Just $ padRight (Pad 1) $ str $ toString _label
+    , Just $ case _items of
         NotFetched -> str "(Not fetched)"
         Fetching -> str "(Fetching)"
         Errored msg -> str [i|Errored: #{msg}|]
-        Fetched xs -> str [i|(#{V.length xs})|]
+        Fetched (PaginatedItemsIssues xs) -> str [i|(#{V.length xs})|]
+        Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
     , Just (padLeft Max (str " "))
     ]
   ]
-listDrawElement ix isSelected x@(MainListElemIssue {..}) = wrapper ix isSelected x [
-  Just $ case _issue of
-    Fetched (Issue {issueNumber=(IssueNumber number), ..}) -> hBox [
+listDrawElement ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
+  Just $ case _item of
+    Fetched (PaginatedItemIssue (Issue {issueNumber=(IssueNumber number), ..})) -> hBox [
       withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
       , str ("#" <> show number <> " ")
       , withAttr normalAttr $ str $ toString issueTitle
       , padLeft Max (str [i|#{issueCreatedAt} by #{untagName $ simpleUserLogin issueUser}, #{issueComments}|])
       ]
+    Fetched (PaginatedItemWorkflow wf) -> workflowWidget wf
     _ -> str ""
   , do
       guard _toggled
-      guardFetched _issue $ \(Issue {..}) -> guardJust issueBody $ \body ->
-        return $ padLeft (Pad 4) $
-          fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-            issueInner body
-  ]
-listDrawElement ix isSelected x@(MainListElemWorkflows {..}) = wrapper ix isSelected x [
-  Just $ hBox $ catMaybes [
-    Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-    , Just (str "Workflows ")
-    , Just $ case _workflows of
-        NotFetched -> str "(Not fetched)"
-        Fetching -> str "(Fetching)"
-        Errored msg -> str [i|Errored: #{msg}|]
-        Fetched xs -> str [i|(#{withTotalCountTotalCount xs})|]
-    , Just (padLeft Max (str " "))
-    ]
-  ]
-listDrawElement ix isSelected x@(MainListElemWorkflow {..}) = wrapper ix isSelected x [
-  Just $ case _workflow of
-    Fetched wf -> workflowWidget wf
-    _ -> str ""
+      guardFetched _item $ \case
+        PaginatedItemIssue (Issue {..}) -> guardJust issueBody $ \body ->
+          return $ padLeft (Pad 4) $
+            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+              issueInner body
+        PaginatedItemWorkflow wf@(WorkflowRun {}) ->
+          return $ padLeft (Pad 4) $
+            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+              workflowInner wf
   ]
 
 wrapper :: Int -> Bool -> MainListElem' f -> [Maybe (Widget ClickableName)] -> Widget ClickableName

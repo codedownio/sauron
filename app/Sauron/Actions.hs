@@ -31,6 +31,7 @@ import Control.Concurrent.STM (retry)
 import Control.Exception.Safe (bracket_, bracketOnError_, handleAny)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
+import Data.Aeson
 import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
@@ -67,90 +68,67 @@ fetchRepo owner name repoVar = do
       Left err -> atomically $ writeTVar repoVar (Errored (show err))
       Right x -> atomically $ writeTVar repoVar (Fetched x)
 
-fetchWorkflows :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> TVar (Fetchable (WithTotalCount WorkflowRun)) -> TVar MainListElemVariable -> m ()
-fetchWorkflows owner name workflowsVar childrenVar = do
-  BaseContext {auth} <- ask
-  bracketOnError_ (atomically $ writeTVar workflowsVar Fetching)
-                  (atomically $ writeTVar workflowsVar (Errored "Workflows fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ github auth (workflowRunsR owner name mempty (FetchAtLeast 10))) >>= \case
-      Left err -> atomically $ do
-        writeTVar workflowsVar (Errored (show err))
-
-        toggledVar <- newTVar False
-        workflowChildrenVar <- newTVar []
-        writeTVar childrenVar $ MainListElemWorkflows {
-          _workflows = workflowsVar
-          , _toggled = toggledVar
-          , _children = workflowChildrenVar
-          , _depth = 2
-          , _ident = 0
-          }
-
-      Right wtc@(WithTotalCount x _count) -> atomically $ do
-        writeTVar workflowsVar (Fetched wtc)
-
-        toggledVar <- newTVar True
-        workflowChildren <- forM (V.toList x) $ \iss -> do
-          workflowVar <- newTVar (Fetched iss)
-          toggledVar' <- newTVar False
-          pure $ MainListElemWorkflow {
-            _workflow = workflowVar
-            , _toggled = toggledVar'
-            , _depth = 3
-            , _ident = 0
-            }
-        workflowChildrenVar <- newTVar workflowChildren
-
-        writeTVar childrenVar (MainListElemWorkflows {
-                                  _workflows = workflowsVar
-                                  , _toggled = toggledVar -- TODO: inherit from previous value
-                                  , _children = workflowChildrenVar
-                                  , _depth = 2
-                                  , _ident = 0
-                                  })
-
 fetchIssues :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> TVar Text -> TVar Int -> TVar (Fetchable (V.Vector Issue)) -> TVar MainListElemVariable -> m ()
-fetchIssues owner name issueSearchVar issuePageVar issuesVar childrenVar = do
-  BaseContext {auth, manager} <- ask
+  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
+  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
+fetchIssues owner name childrenVar = do
   let search = mempty
-  bracketOnError_ (atomically $ writeTVar issuesVar Fetching)
-                  (atomically $ writeTVar issuesVar (Errored "Workflows fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issuesForRepoR owner name search (FetchPage (PageParams (Just 10) (Just 1))))) >>= \case
+  fetchPaginated (issuesForRepoR owner name search) PaginatedItemsIssues childrenVar
+
+fetchWorkflows :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
+  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
+fetchWorkflows owner name childrenVar = do
+  let search = mempty
+  fetchPaginated (workflowRunsR owner name search) PaginatedItemsWorkflows childrenVar
+
+fetchPaginated :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
+  ) => (FetchCount -> Request k res)
+    -> (res -> PaginatedItems)
+    -> TVar MainListElemVariable
+    -> m ()
+fetchPaginated mkReq wrapResponse childrenVar = do
+  BaseContext {auth, manager} <- ask
+
+  MainListElemPaginated {..} <- readTVarIO childrenVar
+
+  bracketOnError_ (atomically $ writeTVar _items Fetching)
+                  (atomically $ writeTVar _items (Errored "Workflows fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just 1))))) >>= \case
       Left err -> atomically $ do
-        writeTVar issuesVar (Errored (show err))
+        writeTVar _items (Errored (show err))
 
         toggledVar <- newTVar False
         issueChildrenVar <- newTVar []
-        writeTVar childrenVar $ MainListElemIssues {
-          _issues = issuesVar
+        writeTVar childrenVar $ MainListElemPaginated {
+          _items = _items
+          , _label = _label
           , _toggled = toggledVar
           , _children = issueChildrenVar
           , _depth = 2
           , _ident = 0
           }
       Right x -> atomically $ do
-        writeTVar issuesVar (Fetched (responseBody x))
+        writeTVar _items (Fetched (wrapResponse (responseBody x)))
 
         toggledVar <- newTVar True
-        issueChildren <- forM (V.toList (responseBody x)) $ \iss -> do
-          issueVar <- newTVar (Fetched iss)
+        itemChildren <- forM (paginatedItemsToList $ wrapResponse (responseBody x)) $ \iss -> do
+          itemVar <- newTVar (Fetched iss)
           toggledVar' <- newTVar False
-          pure $ MainListElemIssue {
-            _issue = issueVar
+          pure $ MainListElemItem {
+            _item = itemVar
             , _toggled = toggledVar'
             , _depth = 3
             , _ident = 0
             }
-        issueChildrenVar <- newTVar issueChildren
+        itemChildrenVar <- newTVar itemChildren
 
-        writeTVar childrenVar (MainListElemIssues {
-                                  _issues = issuesVar
+        writeTVar childrenVar (MainListElemPaginated {
+                                  _items = _items
+                                  , _label = _label
                                   , _toggled = toggledVar -- TODO: inherit from previous value
-                                  , _children = issueChildrenVar
+                                  , _children = itemChildrenVar
                                   , _depth = 2
                                   , _ident = 0
                                   })
@@ -174,12 +152,10 @@ fetchIssue owner name issueNumber issueVar = do
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> m ()
 refresh _ (MainListElemHeading {}) = return () -- TODO
 refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) = liftIO $ do
-  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflows _workflowsChild) bc
-  void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesSearch _issuesPage _issues _issuesChild) bc
-refresh _ (MainListElemIssues {}) = return () -- TODO
-refresh _ (MainListElemIssue {}) = return () -- TODO
-refresh _ (MainListElemWorkflows {}) = return () -- TODO
-refresh _ (MainListElemWorkflow {}) = return () -- TODO
+  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
+  void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
+refresh _ (MainListElemPaginated {}) = return () -- TODO
+refresh _ (MainListElemItem {}) = return () -- TODO
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m
@@ -193,10 +169,8 @@ refreshAll elems = do
       MainListElemRepo {_namespaceName=(owner, name), ..} -> do
         fetchRepo owner name _repo
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
-      MainListElemIssue {} -> return ()
-      MainListElemIssues {} -> return ()
-      MainListElemWorkflow {} -> return ()
-      MainListElemWorkflows {} -> return ()
+      MainListElemPaginated {} -> return ()
+      MainListElemItem {} -> return ()
 
 newHealthCheckThread ::
   BaseContext

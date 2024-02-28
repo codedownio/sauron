@@ -7,6 +7,8 @@ import Brick
 import Commonmark
 import Relude
 
+
+issueInner :: Text -> Widget n
 -- issueInner body = vBox [strWrap (toString body)]
 issueInner body = vBox [strWrap (show parsed)]
   where

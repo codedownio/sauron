@@ -37,8 +37,6 @@ bottomBar s = Widget Greedy Fixed $ do
         phrases = catMaybes [issuesPhrase]
     Just (_, MainListElemRepo {_repo=_}) -> render $ hBox [str ""]
 
-    Just (_, MainListElemIssues {}) -> render $ hBox [str ""]
-    Just (_, MainListElemIssue {}) -> render $ hBox [str ""]
+    Just (_, MainListElemPaginated {}) -> render $ hBox [str ""]
 
-    Just (_, MainListElemWorkflows {}) -> render $ hBox [str ""]
-    Just (_, MainListElemWorkflow {}) -> render $ hBox [str ""]
+    Just (_, MainListElemItem {}) -> render $ hBox [str ""]

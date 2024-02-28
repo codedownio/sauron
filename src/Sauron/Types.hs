@@ -79,6 +79,20 @@ data HealthCheckResult =
   | HealthCheckUnhealthy Text
   deriving (Show, Eq)
 
+data PaginatedItems =
+  PaginatedItemsIssues (V.Vector Issue)
+  | PaginatedItemsWorkflows (WithTotalCount WorkflowRun)
+  deriving (Show, Eq)
+
+data PaginatedItem =
+  PaginatedItemIssue Issue
+  | PaginatedItemWorkflow WorkflowRun
+  deriving (Show, Eq)
+
+paginatedItemsToList :: PaginatedItems -> [PaginatedItem]
+paginatedItemsToList (PaginatedItemsIssues xs) = fmap PaginatedItemIssue $ V.toList xs
+paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
+
 data MainListElem' f =
   MainListElemHeading {
       _label :: Text
@@ -96,12 +110,6 @@ data MainListElem' f =
       , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
       , _healthCheckThread :: Maybe (Async ())
 
-      , _workflows :: Switchable f (Fetchable (WithTotalCount WorkflowRun))
-
-      , _issuesSearch :: Switchable f Text
-      , _issuesPage :: Switchable f Int
-      , _issues :: Switchable f (Fetchable (V.Vector Issue))
-
       , _toggled :: Switchable f Bool
       , _issuesChild :: Switchable f (MainListElem' f)
       , _workflowsChild :: Switchable f (MainListElem' f)
@@ -109,34 +117,18 @@ data MainListElem' f =
       , _depth :: Int
       , _ident :: Int
       }
-  | MainListElemIssues {
-      _issues :: Switchable f (Fetchable (V.Vector Issue))
+  | MainListElemPaginated {
+      _items :: Switchable f (Fetchable PaginatedItems)
 
+      , _label :: Text
       , _toggled :: Switchable f Bool
       , _children :: Switchable f [MainListElem' f]
 
       , _depth :: Int
       , _ident :: Int
       }
-  | MainListElemIssue {
-      _issue :: Switchable f (Fetchable Issue)
-
-      , _toggled :: Switchable f Bool
-
-      , _depth :: Int
-      , _ident :: Int
-      }
-  | MainListElemWorkflows {
-      _workflows :: Switchable f (Fetchable (WithTotalCount WorkflowRun))
-
-      , _toggled :: Switchable f Bool
-      , _children :: Switchable f [MainListElem' f]
-
-      , _depth :: Int
-      , _ident :: Int
-      }
-  | MainListElemWorkflow {
-      _workflow :: Switchable f (Fetchable WorkflowRun)
+  | MainListElemItem {
+      _item :: Switchable f (Fetchable PaginatedItem)
 
       , _toggled :: Switchable f Bool
 

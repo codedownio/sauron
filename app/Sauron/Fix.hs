@@ -24,12 +24,6 @@ fixMainListElem (MainListElemRepo {..}) = do
 
   healthCheckFixed <- readTVar _healthCheck
 
-  issuesSearchFixed <- readTVar _issuesSearch
-  issuesPageFixed <- readTVar _issuesPage
-  issuesFixed <- readTVar _issues
-
-  workflowsFixed <- readTVar _workflows
-
   toggledFixed <- readTVar _toggled
   issuesChildFixed <- readTVar _issuesChild >>= fixMainListElem
   workflowsChildFixed <- readTVar _workflowsChild >>= fixMainListElem
@@ -41,12 +35,6 @@ fixMainListElem (MainListElemRepo {..}) = do
     , _healthCheck = healthCheckFixed
     , _healthCheckThread = _healthCheckThread
 
-    , _workflows = workflowsFixed
-
-    , _issuesSearch = issuesSearchFixed
-    , _issuesPage = issuesPageFixed
-    , _issues = issuesFixed
-
     , _toggled = toggledFixed
     , _issuesChild = issuesChildFixed
     , _workflowsChild = workflowsChildFixed
@@ -54,56 +42,29 @@ fixMainListElem (MainListElemRepo {..}) = do
     , _depth = _depth
     , _ident = _ident
     }
-fixMainListElem (MainListElemIssues {..}) = do
-  issuesFixed <- readTVar _issues
+fixMainListElem (MainListElemPaginated {..}) = do
+  itemsFixed <- readTVar _items
 
   toggledFixed <- readTVar _toggled
   childrenFixed <- readTVar _children >>= mapM fixMainListElem
 
-  return $ MainListElemIssues {
-    _issues = issuesFixed
+  return $ MainListElemPaginated {
+    _items = itemsFixed
 
+    , _label = _label
     , _toggled = toggledFixed
     , _children = childrenFixed
 
     , _depth = _depth
     , _ident = _ident
     }
-fixMainListElem (MainListElemIssue {..}) = do
-  issueFixed <- readTVar _issue
+fixMainListElem (MainListElemItem {..}) = do
+  itemFixed <- readTVar _item
 
   toggledFixed <- readTVar _toggled
 
-  return $ MainListElemIssue {
-    _issue = issueFixed
-
-    , _toggled = toggledFixed
-
-    , _depth = _depth
-    , _ident = _ident
-    }
-fixMainListElem (MainListElemWorkflows {..}) = do
-  workflowsFixed <- readTVar _workflows
-
-  toggledFixed <- readTVar _toggled
-  childrenFixed <- readTVar _children >>= mapM fixMainListElem
-
-  return $ MainListElemWorkflows {
-    _workflows = workflowsFixed
-
-    , _toggled = toggledFixed
-    , _children = childrenFixed
-
-    , _depth = _depth
-    , _ident = _ident
-    }
-fixMainListElem (MainListElemWorkflow {..}) = do
-  workflowFixed <- readTVar _workflow
-
-  toggledFixed <- readTVar _toggled
-
-  return $ MainListElemWorkflow {
-    _workflow = workflowFixed
+  return $ MainListElemItem {
+    _item = itemFixed
 
     , _toggled = toggledFixed
 
