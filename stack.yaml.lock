@@ -40,15 +40,19 @@ packages:
   original:
     hackage: brick-2.0
 - completed:
-    hackage: github-0.29@sha256:1a6f082a24df02e38a2de548ce72654537b3aee5383cb57dce5d3ef6386c6752,7939
+    commit: cd32569e3b4572158ce240096a79633607b08e0a
+    git: git@github.com:codedownio/github.git
+    name: github
     pantry-tree:
-      sha256: 84286a49354095da536c1ab267f77976c1bc69c6e55f43070f4c588ea461fe86
-      size: 10172
+      sha256: db5548baee2eca83e7c1caa6a1004f13967c56eaaf621b3bdb278564eae92468
+      size: 19154
+    version: '0.29'
   original:
-    hackage: github-0.29
+    commit: cd32569e3b4572158ce240096a79633607b08e0a
+    git: git@github.com:codedownio/github.git
 snapshots:
 - completed:
-    sha256: 1b4c2669e26fa828451830ed4725e4d406acc25a1fa24fcc039465dd13d7a575
-    size: 714100
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/6.yaml
-  original: lts-22.6
+    sha256: e2c529ccfb21501f98f639e056cbde50470b86256d9849d7a82d414ca23e4276
+    size: 712898
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/12.yaml
+  original: lts-22.12

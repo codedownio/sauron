@@ -25,6 +25,7 @@ dependencies:
 - commonmark
 - containers
 - github
+- http-client
 - microlens
 - mtl
 - process

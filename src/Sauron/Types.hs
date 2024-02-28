@@ -13,6 +13,7 @@ import Data.Text
 import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro.TH
+import Network.HTTP.Client (Manager)
 import Relude
 import UnliftIO.Async
 
@@ -26,6 +27,7 @@ data BaseContext = BaseContext {
   requestSemaphore :: QSem
   , auth :: Auth
   , debugFn :: Text -> IO ()
+  , manager :: Manager
   }
 
 data ClickableName = ListRow Int | MainList | InnerViewport Text | InfoBar

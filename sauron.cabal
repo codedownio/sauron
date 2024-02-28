@@ -63,6 +63,7 @@ library
     , commonmark
     , containers
     , github
+    , http-client
     , microlens
     , microlens-th
     , mtl
@@ -113,6 +114,7 @@ executable sauron
     , exceptions
     , filepath
     , github
+    , http-client
     , microlens
     , mtl
     , optparse-applicative
@@ -157,6 +159,7 @@ test-suite test
     , commonmark
     , containers
     , github
+    , http-client
     , microlens
     , mtl
     , process

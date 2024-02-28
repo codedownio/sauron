@@ -35,6 +35,7 @@ import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
+import Network.HTTP.Client (responseBody)
 import Relude
 import Sauron.Options
 import Sauron.Types
@@ -114,11 +115,11 @@ fetchIssues :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> TVar Text -> TVar Int -> TVar (Fetchable (V.Vector Issue)) -> TVar MainListElemVariable -> m ()
 fetchIssues owner name issueSearchVar issuePageVar issuesVar childrenVar = do
-  BaseContext {auth} <- ask
+  BaseContext {auth, manager} <- ask
   let search = mempty
   bracketOnError_ (atomically $ writeTVar issuesVar Fetching)
                   (atomically $ writeTVar issuesVar (Errored "Workflows fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ github auth (issuesForRepoR owner name search (FetchAtLeast 10))) >>= \case
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issuesForRepoR owner name search (FetchPage (PageParams (Just 10) (Just 1))))) >>= \case
       Left err -> atomically $ do
         writeTVar issuesVar (Errored (show err))
 
@@ -132,10 +133,10 @@ fetchIssues owner name issueSearchVar issuePageVar issuesVar childrenVar = do
           , _ident = 0
           }
       Right x -> atomically $ do
-        writeTVar issuesVar (Fetched x)
+        writeTVar issuesVar (Fetched (responseBody x))
 
         toggledVar <- newTVar True
-        issueChildren <- forM (V.toList x) $ \iss -> do
+        issueChildren <- forM (V.toList (responseBody x)) $ \iss -> do
           issueVar <- newTVar (Fetched iss)
           toggledVar' <- newTVar False
           pure $ MainListElemIssue {
@@ -159,15 +160,15 @@ fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable Issue) -> m ()
 fetchIssue owner name issueNumber issueVar = do
-  BaseContext {auth} <- ask
+  BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ writeTVar issueVar Fetching)
                   (atomically $ writeTVar issueVar (Errored "Workflows fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ github auth (issueR owner name issueNumber)) >>= \case
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
       Left err -> atomically $ do
         writeTVar issueVar (Errored (show err))
         undefined
       Right x -> atomically $ do
-        writeTVar issueVar (Fetched x)
+        writeTVar issueVar (Fetched (responseBody x))
         undefined
 
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> m ()

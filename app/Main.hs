@@ -19,6 +19,7 @@ import GitHub
 import GitHub.Data.Name
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.CrossPlatform as V
+import Network.HTTP.Client (newManager)
 import Relude hiding (Down)
 import Sauron.Actions
 import Sauron.Auth
@@ -78,10 +79,13 @@ main = do
       h <- openFile fp AppendMode
       return (T.hPutStrLn h)
 
+  manager <- newManager tlsManagerSettings
+
   let baseContext = BaseContext {
         requestSemaphore = githubApiSemaphore
         , auth = auth
         , debugFn = debugFn
+        , manager = manager
         }
 
   currentUser@(User {userLogin=(N userLoginUnwrapped)}) <- withGithubApiSemaphore' githubApiSemaphore (github auth userInfoCurrentR) >>= \case
