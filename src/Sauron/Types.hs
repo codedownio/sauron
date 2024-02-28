@@ -10,6 +10,7 @@ module Sauron.Types where
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Data.Text
+import Data.Time
 import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro.TH
@@ -147,6 +148,7 @@ data AppState = AppState {
   , _appMainListVariable :: V.Vector MainListElemVariable
   , _appMainList :: L.List ClickableName MainListElem
   , _appSortBy :: SortBy
+  , _appNow :: UTCTime
   }
 makeLenses ''AppState
 

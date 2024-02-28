@@ -33,6 +33,7 @@ dependencies:
 - stm
 - string-interpolate
 - text
+- time
 - unliftio-core
 - unliftio
 - vector

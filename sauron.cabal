@@ -36,9 +36,11 @@ library
       Sauron.UI.Draw.Repo
       Sauron.UI.Draw.Util
       Sauron.UI.Draw.Workflow
+      Sauron.UI.Draw.WorkflowLine
       Sauron.UI.Keys
       Sauron.UI.TopBox
       Sauron.UI.Util
+      Sauron.UI.Util.TimeFromNow
       Sauron.Util
   other-modules:
       Paths_sauron
@@ -125,6 +127,7 @@ executable sauron
     , stm
     , string-interpolate
     , text
+    , time
     , unliftio
     , unliftio-core
     , vector
@@ -168,6 +171,7 @@ test-suite test
     , stm
     , string-interpolate
     , text
+    , time
     , unliftio
     , unliftio-core
     , vector

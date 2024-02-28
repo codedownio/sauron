@@ -13,6 +13,7 @@ import Control.Monad.Writer
 import Data.Function
 import Data.String.Interpolate
 import qualified Data.Text.IO as T
+import Data.Time
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import GitHub
@@ -161,6 +162,8 @@ main = do
 
   listElemsFixed :: V.Vector MainListElem <- atomically $ mapM fixMainListElem listElems
 
+  now <- getCurrentTime
+
   let initialState =
         AppState {
           _appUser = currentUser
@@ -169,6 +172,7 @@ main = do
           , _appMainList = list MainList listElemsFixed 1
 
           , _appSortBy = SortByStars
+          , _appNow = now
         }
 
 

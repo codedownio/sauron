@@ -10,6 +10,7 @@ import qualified Brick.Widgets.List as L
 import Control.Monad
 import Data.Maybe
 import Data.String.Interpolate
+import Data.Time
 import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
@@ -30,23 +31,23 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = [vBox [
                  topBox app
                  , borderWithCounts app
-                 , hCenter $ padAll 1 $ L.renderListWithIndex listDrawElement True (app ^. appMainList)
+                 , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement (_appNow app)) True (app ^. appMainList)
                  , clickable InfoBar $ bottomBar app
                  ]
              ]
 
-listDrawElement :: Int -> Bool -> MainListElem -> Widget ClickableName
-listDrawElement ix isSelected x@(MainListElemHeading {..}) = wrapper ix isSelected x [
+listDrawElement :: UTCTime -> Int -> Bool -> MainListElem -> Widget ClickableName
+listDrawElement _now ix isSelected x@(MainListElemHeading {..}) = wrapper ix isSelected x [
   Just $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
     , Just (hBox [str (toString _label)])
     , Just (padLeft Max (str " "))
     ]
   ]
-listDrawElement ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
+listDrawElement _now ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled _namespaceName _repo _healthCheck
   ]
-listDrawElement ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSelected x [
+listDrawElement _now ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSelected x [
   Just $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
     , Just $ padRight (Pad 1) $ str $ toString _label
@@ -59,9 +60,9 @@ listDrawElement ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSele
     , Just (padLeft Max (str " "))
     ]
   ]
-listDrawElement ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
+listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
   Just $ case _item of
-    Fetched (PaginatedItemIssue issue) -> issueLine _toggled issue
+    Fetched (PaginatedItemIssue issue) -> issueLine now _toggled issue
     Fetched (PaginatedItemWorkflow wf) -> workflowLine _toggled wf
     _ -> str ""
   , do
