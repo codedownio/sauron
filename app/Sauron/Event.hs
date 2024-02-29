@@ -63,6 +63,7 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey c [] | c == openSelectedKey -> whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
     MainListElemRepo {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)}))} -> openBrowserToUrl (toString url)
     MainListElemItem {_item=(Fetched x)} -> openBrowserToItem x
+    MainListElemPaginated {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)})), _urlSuffix} -> openBrowserToUrl (toString url </> toString _urlSuffix)
     _ -> return ()
 
   -- Column 3

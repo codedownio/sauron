@@ -218,11 +218,15 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   issuesVar <- newTVarIO NotFetched
   issuesToggledVar <- newTVarIO False
   issuesChildrenVar <- newTVarIO []
+  issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing
   issuesChildVar <- newTVarIO $ MainListElemPaginated {
     _items = issuesVar
+    , _repo = repoVar
     , _label = "Issues"
+    , _urlSuffix = "issues"
     , _toggled = issuesToggledVar
     , _children = issuesChildrenVar
+    , _pageInfo = issuesPageInfoVar
     , _depth = 2
     , _ident = 0
     }
@@ -230,11 +234,15 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   workflowsVar <- newTVarIO NotFetched
   workflowsToggledVar <- newTVarIO False
   workflowsChildrenVar <- newTVarIO []
+  workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing
   workflowsChildVar <- newTVarIO $ MainListElemPaginated {
     _items = workflowsVar
+    , _repo = repoVar
     , _label = "Workflows"
+    , _urlSuffix = "actions"
     , _toggled = workflowsToggledVar
     , _children = workflowsChildrenVar
+    , _pageInfo = workflowsPageInfoVar
     , _depth = 2
     , _ident = 0
     }

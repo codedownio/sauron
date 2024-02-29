@@ -94,6 +94,11 @@ paginatedItemsToList :: PaginatedItems -> [PaginatedItem]
 paginatedItemsToList (PaginatedItemsIssues xs) = fmap PaginatedItemIssue $ V.toList xs
 paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
 
+data PageInfo = PageInfo {
+  pageInfoCurrentPage :: Int
+  , pageInfoLastPage :: Maybe Int
+  } deriving (Show, Eq)
+
 data MainListElem' f =
   MainListElemHeading {
       _label :: Text
@@ -121,9 +126,17 @@ data MainListElem' f =
   | MainListElemPaginated {
       _items :: Switchable f (Fetchable PaginatedItems)
 
+      -- This is a reference to the same fetchable as the parent repo. It's only
+      -- provided here to support openingi etc.
+      , _repo :: Switchable f (Fetchable Repo)
+
       , _label :: Text
+      , _urlSuffix :: Text
+
       , _toggled :: Switchable f Bool
       , _children :: Switchable f [MainListElem' f]
+
+      , _pageInfo :: Switchable f PageInfo
 
       , _depth :: Int
       , _ident :: Int

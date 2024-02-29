@@ -98,21 +98,11 @@ fetchPaginated mkReq wrapResponse childrenVar = do
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just 1))))) >>= \case
       Left err -> atomically $ do
         writeTVar _items (Errored (show err))
+        writeTVar _children []
 
-        toggledVar <- newTVar False
-        issueChildrenVar <- newTVar []
-        writeTVar childrenVar $ MainListElemPaginated {
-          _items = _items
-          , _label = _label
-          , _toggled = toggledVar
-          , _children = issueChildrenVar
-          , _depth = 2
-          , _ident = 0
-          }
       Right x -> atomically $ do
         writeTVar _items (Fetched (wrapResponse (responseBody x)))
 
-        toggledVar <- newTVar True
         itemChildren <- forM (paginatedItemsToList $ wrapResponse (responseBody x)) $ \iss -> do
           itemVar <- newTVar (Fetched iss)
           toggledVar' <- newTVar False
@@ -122,17 +112,7 @@ fetchPaginated mkReq wrapResponse childrenVar = do
             , _depth = 3
             , _ident = 0
             }
-        itemChildrenVar <- newTVar itemChildren
-
-        writeTVar childrenVar (MainListElemPaginated {
-                                  _items = _items
-                                  , _label = _label
-                                  , _toggled = toggledVar -- TODO: inherit from previous value
-                                  , _children = itemChildrenVar
-                                  , _depth = 2
-                                  , _ident = 0
-                                  })
-
+        writeTVar _children itemChildren
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
