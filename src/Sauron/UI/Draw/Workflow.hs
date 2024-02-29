@@ -38,7 +38,7 @@ workflowStatusToIcon WorkflowUnknown = unknown
 getIcon :: Text -> Widget n
 getIcon = workflowStatusToIcon . chooseWorkflowStatus
 
-cancelled = withAttr cancelledAttr (str " ⃠")
+cancelled = withAttr cancelledAttr (str "⊘")
 greenCheck = withAttr greenCheckAttr (str "✓")
 redX = withAttr redXAttr (str "✗")
 ellipses = withAttr ellipsesAttr (str "⋯")
