@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 module Sauron.UI.AttrMap where
@@ -27,6 +27,9 @@ mainAttrMap = attrMap V.defAttr [
   , (fetchingAttr, fg V.blue)
   , (erroredAttr, fg V.red)
 
+  -- Stats box
+  , (starsAttr, fg V.yellow)
+
   -- Workflow icons
   , (cancelledAttr, fg midGray)
   , (greenCheckAttr, fg V.green)
@@ -50,43 +53,32 @@ mainAttrMap = attrMap V.defAttr [
   , (disabledHotkeyMessageAttr, fg brightGray)
   ]
 
-iconAttr :: AttrName
 iconAttr = mkAttrName "icon"
-
-normalAttr :: AttrName
 normalAttr = mkAttrName "normal"
-
-notFetchedAttr :: AttrName
 notFetchedAttr = mkAttrName "not_fetched"
-
-fetchingAttr :: AttrName
 fetchingAttr = mkAttrName "fetching"
-
-erroredAttr :: AttrName
 erroredAttr = mkAttrName "errored"
 
-toggleMarkerAttr :: AttrName
 toggleMarkerAttr = mkAttrName "toggleMarker"
-
-openMarkerAttr :: AttrName
 openMarkerAttr = mkAttrName "openMarker"
 
-hotkeyAttr, disabledHotkeyAttr, hotkeyMessageAttr, disabledHotkeyMessageAttr :: AttrName
 hotkeyAttr = mkAttrName "hotkey"
 disabledHotkeyAttr = mkAttrName "disableHotkey"
 hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
 
+-- * Stats box
+
+starsAttr = mkAttrName "stars"
+
 -- * Workflow icons
 
-cancelledAttr, greenCheckAttr, redXAttr, ellipsesAttr, neutralAttr, unknownAttr :: AttrName
 cancelledAttr = mkAttrName "cancelled"
 greenCheckAttr = mkAttrName "greenCheck"
 redXAttr = mkAttrName "redX"
 ellipsesAttr = mkAttrName "ellipses"
 neutralAttr = mkAttrName "neutral"
 unknownAttr = mkAttrName "neutral"
-
 
 -- * Colors
 

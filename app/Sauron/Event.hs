@@ -12,7 +12,7 @@ import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude hiding (Down)
 import Sauron.Actions
-import Sauron.Expanding
+import Sauron.Event.Helpers
 import Sauron.Types
 import Sauron.UI.Keys
 import System.FilePath
@@ -53,10 +53,8 @@ appEvent s (VtyEvent e) = case e of
     whenRepoSelected s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
-    whenJust (listSelectedElement (s ^. appMainList)) $ \(n, _el) ->
-      atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
-        Nothing -> return ()
-        Just el -> refresh (s ^. appBaseContext) el
+    withNthChildAndRepoParent s $ \el repoEl ->
+      refresh (s ^. appBaseContext) el repoEl
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 
@@ -80,26 +78,16 @@ appEvent _s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
   vScrollBy (viewportScroll MainList) (-1)
 appEvent _s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
   vScrollBy (viewportScroll MainList) 1
-appEvent s (MouseDown (ListRow i) V.BLeft _ _) = do
-  put (s & appMainList %~ (listMoveTo i))
+appEvent s (MouseDown (ListRow n) V.BLeft _ _) = do
+  put (s & appMainList %~ (listMoveTo n))
 
 appEvent _ _ = return ()
 
 
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
-modifyToggled s cb = case listSelectedElement (s ^. appMainList) of
-  Nothing -> return ()
-  Just (n, _) -> do
-    atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
-      Just mle -> do
-        isOpen <- liftIO $ atomically $ do
-          modifyTVar' (_toggled mle) cb
-          readTVar (_toggled mle)
-        when isOpen (refresh (s ^. appBaseContext) mle)
-      _ -> return ()
-
-openBrowserToItem :: MonadIO m => PaginatedItem -> m ()
-openBrowserToItem (PaginatedItemIssue (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
-openBrowserToItem (PaginatedItemWorkflow (WorkflowRun {workflowRunHtmlUrl=url})) = openBrowserToUrl (toString (getUrl url))
-openBrowserToItem _ = return ()
+modifyToggled s cb = withNthChildAndRepoParent s $ \mle repoElem -> do
+  isOpen <- liftIO $ atomically $ do
+    modifyTVar' (_toggled mle) cb
+    readTVar (_toggled mle)
+  when isOpen (refresh (s ^. appBaseContext) mle repoElem)

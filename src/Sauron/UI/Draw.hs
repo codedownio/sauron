@@ -71,7 +71,7 @@ listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelec
         PaginatedItemIssue (Issue {..}) -> guardJust issueBody $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              issueInner body
+              issueInner body _itemInner
         PaginatedItemWorkflow wf@(WorkflowRun {}) ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $

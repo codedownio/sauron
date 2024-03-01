@@ -53,7 +53,8 @@ fixMainListElem (MainListElemPaginated {..}) = do
   pageInfoFixed <- readTVar _pageInfo
 
   return $ MainListElemPaginated {
-    _items = itemsFixed
+    _typ = _typ
+    , _items = itemsFixed
 
     , _repo = repoFixed
 
@@ -69,11 +70,13 @@ fixMainListElem (MainListElemPaginated {..}) = do
     }
 fixMainListElem (MainListElemItem {..}) = do
   itemFixed <- readTVar _item
+  itemInnerFixed <- readTVar _itemInner
 
   toggledFixed <- readTVar _toggled
 
   return $ MainListElemItem {
     _item = itemFixed
+    , _itemInner = itemInnerFixed
 
     , _toggled = toggledFixed
 

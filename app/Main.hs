@@ -35,7 +35,7 @@ import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
 import UnliftIO.Exception
-import UnliftIO.IO
+import UnliftIO.IO hiding (hFlush)
 
 
 refreshPeriod :: Int
@@ -78,7 +78,9 @@ main = do
     Nothing -> return $ const $ return ()
     Just fp -> do
       h <- openFile fp AppendMode
-      return (T.hPutStrLn h)
+      return $ \t -> do
+        T.hPutStrLn h t
+        hFlush h
 
   manager <- newManager tlsManagerSettings
 
@@ -220,7 +222,8 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   issuesChildrenVar <- newTVarIO []
   issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing
   issuesChildVar <- newTVarIO $ MainListElemPaginated {
-    _items = issuesVar
+    _typ = PaginatedIssues
+    , _items = issuesVar
     , _repo = repoVar
     , _label = "Issues"
     , _urlSuffix = "issues"
@@ -236,7 +239,8 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   workflowsChildrenVar <- newTVarIO []
   workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing
   workflowsChildVar <- newTVarIO $ MainListElemPaginated {
-    _items = workflowsVar
+    _typ = PaginatedWorkflows
+    , _items = workflowsVar
     , _repo = repoVar
     , _label = "Workflows"
     , _urlSuffix = "actions"

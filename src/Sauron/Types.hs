@@ -9,6 +9,7 @@ module Sauron.Types where
 
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
+import Data.String.Interpolate
 import Data.Text
 import Data.Time
 import qualified Data.Vector as V
@@ -16,6 +17,7 @@ import GitHub hiding (Status)
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
 import Relude
+import qualified Text.Show
 import UnliftIO.Async
 
 
@@ -80,6 +82,11 @@ data HealthCheckResult =
   | HealthCheckUnhealthy Text
   deriving (Show, Eq)
 
+data PaginatedType =
+  PaginatedIssues
+  | PaginatedWorkflows
+  deriving (Show, Eq)
+
 data PaginatedItems =
   PaginatedItemsIssues (V.Vector Issue)
   | PaginatedItemsWorkflows (WithTotalCount WorkflowRun)
@@ -88,6 +95,11 @@ data PaginatedItems =
 data PaginatedItem =
   PaginatedItemIssue Issue
   | PaginatedItemWorkflow WorkflowRun
+  deriving (Show, Eq)
+
+data PaginatedItemInner =
+  PaginatedItemInnerIssue (V.Vector IssueComment)
+  | PaginatedItemInnerWorkflow (WithTotalCount Job)
   deriving (Show, Eq)
 
 paginatedItemsToList :: PaginatedItems -> [PaginatedItem]
@@ -124,7 +136,8 @@ data MainListElem' f =
       , _ident :: Int
       }
   | MainListElemPaginated {
-      _items :: Switchable f (Fetchable PaginatedItems)
+      _typ :: PaginatedType
+      , _items :: Switchable f (Fetchable PaginatedItems)
 
       -- This is a reference to the same fetchable as the parent repo. It's only
       -- provided here to support openingi etc.
@@ -143,6 +156,7 @@ data MainListElem' f =
       }
   | MainListElemItem {
       _item :: Switchable f (Fetchable PaginatedItem)
+      , _itemInner :: Switchable f (Fetchable PaginatedItemInner)
 
       , _toggled :: Switchable f Bool
 
@@ -154,6 +168,12 @@ makeLenses ''MainListElem'
 type MainListElem = MainListElem' Fixed
 deriving instance Eq MainListElem
 type MainListElemVariable = MainListElem' Variable
+
+instance Show (MainListElem' f) where
+  show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
+  show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
+  show (MainListElemPaginated {..}) = [i|Paginated<#{_label}>|]
+  show (MainListElemItem {}) = [i|Item|]
 
 data AppState = AppState {
   _appUser :: User

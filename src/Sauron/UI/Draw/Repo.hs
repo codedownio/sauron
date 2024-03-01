@@ -47,7 +47,7 @@ statsBox (Repo {..}) = if L.null cells then str " " else hBox cells
   where
     cells = catMaybes [
       guarding (repoWatchersCount > 0) $ padLeft (Pad 1) (
-          padRight (Pad 2) (withAttr iconAttr (str "👁️"))
+          padRight (Pad 1) (withAttr iconAttr (str "👀️"))
           <+> str (show repoWatchersCount)
           )
 
@@ -57,7 +57,7 @@ statsBox (Repo {..}) = if L.null cells then str " " else hBox cells
           )
 
       , guarding (repoStargazersCount > 0) $ padLeft (Pad 1) (
-          padRight (Pad 1) (withAttr iconAttr (str "★"))
+          padRight (Pad 1) (withAttr starsAttr (str "★"))
           <+> str (show repoStargazersCount)
           )
       ]

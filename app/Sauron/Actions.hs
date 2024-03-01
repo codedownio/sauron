@@ -82,6 +82,17 @@ fetchWorkflows owner name childrenVar = do
   let search = mempty
   fetchPaginated (workflowRunsR owner name search) PaginatedItemsWorkflows childrenVar
 
+fetchComments :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable PaginatedItemInner) -> m ()
+fetchComments owner name issueNumber inner = do
+  BaseContext {auth, manager} <- ask
+  bracketOnError_ (atomically $ writeTVar inner Fetching)
+                  (atomically $ writeTVar inner (Errored "Comments fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
+      Left err -> atomically $ writeTVar inner (Errored (show err))
+      Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerIssue (responseBody v)))
+
 fetchPaginated :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
   ) => (FetchCount -> Request k res)
@@ -105,9 +116,11 @@ fetchPaginated mkReq wrapResponse childrenVar = do
 
         itemChildren <- forM (paginatedItemsToList $ wrapResponse (responseBody x)) $ \iss -> do
           itemVar <- newTVar (Fetched iss)
+          itemInnerVar <- newTVar NotFetched
           toggledVar' <- newTVar False
           pure $ MainListElemItem {
             _item = itemVar
+            , _itemInner = itemInnerVar
             , _toggled = toggledVar'
             , _depth = 3
             , _ident = 0
@@ -129,13 +142,18 @@ fetchIssue owner name issueNumber issueVar = do
         writeTVar issueVar (Fetched (responseBody x))
         undefined
 
-refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> m ()
-refresh _ (MainListElemHeading {}) = return () -- TODO
-refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) = liftIO $ do
+refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> MainListElemVariable -> m ()
+refresh _ (MainListElemHeading {}) _ = return () -- TODO: refresh all repos
+refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) _ = liftIO $ do
   void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
-refresh _ (MainListElemPaginated {}) = return () -- TODO
-refresh _ (MainListElemItem {}) = return () -- TODO
+refresh bc (MainListElemPaginated {..}) (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _workflowsChild}) = liftIO $ case _typ of
+  PaginatedIssues -> void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
+  PaginatedWorkflows -> void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
+refresh bc (MainListElemItem {_item, ..}) (MainListElemRepo {_namespaceName=(owner, name)}) = readTVarIO _item >>= \case
+  Fetched (PaginatedItemIssue (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchComments owner name issueNumber _itemInner) bc
+  _ -> return () -- TODO
+refresh _ _ _ = return ()
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m

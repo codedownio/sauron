@@ -1,6 +1,9 @@
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
 
-module Sauron.Expanding where
+module Sauron.Expanding (
+  getExpandedList
+  , nthChildVector
+  ) where
 
 import Control.Monad.Writer
 import qualified Data.Vector as V
@@ -26,26 +29,28 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
 
 -- * Computing nth child in the presence of expanding
 
-nthChildVector :: Int -> V.Vector MainListElemVariable -> STM (Maybe MainListElemVariable)
+-- TODO: make this also return the sequence of parent nodes
+
+nthChildVector :: Int -> V.Vector MainListElemVariable -> STM (Maybe (NonEmpty MainListElemVariable))
 nthChildVector n elems = nthChildList n (V.toList elems) >>= \case
   Left _ -> pure Nothing
   Right x -> pure (Just x)
 
-nthChildList :: Int -> [MainListElemVariable] -> STM (Either Int MainListElemVariable)
+nthChildList :: Int -> [MainListElemVariable] -> STM (Either Int (NonEmpty MainListElemVariable))
 nthChildList n (x:xs) = nthChild n x >>= \case
-  Right el -> pure $ Right el
+  Right els -> pure $ Right els
   Left n' -> nthChildList n' xs
 nthChildList n [] = pure $ Left n
 
-nthChild :: Int -> MainListElemVariable -> STM (Either Int MainListElemVariable)
-nthChild 0 el = pure $ Right el
-nthChild n (MainListElemPaginated {..}) = readTVar _toggled >>= \case
-  True -> readTVar _children >>= nthChildList (n - 1)
+nthChild :: Int -> MainListElemVariable -> STM (Either Int (NonEmpty MainListElemVariable))
+nthChild 0 el = pure $ Right (el :| [])
+nthChild n el@(MainListElemPaginated {..}) = readTVar _toggled >>= \case
+  True -> (fmap ((el :|) . toList)) <$> (readTVar _children >>= nthChildList (n - 1))
   False -> pure $ Left (n - 1)
-nthChild n (MainListElemRepo {..}) = readTVar _toggled >>= \case
+nthChild n el@(MainListElemRepo {..}) = readTVar _toggled >>= \case
   True -> do
     ic <- readTVar _issuesChild
     wc <- readTVar _workflowsChild
-    nthChildList (n - 1) [ic, wc]
+    (fmap ((el :|) . toList)) <$> nthChildList (n - 1) [ic, wc]
   False -> pure $ Left (n - 1)
 nthChild n _ = pure $ Left (n - 1)

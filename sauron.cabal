@@ -88,6 +88,7 @@ executable sauron
       Sauron.Aeson
       Sauron.Auth
       Sauron.Event
+      Sauron.Event.Helpers
       Sauron.Fix
       Sauron.Options
       Paths_sauron

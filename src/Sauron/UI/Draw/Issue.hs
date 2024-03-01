@@ -5,11 +5,13 @@ module Sauron.UI.Draw.Issue (
   ) where
 
 import Brick
+import Brick.Widgets.Border
 import Commonmark hiding (str)
 import Data.String.Interpolate
 import Data.Time
 import GitHub
 import Relude
+import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Util.TimeFromNow
 
@@ -28,9 +30,16 @@ issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) = vBox [lin
       , str [i|opened #{timeFromNow (diffUTCTime now issueCreatedAt)} by #{untagName $ simpleUserLogin issueUser}|]
       ]
 
-issueInner :: Text -> Widget n
+issueInner :: Text -> Fetchable PaginatedItemInner -> Widget n
 -- issueInner body = vBox [strWrap (toString body)]
-issueInner body = vBox [strWrap (show parsed)]
+issueInner body inner = vBox $ fmap border ([strWrap (show parsed)] <> comments)
   where
     parsed :: Either ParseError (Html ())
     parsed = commonmark "issue" body
+
+    comments :: [Widget n]
+    comments = case inner of
+      Fetched (PaginatedItemInnerIssue cs) -> fmap renderComment (toList cs)
+      _ -> []
+
+    renderComment x@(IssueComment {}) = strWrap (show x)
