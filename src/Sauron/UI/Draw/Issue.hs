@@ -10,11 +10,15 @@ import Commonmark hiding (str)
 import Data.String.Interpolate
 import Data.Time
 import GitHub
+import GitHub.Data.Name
 import Relude
 import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Util.TimeFromNow
 
+
+maxCommentWidth :: Int
+maxCommentWidth = 120
 
 issueLine :: UTCTime -> Bool -> Issue -> Widget n
 issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) = vBox [line1, line2]
@@ -30,16 +34,24 @@ issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) = vBox [lin
       , str [i|opened #{timeFromNow (diffUTCTime now issueCreatedAt)} by #{untagName $ simpleUserLogin issueUser}|]
       ]
 
-issueInner :: Text -> Fetchable PaginatedItemInner -> Widget n
+issueInner :: UTCTime -> Issue -> Text -> Fetchable PaginatedItemInner -> Widget n
 -- issueInner body = vBox [strWrap (toString body)]
-issueInner body inner = vBox $ fmap border ([strWrap (show parsed)] <> comments)
+issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) body inner = vBox (firstCell : comments)
   where
-    parsed :: Either ParseError (Html ())
-    parsed = commonmark "issue" body
+    firstCell = hLimit maxCommentWidth $ borderWithLabel
+      (str [i|#{openerUsername} commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|]
+          & padLeftRight 1
+      )
+      (strWrap (show (commonmark "issue" body :: Either ParseError (Html ()))))
 
     comments :: [Widget n]
     comments = case inner of
       Fetched (PaginatedItemInnerIssue cs) -> fmap renderComment (toList cs)
       _ -> []
 
-    renderComment x@(IssueComment {}) = strWrap (show x)
+    -- TODO: use issueCommentUpdatedAt
+    renderComment (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), ..}) = hLimit maxCommentWidth $ borderWithLabel
+      (str [i|#{username} commented #{timeFromNow (diffUTCTime now issueCommentCreatedAt)}|]
+          & padLeftRight 1
+      )
+      (strWrap (show (commonmark "comment" issueCommentBody :: Either ParseError (Html ()))))

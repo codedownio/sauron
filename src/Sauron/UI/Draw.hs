@@ -68,10 +68,10 @@ listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelec
   , do
       guard _toggled
       guardFetched _item $ \case
-        PaginatedItemIssue (Issue {..}) -> guardJust issueBody $ \body ->
+        PaginatedItemIssue iss@(Issue {..}) -> guardJust issueBody $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              issueInner body _itemInner
+              issueInner now iss body _itemInner
         PaginatedItemWorkflow wf@(WorkflowRun {}) ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
