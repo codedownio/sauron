@@ -62,12 +62,15 @@ library
       base >=4.7 && <5
     , brick
     , commonmark
+    , commonmark-extensions
+    , commonmark-pandoc
     , containers
     , github
     , http-client
     , microlens
     , microlens-th
     , mtl
+    , pandoc-types
     , process
     , relude
     , stm
@@ -112,6 +115,8 @@ executable sauron
     , base >=4.7 && <5
     , brick
     , commonmark
+    , commonmark-extensions
+    , commonmark-pandoc
     , containers
     , exceptions
     , filepath
@@ -120,6 +125,7 @@ executable sauron
     , microlens
     , mtl
     , optparse-applicative
+    , pandoc-types
     , process
     , relude
     , safe-exceptions
@@ -160,11 +166,14 @@ test-suite test
       base >=4.7 && <5
     , brick
     , commonmark
+    , commonmark-extensions
+    , commonmark-pandoc
     , containers
     , github
     , http-client
     , microlens
     , mtl
+    , pandoc-types
     , process
     , relude
     , sauron
