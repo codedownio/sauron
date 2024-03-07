@@ -27,6 +27,12 @@ mainAttrMap = attrMap V.defAttr [
   , (fetchingAttr, fg V.blue)
   , (erroredAttr, fg V.red)
 
+  -- Pagination
+
+  , (selectedPageAttr, fg V.white)
+  , (notSelectedPageAttr, fg midGray)
+  , (pageEllipsesAttr, fg midGray)
+
   -- Stats box
   , (starsAttr, fg V.yellow)
 
