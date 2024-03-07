@@ -26,6 +26,7 @@ sections:
   - codedownio/myers-diff
   - codedownio/sandwich
   - codedownio/servant-typescript
+  - codedownio/sauron
 - display_name: "Maintaining"
   repos:
   - haskell-fswatch/hfsnotify

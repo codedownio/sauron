@@ -28,8 +28,10 @@ dependencies:
 - containers
 - github
 - http-client
+- http-types
 - microlens
 - mtl
+- network-uri
 - pandoc-types
 - process
 - relude

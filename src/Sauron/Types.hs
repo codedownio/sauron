@@ -108,6 +108,9 @@ paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap Pagi
 
 data PageInfo = PageInfo {
   pageInfoCurrentPage :: Int
+  , pageInfoFirstPage :: Maybe Int
+  , pageInfoPrevPage :: Maybe Int
+  , pageInfoNextPage :: Maybe Int
   , pageInfoLastPage :: Maybe Int
   } deriving (Show, Eq)
 

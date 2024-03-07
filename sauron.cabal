@@ -33,6 +33,7 @@ library
       Sauron.UI.Draw.Border
       Sauron.UI.Draw.BottomBar
       Sauron.UI.Draw.Issue
+      Sauron.UI.Draw.Pagination
       Sauron.UI.Draw.Repo
       Sauron.UI.Draw.Util
       Sauron.UI.Draw.Workflow
@@ -67,9 +68,11 @@ library
     , containers
     , github
     , http-client
+    , http-types
     , microlens
     , microlens-th
     , mtl
+    , network-uri
     , pandoc-types
     , process
     , relude
@@ -122,8 +125,10 @@ executable sauron
     , filepath
     , github
     , http-client
+    , http-types
     , microlens
     , mtl
+    , network-uri
     , optparse-applicative
     , pandoc-types
     , process
@@ -171,8 +176,10 @@ test-suite test
     , containers
     , github
     , http-client
+    , http-types
     , microlens
     , mtl
+    , network-uri
     , pandoc-types
     , process
     , relude

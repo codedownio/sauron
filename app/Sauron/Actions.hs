@@ -32,11 +32,14 @@ import Control.Exception.Safe (bracket_, bracketOnError_, handleAny)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import Data.Aeson
+import qualified Data.List as L
 import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Network.HTTP.Client (responseBody)
+import Network.HTTP.Types.URI (QueryItem, parseQuery)
+import qualified Network.URI as NURI
 import Relude
 import Sauron.Options
 import Sauron.Types
@@ -104,15 +107,32 @@ fetchPaginated mkReq wrapResponse childrenVar = do
 
   MainListElemPaginated {..} <- readTVarIO childrenVar
 
+  PageInfo {pageInfoCurrentPage} <- readTVarIO _pageInfo
+
   bracketOnError_ (atomically $ writeTVar _items Fetching)
                   (atomically $ writeTVar _items (Errored "Workflows fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just 1))))) >>= \case
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just pageInfoCurrentPage))))) >>= \case
       Left err -> atomically $ do
         writeTVar _items (Errored (show err))
         writeTVar _children []
 
       Right x -> atomically $ do
         writeTVar _items (Fetched (wrapResponse (responseBody x)))
+
+        let PageLinks {..} = parsePageLinks x
+        let parsePageFromUri :: NURI.URI -> Maybe Int
+            parsePageFromUri uri = do
+              let q = NURI.uriQuery uri
+              let parsed :: [QueryItem] = parseQuery (encodeUtf8 q)
+              result :: ByteString <- join $ L.lookup "page" parsed
+              readMaybe (decodeUtf8 result)
+        writeTVar _pageInfo $ PageInfo {
+          pageInfoCurrentPage = pageInfoCurrentPage
+          , pageInfoFirstPage = pageLinksFirst >>= parsePageFromUri
+          , pageInfoPrevPage = pageLinksPrev >>= parsePageFromUri
+          , pageInfoNextPage = pageLinksNext >>= parsePageFromUri
+          , pageInfoLastPage = pageLinksLast >>= parsePageFromUri
+          }
 
         itemChildren <- forM (paginatedItemsToList $ wrapResponse (responseBody x)) $ \iss -> do
           itemVar <- newTVar (Fetched iss)

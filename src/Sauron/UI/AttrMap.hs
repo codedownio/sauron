@@ -67,6 +67,12 @@ disabledHotkeyAttr = mkAttrName "disableHotkey"
 hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
 
+-- * Pagination
+
+selectedPageAttr = mkAttrName "selectedPage"
+notSelectedPageAttr = mkAttrName "notSelectedPage"
+pageEllipsesAttr = mkAttrName "pageEllipses"
+
 -- * Stats box
 
 starsAttr = mkAttrName "stars"

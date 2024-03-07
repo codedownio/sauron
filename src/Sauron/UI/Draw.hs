@@ -20,6 +20,7 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Draw.Border
 import Sauron.UI.Draw.BottomBar
 import Sauron.UI.Draw.Issue
+import Sauron.UI.Draw.Pagination
 import Sauron.UI.Draw.Repo
 import Sauron.UI.Draw.Util
 import Sauron.UI.Draw.Workflow
@@ -57,7 +58,7 @@ listDrawElement _now ix isSelected x@(MainListElemPaginated {..}) = wrapper ix i
         Errored msg -> str [i|Errored: #{msg}|]
         Fetched (PaginatedItemsIssues xs) -> str [i|(#{V.length xs})|]
         Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
-    , Just (padLeft Max (str " "))
+    , Just (hCenter (paginationInfo _pageInfo))
     ]
   ]
 listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [

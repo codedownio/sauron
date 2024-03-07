@@ -220,7 +220,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   issuesVar <- newTVarIO NotFetched
   issuesToggledVar <- newTVarIO False
   issuesChildrenVar <- newTVarIO []
-  issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing
+  issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   issuesChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedIssues
     , _items = issuesVar
@@ -237,7 +237,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   workflowsVar <- newTVarIO NotFetched
   workflowsToggledVar <- newTVarIO False
   workflowsChildrenVar <- newTVarIO []
-  workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing
+  workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   workflowsChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedWorkflows
     , _items = workflowsVar
