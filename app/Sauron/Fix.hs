@@ -45,8 +45,6 @@ fixMainListElem (MainListElemRepo {..}) = do
 fixMainListElem (MainListElemPaginated {..}) = do
   itemsFixed <- readTVar _items
 
-  repoFixed <- readTVar _repo
-
   toggledFixed <- readTVar _toggled
   childrenFixed <- readTVar _children >>= mapM fixMainListElem
 
@@ -55,8 +53,6 @@ fixMainListElem (MainListElemPaginated {..}) = do
   return $ MainListElemPaginated {
     _typ = _typ
     , _items = itemsFixed
-
-    , _repo = repoFixed
 
     , _label = _label
     , _urlSuffix = _urlSuffix

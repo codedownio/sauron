@@ -21,6 +21,7 @@ paginationInfo (PageInfo {..}) =
     pageNumbers :: [PageSegment]
     pageNumbers = catMaybes [pageInfoFirstPage, pageInfoPrevPage, Just pageInfoCurrentPage, pageInfoNextPage, pageInfoLastPage]
                 & sort
+                & L.nub
                 & insertEllipses
 
     insertEllipses :: [Int] -> [PageSegment]

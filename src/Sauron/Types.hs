@@ -142,10 +142,6 @@ data MainListElem' f =
       _typ :: PaginatedType
       , _items :: Switchable f (Fetchable PaginatedItems)
 
-      -- This is a reference to the same fetchable as the parent repo. It's only
-      -- provided here to support openingi etc.
-      , _repo :: Switchable f (Fetchable Repo)
-
       , _label :: Text
       , _urlSuffix :: Text
 

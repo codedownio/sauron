@@ -27,6 +27,7 @@ import Sauron.Auth
 import Sauron.Event
 import Sauron.Expanding
 import Sauron.Fix
+import Sauron.HealthCheck
 import Sauron.Options
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -224,7 +225,6 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   issuesChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedIssues
     , _items = issuesVar
-    , _repo = repoVar
     , _label = "Issues"
     , _urlSuffix = "issues"
     , _toggled = issuesToggledVar
@@ -241,7 +241,6 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   workflowsChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedWorkflows
     , _items = workflowsVar
-    , _repo = repoVar
     , _label = "Workflows"
     , _urlSuffix = "actions"
     , _toggled = workflowsToggledVar

@@ -10,7 +10,7 @@ import Data.Function
 import GitHub
 import qualified Graphics.Vty as V
 import Lens.Micro
-import Relude hiding (Down)
+import Relude hiding (Down, pi)
 import Sauron.Actions
 import Sauron.Event.Helpers
 import Sauron.Types
@@ -53,18 +53,28 @@ appEvent s (VtyEvent e) = case e of
     whenRepoSelected s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
-    withNthChildAndRepoParent s $ \el repoEl ->
+    withNthChildAndRepoParent s $ \_fixedEl el repoEl ->
       refresh (s ^. appBaseContext) el repoEl
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 
-  V.EvKey c [] | c == openSelectedKey -> whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
-    MainListElemRepo {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)}))} -> openBrowserToUrl (toString url)
-    MainListElemItem {_item=(Fetched x)} -> openBrowserToItem x
-    MainListElemPaginated {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)})), _urlSuffix} -> openBrowserToUrl (toString url </> toString _urlSuffix)
-    _ -> return ()
+  V.EvKey c [] | c == openSelectedKey ->
+    withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case fixedEl of
+      MainListElemRepo {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)}))} -> openBrowserToUrl (toString url)
+      MainListElemItem {_item=(Fetched x)} -> openBrowserToItem x
+      MainListElemPaginated {_urlSuffix} -> case repoEl of
+        MainListElemRepo {_repo} -> readTVarIO _repo >>= \case
+          Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> toString _urlSuffix)
+          _ -> return ()
+        _ -> return ()
+      _ -> return ()
 
   -- Column 3
+  V.EvKey c [] | c == nextPageKey -> tryNavigatePage s nextPage
+  V.EvKey c [] | c == prevPageKey -> tryNavigatePage s prevPage
+  V.EvKey c [] | c == firstPageKey -> tryNavigatePage s firstPage
+  V.EvKey c [] | c == lastPageKey -> tryNavigatePage s lastPage
+
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
     -- liftIO $ mapM_ cancelNode (s ^. appRunTreeBase)
@@ -86,8 +96,40 @@ appEvent _ _ = return ()
 
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
-modifyToggled s cb = withNthChildAndRepoParent s $ \mle repoElem -> do
+modifyToggled s cb = withNthChildAndRepoParent s $ \fixedEl mle repoElem -> do
   isOpen <- liftIO $ atomically $ do
     modifyTVar' (_toggled mle) cb
     readTVar (_toggled mle)
-  when isOpen (refresh (s ^. appBaseContext) mle repoElem)
+  when isOpen $
+    unlessM (hasStartedInitialFetch fixedEl) $
+      refresh (s ^. appBaseContext) mle repoElem
+
+
+tryNavigatePage :: MonadIO m => AppState -> (PageInfo -> PageInfo) -> m ()
+tryNavigatePage s cb = do
+  withNthChildAndRepoParent s $ \_fixedEl el repoEl -> case el of
+    MainListElemPaginated {_pageInfo} -> do
+      atomically $ modifyTVar' _pageInfo $ cb
+      refresh (s ^. appBaseContext) el repoEl
+    _ -> return ()
+
+nextPage :: PageInfo -> PageInfo
+nextPage pi = pi { pageInfoCurrentPage = (pageInfoCurrentPage pi) + 1 }
+
+prevPage :: PageInfo -> PageInfo
+prevPage pi = pi { pageInfoCurrentPage = (pageInfoCurrentPage pi) - 1 }
+
+firstPage :: PageInfo -> PageInfo
+firstPage pi@(PageInfo { pageInfoFirstPage = Just n }) = pi {
+  pageInfoCurrentPage = n
+  , pageInfoPrevPage = Nothing
+  , pageInfoNextPage = Nothing
+  }
+firstPage pi@(PageInfo { pageInfoFirstPage = Nothing }) = pi {
+  pageInfoCurrentPage = 1
+  , pageInfoPrevPage = Nothing
+  , pageInfoNextPage = Nothing
+  }
+
+lastPage :: PageInfo -> PageInfo
+lastPage pi = pi { pageInfoCurrentPage = (pageInfoCurrentPage pi) - 1 }

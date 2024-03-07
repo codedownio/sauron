@@ -24,6 +24,10 @@ browserToActionsKey = V.KChar 'A'
 openSelectedKey = V.KChar 'o'
 
 -- Column 3
+nextPageKey = V.KChar 'N'
+prevPageKey = V.KChar 'B'
+firstPageKey = V.KChar 'F'
+lastPageKey = V.KChar 'L'
 exitKey = V.KChar 'q'
 
 -- Other

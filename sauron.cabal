@@ -96,6 +96,7 @@ executable sauron
       Sauron.Event
       Sauron.Event.Helpers
       Sauron.Fix
+      Sauron.HealthCheck
       Sauron.Options
       Paths_sauron
   hs-source-dirs:

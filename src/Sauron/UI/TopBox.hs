@@ -62,44 +62,37 @@ topBox app = hBox [columnPadding settingsColumn
                                   ]
 
     otherActionsColumn = keybindingBox [-- keyIndicator' (showKey cycleVisibilityThresholdKey) (visibilityThresholdWidget app)
-                                       -- , hBox [str "["
-                                       --        , str $ showKey toggleShowRunTimesKey
-                                       --        , str "/"
-                                       --        , str $ showKey toggleFileLocationsKey
-                                       --        , str "/"
-                                       --        , str $ showKey toggleVisibilityThresholdsKey
-                                       --        , str "] "
-                                       --        , highlightMessageIfPredicate (^. appShowRunTimes) app (str "Times")
-                                       --        , str "/"
-                                       --        , highlightMessageIfPredicate (^. appShowFileLocations) app (str "locations")
-                                       --        , str "/"
-                                       --        , highlightMessageIfPredicate (^. appShowVisibilityThresholds) app (str "thresholds")
-                                       --   ]
-                                       -- , hBox [str "["
-                                       --        , highlightIfLogLevel app LevelDebug [unKChar debugKey]
-                                       --        , str "/"
-                                       --        , highlightIfLogLevel app LevelInfo [unKChar infoKey]
-                                       --        , str "/"
-                                       --        , highlightIfLogLevel app LevelWarn [unKChar warnKey]
-                                       --        , str "/"
-                                       --        , highlightIfLogLevel app LevelError [unKChar errorKey]
-                                       --        , str "] "
-                                       --        , str "Log level"]
+      hBox [str "["
+           , highlightKeyIfPredicate hasNextPageKey app (str $ showKey nextPageKey)
+           , str "/"
+           , highlightKeyIfPredicate hasPrevPageKey app (str $ showKey prevPageKey)
+           , str "/"
+           , highlightKeyIfPredicate hasFirstPageKey app (str $ showKey firstPageKey)
+           , str "/"
+           , highlightKeyIfPredicate hasLastPageKey app (str $ showKey lastPageKey)
+           , str "] "
 
-                                       keyIndicator "q" "Exit"]
+           , highlightMessageIfPredicate hasNextPageKey app (str "Next")
+           , str "/"
+           , highlightMessageIfPredicate hasPrevPageKey app (str "Previous")
+           , str "/"
+           , highlightMessageIfPredicate hasFirstPageKey app (str "First")
+           , str "/"
+           , highlightMessageIfPredicate hasLastPageKey app (str "Last")
+           , withAttr hotkeyMessageAttr $ str " page"
+           ]
+      , keyIndicator "q" "Exit"
+      ]
 
--- visibilityThresholdWidget app = hBox $
---   [withAttr hotkeyMessageAttr $ str "Visibility threshold ("]
---   <> L.intersperse (str ", ") [withAttr (if x == app ^. appVisibilityThreshold then visibilityThresholdSelectedAttr else visibilityThresholdNotSelectedAttr) $ str $ show x | x <- (app ^. appVisibilityThresholdSteps)]
---   <> [(str ")")]
+hasNextPageKey = const True
+hasPrevPageKey = const True
+hasFirstPageKey = const True
+hasLastPageKey = const True
 
 columnPadding = padLeft (Pad 1) . padRight (Pad 3) -- . padTop (Pad 1)
 
 keybindingBox = vBox
 
--- highlightIfLogLevel app desiredLevel thing =
---   if | app ^. appLogLevel == Just desiredLevel -> withAttr visibilityThresholdSelectedAttr $ str thing
---      | otherwise -> withAttr hotkeyAttr $ str thing
 
 highlightKeyIfPredicate p app x = case p app of
   True -> withAttr hotkeyAttr x
