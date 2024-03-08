@@ -19,7 +19,9 @@ import Sauron.UI.AttrMap
 workflowLine :: Bool -> WorkflowRun -> Widget n
 workflowLine toggled (WorkflowRun {..}) = hBox [
   withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
-  , str ("#" <> show workflowRunRunNumber <> " ")
+  , withAttr hashAttr $ str "#"
+  , withAttr hashNumberAttr $ str $ show workflowRunRunNumber
+  , str " "
   , withAttr normalAttr $ str $ toString $ untagName workflowRunName
   , str ": "
   , str $ toString workflowRunDisplayTitle

@@ -10,7 +10,11 @@ import GitHub hiding (Status)
 import GitHub.Data.Name
 import Relude
 import Sauron.Types
+import Sauron.UI.AttrMap
 
 
 borderWithCounts :: AppState -> Widget n
-borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [str [i|#{name} (#{userPublicRepos} public repos, #{userFollowers} followers)|]]
+borderWithCounts (AppState {_appUser=(User {userLogin=(N name), ..})}) = hBorderWithLabel $ padLeftRight 1 $ hBox [
+  withAttr usernameAttr $ str [i|#{name} |]
+  , str [i|(#{userPublicRepos} public repos, #{userFollowers} followers)|]
+  ]

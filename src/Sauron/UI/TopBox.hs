@@ -5,15 +5,13 @@ module Sauron.UI.TopBox (
   ) where
 
 import Brick
+import Brick.Widgets.List
 import qualified Data.List as L
+import Lens.Micro
 import Relude
+import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Keys
-
--- import qualified Brick.Widgets.List as L
--- import Data.Either
--- import Data.Maybe
--- import Lens.Micro
 
 
 topBox app = hBox [columnPadding settingsColumn
@@ -104,7 +102,7 @@ highlightMessageIfPredicate p app x = case p app of
 
 keyIndicator key msg = keyIndicator' key (withAttr hotkeyMessageAttr $ str msg)
 
-keyIndicator' key label = hBox [str "[", withAttr hotkeyAttr $ str key, str "] ", label]
+keyIndicator' key l = hBox [str "[", withAttr hotkeyAttr $ str key, str "] ", l]
 
 keyIndicatorHasSelected app = keyIndicatorContextual app someRepoSelected
 
@@ -117,7 +115,13 @@ keyIndicatorContextual app p key msg = case p app of
 
 -- * Predicates
 
-someRepoSelected = const False
+-- someRepoSelected s = runIdentity $ withNthChildAndMaybeRepoParent s $ \_ _ maybeRepo ->
+--   pure $ isJust maybeRepo
+someRepoSelected s = case listSelectedElement (s ^. appMainList) of
+  Nothing -> False
+  Just (_n, MainListElemHeading {}) -> False
+  Just _ -> True
+
 
 selectedRepoToggled = const False
 

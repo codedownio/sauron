@@ -28,6 +28,14 @@ withNthChildAndMaybeRepoParent s cb = do
 withNthChild :: MonadIO m => AppState -> (MainListElem -> MainListElemVariable -> m ()) -> m ()
 withNthChild s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el _ -> cb fixedEl el
 
+withRepoParent :: MonadIO m => AppState -> (Repo -> m ()) -> m ()
+withRepoParent s cb = do
+  withNthChildAndMaybeRepoParent s $ \_ _ repoElem -> case repoElem of
+    Just (MainListElemRepo {_repo}) -> readTVarIO _repo >>= \case
+      Fetched r -> cb r
+      _ -> return ()
+    _ -> return ()
+
 withNthChildAndRepoParent :: MonadIO m => AppState -> (MainListElem -> MainListElemVariable -> MainListElemVariable -> m ()) -> m ()
 withNthChildAndRepoParent s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el -> \case
   Nothing -> return ()

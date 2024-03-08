@@ -57,6 +57,11 @@ mainAttrMap = attrMap V.defAttr [
   , (disabledHotkeyAttr, fg midGray)
   , (hotkeyMessageAttr, fg brightWhite)
   , (disabledHotkeyMessageAttr, fg brightGray)
+
+  -- General UI
+  , (usernameAttr, fg solarizedBlue)
+  , (hashNumberAttr, fg solarizedViolet)
+  , (hashAttr, fg midGray)
   ]
 
 iconAttr = mkAttrName "icon"
@@ -91,6 +96,12 @@ redXAttr = mkAttrName "redX"
 ellipsesAttr = mkAttrName "ellipses"
 neutralAttr = mkAttrName "neutral"
 unknownAttr = mkAttrName "neutral"
+
+-- * General UI
+
+usernameAttr = mkAttrName "username"
+hashNumberAttr = mkAttrName "hashNumber"
+hashAttr = mkAttrName "hash"
 
 -- * Colors
 

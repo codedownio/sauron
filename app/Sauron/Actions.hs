@@ -19,8 +19,6 @@ module Sauron.Actions (
 
   , withGithubApiSemaphore
   , withGithubApiSemaphore'
-
-  , whenRepoSelected
   ) where
 
 import Brick as B
@@ -205,8 +203,3 @@ withGithubApiSemaphore action = do
 -- TODO: add timeout here?
 withGithubApiSemaphore' :: (MonadIO m, MonadMask m) => QSem -> m a -> m a
 withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQSem sem)
-
-whenRepoSelected :: Monad f => AppState -> (Repo -> f ()) -> f ()
-whenRepoSelected s cb = whenJust (listSelectedElement (s ^. appMainList)) $ \(_i, el) -> case el of
-  MainListElemRepo {_repo=(Fetched r)} -> cb r
-  _ -> return ()

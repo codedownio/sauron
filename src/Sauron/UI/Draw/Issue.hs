@@ -33,8 +33,10 @@ issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) = vBox [lin
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox [
-      str ("#" <> show number <> " ")
-      , str [i|opened #{timeFromNow (diffUTCTime now issueCreatedAt)} by #{untagName $ simpleUserLogin issueUser}|]
+      withAttr hashAttr $ str "#"
+      , withAttr hashNumberAttr $ str $ show number
+      , str [i| opened #{timeFromNow (diffUTCTime now issueCreatedAt)} by |]
+      , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
 issueInner :: UTCTime -> Issue -> Text -> Fetchable PaginatedItemInner -> Widget n
