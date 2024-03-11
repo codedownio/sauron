@@ -10,14 +10,17 @@ import Relude hiding (Down, pi)
 import Sauron.Actions
 import Sauron.Event.Helpers
 import Sauron.Types
+import UnliftIO.STM (stateTVar)
 
 
 tryNavigatePage :: MonadIO m => AppState -> (PageInfo -> PageInfo) -> m ()
 tryNavigatePage s cb = do
   withNthChildAndRepoParent s $ \_fixedEl el repoEl -> case el of
     MainListElemPaginated {_pageInfo} -> do
-      atomically $ modifyTVar' _pageInfo $ cb
-      refresh (s ^. appBaseContext) el repoEl
+      didChange <- atomically $ stateTVar _pageInfo $ \pi ->
+        let pi' = cb pi in (pi' /= pi, pi')
+      when didChange $
+        refresh (s ^. appBaseContext) el repoEl
     _ -> return ()
 
 goNextPage :: PageInfo -> PageInfo
@@ -36,7 +39,7 @@ goNextPage pi@(PageInfo {..}) = pi {
     currentPage' = case pageInfoNextPage of
       Just nextPage -> nextPage
       Nothing -> case pageInfoLastPage of
-        Nothing -> pageInfoCurrentPage + 1
+        Nothing -> pageInfoCurrentPage
         Just lastPage -> min lastPage (pageInfoCurrentPage + 1)
 
     didMove = currentPage' > pageInfoCurrentPage
@@ -44,9 +47,7 @@ goNextPage pi@(PageInfo {..}) = pi {
 
 goPrevPage :: PageInfo -> PageInfo
 goPrevPage pi@(PageInfo {..}) = pi {
-  pageInfoCurrentPage = case pageInfoFirstPage of
-      Nothing -> pageInfoCurrentPage - 1
-      Just firstPage -> max firstPage (pageInfoCurrentPage - 1)
+  pageInfoCurrentPage = currentPage'
   , pageInfoNextPage = if
       | not didMove -> pageInfoNextPage
       | otherwise -> Just pageInfoCurrentPage
@@ -55,25 +56,30 @@ goPrevPage pi@(PageInfo {..}) = pi {
       | otherwise -> case pageInfoFirstPage of
           Nothing -> Nothing
           Just firstPage -> Just (max firstPage (pageInfoCurrentPage - 2))
+  , pageInfoLastPage = if
+      | not didMove -> pageInfoLastPage
+      | otherwise -> Just $ case pageInfoLastPage of
+          Nothing -> pageInfoCurrentPage
+          Just lastPage -> lastPage
   }
   where
     currentPage' = case pageInfoPrevPage of
       Just prevPage -> prevPage
       Nothing -> case pageInfoFirstPage of
-        Nothing -> pageInfoCurrentPage - 1
+        Nothing -> pageInfoCurrentPage
         Just firstPage -> max firstPage (pageInfoCurrentPage - 1)
 
-    didMove = currentPage' > pageInfoCurrentPage
+    didMove = currentPage' < pageInfoCurrentPage
 
 goFirstPage :: PageInfo -> PageInfo
 goFirstPage pi@(PageInfo {..}) = pi {
-  pageInfoCurrentPage = case pageInfoFirstPage of
-      Just n -> n
-      Nothing -> 1
+  pageInfoCurrentPage = fromMaybe 1 pageInfoFirstPage
   , pageInfoPrevPage = Nothing
   , pageInfoNextPage = case pageInfoLastPage of
       Just lastPage -> Just $ min 2 lastPage
-      Nothing -> Nothing
+      Nothing -> if
+        | pageInfoCurrentPage >= 2 -> Just 2
+        | otherwise -> Just 1
   }
 
 goLastPage :: PageInfo -> PageInfo
@@ -81,5 +87,6 @@ goLastPage pi@(PageInfo {pageInfoLastPage=(Just lastPage)}) = pi {
   pageInfoCurrentPage = lastPage
   , pageInfoNextPage = Nothing
   , pageInfoPrevPage = Just $ max 1 lastPage
+  , pageInfoFirstPage = Just 1
   }
 goLastPage pi@(PageInfo {pageInfoLastPage=Nothing}) = pi

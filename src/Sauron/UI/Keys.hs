@@ -16,16 +16,16 @@ toggleKeys = [V.KEnter, V.KChar '\t']
 refreshAllKey = V.KChar 'R'
 refreshSelectedKey = V.KChar 'r'
 
-browserToHomeKey = V.KChar 'H'
-browserToIssuesKey = V.KChar 'I'
-browserToPullsKey = V.KChar 'P'
-browserToActionsKey = V.KChar 'A'
+browserToHomeKey = V.KChar 'h'
+browserToIssuesKey = V.KChar 'i'
+browserToPullsKey = V.KChar 'p'
+browserToActionsKey = V.KChar 'a'
 
 openSelectedKey = V.KChar 'o'
 
 -- Column 3
 nextPageKey = V.KChar 'N'
-prevPageKey = V.KChar 'B'
+prevPageKey = V.KChar 'P'
 firstPageKey = V.KChar 'F'
 lastPageKey = V.KChar 'L'
 exitKey = V.KChar 'q'

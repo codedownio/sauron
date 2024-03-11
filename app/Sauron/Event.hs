@@ -43,13 +43,13 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey V.KEnd [V.MCtrl] -> withScroll s $ \vp -> vScrollToEnd vp
 
   -- Column 2
-  V.EvKey c [] | c == browserToHomeKey ->
+  V.EvKey c [V.MMeta] | c == browserToHomeKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url)
-  V.EvKey c [] | c == browserToIssuesKey ->
+  V.EvKey c [V.MMeta] | c == browserToIssuesKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "issues")
-  V.EvKey c [] | c == browserToPullsKey ->
+  V.EvKey c [V.MMeta] | c == browserToPullsKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "pulls")
-  V.EvKey c [] | c == browserToActionsKey ->
+  V.EvKey c [V.MMeta] | c == browserToActionsKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
