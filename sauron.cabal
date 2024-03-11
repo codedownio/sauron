@@ -95,6 +95,7 @@ executable sauron
       Sauron.Auth
       Sauron.Event
       Sauron.Event.Helpers
+      Sauron.Event.Paging
       Sauron.Fix
       Sauron.HealthCheck
       Sauron.Options

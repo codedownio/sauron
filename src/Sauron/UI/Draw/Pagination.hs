@@ -14,7 +14,7 @@ import Sauron.UI.AttrMap
 paginationInfo :: PageInfo -> Widget n
 paginationInfo (PageInfo {..}) =
   fmap renderSegment pageNumbers
-  & ((str "Page ") :)
+  & ((str "Page:") :)
   & L.intersperse (str " ")
   & hBox
   where

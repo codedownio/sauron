@@ -13,10 +13,10 @@ import Lens.Micro
 import Relude hiding (Down, pi)
 import Sauron.Actions
 import Sauron.Event.Helpers
+import Sauron.Event.Paging
 import Sauron.Types
 import Sauron.UI.Keys
 import System.FilePath
-
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
 appEvent s (AppEvent (ListUpdate l')) = put $ s
@@ -70,10 +70,10 @@ appEvent s (VtyEvent e) = case e of
       _ -> return ()
 
   -- Column 3
-  V.EvKey c [] | c == nextPageKey -> tryNavigatePage s nextPage
-  V.EvKey c [] | c == prevPageKey -> tryNavigatePage s prevPage
-  V.EvKey c [] | c == firstPageKey -> tryNavigatePage s firstPage
-  V.EvKey c [] | c == lastPageKey -> tryNavigatePage s lastPage
+  V.EvKey c [] | c == nextPageKey -> tryNavigatePage s goNextPage
+  V.EvKey c [] | c == prevPageKey -> tryNavigatePage s goPrevPage
+  V.EvKey c [] | c == firstPageKey -> tryNavigatePage s goFirstPage
+  V.EvKey c [] | c == lastPageKey -> tryNavigatePage s goLastPage
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
@@ -103,33 +103,3 @@ modifyToggled s cb = withNthChildAndRepoParent s $ \fixedEl mle repoElem -> do
   when isOpen $
     unlessM (hasStartedInitialFetch fixedEl) $
       refresh (s ^. appBaseContext) mle repoElem
-
-
-tryNavigatePage :: MonadIO m => AppState -> (PageInfo -> PageInfo) -> m ()
-tryNavigatePage s cb = do
-  withNthChildAndRepoParent s $ \_fixedEl el repoEl -> case el of
-    MainListElemPaginated {_pageInfo} -> do
-      atomically $ modifyTVar' _pageInfo $ cb
-      refresh (s ^. appBaseContext) el repoEl
-    _ -> return ()
-
-nextPage :: PageInfo -> PageInfo
-nextPage pi = pi { pageInfoCurrentPage = (pageInfoCurrentPage pi) + 1 }
-
-prevPage :: PageInfo -> PageInfo
-prevPage pi = pi { pageInfoCurrentPage = (pageInfoCurrentPage pi) - 1 }
-
-firstPage :: PageInfo -> PageInfo
-firstPage pi@(PageInfo { pageInfoFirstPage = Just n }) = pi {
-  pageInfoCurrentPage = n
-  , pageInfoPrevPage = Nothing
-  , pageInfoNextPage = Nothing
-  }
-firstPage pi@(PageInfo { pageInfoFirstPage = Nothing }) = pi {
-  pageInfoCurrentPage = 1
-  , pageInfoPrevPage = Nothing
-  , pageInfoNextPage = Nothing
-  }
-
-lastPage :: PageInfo -> PageInfo
-lastPage pi = pi { pageInfoCurrentPage = (pageInfoCurrentPage pi) - 1 }
