@@ -1,5 +1,5 @@
 
-module Sauron.UI.Draw.Pagination (
+module Sauron.UI.Pagination (
   paginationInfo
   ) where
 
@@ -8,7 +8,7 @@ import qualified Data.List as L
 import Data.String.Interpolate
 import Relude
 import Sauron.Types
-import Sauron.UI.Draw.AttrMap
+import Sauron.UI.AttrMap
 
 
 paginationInfo :: PageInfo -> Widget n

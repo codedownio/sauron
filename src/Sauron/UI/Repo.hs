@@ -1,5 +1,5 @@
 
-module Sauron.UI.Draw.Repo (
+module Sauron.UI.Repo (
   renderRepoLine
   ) where
 
@@ -9,9 +9,9 @@ import Data.Maybe
 import GitHub hiding (Status)
 import Relude
 import Sauron.Types
-import Sauron.UI.Draw.AttrMap
-import Sauron.UI.Draw.Util
-import Sauron.UI.Draw.Workflow
+import Sauron.UI.AttrMap
+import Sauron.UI.Util
+import Sauron.UI.Workflow
 
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> Fetchable Repo -> Fetchable HealthCheckResult -> Widget n

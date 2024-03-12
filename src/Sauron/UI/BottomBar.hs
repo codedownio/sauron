@@ -1,5 +1,5 @@
 
-module Sauron.UI.Draw.BottomBar (
+module Sauron.UI.BottomBar (
   bottomBar
   ) where
 

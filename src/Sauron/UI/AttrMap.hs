@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
-module Sauron.UI.Draw.AttrMap where
+module Sauron.UI.AttrMap where
 
 import Brick
 import Brick.Widgets.ProgressBar

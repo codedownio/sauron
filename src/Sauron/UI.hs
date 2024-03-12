@@ -1,5 +1,5 @@
 
-module Sauron.UI.Draw (
+module Sauron.UI (
   drawUI
   ) where
 
@@ -16,16 +16,15 @@ import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
 import Relude
 import Sauron.Types
-import Sauron.UI.Draw.AttrMap
-import Sauron.UI.Draw.Border
-import Sauron.UI.Draw.BottomBar
-import Sauron.UI.Draw.Issue
-import Sauron.UI.Draw.Pagination
-import Sauron.UI.Draw.Repo
-import Sauron.UI.Draw.TopBox
-import Sauron.UI.Draw.Util
-import Sauron.UI.Draw.Workflow
+import Sauron.UI.AttrMap
+import Sauron.UI.Border
+import Sauron.UI.BottomBar
+import Sauron.UI.Issue
+import Sauron.UI.Pagination
+import Sauron.UI.Repo
+import Sauron.UI.TopBox
 import Sauron.UI.Util
+import Sauron.UI.Workflow
 
 
 drawUI :: AppState -> [Widget ClickableName]

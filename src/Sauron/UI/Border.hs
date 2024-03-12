@@ -1,5 +1,5 @@
 
-module Sauron.UI.Draw.Border (
+module Sauron.UI.Border (
   borderWithCounts
   ) where
 
@@ -10,7 +10,7 @@ import GitHub hiding (Status)
 import GitHub.Data.Name
 import Relude
 import Sauron.Types
-import Sauron.UI.Draw.AttrMap
+import Sauron.UI.AttrMap
 
 
 borderWithCounts :: AppState -> Widget n

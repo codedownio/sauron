@@ -15,7 +15,7 @@ import Sauron.Actions
 import Sauron.Event.Helpers
 import Sauron.Event.Paging
 import Sauron.Types
-import Sauron.UI.Draw.Keys
+import Sauron.UI.Keys
 import System.FilePath
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()

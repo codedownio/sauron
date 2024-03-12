@@ -1,5 +1,5 @@
 
-module Sauron.UI.Draw.Issue (
+module Sauron.UI.Issue (
   issueLine
   , issueInner
   ) where
@@ -15,7 +15,7 @@ import GitHub
 import GitHub.Data.Name
 import Relude
 import Sauron.Types hiding (toggled)
-import Sauron.UI.Draw.AttrMap
+import Sauron.UI.AttrMap
 import Sauron.UI.Util.TimeFromNow
 import qualified Text.Pandoc.Builder as B
 
