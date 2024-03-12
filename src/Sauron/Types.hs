@@ -102,7 +102,7 @@ data PaginatedItem =
 
 data PaginatedItemInner =
   PaginatedItemInnerIssue (V.Vector IssueComment)
-  | PaginatedItemInnerPull (V.Vector Comment)
+  | PaginatedItemInnerPull (V.Vector IssueComment)
   | PaginatedItemInnerWorkflow (WithTotalCount Job)
   deriving (Show, Eq)
 

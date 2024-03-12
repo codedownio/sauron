@@ -104,7 +104,10 @@ fetchPullComments owner name issueNumber inner = do
   BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ writeTVar inner Fetching)
                   (atomically $ writeTVar inner (Errored "Pull comments fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (pullRequestCommentsR owner name issueNumber FetchAll)) >>= \case
+    -- pullRequestCommentsR returns comments on the "unified diff"
+    -- there are also "commit comments" and "issue comments".
+    -- The last one are the most common on PRs, so we use commentsR
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerPull (responseBody v)))
 

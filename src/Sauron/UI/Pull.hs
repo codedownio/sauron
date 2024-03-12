@@ -55,12 +55,8 @@ pullInner now (SimplePullRequest {..}) body inner = vBox (firstCell : comments)
       NotFetched -> [strWrap [i|Comments not fetched.|]]
 
     -- TODO: use pullCommentUpdatedAt
-    renderComment (Comment {commentUser=(SimpleUser {simpleUserLogin=(N username)}), ..}) = hLimit maxCommentWidth $ borderWithLabel
-      (str [i|#{username} commented#{timeInfo commentCreatedAt}|]
+    renderComment (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), ..}) = hLimit maxCommentWidth $ borderWithLabel
+      (str [i|#{username} commented #{timeFromNow (diffUTCTime now issueCommentCreatedAt)}|]
           & padLeftRight 1
       )
-      (markdownToWidgets commentBody)
-
-    timeInfo cca = case cca of
-      Nothing -> ""
-      Just x -> [i| #{timeFromNow (diffUTCTime now x)}|] :: Text
+      (markdownToWidgets issueCommentBody)
