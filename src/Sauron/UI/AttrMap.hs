@@ -29,7 +29,7 @@ mainAttrMap = attrMap V.defAttr [
 
   -- Pagination
 
-  , (selectedPageAttr, fg V.white)
+  , (selectedPageAttr, fg solarizedGreen)
   , (notSelectedPageAttr, fg midGray)
   , (pageEllipsesAttr, fg midGray)
 

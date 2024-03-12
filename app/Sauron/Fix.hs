@@ -26,6 +26,7 @@ fixMainListElem (MainListElemRepo {..}) = do
 
   toggledFixed <- readTVar _toggled
   issuesChildFixed <- readTVar _issuesChild >>= fixMainListElem
+  pullsChildFixed <- readTVar _pullsChild >>= fixMainListElem
   workflowsChildFixed <- readTVar _workflowsChild >>= fixMainListElem
 
   return $ MainListElemRepo {
@@ -37,6 +38,7 @@ fixMainListElem (MainListElemRepo {..}) = do
 
     , _toggled = toggledFixed
     , _issuesChild = issuesChildFixed
+    , _pullsChild = pullsChildFixed
     , _workflowsChild = workflowsChildFixed
 
     , _depth = _depth

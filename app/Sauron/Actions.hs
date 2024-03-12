@@ -72,6 +72,13 @@ fetchIssues owner name childrenVar = do
   let search = mempty
   fetchPaginated (issuesForRepoR owner name search) PaginatedItemsIssues childrenVar
 
+fetchPulls :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
+  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
+fetchPulls owner name childrenVar = do
+  let search = mempty
+  fetchPaginated (pullRequestsForR owner name search) PaginatedItemsPulls childrenVar
+
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
   ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
@@ -79,16 +86,27 @@ fetchWorkflows owner name childrenVar = do
   let search = mempty
   fetchPaginated (workflowRunsR owner name search) PaginatedItemsWorkflows childrenVar
 
-fetchComments :: (
+fetchIssueComments :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable PaginatedItemInner) -> m ()
-fetchComments owner name issueNumber inner = do
+fetchIssueComments owner name issueNumber inner = do
   BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ writeTVar inner Fetching)
-                  (atomically $ writeTVar inner (Errored "Comments fetch failed with exception.")) $
+                  (atomically $ writeTVar inner (Errored "Issue comments fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerIssue (responseBody v)))
+
+fetchPullComments :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable PaginatedItemInner) -> m ()
+fetchPullComments owner name issueNumber inner = do
+  BaseContext {auth, manager} <- ask
+  bracketOnError_ (atomically $ writeTVar inner Fetching)
+                  (atomically $ writeTVar inner (Errored "Pull comments fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (pullRequestCommentsR owner name issueNumber FetchAll)) >>= \case
+      Left err -> atomically $ writeTVar inner (Errored (show err))
+      Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerPull (responseBody v)))
 
 fetchPaginated :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
@@ -159,13 +177,16 @@ fetchIssue owner name issueNumber issueVar = do
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> MainListElemVariable -> m ()
 refresh _ (MainListElemHeading {}) _ = return () -- TODO: refresh all repos
 refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) _ = liftIO $ do
-  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
-refresh bc (MainListElemPaginated {..}) (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _workflowsChild}) = liftIO $ case _typ of
+  void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
+  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
+refresh bc (MainListElemPaginated {..}) (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) = liftIO $ case _typ of
   PaginatedIssues -> void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
+  PaginatedPulls -> void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
   PaginatedWorkflows -> void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
 refresh bc (MainListElemItem {_item, ..}) (MainListElemRepo {_namespaceName=(owner, name)}) = readTVarIO _item >>= \case
-  Fetched (PaginatedItemIssue (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchComments owner name issueNumber _itemInner) bc
+  Fetched (PaginatedItemIssue (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _itemInner) bc
+  Fetched (PaginatedItemPull (SimplePullRequest {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name simplePullRequestNumber _itemInner) bc
   _ -> return () -- TODO
 refresh _ _ _ = return ()
 

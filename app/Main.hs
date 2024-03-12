@@ -234,6 +234,22 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _ident = 0
     }
 
+  pullsVar <- newTVarIO NotFetched
+  pullsToggledVar <- newTVarIO False
+  pullsChildrenVar <- newTVarIO []
+  pullsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  pullsChildVar <- newTVarIO $ MainListElemPaginated {
+    _typ = PaginatedPulls
+    , _items = pullsVar
+    , _label = "Pulls"
+    , _urlSuffix = "pulls"
+    , _toggled = pullsToggledVar
+    , _children = pullsChildrenVar
+    , _pageInfo = pullsPageInfoVar
+    , _depth = 2
+    , _ident = 0
+    }
+
   workflowsVar <- newTVarIO NotFetched
   workflowsToggledVar <- newTVarIO False
   workflowsChildrenVar <- newTVarIO []
@@ -259,6 +275,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
 
     , _toggled = toggledVar
     , _issuesChild = issuesChildVar
+    , _pullsChild = pullsChildVar
     , _workflowsChild = workflowsChildVar
 
     , _depth = repoDepth

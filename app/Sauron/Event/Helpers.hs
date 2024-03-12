@@ -43,5 +43,6 @@ withNthChildAndRepoParent s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el 
 
 openBrowserToItem :: MonadIO m => PaginatedItem -> m ()
 openBrowserToItem (PaginatedItemIssue (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
+openBrowserToItem (PaginatedItemPull (SimplePullRequest {..})) = openBrowserToUrl (toString (getUrl simplePullRequestHtmlUrl))
 openBrowserToItem (PaginatedItemWorkflow (WorkflowRun {workflowRunHtmlUrl=url})) = openBrowserToUrl (toString (getUrl url))
 openBrowserToItem _ = return ()

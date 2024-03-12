@@ -21,6 +21,7 @@ import Sauron.UI.Border
 import Sauron.UI.BottomBar
 import Sauron.UI.Issue
 import Sauron.UI.Pagination
+import Sauron.UI.Pull
 import Sauron.UI.Repo
 import Sauron.UI.TopBox
 import Sauron.UI.Util
@@ -56,6 +57,7 @@ listDrawElement _now ix isSelected x@(MainListElemPaginated {..}) = wrapper ix i
         Fetching -> str "(Fetching)"
         Errored msg -> str [i|Errored: #{msg}|]
         Fetched (PaginatedItemsIssues xs) -> str [i|(#{V.length xs})|]
+        Fetched (PaginatedItemsPulls xs) -> str [i|(#{V.length xs})|]
         Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
     , Just (hCenter (paginationInfo _pageInfo))
     ]
@@ -63,6 +65,7 @@ listDrawElement _now ix isSelected x@(MainListElemPaginated {..}) = wrapper ix i
 listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
   Just $ case _item of
     Fetched (PaginatedItemIssue issue) -> issueLine now _toggled issue
+    Fetched (PaginatedItemPull pull) -> pullLine now _toggled pull
     Fetched (PaginatedItemWorkflow wf) -> workflowLine _toggled wf
     _ -> str ""
   , do
@@ -72,6 +75,10 @@ listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelec
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
               issueInner now iss body _itemInner
+        PaginatedItemPull pr@(SimplePullRequest {..}) -> guardJust simplePullRequestBody $ \body ->
+          return $ padLeft (Pad 4) $
+            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+              pullInner now pr body _itemInner
         PaginatedItemWorkflow wf@(WorkflowRun {}) ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $

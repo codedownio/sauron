@@ -84,26 +84,31 @@ data HealthCheckResult =
 
 data PaginatedType =
   PaginatedIssues
+  | PaginatedPulls
   | PaginatedWorkflows
   deriving (Show, Eq)
 
 data PaginatedItems =
   PaginatedItemsIssues (V.Vector Issue)
+  | PaginatedItemsPulls (V.Vector SimplePullRequest)
   | PaginatedItemsWorkflows (WithTotalCount WorkflowRun)
   deriving (Show, Eq)
 
 data PaginatedItem =
   PaginatedItemIssue Issue
+  | PaginatedItemPull SimplePullRequest
   | PaginatedItemWorkflow WorkflowRun
   deriving (Show, Eq)
 
 data PaginatedItemInner =
   PaginatedItemInnerIssue (V.Vector IssueComment)
+  | PaginatedItemInnerPull (V.Vector Comment)
   | PaginatedItemInnerWorkflow (WithTotalCount Job)
   deriving (Show, Eq)
 
 paginatedItemsToList :: PaginatedItems -> [PaginatedItem]
 paginatedItemsToList (PaginatedItemsIssues xs) = fmap PaginatedItemIssue $ V.toList xs
+paginatedItemsToList (PaginatedItemsPulls xs) = fmap PaginatedItemPull $ V.toList xs
 paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
 
 data PageInfo = PageInfo {
@@ -133,6 +138,7 @@ data MainListElem' f =
 
       , _toggled :: Switchable f Bool
       , _issuesChild :: Switchable f (MainListElem' f)
+      , _pullsChild :: Switchable f (MainListElem' f)
       , _workflowsChild :: Switchable f (MainListElem' f)
 
       , _depth :: Int

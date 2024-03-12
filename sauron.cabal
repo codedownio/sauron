@@ -34,7 +34,9 @@ library
       Sauron.UI.BottomBar
       Sauron.UI.Issue
       Sauron.UI.Keys
+      Sauron.UI.Markdown
       Sauron.UI.Pagination
+      Sauron.UI.Pull
       Sauron.UI.Repo
       Sauron.UI.TopBox
       Sauron.UI.Util

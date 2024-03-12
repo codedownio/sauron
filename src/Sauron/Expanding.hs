@@ -19,6 +19,7 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
       tell [x]
       when _toggled $ do
         tell (expandNodes _issuesChild)
+        tell (expandNodes _pullsChild)
         tell (expandNodes _workflowsChild)
     expandNodes x@(MainListElemPaginated {..}) = execWriter $ do
       tell [x]
@@ -50,7 +51,8 @@ nthChild n el@(MainListElemPaginated {..}) = readTVar _toggled >>= \case
 nthChild n el@(MainListElemRepo {..}) = readTVar _toggled >>= \case
   True -> do
     ic <- readTVar _issuesChild
+    pc <- readTVar _pullsChild
     wc <- readTVar _workflowsChild
-    (fmap ((el :|) . toList)) <$> nthChildList (n - 1) [ic, wc]
+    (fmap ((el :|) . toList)) <$> nthChildList (n - 1) [ic, pc, wc]
   False -> pure $ Left (n - 1)
 nthChild n _ = pure $ Left (n - 1)
