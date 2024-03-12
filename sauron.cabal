@@ -28,17 +28,17 @@ library
       Sauron.Expanding
       Sauron.Filter
       Sauron.Types
-      Sauron.UI.AttrMap
       Sauron.UI.Draw
+      Sauron.UI.Draw.AttrMap
       Sauron.UI.Draw.Border
       Sauron.UI.Draw.BottomBar
       Sauron.UI.Draw.Issue
+      Sauron.UI.Draw.Keys
       Sauron.UI.Draw.Pagination
       Sauron.UI.Draw.Repo
+      Sauron.UI.Draw.TopBox
       Sauron.UI.Draw.Util
       Sauron.UI.Draw.Workflow
-      Sauron.UI.Keys
-      Sauron.UI.TopBox
       Sauron.UI.Util
       Sauron.UI.Util.TimeFromNow
       Sauron.Util

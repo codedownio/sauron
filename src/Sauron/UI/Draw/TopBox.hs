@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
-module Sauron.UI.TopBox (
+module Sauron.UI.Draw.TopBox (
   topBox
   ) where
 
@@ -10,8 +10,8 @@ import qualified Data.List as L
 import Lens.Micro
 import Relude
 import Sauron.Types
-import Sauron.UI.AttrMap
-import Sauron.UI.Keys
+import Sauron.UI.Draw.AttrMap
+import Sauron.UI.Draw.Keys
 
 
 topBox app = hBox [columnPadding settingsColumn

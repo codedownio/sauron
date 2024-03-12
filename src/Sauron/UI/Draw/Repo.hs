@@ -9,7 +9,7 @@ import Data.Maybe
 import GitHub hiding (Status)
 import Relude
 import Sauron.Types
-import Sauron.UI.AttrMap
+import Sauron.UI.Draw.AttrMap
 import Sauron.UI.Draw.Util
 import Sauron.UI.Draw.Workflow
 

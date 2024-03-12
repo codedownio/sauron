@@ -30,7 +30,7 @@ import Sauron.Fix
 import Sauron.HealthCheck
 import Sauron.Options
 import Sauron.Types
-import Sauron.UI.AttrMap
+import Sauron.UI.Draw.AttrMap
 import Sauron.UI.Draw
 import System.IO.Error (userError)
 import UnliftIO.Async

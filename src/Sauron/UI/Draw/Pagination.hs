@@ -8,7 +8,7 @@ import qualified Data.List as L
 import Data.String.Interpolate
 import Relude
 import Sauron.Types
-import Sauron.UI.AttrMap
+import Sauron.UI.Draw.AttrMap
 
 
 paginationInfo :: PageInfo -> Widget n

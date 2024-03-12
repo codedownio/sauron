@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
-module Sauron.UI.Keys where
+module Sauron.UI.Draw.Keys where
 
 import qualified Data.List as L
 import qualified Graphics.Vty as V

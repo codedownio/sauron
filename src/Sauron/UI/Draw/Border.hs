@@ -10,7 +10,7 @@ import GitHub hiding (Status)
 import GitHub.Data.Name
 import Relude
 import Sauron.Types
-import Sauron.UI.AttrMap
+import Sauron.UI.Draw.AttrMap
 
 
 borderWithCounts :: AppState -> Widget n
