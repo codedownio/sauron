@@ -78,12 +78,15 @@ library:
 
 executables:
   sauron:
-    main:                Main.hs
-    source-dirs:         app
+    main: Main.hs
+    source-dirs:
+    - app
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -O2
+    - -W
     dependencies:
     - aeson
     - exceptions
