@@ -53,6 +53,7 @@ final: prev: {
                 ''--ghc-options="-pgml g++"''
             ];
             packages.sauron.components.exes.sauron.build-tools = [prev.gcc];
+            packages.sauron.components.exes.sauron.dontStrip = false;
         }
       ];
     };
