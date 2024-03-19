@@ -8,8 +8,6 @@ nix:
   pure: false
   packages:
   - zlib
-  - pkg-config
-  - pcre
   path:
   - "nixpkgs=/home/tom/tools/nixpkgs"
 

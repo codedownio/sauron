@@ -48,6 +48,11 @@ final: prev: {
             "xhtml"
             "terminfo"
           ];
+        } {
+            packages.sauron.components.exes.sauron.configureFlags = [
+                ''--ghc-options="-pgml g++"''
+            ];
+            packages.sauron.components.exes.sauron.build-tools = [prev.gcc];
         }
       ];
     };
