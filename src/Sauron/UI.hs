@@ -11,7 +11,6 @@ import Control.Monad
 import Data.Maybe
 import Data.String.Interpolate
 import Data.Time
-import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
 import Relude
@@ -56,8 +55,8 @@ listDrawElement _now ix isSelected x@(MainListElemPaginated {..}) = wrapper ix i
         NotFetched -> str "(Not fetched)"
         Fetching -> str "(Fetching)"
         Errored msg -> str [i|Errored: #{msg}|]
-        Fetched (PaginatedItemsIssues xs) -> str [i|(#{V.length xs})|]
-        Fetched (PaginatedItemsPulls xs) -> str [i|(#{V.length xs})|]
+        Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
+        Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
         Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
     , Just (hCenter (paginationInfo _pageInfo))
     ]
@@ -75,7 +74,7 @@ listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelec
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
               issueInner now iss body _itemInner
-        PaginatedItemPull pr@(SimplePullRequest {..}) -> guardJust simplePullRequestBody $ \body ->
+        PaginatedItemPull pr@(Issue {..}) -> guardJust issueBody $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
               pullInner now pr body _itemInner

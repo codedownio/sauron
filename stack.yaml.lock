@@ -16,11 +16,11 @@ packages:
     git: git@github.com:codedownio/github.git
     name: github
     pantry-tree:
-      sha256: db5548baee2eca83e7c1caa6a1004f13967c56eaaf621b3bdb278564eae92468
+      sha256: df14be9b9dd06b42c9d1fe05dc58d9b19dd52a81a3d0b5561ab16a889a2fcc07
       size: 19154
     version: '0.29'
   original:
-    commit: cd32569e3b4572158ce240096a79633607b08e0a
+    commit: 772b9f1039663c96db77dc14570fbffd6e833e17
     git: git@github.com:codedownio/github.git
 snapshots:
 - completed:

@@ -89,14 +89,14 @@ data PaginatedType =
   deriving (Show, Eq)
 
 data PaginatedItems =
-  PaginatedItemsIssues (V.Vector Issue)
-  | PaginatedItemsPulls (V.Vector SimplePullRequest)
+  PaginatedItemsIssues (SearchResult Issue)
+  | PaginatedItemsPulls (SearchResult Issue)
   | PaginatedItemsWorkflows (WithTotalCount WorkflowRun)
   deriving (Show, Eq)
 
 data PaginatedItem =
   PaginatedItemIssue Issue
-  | PaginatedItemPull SimplePullRequest
+  | PaginatedItemPull Issue
   | PaginatedItemWorkflow WorkflowRun
   deriving (Show, Eq)
 
@@ -107,8 +107,8 @@ data PaginatedItemInner =
   deriving (Show, Eq)
 
 paginatedItemsToList :: PaginatedItems -> [PaginatedItem]
-paginatedItemsToList (PaginatedItemsIssues xs) = fmap PaginatedItemIssue $ V.toList xs
-paginatedItemsToList (PaginatedItemsPulls xs) = fmap PaginatedItemPull $ V.toList xs
+paginatedItemsToList (PaginatedItemsIssues (SearchResult _ xs)) = fmap PaginatedItemIssue $ V.toList xs
+paginatedItemsToList (PaginatedItemsPulls (SearchResult _ xs)) = fmap PaginatedItemPull $ V.toList xs
 paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
 
 data PageInfo = PageInfo {

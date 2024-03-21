@@ -69,15 +69,15 @@ fetchIssues :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
   ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
 fetchIssues owner name childrenVar = do
-  let search = mempty
-  fetchPaginated (issuesForRepoR owner name search) PaginatedItemsIssues childrenVar
+  let fullQuery = [i|repo:#{untagName owner}/#{untagName name}+is:issue+is:open|]
+  fetchPaginated (searchIssuesR fullQuery) PaginatedItemsIssues childrenVar
 
 fetchPulls :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
   ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
 fetchPulls owner name childrenVar = do
-  let search = mempty
-  fetchPaginated (pullRequestsForR owner name search) PaginatedItemsPulls childrenVar
+  let fullQuery = [i|repo:#{untagName owner}/#{untagName name}+is:pr+is:open|]
+  fetchPaginated (searchIssuesR fullQuery) PaginatedItemsPulls childrenVar
 
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
@@ -189,7 +189,7 @@ refresh bc (MainListElemPaginated {..}) (MainListElemRepo {_namespaceName=(owner
   PaginatedWorkflows -> void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
 refresh bc (MainListElemItem {_item, ..}) (MainListElemRepo {_namespaceName=(owner, name)}) = readTVarIO _item >>= \case
   Fetched (PaginatedItemIssue (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _itemInner) bc
-  Fetched (PaginatedItemPull (SimplePullRequest {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name simplePullRequestNumber _itemInner) bc
+  Fetched (PaginatedItemPull (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name issueNumber _itemInner) bc
   _ -> return () -- TODO
 refresh _ _ _ = return ()
 

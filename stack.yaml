@@ -17,5 +17,5 @@ extra-deps:
 # - github-0.29
 
 - git: git@github.com:codedownio/github.git
-  # per-page-query-v2 branch
-  commit: cd32569e3b4572158ce240096a79633607b08e0a
+  # main branch
+  commit: 772b9f1039663c96db77dc14570fbffd6e833e17

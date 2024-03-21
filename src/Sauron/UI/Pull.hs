@@ -19,29 +19,29 @@ import Sauron.UI.Markdown
 import Sauron.UI.Util.TimeFromNow
 
 
-pullLine :: UTCTime -> Bool -> SimplePullRequest -> Widget n
-pullLine now toggled (SimplePullRequest {simplePullRequestNumber=(IssueNumber number), ..}) = vBox [line1, line2]
+pullLine :: UTCTime -> Bool -> Issue -> Widget n
+pullLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
-      , withAttr normalAttr $ str $ toString simplePullRequestTitle
+      , withAttr normalAttr $ str $ toString issueTitle
       , padLeft Max $ str "" -- (if pullComments > 0 then [i|🗨  #{pullComments}|] else "")
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox [
       withAttr hashAttr $ str "#"
       , withAttr hashNumberAttr $ str $ show number
-      , str [i| opened #{timeFromNow (diffUTCTime now simplePullRequestCreatedAt)} by |]
-      , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin simplePullRequestUser}|]
+      , str [i| opened #{timeFromNow (diffUTCTime now issueCreatedAt)} by |]
+      , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
-pullInner :: UTCTime -> SimplePullRequest -> Text -> Fetchable PaginatedItemInner -> Widget n
-pullInner now (SimplePullRequest {..}) body inner = vBox (firstCell : comments)
+pullInner :: UTCTime -> Issue -> Text -> Fetchable PaginatedItemInner -> Widget n
+pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
   where
-    SimpleUser {simpleUserLogin=(N openerUsername)} = simplePullRequestUser
+    SimpleUser {simpleUserLogin=(N openerUsername)} = issueUser
 
     firstCell = hLimit maxCommentWidth $ borderWithLabel
-      (str [i|#{openerUsername} opened #{timeFromNow (diffUTCTime now simplePullRequestCreatedAt)}|]
+      (str [i|#{openerUsername} opened #{timeFromNow (diffUTCTime now issueCreatedAt)}|]
           & padLeftRight 1
       )
       (markdownToWidgets body)
