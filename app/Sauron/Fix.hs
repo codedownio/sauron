@@ -50,6 +50,7 @@ fixMainListElem (MainListElemPaginated {..}) = do
   toggledFixed <- readTVar _toggled
   childrenFixed <- readTVar _children >>= mapM fixMainListElem
 
+  searchFixed <- readTVar _search
   pageInfoFixed <- readTVar _pageInfo
 
   return $ MainListElemPaginated {
@@ -61,6 +62,7 @@ fixMainListElem (MainListElemPaginated {..}) = do
     , _toggled = toggledFixed
     , _children = childrenFixed
 
+    , _search = searchFixed
     , _pageInfo = pageInfoFixed
 
     , _depth = _depth

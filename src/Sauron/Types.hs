@@ -111,6 +111,10 @@ paginatedItemsToList (PaginatedItemsIssues (SearchResult _ xs)) = fmap Paginated
 paginatedItemsToList (PaginatedItemsPulls (SearchResult _ xs)) = fmap PaginatedItemPull $ V.toList xs
 paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
 
+data Search = SearchText Text
+            | SearchNone
+  deriving (Show, Eq)
+
 data PageInfo = PageInfo {
   pageInfoCurrentPage :: Int
   , pageInfoFirstPage :: Maybe Int
@@ -154,6 +158,7 @@ data MainListElem' f =
       , _toggled :: Switchable f Bool
       , _children :: Switchable f [MainListElem' f]
 
+      , _search :: Switchable f Search
       , _pageInfo :: Switchable f PageInfo
 
       , _depth :: Int

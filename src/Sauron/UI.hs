@@ -22,6 +22,7 @@ import Sauron.UI.Issue
 import Sauron.UI.Pagination
 import Sauron.UI.Pull
 import Sauron.UI.Repo
+import Sauron.UI.Search
 import Sauron.UI.TopBox
 import Sauron.UI.Util
 import Sauron.UI.Workflow
@@ -58,7 +59,7 @@ listDrawElement _now ix isSelected x@(MainListElemPaginated {..}) = wrapper ix i
         Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
         Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
         Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
-    , Just (hCenter (paginationInfo _pageInfo))
+    , Just (hCenter (padRight (Pad 4) (searchInfo _search) <+> paginationInfo _pageInfo))
     ]
   ]
 listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [

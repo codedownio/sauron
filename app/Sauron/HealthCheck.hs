@@ -38,8 +38,8 @@ newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar heal
     liftIO $ flip runReaderT baseContext $
       bracketOnError_ (atomically $ writeTVar healthCheckVar Fetching)
                       (atomically $ writeTVar healthCheckVar (Errored "Health check fetch failed with exception.")) $ do
-        let search = optionsWorkflowRunBranch defaultBranch
-        withGithubApiSemaphore (liftIO $ github auth (workflowRunsR owner name search (FetchAtLeast 1))) >>= \case
+        let search' = optionsWorkflowRunBranch defaultBranch
+        withGithubApiSemaphore (liftIO $ github auth (workflowRunsR owner name search' (FetchAtLeast 1))) >>= \case
           Left err -> atomically $ writeTVar healthCheckVar (Errored (show err))
           Right (WithTotalCount {withTotalCountItems=(V.toList -> ((WorkflowRun {..}):_))}) -> do
             let result = HealthCheckWorkflowResult (chooseWorkflowStatus (fromMaybe workflowRunStatus workflowRunConclusion))

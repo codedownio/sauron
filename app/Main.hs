@@ -221,6 +221,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   issuesVar <- newTVarIO NotFetched
   issuesToggledVar <- newTVarIO False
   issuesChildrenVar <- newTVarIO []
+  issuesSearchVar <- newTVarIO $ SearchText "is:issue is:open"
   issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   issuesChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedIssues
@@ -229,6 +230,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _urlSuffix = "issues"
     , _toggled = issuesToggledVar
     , _children = issuesChildrenVar
+    , _search = issuesSearchVar
     , _pageInfo = issuesPageInfoVar
     , _depth = 2
     , _ident = 0
@@ -237,6 +239,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   pullsVar <- newTVarIO NotFetched
   pullsToggledVar <- newTVarIO False
   pullsChildrenVar <- newTVarIO []
+  pullsSearchVar <- newTVarIO $ SearchText "is:pr is:open"
   pullsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   pullsChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedPulls
@@ -245,6 +248,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _urlSuffix = "pulls"
     , _toggled = pullsToggledVar
     , _children = pullsChildrenVar
+    , _search = pullsSearchVar
     , _pageInfo = pullsPageInfoVar
     , _depth = 2
     , _ident = 0
@@ -253,6 +257,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   workflowsVar <- newTVarIO NotFetched
   workflowsToggledVar <- newTVarIO False
   workflowsChildrenVar <- newTVarIO []
+  workflowsSearchVar <- newTVarIO $ SearchNone
   workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   workflowsChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedWorkflows
@@ -261,6 +266,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _urlSuffix = "actions"
     , _toggled = workflowsToggledVar
     , _children = workflowsChildrenVar
+    , _search = workflowsSearchVar
     , _pageInfo = workflowsPageInfoVar
     , _depth = 2
     , _ident = 0

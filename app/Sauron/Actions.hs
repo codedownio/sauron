@@ -30,6 +30,7 @@ import Control.Monad.IO.Class
 import Data.Aeson
 import qualified Data.List as L
 import Data.String.Interpolate
+import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
@@ -69,22 +70,31 @@ fetchIssues :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
   ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
 fetchIssues owner name childrenVar = do
-  let fullQuery = [i|repo:#{untagName owner}/#{untagName name}+is:issue+is:open|]
+  extraTerms <- readTVarIO childrenVar >>= (readTVarIO . _search) >>= \case
+    SearchNone -> pure []
+    SearchText t -> pure $ T.words t
+
+  let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
+
   fetchPaginated (searchIssuesR fullQuery) PaginatedItemsIssues childrenVar
 
 fetchPulls :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
   ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
 fetchPulls owner name childrenVar = do
-  let fullQuery = [i|repo:#{untagName owner}/#{untagName name}+is:pr+is:open|]
+  extraTerms <- readTVarIO childrenVar >>= (readTVarIO . _search) >>= \case
+    SearchNone -> pure []
+    SearchText t -> pure $ T.words t
+
+  let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
+
   fetchPaginated (searchIssuesR fullQuery) PaginatedItemsPulls childrenVar
 
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
   ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
 fetchWorkflows owner name childrenVar = do
-  let search = mempty
-  fetchPaginated (workflowRunsR owner name search) PaginatedItemsWorkflows childrenVar
+  fetchPaginated (workflowRunsR owner name mempty) PaginatedItemsWorkflows childrenVar
 
 fetchIssueComments :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m

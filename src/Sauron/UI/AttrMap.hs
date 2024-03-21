@@ -29,6 +29,7 @@ mainAttrMap = attrMap V.defAttr [
 
   -- Pagination
 
+  , (searchAttr, fg midGray)
   , (selectedPageAttr, fg solarizedGreen)
   , (notSelectedPageAttr, fg midGray)
   , (pageEllipsesAttr, fg midGray)
@@ -78,8 +79,9 @@ disabledHotkeyAttr = mkAttrName "disableHotkey"
 hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
 
--- * Pagination
+-- * Search and pagination
 
+searchAttr = mkAttrName "search"
 selectedPageAttr = mkAttrName "selectedPage"
 notSelectedPageAttr = mkAttrName "notSelectedPage"
 pageEllipsesAttr = mkAttrName "pageEllipses"
