@@ -101,6 +101,9 @@ executable sauron
       Sauron.Fix
       Sauron.HealthCheck
       Sauron.Options
+      Sauron.Setup.AllReposForUser
+      Sauron.Setup.Common
+      Sauron.Setup.ReposFromConfigFile
       Paths_sauron
   hs-source-dirs:
       app
