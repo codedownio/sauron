@@ -202,8 +202,7 @@ data AppState = AppState {
   , _appSortBy :: SortBy
   , _appNow :: UTCTime
 
-  , _appForm :: Form Text AppEvent ClickableName
-  , _appFormActiveIdentifier :: Maybe Int
+  , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
   }
 
 

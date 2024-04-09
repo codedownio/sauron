@@ -79,13 +79,20 @@ topBox app = hBox [columnPadding settingsColumn
            , highlightMessageIfPredicate hasLastPageKey app (str "Last")
            , withAttr hotkeyMessageAttr $ str " page"
            ]
+      , hBox [str "["
+             , highlightKeyIfPredicate isSearchable app (str $ showKey editSearchKey)
+             , str "] "
+             , withAttr hotkeyMessageAttr $ str "Search"
+             ]
       , keyIndicator "q" "Exit"
       ]
 
-hasNextPageKey = const True
-hasPrevPageKey = const True
-hasFirstPageKey = const True
-hasLastPageKey = const True
+hasNextPageKey = const True -- TODO
+hasPrevPageKey = const True -- TODO
+hasFirstPageKey = const True -- TODO
+hasLastPageKey = const True -- TODO
+
+isSearchable = const True -- TODO
 
 columnPadding = padLeft (Pad 1) . padRight (Pad 3) -- . padTop (Pad 1)
 

@@ -5,9 +5,10 @@
 module Sauron.UI.AttrMap where
 
 import Brick
+import qualified Brick.Widgets.Edit as E
 import Brick.Widgets.ProgressBar
 import qualified Graphics.Vty as V
-import Relude
+import Relude hiding (on)
 
 
 mkAttrName :: String -> AttrName
@@ -63,6 +64,9 @@ mainAttrMap = attrMap V.defAttr [
   , (usernameAttr, fg solarizedBlue)
   , (hashNumberAttr, fg solarizedViolet)
   , (hashAttr, fg midGray)
+
+  -- Forms
+  , (E.editFocusedAttr, V.black `on` V.yellow)
   ]
 
 iconAttr = mkAttrName "icon"

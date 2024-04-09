@@ -28,6 +28,9 @@ nextPageKey = V.KChar 'N'
 prevPageKey = V.KChar 'P'
 firstPageKey = V.KChar 'F'
 lastPageKey = V.KChar 'L'
+
+editSearchKey = V.KChar 's'
+
 exitKey = V.KChar 'q'
 
 -- Other
