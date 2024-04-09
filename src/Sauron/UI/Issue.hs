@@ -43,7 +43,7 @@ issueInner :: UTCTime -> Issue -> Text -> Fetchable PaginatedItemInner -> Widget
 issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) body inner = vBox (firstCell : comments)
   where
     firstCell = hLimit maxCommentWidth $ borderWithLabel
-      (str [i|#{openerUsername} commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|]
+      ((withAttr usernameAttr (str [i|#{openerUsername} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
           & padLeftRight 1
       )
       (markdownToWidgets body)
