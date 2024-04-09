@@ -35,4 +35,4 @@ allReposForUser baseContext defaultHealthCheckPeriodUs (N userLoginUnwrapped) = 
     repoVar <- newTVarIO (Fetched r)
     healthCheckVar <- newTVarIO NotFetched
     hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar defaultHealthCheckPeriodUs
-    newRepoNode nsName repoVar healthCheckVar (Just hcThread) 0
+    newRepoNode nsName repoVar healthCheckVar (Just hcThread) 0 getIdentifier

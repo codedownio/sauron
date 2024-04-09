@@ -19,8 +19,9 @@ newRepoNode ::
   -> TVar (Fetchable HealthCheckResult)
   -> Maybe (Async ())
   -> Int
+  -> IO Int
   -> m MainListElemVariable
-newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
+newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   toggledVar <- newTVarIO False
 
   issuesVar <- newTVarIO NotFetched
@@ -28,6 +29,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   issuesChildrenVar <- newTVarIO []
   issuesSearchVar <- newTVarIO $ SearchText "is:issue is:open"
   issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  issuesIdentifier <- liftIO getIdentifier
   issuesChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedIssues
     , _items = issuesVar
@@ -38,7 +40,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _search = issuesSearchVar
     , _pageInfo = issuesPageInfoVar
     , _depth = 2
-    , _ident = 0
+    , _ident = issuesIdentifier
     }
 
   pullsVar <- newTVarIO NotFetched
@@ -46,6 +48,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
   pullsChildrenVar <- newTVarIO []
   pullsSearchVar <- newTVarIO $ SearchText "is:pr is:open"
   pullsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  pullsIdentifier <- liftIO getIdentifier
   pullsChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedPulls
     , _items = pullsVar
@@ -56,14 +59,15 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _search = pullsSearchVar
     , _pageInfo = pullsPageInfoVar
     , _depth = 2
-    , _ident = 0
+    , _ident = pullsIdentifier
     }
 
   workflowsVar <- newTVarIO NotFetched
   workflowsToggledVar <- newTVarIO False
   workflowsChildrenVar <- newTVarIO []
-  workflowsSearchVar <- newTVarIO $ SearchNone
+  workflowsSearchVar <- newTVarIO SearchNone
   workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  workflowsIdentifier <- liftIO getIdentifier
   workflowsChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedWorkflows
     , _items = workflowsVar
@@ -74,7 +78,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth = do
     , _search = workflowsSearchVar
     , _pageInfo = workflowsPageInfoVar
     , _depth = 2
-    , _ident = 0
+    , _ident = workflowsIdentifier
     }
 
   return $ MainListElemRepo {

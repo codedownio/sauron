@@ -182,10 +182,8 @@ fetchIssue owner name issueNumber issueVar = do
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
       Left err -> atomically $ do
         writeTVar issueVar (Errored (show err))
-        undefined
       Right x -> atomically $ do
         writeTVar issueVar (Fetched (responseBody x))
-        undefined
 
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> MainListElemVariable -> m ()
 refresh _ (MainListElemHeading {}) _ = return () -- TODO: refresh all repos

@@ -34,12 +34,13 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           Just l -> do
             toggledVar <- newTVarIO True
             statusVar <- newTVarIO NotFetched
+            identifier <- liftIO $ getIdentifier baseContext
             tell [MainListElemHeading {
               _label = l
               , _depth = 0
               , _toggled = toggledVar
               , _status = statusVar
-              , _ident = 0
+              , _ident = identifier
               }]
             pure 1
 
@@ -57,5 +58,5 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
               let period = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
               Just <$> lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar period)
             ConfigRepoWildcard {} -> pure Nothing
-          node <- newRepoNode nsName repoVar healthCheckVar hcThread repoDepth
+          node <- newRepoNode nsName repoVar healthCheckVar hcThread repoDepth (getIdentifier baseContext)
           tell [node]

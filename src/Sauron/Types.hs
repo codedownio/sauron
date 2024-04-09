@@ -7,6 +7,7 @@
 
 module Sauron.Types where
 
+import Brick.Forms
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Data.String.Interpolate
@@ -31,9 +32,15 @@ data BaseContext = BaseContext {
   , auth :: Auth
   , debugFn :: Text -> IO ()
   , manager :: Manager
+  , getIdentifier :: IO Int
   }
 
-data ClickableName = ListRow Int | MainList | InnerViewport Text | InfoBar
+data ClickableName =
+  ListRow Int
+  | MainList
+  | InnerViewport Text
+  | InfoBar
+  | TextForm
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -174,10 +181,12 @@ data MainListElem' f =
       , _ident :: Int
       }
 
-makeLenses ''MainListElem'
 type MainListElem = MainListElem' Fixed
 deriving instance Eq MainListElem
 type MainListElemVariable = MainListElem' Variable
+
+data AppEvent =
+  ListUpdate (V.Vector MainListElem)
 
 instance Show (MainListElem' f) where
   show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
@@ -192,8 +201,12 @@ data AppState = AppState {
   , _appMainList :: L.List ClickableName MainListElem
   , _appSortBy :: SortBy
   , _appNow :: UTCTime
-  }
-makeLenses ''AppState
 
-data AppEvent =
-  ListUpdate (V.Vector MainListElem)
+  , _appForm :: Form Text AppEvent ClickableName
+  , _appFormActiveIdentifier :: Maybe Int
+  }
+
+
+
+makeLenses ''AppState
+makeLenses ''MainListElem'

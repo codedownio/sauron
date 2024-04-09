@@ -5,6 +5,7 @@ module Main (main) where
 
 import Brick as B
 import Brick.BChan
+import Brick.Forms
 import Brick.Widgets.List
 import Control.Concurrent.QSem
 import Control.Concurrent.STM (retry)
@@ -83,6 +84,10 @@ main = do
 
           , _appSortBy = SortByStars
           , _appNow = now
+
+          -- , _appForm = newForm [ ((str "Please check: " <+>)) @@= editTextField id TextForm (Just 1) ] ""
+          , _appForm = newForm [ editTextField id TextForm (Just 1) ] ""
+          , _appFormActiveIdentifier = Nothing
         }
 
 
@@ -141,9 +146,13 @@ buildBaseContext = do
 
   manager <- newManager tlsManagerSettings
 
+  idRef <- newIORef 0
+  let getIdentifier = atomicModifyIORef' idRef (\x -> (x + 1, x))
+
   return $ BaseContext {
     requestSemaphore = githubApiSemaphore
     , auth = auth
     , debugFn = debugFn
     , manager = manager
+    , getIdentifier = getIdentifier
     }

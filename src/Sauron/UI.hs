@@ -10,7 +10,6 @@ import qualified Brick.Widgets.List as L
 import Control.Monad
 import Data.Maybe
 import Data.String.Interpolate
-import Data.Time
 import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
 import Relude
@@ -32,23 +31,23 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = [vBox [
                  topBox app
                  , borderWithCounts app
-                 , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement (_appNow app)) True (app ^. appMainList)
+                 , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
                  , clickable InfoBar $ bottomBar app
                  ]
              ]
 
-listDrawElement :: UTCTime -> Int -> Bool -> MainListElem -> Widget ClickableName
-listDrawElement _now ix isSelected x@(MainListElemHeading {..}) = wrapper ix isSelected x [
+listDrawElement :: AppState -> Int -> Bool -> MainListElem -> Widget ClickableName
+listDrawElement _appState ix isSelected x@(MainListElemHeading {..}) = wrapper ix isSelected x [
   Just $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
     , Just (hBox [str (toString _label)])
     , Just (padLeft Max (str " "))
     ]
   ]
-listDrawElement _now ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
+listDrawElement _appState ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled _namespaceName _repo _healthCheck
   ]
-listDrawElement _now ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSelected x [
   Just $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
     , Just $ padRight (Pad 1) $ str $ toString _label
@@ -59,13 +58,13 @@ listDrawElement _now ix isSelected x@(MainListElemPaginated {..}) = wrapper ix i
         Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
         Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
         Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
-    , Just (hCenter (padRight (Pad 4) (searchInfo _search) <+> paginationInfo _pageInfo))
+    , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
     ]
   ]
-listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
   Just $ case _item of
-    Fetched (PaginatedItemIssue issue) -> issueLine now _toggled issue
-    Fetched (PaginatedItemPull pull) -> pullLine now _toggled pull
+    Fetched (PaginatedItemIssue issue) -> issueLine (_appNow appState) _toggled issue
+    Fetched (PaginatedItemPull pull) -> pullLine (_appNow appState) _toggled pull
     Fetched (PaginatedItemWorkflow wf) -> workflowLine _toggled wf
     _ -> str ""
   , do
@@ -74,11 +73,11 @@ listDrawElement now ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelec
         PaginatedItemIssue iss@(Issue {..}) -> guardJust issueBody $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              issueInner now iss body _itemInner
+              issueInner (_appNow appState) iss body _itemInner
         PaginatedItemPull pr@(Issue {..}) -> guardJust issueBody $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              pullInner now pr body _itemInner
+              pullInner (_appNow appState) pr body _itemInner
         PaginatedItemWorkflow wf@(WorkflowRun {}) ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
