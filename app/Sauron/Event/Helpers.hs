@@ -6,7 +6,6 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
-import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude hiding (Down, pred)
@@ -56,26 +55,26 @@ withNthChildAndRepoParent s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el 
   Nothing -> return ()
   Just x -> cb fixedEl el x
 
-withElemByIdentifier :: MonadIO m => AppState -> Int -> (Maybe MainListElemVariable -> m ()) -> m ()
-withElemByIdentifier s identifier cb =
-  atomically (findElemInList (\x -> _ident x == identifier) (V.toList (_appMainListVariable s))) >>= cb
+-- withElemByIdentifier :: MonadIO m => AppState -> Int -> (Maybe MainListElemVariable -> m ()) -> m ()
+-- withElemByIdentifier s identifier cb =
+--   atomically (findElemInList (\x -> _ident x == identifier) (V.toList (_appMainListVariable s))) >>= cb
 
-findElem :: (MainListElemVariable -> Bool) -> MainListElemVariable -> STM (Maybe MainListElemVariable)
-findElem pred el | pred el = pure $ Just el
-findElem pred (MainListElemPaginated {..}) = readTVar _children >>= findElemInList pred
-findElem pred (MainListElemRepo {..}) = do
-  ic <- readTVar _issuesChild
-  pc <- readTVar _pullsChild
-  wc <- readTVar _workflowsChild
-  findElemInList pred [ic, pc, wc]
-findElem _ _ = pure Nothing
+-- findElem :: (MainListElemVariable -> Bool) -> MainListElemVariable -> STM (Maybe MainListElemVariable)
+-- findElem pred el | pred el = pure $ Just el
+-- findElem pred (MainListElemPaginated {..}) = readTVar _children >>= findElemInList pred
+-- findElem pred (MainListElemRepo {..}) = do
+--   ic <- readTVar _issuesChild
+--   pc <- readTVar _pullsChild
+--   wc <- readTVar _workflowsChild
+--   findElemInList pred [ic, pc, wc]
+-- findElem _ _ = pure Nothing
 
-findElemInList :: (MainListElemVariable -> Bool) -> [MainListElemVariable] -> STM (Maybe MainListElemVariable)
-findElemInList pred elems = flip fix elems $ \loop -> \case
-  (x:xs) -> findElem pred x >>= \case
-    Just x' -> pure (Just x')
-    Nothing -> loop xs
-  [] -> pure Nothing
+-- findElemInList :: (MainListElemVariable -> Bool) -> [MainListElemVariable] -> STM (Maybe MainListElemVariable)
+-- findElemInList pred elems = flip fix elems $ \loop -> \case
+--   (x:xs) -> findElem pred x >>= \case
+--     Just x' -> pure (Just x')
+--     Nothing -> loop xs
+--   [] -> pure Nothing
 
 openBrowserToItem :: MonadIO m => PaginatedItem -> m ()
 openBrowserToItem (PaginatedItemIssue (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
