@@ -50,9 +50,7 @@ openBrowserToUrl url =
 withScroll :: AppState -> (forall s. ViewportScroll ClickableName -> EventM n s ()) -> EventM n AppState ()
 withScroll s action = do
   case listSelectedElement (s ^. appMainList) of
-    Just (_, MainListElemRepo {..}) -> do
-      let scroll = viewportScroll (InnerViewport [i|viewport_#{_ident}|])
-      action scroll
+    Just (_, el) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident el}|])
     _ -> return ()
 
 fetchRepo :: (
@@ -128,7 +126,7 @@ fetchPaginated :: (
     -> TVar MainListElemVariable
     -> m ()
 fetchPaginated mkReq wrapResponse childrenVar = do
-  BaseContext {auth, manager} <- ask
+  BaseContext {auth, getIdentifier, manager} <- ask
 
   MainListElemPaginated {..} <- readTVarIO childrenVar
 
@@ -141,36 +139,40 @@ fetchPaginated mkReq wrapResponse childrenVar = do
         writeTVar _items (Errored (show err))
         writeTVar _children []
 
-      Right x -> atomically $ do
-        writeTVar _items (Fetched (wrapResponse (responseBody x)))
+      Right x -> do
+        let paginatedItems = paginatedItemsToList $ wrapResponse (responseBody x)
+        identifiers <- replicateM (L.length paginatedItems) (liftIO getIdentifier)
 
-        let PageLinks {..} = parsePageLinks x
-        let parsePageFromUri :: NURI.URI -> Maybe Int
-            parsePageFromUri uri = do
-              let q = NURI.uriQuery uri
-              let parsed :: [QueryItem] = parseQuery (encodeUtf8 q)
-              result :: ByteString <- join $ L.lookup "page" parsed
-              readMaybe (decodeUtf8 result)
-        writeTVar _pageInfo $ PageInfo {
-          pageInfoCurrentPage = pageInfoCurrentPage
-          , pageInfoFirstPage = pageLinksFirst >>= parsePageFromUri
-          , pageInfoPrevPage = pageLinksPrev >>= parsePageFromUri
-          , pageInfoNextPage = pageLinksNext >>= parsePageFromUri
-          , pageInfoLastPage = pageLinksLast >>= parsePageFromUri
-          }
+        atomically $ do
+          writeTVar _items (Fetched (wrapResponse (responseBody x)))
 
-        itemChildren <- forM (paginatedItemsToList $ wrapResponse (responseBody x)) $ \iss -> do
-          itemVar <- newTVar (Fetched iss)
-          itemInnerVar <- newTVar NotFetched
-          toggledVar' <- newTVar False
-          pure $ MainListElemItem {
-            _item = itemVar
-            , _itemInner = itemInnerVar
-            , _toggled = toggledVar'
-            , _depth = 3
-            , _ident = 0
+          let PageLinks {..} = parsePageLinks x
+          let parsePageFromUri :: NURI.URI -> Maybe Int
+              parsePageFromUri uri = do
+                let q = NURI.uriQuery uri
+                let parsed :: [QueryItem] = parseQuery (encodeUtf8 q)
+                result :: ByteString <- join $ L.lookup "page" parsed
+                readMaybe (decodeUtf8 result)
+          writeTVar _pageInfo $ PageInfo {
+            pageInfoCurrentPage = pageInfoCurrentPage
+            , pageInfoFirstPage = pageLinksFirst >>= parsePageFromUri
+            , pageInfoPrevPage = pageLinksPrev >>= parsePageFromUri
+            , pageInfoNextPage = pageLinksNext >>= parsePageFromUri
+            , pageInfoLastPage = pageLinksLast >>= parsePageFromUri
             }
-        writeTVar _children itemChildren
+
+          itemChildren <- forM (zip paginatedItems identifiers) $ \(iss, identifier) -> do
+            itemVar <- newTVar (Fetched iss)
+            itemInnerVar <- newTVar NotFetched
+            toggledVar' <- newTVar False
+            pure $ MainListElemItem {
+              _item = itemVar
+              , _itemInner = itemInnerVar
+              , _toggled = toggledVar'
+              , _depth = 3
+              , _ident = identifier
+              }
+          writeTVar _children itemChildren
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
