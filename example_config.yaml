@@ -18,6 +18,7 @@ sections:
 - display_name: "Languages ecosystem"
   repos:
   - codedownio/haskell-notebook-language-server
+  - codedownio/markdown-spellcheck-lsp
   - codedownio/rust-notebook-language-server
   - codedownio/General
 - display_name: "Open source"
