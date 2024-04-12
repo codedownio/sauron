@@ -27,6 +27,7 @@ import Sauron.Fix
 import Sauron.Options
 import Sauron.Setup.AllReposForUser
 import Sauron.Setup.ReposFromConfigFile
+import Sauron.Setup.ReposFromCurrentDirectory
 import Sauron.Types
 import Sauron.UI
 import Sauron.UI.AttrMap
@@ -64,8 +65,10 @@ main = do
     Right x -> pure x
 
   listElems :: V.Vector MainListElemVariable <- case cliConfigFile of
-    Nothing -> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
     Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
+    Nothing -> isContainedInGitRepo >>= \case
+      Just (namespace, name) -> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
+      Nothing -> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   -- Kick off fetches for repos, workflows
   runReaderT (refreshAll listElems) baseContext

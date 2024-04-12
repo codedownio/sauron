@@ -91,6 +91,9 @@ executables:
     - aeson
     - exceptions
     - filepath
+    - git-config
+    - lens
+    - lens-regex-pcre
     - optparse-applicative
     - safe-exceptions
     - sauron

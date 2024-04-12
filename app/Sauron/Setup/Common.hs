@@ -39,7 +39,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _children = issuesChildrenVar
     , _search = issuesSearchVar
     , _pageInfo = issuesPageInfoVar
-    , _depth = 2
+    , _depth = repoDepth + 1
     , _ident = issuesIdentifier
     }
 
@@ -58,7 +58,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _children = pullsChildrenVar
     , _search = pullsSearchVar
     , _pageInfo = pullsPageInfoVar
-    , _depth = 2
+    , _depth = repoDepth + 1
     , _ident = pullsIdentifier
     }
 
@@ -77,7 +77,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _children = workflowsChildrenVar
     , _search = workflowsSearchVar
     , _pageInfo = workflowsPageInfoVar
-    , _depth = 2
+    , _depth = repoDepth + 1
     , _ident = workflowsIdentifier
     }
 

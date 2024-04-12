@@ -22,10 +22,10 @@ markdownToWidgets t = case parseCommonmarkWith gfmExtensions (tokenize "source" 
 
 renderBlock :: B.Block -> Widget n
 renderBlock (B.Para inlines) = hBox (fmap renderInline inlines)
-renderBlock b = strWrap [i|UNHANDLED: #{b}|]
+renderBlock b = strWrap [i|UNHANDLED BLOCK: #{b}|]
 
 renderInline :: B.Inline -> Widget n
 renderInline (B.Str t) = str (toString t)
 renderInline B.Space = str " "
 renderInline B.SoftBreak = str "\n"
-renderInline x = str [i|UNHANDLED: #{x}|]
+renderInline x = str [i|UNHANDLED INLINE: #{x}|]

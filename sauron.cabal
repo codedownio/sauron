@@ -104,6 +104,7 @@ executable sauron
       Sauron.Setup.AllReposForUser
       Sauron.Setup.Common
       Sauron.Setup.ReposFromConfigFile
+      Sauron.Setup.ReposFromCurrentDirectory
       Paths_sauron
   hs-source-dirs:
       app
@@ -130,9 +131,12 @@ executable sauron
     , containers
     , exceptions
     , filepath
+    , git-config
     , github
     , http-client
     , http-types
+    , lens
+    , lens-regex-pcre
     , microlens
     , mtl
     , network-uri
