@@ -12,9 +12,11 @@ sections:
     settings:
       check_period: 300000000
       # check_period: 5m
+  - codedownio/codedown-db
   - codedownio/codedown-languages
-  - codedownio/ot
   - codedownio/matheditable
+  - codedownio/ot
+  - codedownio/resource-map
 - display_name: "Languages ecosystem"
   repos:
   - codedownio/haskell-notebook-language-server
