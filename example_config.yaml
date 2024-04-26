@@ -37,6 +37,8 @@ sections:
   repos:
   - codedownio/immutability-helper-rfc6902
   - codedownio/julia2nix
+  - codedownio/registry2nix
+
 # - display_name: "thomasjm"
 #   open: false
 #   repos:
