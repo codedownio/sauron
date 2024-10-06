@@ -1,3 +1,8 @@
 
+import Test.Sandwich
+import Relude
+
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = runSandwichWithCommandLineArgs defaultOptions $ do
+  it "works" $ pending

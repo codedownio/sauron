@@ -108,4 +108,5 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - sandwich
     - sauron
