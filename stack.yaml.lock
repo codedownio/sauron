@@ -12,8 +12,8 @@ packages:
   original:
     hackage: vty-windows-0.1.0.1
 - completed:
-    commit: cd32569e3b4572158ce240096a79633607b08e0a
-    git: git@github.com:codedownio/github.git
+    commit: 772b9f1039663c96db77dc14570fbffd6e833e17
+    git: https://github.com/codedownio/github.git
     name: github
     pantry-tree:
       sha256: df14be9b9dd06b42c9d1fe05dc58d9b19dd52a81a3d0b5561ab16a889a2fcc07
@@ -21,10 +21,10 @@ packages:
     version: '0.29'
   original:
     commit: 772b9f1039663c96db77dc14570fbffd6e833e17
-    git: git@github.com:codedownio/github.git
+    git: https://github.com/codedownio/github.git
 - completed:
     commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
-    git: git@github.com:dogonthehorizon/git-config.git
+    git: https://github.com/dogonthehorizon/git-config.git
     name: git-config
     pantry-tree:
       sha256: b5ef68baa303ae152c9dc3b2b9d594105ae0e90d5a17c35213761077bc026d2a
@@ -32,7 +32,7 @@ packages:
     version: 0.1.2
   original:
     commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
-    git: git@github.com:dogonthehorizon/git-config.git
+    git: https://github.com/dogonthehorizon/git-config.git
 snapshots:
 - completed:
     sha256: 6f0bea3ba5b07360f25bc886e8cff8d847767557a492a6f7f6dcb06e3cc79ee9

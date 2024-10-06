@@ -17,9 +17,9 @@ extra-deps:
 
 # - github-0.29
 
-- git: git@github.com:codedownio/github.git
+- git: https://github.com/codedownio/github.git
   # main branch
   commit: 772b9f1039663c96db77dc14570fbffd6e833e17
 
-- git: git@github.com:dogonthehorizon/git-config.git
+- git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
