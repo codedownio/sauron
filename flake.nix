@@ -5,11 +5,10 @@
     inputs.nixpkgs.follows = "nixpkgs";
   };
   inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.05";
 
   outputs = { self, flake-utils, gitignore, haskellNix, nixpkgs }@inputs:
-    # flake-utils.lib.eachDefaultSystem (system:
-    flake-utils.lib.eachSystem ["x86_64-linux"] (system:
+    flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [
           haskellNix.overlay
