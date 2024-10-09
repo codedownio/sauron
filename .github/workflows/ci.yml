@@ -61,9 +61,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      include:
-      - output: normal
-      - output: static
+      matrix:
+        include:
+        - output: normal
+
+        # Tries to build a whole static GHC, which runs out of resources on GitHub runners
+        # - output: static
 
     steps:
     - uses: actions/checkout@v4
