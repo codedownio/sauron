@@ -19,8 +19,10 @@
 
         src = gitignore.lib.gitignoreSource ./.;
 
-        flake = (pkgs.hixProject "ghc964" src).flake {};
-        flakeStatic = (pkgs.pkgsCross.musl64.hixProject "ghc964" src).flake {};
+        compilerNixName = "ghc966";
+
+        flake = (pkgs.hixProject compilerNixName src).flake {};
+        flakeStatic = (pkgs.pkgsCross.musl64.hixProject compilerNixName src).flake {};
 
       in
         rec {
