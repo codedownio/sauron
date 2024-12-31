@@ -41,7 +41,7 @@ library
       Sauron.UI.Search
       Sauron.UI.TopBox
       Sauron.UI.Util
-      Sauron.UI.Util.TimeFromNow
+      Sauron.UI.Util.TimeDiff
       Sauron.UI.Workflow
       Sauron.Util
   other-modules:

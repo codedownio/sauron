@@ -61,9 +61,10 @@ mainAttrMap = attrMap V.defAttr [
   , (disabledHotkeyMessageAttr, fg brightGray)
 
   -- General UI
-  , (usernameAttr, fg solarizedBlue)
-  , (hashNumberAttr, fg solarizedViolet)
+  , (branchAttr, fg solarizedBlue)
   , (hashAttr, fg midGray)
+  , (hashNumberAttr, fg solarizedViolet)
+  , (usernameAttr, fg solarizedBlue)
 
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
@@ -105,9 +106,10 @@ unknownAttr = mkAttrName "neutral"
 
 -- * General UI
 
-usernameAttr = mkAttrName "username"
-hashNumberAttr = mkAttrName "hashNumber"
+branchAttr = mkAttrName "branch"
 hashAttr = mkAttrName "hash"
+hashNumberAttr = mkAttrName "hashNumber"
+usernameAttr = mkAttrName "username"
 
 -- * Colors
 

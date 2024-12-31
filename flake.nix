@@ -7,7 +7,7 @@
   inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
 
-  outputs = { self, flake-utils, gitignore, haskellNix, nixpkgs }@inputs:
+  outputs = { self, flake-utils, gitignore, haskellNix, nixpkgs }:
     # flake-utils.lib.eachDefaultSystem (system:
     flake-utils.lib.eachSystem ["x86_64-linux"] (system:
       let
@@ -24,7 +24,7 @@
         flakeStatic = (pkgs.pkgsCross.musl64.hixProject "ghc964" src).flake {};
 
       in
-        rec {
+        {
           packages = rec {
             inherit pkgs flake flakeStatic;
 

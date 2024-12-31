@@ -16,7 +16,7 @@ import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
 import Sauron.UI.Markdown
-import Sauron.UI.Util.TimeFromNow
+import Sauron.UI.Util.TimeDiff
 
 
 pullLine :: UTCTime -> Bool -> Issue -> Widget n
