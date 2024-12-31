@@ -5,11 +5,10 @@
     inputs.nixpkgs.follows = "nixpkgs";
   };
   inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.05";
 
   outputs = { self, flake-utils, gitignore, haskellNix, nixpkgs }:
-    # flake-utils.lib.eachDefaultSystem (system:
-    flake-utils.lib.eachSystem ["x86_64-linux"] (system:
+    flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [
           haskellNix.overlay
@@ -20,8 +19,10 @@
 
         src = gitignore.lib.gitignoreSource ./.;
 
-        flake = (pkgs.hixProject "ghc964" src).flake {};
-        flakeStatic = (pkgs.pkgsCross.musl64.hixProject "ghc964" src).flake {};
+        compilerNixName = "ghc966";
+
+        flake = (pkgs.hixProject compilerNixName src).flake {};
+        flakeStatic = (pkgs.pkgsCross.musl64.hixProject compilerNixName src).flake {};
 
       in
         {
