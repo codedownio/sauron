@@ -7,3 +7,5 @@ debug.txt
 test_runs
 
 dist-newstyle
+
+cabal.project.freeze
