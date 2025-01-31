@@ -1,5 +1,5 @@
 
-resolver: lts-22.36
+resolver: lts-23.6
 
 packages:
 - .
@@ -13,7 +13,7 @@ nix:
   - "nixpkgs=/home/tom/tools/nixpkgs"
 
 extra-deps:
-- vty-windows-0.1.0.1
+- vty-windows-0.2.0.3
 
 # - github-0.29
 
@@ -25,3 +25,8 @@ extra-deps:
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
+
+# This is forked solely to remove a couple problematic lines from the cabal files; see
+# https://github.com/input-output-hk/haskell.nix/issues/2312
+- git: https://github.com/thomasjm/vty-crossplatform.git
+  commit: 030ceab629d5c888a4a890e2aa7f1e0e6eda0578

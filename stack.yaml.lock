@@ -5,12 +5,12 @@
 
 packages:
 - completed:
-    hackage: vty-windows-0.1.0.1@sha256:b1dbfeffe62a9504384e65fc01bbea1ebd08d7715c6e159e349962b50c2aa048,3173
+    hackage: vty-windows-0.2.0.3@sha256:0c010b1086a725046a8bb08bb1e6bfdfdb3cfe1c72d6fa77c37306ef9ec774d8,2844
     pantry-tree:
-      sha256: ba4d2508d97c535f390a600683768cace73702669e2b51d0595bacd47fc4aba4
+      sha256: 958fd0386c589130177c841df63368ff191eb296f9ed2fd050de10e266c354eb
       size: 2160
   original:
-    hackage: vty-windows-0.1.0.1
+    hackage: vty-windows-0.2.0.3
 - completed:
     commit: 772b9f1039663c96db77dc14570fbffd6e833e17
     git: https://github.com/codedownio/github.git
@@ -33,9 +33,20 @@ packages:
   original:
     commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
     git: https://github.com/dogonthehorizon/git-config.git
+- completed:
+    commit: 030ceab629d5c888a4a890e2aa7f1e0e6eda0578
+    git: https://github.com/thomasjm/vty-crossplatform.git
+    name: vty-crossplatform
+    pantry-tree:
+      sha256: 3ba74b2a1692d64e2093dca2d0778631ae5a09538c1076df7308a4780da6b52b
+      size: 680
+    version: 0.4.0.0
+  original:
+    commit: 030ceab629d5c888a4a890e2aa7f1e0e6eda0578
+    git: https://github.com/thomasjm/vty-crossplatform.git
 snapshots:
 - completed:
-    sha256: 6a553c5fa4f211a9b639da5e5359124a93627852dd9967bed202fdd71b25f15e
-    size: 720021
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/36.yaml
-  original: lts-22.36
+    sha256: b3858b16720f396d01605a014104be44fd7f3ca2c9c7b0762506b87b78ce526d
+    size: 680777
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/6.yaml
+  original: lts-23.6
