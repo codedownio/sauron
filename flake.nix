@@ -72,6 +72,16 @@
 
       in
         {
+          devShells = {
+            default = pkgs.mkShell {
+              buildInputs = with pkgs; [
+                pcre
+                pkg-config
+                zlib
+              ];
+            };
+          };
+
           packages = rec {
             inherit pkgs flake flakeStatic;
 
