@@ -75,6 +75,8 @@
           devShells = {
             default = pkgs.mkShell {
               buildInputs = with pkgs; [
+                gmp
+                ncurses
                 pcre
                 pkg-config
                 zlib
