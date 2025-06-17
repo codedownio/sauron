@@ -31,8 +31,8 @@ mainAttrMap = attrMap V.defAttr [
   -- Pagination
 
   , (searchAttr, fg midGray)
-  , (selectedPageAttr, fg solarizedGreen)
-  , (notSelectedPageAttr, fg midGray)
+  , (selectedPageAttr, fg solarizedGreen & flip V.withStyle V.bold)
+  , (notSelectedPageAttr, fg midGray & flip V.withStyle V.dim)
   , (pageEllipsesAttr, fg midGray)
 
   -- Stats box
@@ -65,6 +65,12 @@ mainAttrMap = attrMap V.defAttr [
   , (hashAttr, fg midGray)
   , (hashNumberAttr, fg solarizedViolet)
   , (usernameAttr, fg solarizedBlue)
+
+  -- Text
+  , (italicText, style V.italic)
+  , (underlineText, style V.underline)
+  , (boldText, style V.bold)
+  , (strikeoutText, style V.strikethrough)
 
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
@@ -110,6 +116,13 @@ branchAttr = mkAttrName "branch"
 hashAttr = mkAttrName "hash"
 hashNumberAttr = mkAttrName "hashNumber"
 usernameAttr = mkAttrName "username"
+
+-- * Text
+
+italicText = mkAttrName "italic-text"
+underlineText = mkAttrName "underline-text"
+boldText = mkAttrName "bold-text"
+strikeoutText = mkAttrName "strikeout-text"
 
 -- * Colors
 

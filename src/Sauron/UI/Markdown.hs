@@ -9,6 +9,7 @@ import Commonmark.Extensions
 import Commonmark.Pandoc
 import Data.String.Interpolate
 import Relude
+import Sauron.UI.AttrMap
 import qualified Text.Pandoc.Builder as B
 
 
@@ -26,6 +27,11 @@ renderBlock b = strWrap [i|UNHANDLED BLOCK: #{b}|]
 
 renderInline :: B.Inline -> Widget n
 renderInline (B.Str t) = str (toString t)
+renderInline (B.Emph inlines) = withAttr italicText $ hBox (fmap renderInline inlines)
+renderInline (B.Underline inlines) = withAttr underlineText $ hBox (fmap renderInline inlines)
+renderInline (B.Strong inlines) = withAttr boldText $ hBox (fmap renderInline inlines)
+renderInline (B.Strikeout inlines) = withAttr strikeoutText $ hBox (fmap renderInline inlines)
 renderInline B.Space = str " "
 renderInline B.SoftBreak = str "\n"
+renderInline (B.Link attr inlines target) = withAttr underlineText $ hBox (fmap renderInline inlines)
 renderInline x = str [i|UNHANDLED INLINE: #{x}|]
