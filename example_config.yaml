@@ -28,6 +28,7 @@ sections:
   repos:
   - codedownio/aeson-typescript
   - codedownio/myers-diff
+  - codedownio/nixpkgs-slim
   - codedownio/sandwich
   - codedownio/servant-typescript
   - codedownio/sauron
