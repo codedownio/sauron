@@ -8,14 +8,16 @@ import Data.Time
 import Relude
 
 timeFromNow :: NominalDiffTime -> String
-timeFromNow diffTime = show (round value :: Integer) ++ " " ++ unit ++ suffix
+timeFromNow diffTime = show rounded ++ " " ++ unit ++ suffix
   where
+    rounded = round value :: Integer
     (value, unit) = timeDiffNumberAndString diffTime
-    suffix = if value == 1 then " ago" else "s ago"
+    suffix = if rounded == 1 then " ago" else "s ago"
 
 timeDiff :: NominalDiffTime -> String
-timeDiff diffTime = show (round value :: Integer) ++ " " ++ unit ++ suffix
+timeDiff diffTime = show rounded ++ " " ++ unit ++ suffix
   where
+    rounded = round value :: Integer
     (value, unit) = timeDiffNumberAndString diffTime
     suffix = if value == 1 then "" else "s"
 
