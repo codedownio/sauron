@@ -44,7 +44,7 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
       (str [i|#{openerUsername} opened #{timeFromNow (diffUTCTime now issueCreatedAt)}|]
           & padLeftRight 1
       )
-      (markdownToWidgets body)
+      (markdownToWidgetsWithWidth (maxCommentWidth - 2) body)
 
     comments :: [Widget n]
     comments = case inner of
@@ -59,4 +59,4 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
       (str [i|#{username} commented #{timeFromNow (diffUTCTime now issueCommentCreatedAt)}|]
           & padLeftRight 1
       )
-      (markdownToWidgets issueCommentBody)
+      (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
