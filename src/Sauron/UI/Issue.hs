@@ -46,7 +46,7 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
       ((withAttr usernameAttr (str [i|#{openerUsername} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
           & padLeftRight 1
       )
-      (markdownToWidgets body)
+      (markdownToWidgetsWithWidth maxCommentWidth body)
 
     comments :: [Widget n]
     comments = case inner of
@@ -58,4 +58,4 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
       (str [i|#{username} commented #{timeFromNow (diffUTCTime now issueCommentCreatedAt)}|]
           & padLeftRight 1
       )
-      (markdownToWidgets issueCommentBody)
+      (markdownToWidgetsWithWidth maxCommentWidth issueCommentBody)
