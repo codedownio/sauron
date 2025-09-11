@@ -71,6 +71,8 @@ mainAttrMap = attrMap V.defAttr [
   , (underlineText, style V.underline)
   , (boldText, style V.bold)
   , (strikeoutText, style V.strikethrough)
+  , (codeText, fg solarizedOrange)
+  , (codeBlockText, fg midGray)
 
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
@@ -123,6 +125,8 @@ italicText = mkAttrName "italic-text"
 underlineText = mkAttrName "underline-text"
 boldText = mkAttrName "bold-text"
 strikeoutText = mkAttrName "strikeout-text"
+codeText = mkAttrName "code-text"
+codeBlockText = mkAttrName "code-block-text"
 
 -- * Colors
 

@@ -42,8 +42,8 @@ renderBlockWithWidth width (B.Para inlines) =
 renderBlockWithWidth width (B.Plain inlines) = renderWrappedParagraphWithWidth width inlines
 renderBlockWithWidth width (B.Header level _ inlines) = 
   withAttr (getHeaderAttr level) $ renderWrappedParagraphWithWidth width inlines
-renderBlockWithWidth _ (B.CodeBlock _ codeText) = 
-  withAttr (attrName "code") $ strWrap (toString codeText)  -- Code blocks
+renderBlockWithWidth _ (B.CodeBlock _ codeContent) = 
+  withAttr codeBlockText $ strWrap (toString codeContent)  -- Code blocks
 renderBlockWithWidth width (B.OrderedList _ items) = 
   vBox $ zipWith (renderOrderedItem width) [1..] items
 renderBlockWithWidth width (B.BulletList items) = 
@@ -119,7 +119,7 @@ inlineToStyledWords attrs (B.Link _ inlines _) =
 inlineToStyledWords attrs B.Space = [StyledWord " " attrs]
 inlineToStyledWords _ B.SoftBreak = []  -- SoftBreak is handled by word wrapping
 inlineToStyledWords _ B.LineBreak = []  -- LineBreak is handled by splitInlinesOnLineBreaks
-inlineToStyledWords attrs (B.Code _ t) = [StyledWord t attrs]  -- Handle inline code (no special styling for now)
+inlineToStyledWords attrs (B.Code _ t) = [StyledWord t (codeText : attrs)]  -- Handle inline code
 inlineToStyledWords _ inline = [StyledWord ("[UNHANDLED: " <> T.pack (show inline) <> "]") []]  -- Debug unknown inlines
 
 -- Wrap styled words into lines
@@ -140,8 +140,8 @@ takeWordsUpToWidth maxWidth (w:ws)
   where
     go _ acc [] = (acc, [])
     go currentLen acc (word:rest)
-      | currentLen + 1 + T.length (wordText word) <= maxWidth = 
-          go (currentLen + 1 + T.length (wordText word)) (word:acc) rest
+      | currentLen + T.length (wordText word) <= maxWidth = 
+          go (currentLen + T.length (wordText word)) (word:acc) rest
       | otherwise = (acc, word:rest)
 
 -- Render a line of styled words
