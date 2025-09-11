@@ -1,7 +1,6 @@
 
 module Sauron.UI.Markdown (
-  markdownToWidgets
-  , markdownToWidgetsWithWidth
+  markdownToWidgetsWithWidth
   ) where
 
 import Brick
@@ -15,9 +14,6 @@ import Sauron.UI.AttrMap
 import qualified Text.Pandoc.Builder as B
 
 
-markdownToWidgets :: Text -> Widget n
-markdownToWidgets = markdownToWidgetsWithWidth 100
-
 markdownToWidgetsWithWidth :: Int -> Text -> Widget n
 markdownToWidgetsWithWidth width t =
   case parseCommonmarkWith (defaultSyntaxSpec <> gfmExtensions) (tokenize "source" t) :: Maybe (Either ParseError (Cm () B.Blocks)) of
@@ -29,38 +25,26 @@ markdownToWidgetsWithWidth width t =
         x -> x
 
 renderBlockWithWidth :: Int -> B.Block -> Widget n
-renderBlockWithWidth width (B.Para inlines) =
-  -- Check if this paragraph starts with header-like text
-  case inlines of
-    (B.Str headerLevel : B.Space : rest) | T.all (== '#') headerLevel && not (T.null headerLevel) ->
-      let headerAttr = getHeaderAttr (T.length headerLevel)
-          inlinesToRender = if showHeaderSymbols
-                           then inlines
-                           else rest
-      in withAttr headerAttr $ renderWrappedParagraphWithWidth width inlinesToRender
-    _ -> renderWrappedParagraphWithWidth width inlines
-renderBlockWithWidth width (B.Plain inlines) = renderWrappedParagraphWithWidth width inlines
-renderBlockWithWidth width (B.Header level _ inlines) =
-  withAttr (getHeaderAttr level) $ renderWrappedParagraphWithWidth width inlines
-renderBlockWithWidth _ (B.CodeBlock _ codeContent) =
-  withAttr codeBlockText $ strWrap (toString codeContent)  -- Code blocks
-renderBlockWithWidth width (B.OrderedList _ items) =
-  vBox $ zipWith (renderOrderedItem width) [1..] items
-renderBlockWithWidth width (B.BulletList items) =
-  vBox $ map (renderBulletItem width) items
-renderBlockWithWidth _ b = strWrap [i|UNHANDLED BLOCK: #{b}|]
+renderBlockWithWidth = renderBlockWithPrefix Nothing
 
-renderOrderedItem :: Int -> Int -> [B.Block] -> Widget n
-renderOrderedItem width n blocks =
-  let prefix = str [i|#{n}. |]
-      content = vBox $ map (renderBlockWithWidth (width - 3)) blocks
-  in hBox [prefix, content]
+renderOrderedItem :: Maybe (Widget n) -> Int -> Int -> [B.Block] -> Widget n
+renderOrderedItem maybePrefix width n blocks =
+  let itemPrefix = str [i|#{n}. |]
+      content = vBox $ map (renderBlockWithPrefix maybePrefix (width - 3)) blocks
+      fullPrefix = case maybePrefix of
+                    Nothing -> itemPrefix
+                    Just prefix -> hBox [prefix, itemPrefix]
+  in hBox [fullPrefix, content]
 
-renderBulletItem :: Int -> [B.Block] -> Widget n
-renderBulletItem width blocks =
-  let prefix = str "• "
-      content = vBox $ map (renderBlockWithWidth (width - 2)) blocks
-  in hBox [prefix, content]
+
+renderBulletItem :: Maybe (Widget n) -> Int -> [B.Block] -> Widget n
+renderBulletItem maybePrefix width blocks =
+  let bulletPrefix = str "• "
+      content = vBox $ map (renderBlockWithPrefix maybePrefix (width - 2)) blocks
+      fullPrefix = case maybePrefix of
+                    Nothing -> bulletPrefix
+                    Just prefix -> hBox [prefix, bulletPrefix]
+  in hBox [fullPrefix, content]
 
 data StyledWord = StyledWord
   { wordText :: Text
@@ -80,10 +64,42 @@ getHeaderAttr level = case level of
   4 -> underlineText   -- #### = underlined
   _ -> boldText        -- fallback
 
-renderWrappedParagraphWithWidth :: Int -> [B.Inline] -> Widget n
-renderWrappedParagraphWithWidth width inlines =
+
+renderWrappedParagraph :: Maybe (Widget n) -> Int -> [B.Inline] -> Widget n
+renderWrappedParagraph maybePrefix width inlines =
   let lineGroups = splitInlinesOnLineBreaks inlines
-  in vBox $ map (renderInlineGroup width) lineGroups
+  in vBox $ map (renderInlineGroup maybePrefix width) lineGroups
+
+renderBlockWithPrefix :: Maybe (Widget n) -> Int -> B.Block -> Widget n
+renderBlockWithPrefix maybePrefix width (B.Para inlines) =
+  case inlines of
+    (B.Str headerLevel : B.Space : rest) | T.all (== '#') headerLevel && not (T.null headerLevel) ->
+      let headerAttr = getHeaderAttr (T.length headerLevel)
+          inlinesToRender = if showHeaderSymbols then inlines else rest
+      in withAttr headerAttr $ renderWrappedParagraph maybePrefix width inlinesToRender
+    _ -> renderWrappedParagraph maybePrefix width inlines
+renderBlockWithPrefix maybePrefix width (B.Plain inlines) = renderWrappedParagraph maybePrefix width inlines
+renderBlockWithPrefix maybePrefix width (B.Header level _ inlines) =
+  withAttr (getHeaderAttr level) $ renderWrappedParagraph maybePrefix width inlines
+renderBlockWithPrefix maybePrefix _ (B.CodeBlock _ codeContent) =
+  case maybePrefix of
+    Nothing -> withAttr codeBlockText $ strWrap (toString codeContent)  -- Code blocks
+    Just prefix ->
+      let codeLines = T.lines codeContent
+          renderLine line = hBox [prefix, withAttr codeBlockText $ txt line]
+      in vBox $ map renderLine codeLines
+renderBlockWithPrefix maybePrefix width (B.OrderedList _ items) =
+  vBox $ zipWith (\n blocks -> renderOrderedItem maybePrefix width n blocks) [1..] items
+renderBlockWithPrefix maybePrefix width (B.BulletList items) =
+  vBox $ map (renderBulletItem maybePrefix width) items
+renderBlockWithPrefix _ width (B.BlockQuote blocks) =
+  -- Nested blockquotes get double prefix
+  let quotePrefix = Just (withAttr italicText $ str "│ ")
+  in vBox $ map (renderBlockWithPrefix quotePrefix (width - 2)) blocks
+renderBlockWithPrefix maybePrefix _ b =
+  case maybePrefix of
+    Nothing -> strWrap [i|UNHANDLED BLOCK: #{b}|]
+    Just prefix -> hBox [prefix, strWrap [i|UNHANDLED BLOCK: #{b}|]]
 
 splitInlinesOnLineBreaks :: [B.Inline] -> [[B.Inline]]
 splitInlinesOnLineBreaks = go []
@@ -93,14 +109,19 @@ splitInlinesOnLineBreaks = go []
     go acc (B.SoftBreak : rest) = reverse acc : go [] rest  -- Treat SoftBreak as line break too
     go acc (x : rest) = go (x : acc) rest
 
-renderInlineGroup :: Int -> [B.Inline] -> Widget n
-renderInlineGroup width inlines =
+
+renderInlineGroup :: Maybe (Widget n) -> Int -> [B.Inline] -> Widget n
+renderInlineGroup maybePrefix width inlines =
   let styledWords = concatMap (inlineToStyledWords []) inlines
       wrappedLines = wrapStyledWords width styledWords
+      renderLineWithPrefix line = case maybePrefix of
+                                   Nothing -> padRight Max $ renderStyledWordLine line
+                                   Just prefix -> hBox [prefix, padRight Max $ renderStyledWordLine line]
   in case wrappedLines of
-       [] -> emptyWidget
-       [line] -> padRight Max $ renderStyledWordLine line
-       multiLines -> vBox $ map (padRight Max . renderStyledWordLine) multiLines
+       [] -> case maybePrefix of
+              Nothing -> emptyWidget
+              Just prefix -> hBox [prefix, emptyWidget]
+       lines' -> vBox $ map renderLineWithPrefix lines'
 
 -- Convert inline elements to styled words with attribute stacks
 inlineToStyledWords :: [AttrName] -> B.Inline -> [StyledWord]

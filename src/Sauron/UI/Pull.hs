@@ -56,7 +56,8 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
 
     -- TODO: use pullCommentUpdatedAt
     renderComment (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), ..}) = hLimit maxCommentWidth $ borderWithLabel
-      (str [i|#{username} commented #{timeFromNow (diffUTCTime now issueCommentCreatedAt)}|]
-          & padLeftRight 1
-      )
+      (topLabel username)
       (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
+
+    topLabel username = ((withAttr usernameAttr (str [i|#{username} |])) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
+                      & padLeftRight 1
