@@ -99,8 +99,8 @@ renderInlineGroup width inlines =
       wrappedLines = wrapStyledWords width styledWords
   in case wrappedLines of
        [] -> emptyWidget
-       [line] -> renderStyledWordLine line
-       multiLines -> vBox $ map renderStyledWordLine multiLines
+       [line] -> padRight Max $ renderStyledWordLine line
+       multiLines -> vBox $ map (padRight Max . renderStyledWordLine) multiLines
 
 -- Convert inline elements to styled words with attribute stacks
 inlineToStyledWords :: [AttrName] -> B.Inline -> [StyledWord]
