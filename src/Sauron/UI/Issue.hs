@@ -43,9 +43,7 @@ issueInner :: UTCTime -> Issue -> Text -> Fetchable PaginatedItemInner -> Widget
 issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) body inner = vBox (firstCell : comments)
   where
     firstCell = hLimit maxCommentWidth $ borderWithLabel
-      ((withAttr usernameAttr (str [i|#{openerUsername} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
-          & padLeftRight 1
-      )
+      (topLabel openerUsername)
       (markdownToWidgetsWithWidth (maxCommentWidth - 2) body)
 
     comments :: [Widget n]
@@ -55,7 +53,8 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
 
     -- TODO: use issueCommentUpdatedAt
     renderComment (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), ..}) = hLimit maxCommentWidth $ borderWithLabel
-      (str [i|#{username} commented #{timeFromNow (diffUTCTime now issueCommentCreatedAt)}|]
-          & padLeftRight 1
-      )
+      (topLabel username)
       (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
+
+    topLabel username = ((withAttr usernameAttr (str [i|#{username} |])) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
+                      & padLeftRight 1
