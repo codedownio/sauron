@@ -71,7 +71,7 @@ mainAttrMap = attrMap V.defAttr [
   , (underlineText, style V.underline)
   , (boldText, style V.bold)
   , (strikeoutText, style V.strikethrough)
-  , (codeText, fg solarizedOrange)
+  , (codeText, brightWhite `on` dimGray)
   , (codeBlockText, fg midGray)
 
   -- Forms
@@ -147,6 +147,7 @@ solarizedBlue = V.rgbColor 0x26 0x8b 0xd2
 solarizedCyan = V.rgbColor 0x2a 0xa1 0x98
 solarizedGreen = V.rgbColor 0x85 0x99 0x00
 
+dimGray = grayAt 25
 midGray = grayAt 50
 brightGray = grayAt 80
 midWhite = grayAt 140
