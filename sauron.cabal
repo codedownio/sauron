@@ -64,6 +64,7 @@ library
   build-depends:
       base >=4.7 && <5
     , brick
+    , brick-skylighting
     , commonmark
     , commonmark-extensions
     , commonmark-pandoc
@@ -78,6 +79,7 @@ library
     , pandoc-types
     , process
     , relude
+    , skylighting
     , stm
     , string-interpolate
     , text
@@ -125,6 +127,7 @@ executable sauron
       aeson
     , base >=4.7 && <5
     , brick
+    , brick-skylighting
     , commonmark
     , commonmark-extensions
     , commonmark-pandoc
@@ -146,6 +149,7 @@ executable sauron
     , relude
     , safe-exceptions
     , sauron
+    , skylighting
     , stm
     , string-interpolate
     , text
@@ -181,6 +185,7 @@ test-suite test
   build-depends:
       base >=4.7 && <5
     , brick
+    , brick-skylighting
     , commonmark
     , commonmark-extensions
     , commonmark-pandoc
@@ -196,6 +201,7 @@ test-suite test
     , relude
     , sandwich
     , sauron
+    , skylighting
     , stm
     , string-interpolate
     , text

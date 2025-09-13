@@ -22,6 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - brick
+- brick-skylighting
 - commonmark
 - commonmark-extensions
 - commonmark-pandoc
@@ -35,6 +36,7 @@ dependencies:
 - pandoc-types
 - process
 - relude
+- skylighting
 - stm
 - string-interpolate
 - text

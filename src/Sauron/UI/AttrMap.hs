@@ -7,15 +7,17 @@ module Sauron.UI.AttrMap where
 import Brick
 import qualified Brick.Widgets.Edit as E
 import Brick.Widgets.ProgressBar
+import Brick.Widgets.Skylighting (attrMappingsForStyle)
 import qualified Graphics.Vty as V
 import Relude hiding (on)
+import qualified Skylighting.Styles as Sky
 
 
 mkAttrName :: String -> AttrName
 mkAttrName = attrName
 
 mainAttrMap :: AttrMap
-mainAttrMap = attrMap V.defAttr [
+mainAttrMap = attrMap V.defAttr ([
   -- (listAttr, V.white `on` V.blue)
   -- (listSelectedAttr, V.blue `on` V.white)
   -- (listSelectedAttr, bg (V.Color240 $ V.rgbColorToColor240 0 1 0))
@@ -76,7 +78,7 @@ mainAttrMap = attrMap V.defAttr [
 
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
-  ]
+  ] <> attrMappingsForStyle Sky.breezeDark)
 
 iconAttr = mkAttrName "icon"
 normalAttr = mkAttrName "normal"

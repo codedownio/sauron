@@ -12,6 +12,13 @@ packages:
   original:
     hackage: vty-windows-0.2.0.3
 - completed:
+    hackage: brick-skylighting-1.0@sha256:64764b6be36c05261959f68ed38b9cb37e1acb6180a3bde5dd98255f62ea7e3b,1812
+    pantry-tree:
+      sha256: d598090f726b96e84438f3b8bc52174faeb21c0f00f85f77060e3a25c89ad926
+      size: 393
+  original:
+    hackage: brick-skylighting-1.0@sha256:64764b6be36c05261959f68ed38b9cb37e1acb6180a3bde5dd98255f62ea7e3b,1812
+- completed:
     commit: 01be3c1168c81dc45123fb08e2904b8cc958a5e4
     git: https://github.com/codedownio/github.git
     name: github

@@ -14,6 +14,7 @@ nix:
 
 extra-deps:
 - vty-windows-0.2.0.3
+- brick-skylighting-1.0@sha256:64764b6be36c05261959f68ed38b9cb37e1acb6180a3bde5dd98255f62ea7e3b,1812
 
 # - github-0.29
 
