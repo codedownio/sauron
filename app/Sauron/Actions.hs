@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -43,9 +44,23 @@ import UnliftIO.Async
 import UnliftIO.Process
 
 
+#ifdef mingw32_HOST_OS
+import System.Directory
+
+openBrowserToUrl :: MonadIO m => String -> m ()
+openBrowserToUrl url = do
+  findExecutable "explorer.exe" >>= \case
+    Just p -> void $ readCreateProcessWithExitCode (proc p [url]) ""
+    Nothing -> return ()
+#elif darwin_HOST_OS
+openBrowserToUrl :: MonadIO m => String -> m ()
+openBrowserToUrl url =
+  void $ readCreateProcessWithExitCode (proc "open" [url]) ""
+#else
 openBrowserToUrl :: MonadIO m => String -> m ()
 openBrowserToUrl url =
   void $ readCreateProcessWithExitCode (proc "xdg-open" [url]) ""
+#endif
 
 withScroll :: AppState -> (forall s. ViewportScroll ClickableName -> EventM n s ()) -> EventM n AppState ()
 withScroll s action = do
