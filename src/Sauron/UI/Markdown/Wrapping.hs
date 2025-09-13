@@ -63,6 +63,8 @@ inlineToStyledWords attrs B.Space = [StyledWord " " attrs]
 inlineToStyledWords _ B.SoftBreak = []  -- SoftBreak is handled by word wrapping
 inlineToStyledWords _ B.LineBreak = []  -- LineBreak is handled by splitInlinesOnLineBreaks
 inlineToStyledWords attrs (B.Code _ t) = [StyledWord t (codeText : attrs)]  -- Handle inline code
+inlineToStyledWords attrs (B.Span (_, classes, _) inlines)
+  | "emoji" `elem` classes = concatMap (inlineToStyledWords attrs) inlines  -- Handle emojis by rendering their content
 inlineToStyledWords _ inline = [StyledWord ("[UNHANDLED: " <> T.pack (show inline) <> "]") []]  -- Debug unknown inlines
 
 -- Wrap styled words into lines

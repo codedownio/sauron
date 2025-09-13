@@ -72,6 +72,10 @@ renderBlock _ width (B.BlockQuote blocks) =
   -- Nested blockquotes get double prefix
   let quotePrefix = Just (withAttr italicText $ str "│ ")
   in vBox $ map (renderBlock quotePrefix (width - 2)) blocks
+renderBlock maybePrefix width B.HorizontalRule =
+  case maybePrefix of
+    Nothing -> withAttr horizontalRuleAttr $ str (replicate width '─')
+    Just prefix -> hBox [prefix, withAttr horizontalRuleAttr $ str (replicate (width - 2) '─')]
 renderBlock maybePrefix _ b =
   case maybePrefix of
     Nothing -> strWrap [i|UNHANDLED BLOCK: #{b}|]

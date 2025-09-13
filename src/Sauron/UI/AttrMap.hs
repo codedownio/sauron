@@ -75,6 +75,7 @@ mainAttrMap = attrMap V.defAttr ([
   , (strikeoutText, style V.strikethrough)
   , (codeText, brightWhite `on` dimGray)
   , (codeBlockText, fg midGray)
+  , (horizontalRuleAttr, fg midGray)
 
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
@@ -129,6 +130,7 @@ boldText = mkAttrName "bold-text"
 strikeoutText = mkAttrName "strikeout-text"
 codeText = mkAttrName "code-text"
 codeBlockText = mkAttrName "code-block-text"
+horizontalRuleAttr = mkAttrName "horizontal-rule"
 
 -- * Colors
 
