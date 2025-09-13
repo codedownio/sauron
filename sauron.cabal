@@ -35,6 +35,7 @@ library
       Sauron.UI.Issue
       Sauron.UI.Keys
       Sauron.UI.Markdown
+      Sauron.UI.Markdown.Wrapping
       Sauron.UI.Pagination
       Sauron.UI.Pull
       Sauron.UI.Repo
