@@ -13,6 +13,7 @@ import qualified Data.Text as T
 import Relude
 import Sauron.UI.AttrMap
 import Sauron.UI.Markdown.Wrapping
+import Sauron.UI.Markdown.Table
 import qualified Skylighting as Sky
 import qualified Skylighting.Core as SkyCore
 import qualified Text.Pandoc.Builder as B
@@ -76,6 +77,10 @@ renderBlock maybePrefix width B.HorizontalRule =
   case maybePrefix of
     Nothing -> withAttr horizontalRuleAttr $ str (replicate width '─')
     Just prefix -> hBox [prefix, withAttr horizontalRuleAttr $ str (replicate (width - 2) '─')]
+renderBlock maybePrefix width (B.Table _ _ _ thead tbody _) =
+  case maybePrefix of
+    Nothing -> renderTableWith renderBlock width thead tbody
+    Just prefix -> hBox [prefix, renderTableWith renderBlock (width - 2) thead tbody]
 renderBlock maybePrefix _ b =
   case maybePrefix of
     Nothing -> strWrap [i|UNHANDLED BLOCK: #{b}|]
