@@ -8,12 +8,14 @@ import Brick.Widgets.Skylighting (highlight)
 import Commonmark hiding (str)
 import Commonmark.Extensions
 import Commonmark.Pandoc
+import Control.Monad.Writer
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Relude
 import Sauron.UI.AttrMap
-import Sauron.UI.Markdown.Wrapping
+import Sauron.UI.Markdown.Footnotes
 import Sauron.UI.Markdown.Table
+import Sauron.UI.Markdown.Wrapping
 import qualified Skylighting as Sky
 import qualified Skylighting.Core as SkyCore
 import qualified Text.Pandoc.Builder as B
@@ -25,9 +27,33 @@ markdownToWidgetsWithWidth width t =
     Nothing -> strWrap [i|Parse error.|]
     Just (Left err) -> strWrap [i|Parse error: '#{err}'.|]
     Just (Right (Cm (B.Many bs))) ->
-      vBox $ case fmap (renderBlock Nothing width) (toList bs) of
-        (x:xs) -> x : fmap (padTop (Pad 1)) xs
-        x -> x
+      let (renderedBlocks, footnotes) = runWriter $ traverse (renderBlockM Nothing width) (toList bs)
+          contentWidgets = case renderedBlocks of
+                            (x:xs) -> x : fmap (padTop (Pad 1)) xs
+                            x -> x
+          footnoteWidget = if null footnotes
+                          then emptyWidget
+                          else vBox [
+                            padTop (Pad 1) $ withAttr horizontalRuleAttr $ str (replicate width '─'),
+                            padTop (Pad 1) $ vBox $ map (renderFootnoteRef width) footnotes
+                          ]
+      in vBox $ contentWidgets ++ [footnoteWidget]
+
+renderBlockM :: Maybe (Widget n) -> Int -> B.Block -> FootnoteM (Widget n)
+renderBlockM maybePrefix width block = case block of
+  B.Para inlines -> renderParaM maybePrefix width inlines
+  B.Plain inlines -> renderParaM maybePrefix width inlines
+  B.Header level _ inlines -> withAttr (getHeaderAttr level) <$> renderParaM maybePrefix width inlines
+  other -> pure $ renderBlock maybePrefix width other
+
+renderParaM :: Maybe (Widget n) -> Int -> [B.Inline] -> FootnoteM (Widget n)
+renderParaM = renderWrappedParagraphM
+
+renderFootnoteRef :: Int -> FootnoteRef -> Widget n
+renderFootnoteRef width (FootnoteRef num blocks) =
+  let numberPrefix = withAttr hashNumberAttr $ str ("[" <> show num <> "] ")
+      renderedContent = vBox $ map (renderBlock Nothing (width - 4)) blocks
+  in hBox [numberPrefix, renderedContent]
 
 renderBlock :: forall n. Maybe (Widget n) -> Int -> B.Block -> Widget n
 renderBlock maybePrefix width (B.Para inlines) =

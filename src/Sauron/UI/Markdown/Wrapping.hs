@@ -1,16 +1,20 @@
 module Sauron.UI.Markdown.Wrapping (
   StyledWord(..)
   , renderWrappedParagraph
+  , renderWrappedParagraphM
   , wrapStyledWords
   , renderStyledWordLine
   , renderStyledWord
   , inlineToStyledWords
+  , FootnoteM
   ) where
 
 import Brick
+import Control.Monad.Writer
 import qualified Data.Text as T
 import Relude
 import Sauron.UI.AttrMap
+import Sauron.UI.Markdown.Footnotes
 import qualified Text.Pandoc.Builder as B
 
 data StyledWord = StyledWord {
@@ -19,6 +23,7 @@ data StyledWord = StyledWord {
   , wordAttrs :: [AttrName]
   } deriving (Show, Eq)
 
+-- Pure version for backward compatibility (discards footnotes)
 renderWrappedParagraph :: Maybe (Widget n) -> Int -> [B.Inline] -> Widget n
 renderWrappedParagraph maybePrefix width inlines =
   let lineGroups = splitInlinesOnLineBreaks inlines
@@ -34,7 +39,7 @@ renderWrappedParagraph maybePrefix width inlines =
 
 renderInlineGroup :: Maybe (Widget n) -> Int -> [B.Inline] -> Widget n
 renderInlineGroup maybePrefix width inlines =
-  let styledWords = concatMap (inlineToStyledWords []) inlines
+  let (styledWords, _) = runWriter $ concat <$> traverse (inlineToStyledWords []) inlines
       wrappedLines = wrapStyledWords width styledWords
       renderLineWithPrefix line = case maybePrefix of
                                    Nothing -> padRight Max $ renderStyledWordLine line
@@ -45,27 +50,57 @@ renderInlineGroup maybePrefix width inlines =
               Just prefix -> hBox [prefix, emptyWidget]
        lines' -> vBox $ map renderLineWithPrefix lines'
 
--- Convert inline elements to styled words with attribute stacks
-inlineToStyledWords :: [AttrName] -> B.Inline -> [StyledWord]
-inlineToStyledWords attrs (B.Str t) =
-  map (\word -> StyledWord word attrs) (T.words t)
-inlineToStyledWords attrs (B.Emph inlines) =
-  concatMap (inlineToStyledWords (italicText : attrs)) inlines
-inlineToStyledWords attrs (B.Strong inlines) =
-  concatMap (inlineToStyledWords (boldText : attrs)) inlines
-inlineToStyledWords attrs (B.Underline inlines) =
-  concatMap (inlineToStyledWords (underlineText : attrs)) inlines
-inlineToStyledWords attrs (B.Strikeout inlines) =
-  concatMap (inlineToStyledWords (strikeoutText : attrs)) inlines
-inlineToStyledWords attrs (B.Link _ inlines _) =
-  concatMap (inlineToStyledWords (underlineText : attrs)) inlines
-inlineToStyledWords attrs B.Space = [StyledWord " " attrs]
-inlineToStyledWords _ B.SoftBreak = []  -- SoftBreak is handled by word wrapping
-inlineToStyledWords _ B.LineBreak = []  -- LineBreak is handled by splitInlinesOnLineBreaks
-inlineToStyledWords attrs (B.Code _ t) = [StyledWord t (codeText : attrs)]  -- Handle inline code
-inlineToStyledWords attrs (B.Span (_, classes, _) inlines)
-  | "emoji" `elem` classes = concatMap (inlineToStyledWords attrs) inlines  -- Handle emojis by rendering their content
-inlineToStyledWords _ inline = [StyledWord ("[UNHANDLED: " <> T.pack (show inline) <> "]") []]  -- Debug unknown inlines
+-- Convert inline elements to styled words with attribute stacks (monadic version for footnote support)
+inlineToStyledWords :: [AttrName] -> B.Inline -> FootnoteM [StyledWord]
+inlineToStyledWords attrs inline = case inline of
+  B.Note blocks -> do
+    footnotes <- listen (pure ())
+    let footnoteNum = length (snd footnotes) + 1
+    tell [FootnoteRef footnoteNum blocks]
+    pure [StyledWord ("[" <> T.pack (show footnoteNum) <> "]") (underlineText : attrs)]
+  B.Str t -> pure $ map (\word -> StyledWord word attrs) (T.words t)
+  B.Emph inlines -> concat <$> traverse (inlineToStyledWords (italicText : attrs)) inlines
+  B.Strong inlines -> concat <$> traverse (inlineToStyledWords (boldText : attrs)) inlines
+  B.Underline inlines -> concat <$> traverse (inlineToStyledWords (underlineText : attrs)) inlines
+  B.Strikeout inlines -> concat <$> traverse (inlineToStyledWords (strikeoutText : attrs)) inlines
+  B.Link _ inlines _ -> concat <$> traverse (inlineToStyledWords (underlineText : attrs)) inlines
+  B.Space -> pure [StyledWord " " attrs]
+  B.SoftBreak -> pure []
+  B.LineBreak -> pure []
+  B.Code _ t -> pure [StyledWord t (codeText : attrs)]
+  B.Span (_, classes, _) inlines
+    | "emoji" `elem` classes -> concat <$> traverse (inlineToStyledWords attrs) inlines
+  _ -> pure [StyledWord ("[UNHANDLED: " <> T.pack (show inline) <> "]") []]
+
+-- Monadic versions for footnote support
+type FootnoteM = WriterT [FootnoteRef] Identity
+
+renderWrappedParagraphM :: Maybe (Widget n) -> Int -> [B.Inline] -> FootnoteM (Widget n)
+renderWrappedParagraphM maybePrefix width inlines = do
+  let lineGroups = splitInlinesOnLineBreaks inlines
+  renderedGroups <- traverse (renderInlineGroupM maybePrefix width) lineGroups
+  pure $ vBox renderedGroups
+  where
+    splitInlinesOnLineBreaks :: [B.Inline] -> [[B.Inline]]
+    splitInlinesOnLineBreaks = go []
+      where
+        go acc [] = if null acc then [] else [reverse acc]
+        go acc (B.LineBreak : rest) = reverse acc : go [] rest
+        go acc (B.SoftBreak : rest) = reverse acc : go [] rest
+        go acc (x : rest) = go (x : acc) rest
+
+renderInlineGroupM :: Maybe (Widget n) -> Int -> [B.Inline] -> FootnoteM (Widget n)
+renderInlineGroupM maybePrefix width inlines = do
+  styledWords <- concat <$> traverse (inlineToStyledWords []) inlines
+  let wrappedLines = wrapStyledWords width styledWords
+      renderLineWithPrefix line = case maybePrefix of
+                                   Nothing -> padRight Max $ renderStyledWordLine line
+                                   Just prefix -> hBox [prefix, padRight Max $ renderStyledWordLine line]
+  pure $ case wrappedLines of
+    [] -> case maybePrefix of
+           Nothing -> emptyWidget
+           Just prefix -> hBox [prefix, emptyWidget]
+    lines' -> vBox $ map renderLineWithPrefix lines'
 
 -- Wrap styled words into lines
 wrapStyledWords :: Int -> [StyledWord] -> [[StyledWord]]
