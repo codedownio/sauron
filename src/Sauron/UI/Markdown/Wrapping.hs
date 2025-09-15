@@ -46,11 +46,22 @@ inlineToStyledWords attrs inline = case inline of
   B.Strong inlines -> concat <$> traverse (inlineToStyledWords (boldText : attrs)) inlines
   B.Underline inlines -> concat <$> traverse (inlineToStyledWords (underlineText : attrs)) inlines
   B.Strikeout inlines -> concat <$> traverse (inlineToStyledWords (strikeoutText : attrs)) inlines
-  B.Link _ inlines _ -> concat <$> traverse (inlineToStyledWords (underlineText : attrs)) inlines
+  B.Link _ linkText (url, _) -> do
+    textWords <- concat <$> traverse (inlineToStyledWords (underlineText : attrs)) linkText
+    let bracketOpen = StyledWord " <" attrs
+        urlWord = StyledWord url (underlineText : attrs)
+        bracketClose = StyledWord ">" attrs
+    pure $ textWords ++ [bracketOpen, urlWord, bracketClose]
   B.Space -> pure [StyledWord " " attrs]
   B.SoftBreak -> pure []
   B.LineBreak -> pure []
   B.Code _ t -> pure [StyledWord t (codeText : attrs)]
+  B.Image _ altText (url, _) -> do
+    altWords <- concat <$> traverse (inlineToStyledWords attrs) altText
+    let bracketOpen = StyledWord " <" attrs
+        urlWord = StyledWord url (underlineText : attrs)  
+        bracketClose = StyledWord ">" attrs
+    pure $ altWords ++ [bracketOpen, urlWord, bracketClose]
   B.Span (_, classes, _) inlines
     | "emoji" `elem` classes -> concat <$> traverse (inlineToStyledWords attrs) inlines
   _ -> pure [StyledWord ("[UNHANDLED: " <> T.pack (show inline) <> "]") []]
