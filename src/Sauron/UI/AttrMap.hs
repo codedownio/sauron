@@ -72,6 +72,7 @@ mainAttrMap = attrMap V.defAttr ([
   , (italicText, style V.italic)
   , (underlineText, style V.underline)
   , (boldText, style V.bold)
+  , (boldUnderlineText, V.defAttr `V.withStyle` V.bold `V.withStyle` V.underline)
   , (strikeoutText, style V.strikethrough)
   , (codeText, brightWhite `on` dimGray)
   , (codeBlockText, fg midGray)
@@ -127,6 +128,7 @@ usernameAttr = mkAttrName "username"
 italicText = mkAttrName "italic-text"
 underlineText = mkAttrName "underline-text"
 boldText = mkAttrName "bold-text"
+boldUnderlineText = mkAttrName "bold-underline-text"
 strikeoutText = mkAttrName "strikeout-text"
 codeText = mkAttrName "code-text"
 codeBlockText = mkAttrName "code-block-text"

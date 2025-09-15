@@ -114,11 +114,11 @@ showHeaderSymbols = False
 
 getHeaderAttr :: Int -> AttrName
 getHeaderAttr level = case level of
-  1 -> boldText        -- # = most intense
-  2 -> boldText        -- ## = still bold
-  3 -> italicText      -- ### = italic
-  4 -> underlineText   -- #### = underlined
-  _ -> boldText        -- fallback
+  1 -> boldUnderlineText
+  2 -> underlineText
+  3 -> boldText
+  4 -> italicText
+  _ -> boldText
 
 
 -- Render code block with syntax highlighting
