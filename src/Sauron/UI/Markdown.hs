@@ -13,9 +13,8 @@ import Data.String.Interpolate
 import qualified Data.Text as T
 import Relude
 import Sauron.UI.AttrMap
-import Sauron.UI.Markdown.Footnotes
 import Sauron.UI.Markdown.Table
-import Sauron.UI.Markdown.Wrapping
+import Sauron.UI.Markdown.Wrapping (FootnoteM, renderWrappedParagraphM)
 import qualified Skylighting as Sky
 import qualified Skylighting.Core as SkyCore
 import qualified Text.Pandoc.Builder as B
@@ -27,30 +26,27 @@ markdownToWidgetsWithWidth width t =
     Nothing -> strWrap [i|Parse error.|]
     Just (Left err) -> strWrap [i|Parse error: '#{err}'.|]
     Just (Right (Cm (B.Many bs))) ->
-      let (renderedBlocks, footnotes) = runWriter $ traverse (renderBlockM Nothing width) (toList bs)
+      let (renderedBlocks, footnoteBlocks) = runWriter $ traverse (renderBlockM Nothing width) (toList bs)
           contentWidgets = case renderedBlocks of
                             (x:xs) -> x : fmap (padTop (Pad 1)) xs
                             x -> x
-          footnoteWidget = if null footnotes
+          footnoteWidget = if null footnoteBlocks
                           then emptyWidget
                           else vBox [
                             padTop (Pad 1) $ withAttr horizontalRuleAttr $ str (replicate width '─'),
-                            padTop (Pad 1) $ vBox $ map (renderFootnoteRef width) footnotes
+                            padTop (Pad 1) $ vBox $ zipWith (renderFootnoteRef width) [1..] footnoteBlocks
                           ]
       in vBox $ contentWidgets ++ [footnoteWidget]
 
 renderBlockM :: Maybe (Widget n) -> Int -> B.Block -> FootnoteM (Widget n)
 renderBlockM maybePrefix width block = case block of
-  B.Para inlines -> renderParaM maybePrefix width inlines
-  B.Plain inlines -> renderParaM maybePrefix width inlines
-  B.Header level _ inlines -> withAttr (getHeaderAttr level) <$> renderParaM maybePrefix width inlines
+  B.Para inlines -> renderWrappedParagraphM maybePrefix width inlines
+  B.Plain inlines -> renderWrappedParagraphM maybePrefix width inlines
+  B.Header level _ inlines -> withAttr (getHeaderAttr level) <$> renderWrappedParagraphM maybePrefix width inlines
   other -> pure $ renderBlock maybePrefix width other
 
-renderParaM :: Maybe (Widget n) -> Int -> [B.Inline] -> FootnoteM (Widget n)
-renderParaM = renderWrappedParagraphM
-
-renderFootnoteRef :: Int -> FootnoteRef -> Widget n
-renderFootnoteRef width (FootnoteRef num blocks) =
+renderFootnoteRef :: Int -> Int -> [B.Block] -> Widget n
+renderFootnoteRef width num blocks =
   let numberPrefix = withAttr hashNumberAttr $ str ("[" <> show num <> "] ")
       renderedContent = vBox $ map (renderBlock Nothing (width - 4)) blocks
   in hBox [numberPrefix, renderedContent]
@@ -58,14 +54,14 @@ renderFootnoteRef width (FootnoteRef num blocks) =
 renderBlock :: forall n. Maybe (Widget n) -> Int -> B.Block -> Widget n
 renderBlock maybePrefix width (B.Para inlines) =
   case inlines of
-    (B.Str headerLevel : B.Space : rest) | T.all (== '#') headerLevel && not (T.null headerLevel) -> do
+    (B.Str headerLevel : B.Space : rest) | T.all (== '#') headerLevel && not (T.null headerLevel) ->
       let headerAttr = getHeaderAttr (T.length headerLevel)
-      let inlinesToRender = if showHeaderSymbols then inlines else rest
-      withAttr headerAttr $ renderWrappedParagraph maybePrefix width inlinesToRender
-    _ -> renderWrappedParagraph maybePrefix width inlines
-renderBlock maybePrefix width (B.Plain inlines) = renderWrappedParagraph maybePrefix width inlines
+          inlinesToRender = if showHeaderSymbols then inlines else rest
+      in withAttr headerAttr $ fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlinesToRender
+    _ -> fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
+renderBlock maybePrefix width (B.Plain inlines) = fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
 renderBlock maybePrefix width (B.Header level _ inlines) =
-  withAttr (getHeaderAttr level) $ renderWrappedParagraph maybePrefix width inlines
+  withAttr (getHeaderAttr level) $ fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
 renderBlock maybePrefix width (B.CodeBlock (_, classes, _) codeContent) =
   case maybePrefix of
     Nothing -> renderHighlightedCodeBlock width classes codeContent
