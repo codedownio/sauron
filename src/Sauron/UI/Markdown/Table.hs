@@ -1,8 +1,5 @@
 module Sauron.UI.Markdown.Table (
   renderTableWith
-  , renderTableRowWith
-  , renderTableCellWith
-  , renderTableRowWithWidths
   ) where
 
 import Brick
@@ -11,9 +8,8 @@ import Relude
 import Sauron.UI.AttrMap
 import qualified Text.Pandoc.Builder as B
 
--- Render a table with header and body rows (parameterized to avoid circular imports)
 renderTableWith :: (Maybe (Widget n) -> Int -> B.Block -> Widget n) -> Int -> B.TableHead -> [B.TableBody] -> Widget n
-renderTableWith renderBlockFn width (B.TableHead _ theadRows) tbodyList = 
+renderTableWith renderBlockFn width (B.TableHead _ theadRows) tbodyList =
   let extractBodyRows (B.TableBody _ _ rows1 rows2) = rows1 ++ rows2
       allBodyRows = concatMap extractBodyRows tbodyList
       allRows = theadRows ++ allBodyRows
@@ -23,26 +19,17 @@ renderTableWith renderBlockFn width (B.TableHead _ theadRows) tbodyList =
       topBorder = renderTopBorder colWidths
       bottomBorder = renderBottomBorder colWidths
       -- Special separator after header if we have headers
-      headerSeparator = if not (null theadRows) 
-                       then [renderHeaderSeparator colWidths] 
+      headerSeparator = if not (null theadRows)
+                       then [renderHeaderSeparator colWidths]
                        else []
       -- Combine everything
-      allElements = [topBorder] ++ 
+      allElements = [topBorder] ++
                    take (length theadRows) renderedRows ++
                    headerSeparator ++
                    drop (length theadRows) renderedRows ++
                    [bottomBorder]
   in vBox allElements
 
--- Render a single table row (parameterized to avoid circular imports)
-renderTableRowWith :: (Maybe (Widget n) -> Int -> B.Block -> Widget n) -> Int -> Int -> B.Row -> Widget n
-renderTableRowWith renderBlockFn colWidth numCols (B.Row _ cells) =
-  let paddedCells = take numCols (cells ++ repeat (B.Cell ("", [], []) B.AlignDefault (B.RowSpan 1) (B.ColSpan 1) []))
-      renderedCells = map (renderTableCellWith renderBlockFn colWidth) paddedCells
-      cellsWithSeparators = intersperse (withAttr horizontalRuleAttr $ str "│") renderedCells
-  in hBox cellsWithSeparators
-
--- Render a single table cell (parameterized to avoid circular imports)
 renderTableCellWith :: (Maybe (Widget n) -> Int -> B.Block -> Widget n) -> Int -> B.Cell -> Widget n
 renderTableCellWith renderBlockFn colWidth (B.Cell _ _ _ _ blocks) =
   let cellContent = case blocks of
@@ -50,7 +37,6 @@ renderTableCellWith renderBlockFn colWidth (B.Cell _ _ _ _ blocks) =
                       _ -> vBox $ map (renderBlockFn Nothing colWidth) blocks
   in hLimit colWidth $ padRight Max cellContent
 
--- Calculate optimal column widths based on content
 calculateColumnWidths :: Int -> [B.Row] -> [Int]
 calculateColumnWidths totalWidth rows =
   let numCols = case rows of
@@ -58,7 +44,7 @@ calculateColumnWidths totalWidth rows =
                   [] -> 0
   in if numCols == 0
      then []
-     else 
+     else
        let -- Get content widths for each column
            colContentWidths = map (getColumnContentWidth rows) [0..numCols-1]
            -- Reserve space for separators (│) - one less separator than columns
@@ -74,7 +60,6 @@ calculateColumnWidths totalWidth rows =
                               minColWidths
        in scaledWidths
 
--- Get the maximum content width for a specific column across all rows
 getColumnContentWidth :: [B.Row] -> Int -> Int
 getColumnContentWidth rows colIndex =
   let cellWidths = mapMaybe (getCellWidth colIndex) rows
@@ -86,7 +71,6 @@ getColumnContentWidth rows colIndex =
         (cell:_) -> Just (getCellTextWidth cell)
         [] -> Nothing
 
--- Get the text width of a cell's content
 getCellTextWidth :: B.Cell -> Int
 getCellTextWidth (B.Cell _ _ _ _ blocks) =
   foldl' max 3 $ map getBlockTextWidth blocks
@@ -105,7 +89,6 @@ getCellTextWidth (B.Cell _ _ _ _ blocks) =
     getInlineTextWidth (B.Link _ inlines _) = sum $ map getInlineTextWidth inlines
     getInlineTextWidth _ = 1 -- fallback
 
--- Render a table row with specific column widths
 renderTableRowWithWidths :: (Maybe (Widget n) -> Int -> B.Block -> Widget n) -> [Int] -> B.Row -> Widget n
 renderTableRowWithWidths renderBlockFn colWidths (B.Row _ cells) =
   let paddedCells = take (length colWidths) (cells ++ repeat (B.Cell ("", [], []) B.AlignDefault (B.RowSpan 1) (B.ColSpan 1) []))
@@ -115,29 +98,19 @@ renderTableRowWithWidths renderBlockFn colWidths (B.Row _ cells) =
       rightBorder = withAttr horizontalRuleAttr $ str "│"
   in hBox $ [leftBorder] ++ cellsWithSeparators ++ [rightBorder]
 
--- Render horizontal separator line for tables
-renderHorizontalSeparator :: [Int] -> Widget n
-renderHorizontalSeparator colWidths =
-  let separatorParts = map (\w -> withAttr horizontalRuleAttr $ str (replicate w '─')) colWidths
-      separatorsWithJoins = intersperse (withAttr horizontalRuleAttr $ str "┼") separatorParts
-  in hBox separatorsWithJoins
-
--- Render top border of table
 renderTopBorder :: [Int] -> Widget n
 renderTopBorder colWidths =
   let borderParts = map (\w -> withAttr horizontalRuleAttr $ str (replicate w '─')) colWidths
       bordersWithJoins = intersperse (withAttr horizontalRuleAttr $ str "┬") borderParts
   in hBox $ [withAttr horizontalRuleAttr $ str "┌"] ++ bordersWithJoins ++ [withAttr horizontalRuleAttr $ str "┐"]
 
--- Render bottom border of table  
 renderBottomBorder :: [Int] -> Widget n
 renderBottomBorder colWidths =
   let borderParts = map (\w -> withAttr horizontalRuleAttr $ str (replicate w '─')) colWidths
       bordersWithJoins = intersperse (withAttr horizontalRuleAttr $ str "┴") borderParts
   in hBox $ [withAttr horizontalRuleAttr $ str "└"] ++ bordersWithJoins ++ [withAttr horizontalRuleAttr $ str "┘"]
 
--- Render header separator (stronger line after header row)
-renderHeaderSeparator :: [Int] -> Widget n  
+renderHeaderSeparator :: [Int] -> Widget n
 renderHeaderSeparator colWidths =
   let separatorParts = map (\w -> withAttr horizontalRuleAttr $ str (replicate w '═')) colWidths
       separatorsWithJoins = intersperse (withAttr horizontalRuleAttr $ str "╪") separatorParts
