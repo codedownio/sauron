@@ -8,6 +8,7 @@ module Sauron.UI.Issue (
 
 import Brick
 import Brick.Widgets.Border
+import Brick.Widgets.Skylighting (highlight)
 import Data.String.Interpolate
 import Data.Time
 import GitHub
@@ -17,6 +18,7 @@ import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Markdown
 import Sauron.UI.Util.TimeDiff
+import qualified Skylighting as Sky
 
 
 maxCommentWidth :: Int
@@ -40,8 +42,16 @@ issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) = vBox [lin
 
 issueInner :: UTCTime -> Issue -> Text -> Fetchable PaginatedItemInner -> Widget n
 -- issueInner body = vBox [strWrap (toString body)]
-issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) body inner = vBox (firstCell : comments)
+issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) body inner = vBox (testCell : firstCell : comments)
   where
+    testCell = hLimit maxCommentWidth $ borderWithLabel
+      (str "AAAAAAAAAAAA")
+      (highlight syntax codeContent)
+
+    Just syntax = Sky.lookupSyntax "python" Sky.defaultSyntaxMap
+
+    codeContent = [i|def foo():\n  print("HI")\n|]
+
     firstCell = hLimit maxCommentWidth $ borderWithLabel
       (topLabel openerUsername)
       (markdownToWidgetsWithWidth (maxCommentWidth - 2) body)
