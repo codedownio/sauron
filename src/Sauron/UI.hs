@@ -81,7 +81,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {..}) = wrapper ix is
         PaginatedItemWorkflow wf@(WorkflowRun {}) ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              workflowInner wf
+              workflowInner wf _itemInner
   ]
 
 wrapper :: Int -> Bool -> MainListElem' f -> [Maybe (Widget ClickableName)] -> Widget ClickableName

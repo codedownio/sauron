@@ -14,6 +14,8 @@ module Sauron.Actions (
   , fetchIssues
   , fetchIssue
 
+  , fetchWorkflowJobs
+
   , hasStartedInitialFetch
   , refresh
   , refreshAll
@@ -134,6 +136,14 @@ fetchPullComments owner name issueNumber inner = do
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerPull (responseBody v)))
 
+fetchWorkflowJobs :: (
+  MonadIO m
+  ) => Name Owner -> Name Repo -> Id WorkflowRun -> TVar (Fetchable PaginatedItemInner) -> m ()
+fetchWorkflowJobs _owner _name _workflowRunId inner = do
+  -- TODO: Implement proper workflow jobs fetching once we determine the correct API function
+  -- For now, we'll set it as not implemented to avoid compilation errors
+  atomically $ writeTVar inner (Errored "Workflow jobs fetching not yet implemented - need to find correct GitHub API function")
+
 fetchPaginated :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
   ) => (FetchCount -> Request k res)
@@ -215,7 +225,8 @@ refresh bc (MainListElemPaginated {..}) (MainListElemRepo {_namespaceName=(owner
 refresh bc (MainListElemItem {_item, ..}) (MainListElemRepo {_namespaceName=(owner, name)}) = readTVarIO _item >>= \case
   Fetched (PaginatedItemIssue (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _itemInner) bc
   Fetched (PaginatedItemPull (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name issueNumber _itemInner) bc
-  _ -> return () -- TODO
+  Fetched (PaginatedItemWorkflow (WorkflowRun {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId _itemInner) bc
+  _ -> return ()
 refresh _ _ _ = return ()
 
 hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool

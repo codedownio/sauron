@@ -10,6 +10,7 @@ module Sauron.UI.Workflow (
 import Brick
 import Data.String.Interpolate
 import Data.Time.Clock
+import qualified Data.Vector as V
 import GitHub
 import Relude
 import Sauron.Types hiding (toggled)
@@ -64,7 +65,53 @@ ellipses = withAttr ellipsesAttr (str "⋯")
 neutral = withAttr neutralAttr (str "-")
 unknown = withAttr unknownAttr (str "?")
 
-workflowInner :: WorkflowRun -> Widget n
-workflowInner (WorkflowRun {..}) = vBox [
-  strWrap $ toString workflowRunDisplayTitle
-  ]
+workflowInner :: WorkflowRun -> Fetchable PaginatedItemInner -> Widget n
+workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobsSection]
+  where
+    runTime = diffUTCTime workflowRunUpdatedAt workflowRunStartedAt
+
+    workflowDetails = [
+      withAttr normalAttr $ strWrap $ toString workflowRunDisplayTitle
+
+      , padTop (Pad 1) $ hBox [
+          str "File: "
+          , withAttr hashAttr $ str $ toString workflowRunPath
+          , str " • Event: "
+          , withAttr branchAttr $ str $ toString workflowRunEvent
+        ]
+
+      , hBox [
+          str "Triggered by "
+          , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
+          , str [i| on #{workflowRunCreatedAt}|]
+        ]
+
+      , hBox [
+          str "Run #"
+          , withAttr hashNumberAttr $ str $ show workflowRunRunNumber
+          , str " • Attempt "
+          , str $ show workflowRunAttempt
+          , str " • Duration: "
+          , str [i|#{timeDiff runTime}|]
+        ]
+
+      , hBox [
+          str "Commit: "
+          , withAttr hashAttr $ str $ take 7 $ toString workflowRunHeadSha
+          , str " on "
+          , withAttr branchAttr $ str $ toString workflowRunHeadBranch
+        ]
+      ]
+
+    jobsSection = padTop (Pad 1) $ case jobsFetchable of
+      NotFetched -> str "Jobs: (Not fetched)"
+      Fetching -> str "Jobs: (Fetching...)"
+      Errored err -> str [i|Jobs error: #{err}|]
+      Fetched (PaginatedItemInnerWorkflow (WithTotalCount jobs totalCount)) ->
+        vBox [
+          str [i|Jobs (#{totalCount}):|]
+          , padLeft (Pad 2) $ vBox $ map renderJobSimple (V.toList jobs)
+        ]
+        where
+          renderJobSimple job = hBox [greenCheck, padLeft (Pad 1) $ str $ show job]
+      _ -> str "Jobs: (Unknown format)"
