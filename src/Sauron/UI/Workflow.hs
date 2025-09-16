@@ -113,5 +113,8 @@ workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobs
           , padLeft (Pad 2) $ vBox $ map renderJobSimple (V.toList jobs)
         ]
         where
-          renderJobSimple job = hBox [greenCheck, padLeft (Pad 1) $ str $ show job]
+          renderJobSimple job = hBox [
+            greenCheck  -- TODO: extract proper job status and use appropriate icon
+            , padLeft (Pad 1) $ str $ show job  -- TODO: extract job name when field names are known
+            ]
       _ -> str "Jobs: (Unknown format)"

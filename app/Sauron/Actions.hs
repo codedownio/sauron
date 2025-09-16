@@ -137,12 +137,15 @@ fetchPullComments owner name issueNumber inner = do
       Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerPull (responseBody v)))
 
 fetchWorkflowJobs :: (
-  MonadIO m
+  MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Id WorkflowRun -> TVar (Fetchable PaginatedItemInner) -> m ()
-fetchWorkflowJobs _owner _name _workflowRunId inner = do
-  -- TODO: Implement proper workflow jobs fetching once we determine the correct API function
-  -- For now, we'll set it as not implemented to avoid compilation errors
-  atomically $ writeTVar inner (Errored "Workflow jobs fetching not yet implemented - need to find correct GitHub API function")
+fetchWorkflowJobs owner name workflowRunId inner = do
+  BaseContext {auth, manager} <- ask
+  bracketOnError_ (atomically $ writeTVar inner Fetching)
+                  (atomically $ writeTVar inner (Errored "Workflow jobs fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
+      Left err -> atomically $ writeTVar inner (Errored (show err))
+      Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerWorkflow (responseBody v)))
 
 fetchPaginated :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
