@@ -115,7 +115,8 @@ data PaginatedItemInner =
   | PaginatedItemInnerPull (V.Vector IssueComment)
   | PaginatedItemInnerWorkflow (WithTotalCount Job)
   | PaginatedItemInnerJob Job
-  deriving (Show, Eq)
+  | PaginatedItemInnerPaginated (MainListElem' Variable)
+  deriving (Show)
 
 paginatedItemsToList :: PaginatedItems -> [PaginatedItem]
 paginatedItemsToList (PaginatedItemsIssues (SearchResult _ xs)) = fmap PaginatedItemIssue $ V.toList xs
@@ -187,8 +188,17 @@ data MainListElem' f =
       }
 
 type MainListElem = MainListElem' Fixed
-deriving instance Eq MainListElem
 type MainListElemVariable = MainListElem' Variable
+
+instance Eq PaginatedItemInner where
+  (PaginatedItemInnerIssue a) == (PaginatedItemInnerIssue b) = a == b
+  (PaginatedItemInnerPull a) == (PaginatedItemInnerPull b) = a == b
+  (PaginatedItemInnerWorkflow a) == (PaginatedItemInnerWorkflow b) = a == b
+  (PaginatedItemInnerJob a) == (PaginatedItemInnerJob b) = a == b
+  (PaginatedItemInnerPaginated _) == (PaginatedItemInnerPaginated _) = False -- Different variables can't be compared
+  _ == _ = False
+
+deriving instance Eq MainListElem
 
 data AppEvent =
   ListUpdate (V.Vector MainListElem)

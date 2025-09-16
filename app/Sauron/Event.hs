@@ -124,3 +124,14 @@ modifyToggled s cb = withNthChildAndRepoParent s $ \fixedEl mle repoElem -> do
   when isOpen $
     unlessM (hasStartedInitialFetch fixedEl) $
       refresh (s ^. appBaseContext) mle repoElem
+  where
+    hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
+    hasStartedInitialFetch (MainListElemHeading {}) = return True
+    hasStartedInitialFetch (MainListElemRepo {..}) = and <$> (mapM hasStartedInitialFetch [_issuesChild, _workflowsChild])
+    hasStartedInitialFetch (MainListElemPaginated {..}) = return $ isFetchingOrFetched _items
+    hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _item && isFetchingOrFetched _itemInner)
+
+    isFetchingOrFetched :: Fetchable a -> Bool
+    isFetchingOrFetched (Fetched {}) = True
+    isFetchingOrFetched (Fetching {}) = True
+    isFetchingOrFetched _ = False

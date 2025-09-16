@@ -20,6 +20,7 @@ import qualified Graphics.Vty.CrossPlatform as V
 import Network.HTTP.Client (newManager)
 import Relude hiding (Down)
 import Sauron.Actions
+import Sauron.Actions.Util
 import Sauron.Auth
 import Sauron.Event
 import Sauron.Expanding

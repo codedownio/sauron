@@ -10,6 +10,7 @@ module Sauron.Actions (
   , fetchRepo
 
   , fetchWorkflows
+  , fetchWorkflowsWithJobs
 
   , fetchIssues
   , fetchIssue
@@ -17,31 +18,24 @@ module Sauron.Actions (
   , fetchWorkflowJobs
   , fetchJobs
 
-  , hasStartedInitialFetch
   , refresh
   , refreshAll
-
-  , withGithubApiSemaphore
-  , withGithubApiSemaphore'
   ) where
 
 import Brick as B
 import Brick.Widgets.List
-import Control.Concurrent.QSem
-import Control.Exception.Safe (bracket_, bracketOnError_)
+import Control.Exception.Safe (bracketOnError_)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
-import Data.Aeson
-import qualified Data.List as L
 import Data.String.Interpolate
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Network.HTTP.Client (responseBody)
-import Network.HTTP.Types.URI (QueryItem, parseQuery)
-import qualified Network.URI as NURI
 import Relude
+import Sauron.Actions.Fetch
+import Sauron.Actions.Util
 import Sauron.Types
 import UnliftIO.Async
 import UnliftIO.Process
@@ -148,106 +142,11 @@ fetchWorkflowJobs owner name workflowRunId inner = do
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerWorkflow (responseBody v)))
 
-fetchPaginated' :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
-  )
-  => (FetchCount -> Request k res)
-  -> (res -> PaginatedItems)
-  -> (Int -> [PaginatedItem] -> [Int] -> STM [MainListElemVariable])
-  -> TVar MainListElemVariable
-  -> m ()
-fetchPaginated' mkReq wrapResponse makeChildren parentVar = do
-  BaseContext {auth, getIdentifier, manager} <- ask
-
-  MainListElemPaginated {..} <- readTVarIO parentVar
-
-  PageInfo {pageInfoCurrentPage} <- readTVarIO _pageInfo
-
-  bracketOnError_ (atomically $ writeTVar _items Fetching)
-                  (atomically $ writeTVar _items (Errored "Workflows fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just pageInfoCurrentPage))))) >>= \case
-      Left err -> atomically $ do
-        writeTVar _items (Errored (show err))
-        writeTVar _children []
-
-      Right x -> do
-        let paginatedItems = paginatedItemsToList $ wrapResponse (responseBody x)
-        identifiers <- replicateM (L.length paginatedItems) (liftIO getIdentifier)
-
-        atomically $ do
-          writeTVar _items (Fetched (wrapResponse (responseBody x)))
-
-          let PageLinks {..} = parsePageLinks x
-          let parsePageFromUri :: NURI.URI -> Maybe Int
-              parsePageFromUri uri = do
-                let q = NURI.uriQuery uri
-                let parsed :: [QueryItem] = parseQuery (encodeUtf8 q)
-                result :: ByteString <- join $ L.lookup "page" parsed
-                readMaybe (decodeUtf8 result)
-          writeTVar _pageInfo $ PageInfo {
-            pageInfoCurrentPage = pageInfoCurrentPage
-            , pageInfoFirstPage = pageLinksFirst >>= parsePageFromUri
-            , pageInfoPrevPage = pageLinksPrev >>= parsePageFromUri
-            , pageInfoNextPage = pageLinksNext >>= parsePageFromUri
-            , pageInfoLastPage = pageLinksLast >>= parsePageFromUri
-            }
-
-          itemChildren <- makeChildren _depth paginatedItems identifiers
-          writeTVar _children itemChildren
-
-fetchPaginated :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
-  ) => (FetchCount -> Request k res)
-    -> (res -> PaginatedItems)
-    -> TVar MainListElemVariable
-    -> m ()
-fetchPaginated mkReq wrapResponse = fetchPaginated' mkReq wrapResponse makeItemChildren
-  where
-    makeItemChildren parentDepth paginatedItems identifiers = do
-      forM (zip paginatedItems identifiers) $ \(iss, identifier) -> do
-        itemVar <- newTVar (Fetched iss)
-        itemInnerVar <- newTVar NotFetched
-        toggledVar' <- newTVar False
-        pure $ MainListElemItem {
-          _item = itemVar
-          , _itemInner = itemInnerVar
-          , _toggled = toggledVar'
-          , _depth = parentDepth + 1
-          , _ident = identifier
-          }
-
--- fetchPaginatedPaginated :: (
---   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
---   )
---   => PaginatedType
---   -> (FetchCount -> Request k res)
---   -> (res -> PaginatedItems)
---   -> TVar MainListElemVariable
---   -> m ()
--- fetchPaginatedPaginated typ mkReq wrapResponse childrenVar = undefined -- fetchPaginated' mkReq wrapResponse makeItemChildren childrenVar
---   where
---     makeItemChildren paginatedItems identifiers = do
---       forM (zip paginatedItems identifiers) $ \(iss, identifier) -> do
---         var <- newTVarIO NotFetched
---         toggledVar <- newTVarIO False
---         childrenVar <- atomically $ makeItemChildren
---         searchVar <- newTVarIO SearchNone
---         pageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
-
---         BaseContext {..} <- ask
-
---         pure $ MainListElemPaginated {
---           _typ = typ
---           , _items = var
---           , _label = "Workflows"
---           , _urlSuffix = "actions"
---           , _toggled = toggledVar
---           , _children = childrenVar
---           , _search = searchVar
---           , _pageInfo = pageInfoVar
---           , _depth = parentDepth + 1
---           , _ident = identifier
---           }
+fetchWorkflowsWithJobs :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
+  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
+fetchWorkflowsWithJobs owner name =
+  fetchPaginatedPaginated PaginatedJobs "Jobs" "" (\fc -> workflowRunsR owner name mempty fc) PaginatedItemsWorkflows
 
 fetchJobs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
@@ -272,7 +171,7 @@ refresh _ (MainListElemHeading {}) _ = return () -- TODO: refresh all repos
 refresh bc (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) _ = liftIO $ do
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
   void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
-  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
+  void $ async $ liftIO $ runReaderT (fetchWorkflowsWithJobs owner name _workflowsChild) bc
 refresh bc (MainListElemPaginated {..}) (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) = liftIO $ case _typ of
   PaginatedIssues -> void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
   PaginatedPulls -> void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
@@ -285,17 +184,6 @@ refresh bc (MainListElemItem {_item, ..}) (MainListElemRepo {_namespaceName=(own
   Fetched (PaginatedItemJob _) -> return ()
   _ -> return ()
 refresh _ _ _ = return ()
-
-hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
-hasStartedInitialFetch (MainListElemHeading {}) = return True
-hasStartedInitialFetch (MainListElemRepo {..}) = and <$> (mapM hasStartedInitialFetch [_issuesChild, _workflowsChild])
-hasStartedInitialFetch (MainListElemPaginated {..}) = return $ isFetchingOrFetched _items
-hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _item && isFetchingOrFetched _itemInner)
-
-isFetchingOrFetched :: Fetchable a -> Bool
-isFetchingOrFetched (Fetched {}) = True
-isFetchingOrFetched (Fetching {}) = True
-isFetchingOrFetched _ = False
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m
@@ -311,12 +199,3 @@ refreshAll elems = do
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
       MainListElemPaginated {} -> return ()
       MainListElemItem {} -> return ()
-
-withGithubApiSemaphore :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => m a -> m a
-withGithubApiSemaphore action = do
-  sem <- asks requestSemaphore
-  withGithubApiSemaphore' sem action
-
--- TODO: add timeout here?
-withGithubApiSemaphore' :: (MonadIO m, MonadMask m) => QSem -> m a -> m a
-withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQSem sem)

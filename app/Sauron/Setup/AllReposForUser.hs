@@ -10,7 +10,7 @@ import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
 import Relude hiding (Down)
-import Sauron.Actions
+import Sauron.Actions.Util (withGithubApiSemaphore')
 import Sauron.HealthCheck
 import Sauron.Options
 import Sauron.Setup.Common (newRepoNode)

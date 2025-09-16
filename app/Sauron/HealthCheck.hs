@@ -12,7 +12,7 @@ import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import Relude
-import Sauron.Actions
+import Sauron.Actions.Util (withGithubApiSemaphore)
 import Sauron.Options
 import Sauron.Types
 import UnliftIO.Async
