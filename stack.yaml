@@ -22,7 +22,8 @@ extra-deps:
   # main branch, which has some changes from upstream:
   # - fixes for search query escaping
   # - support for detailed pagination
-  commit: 01be3c1168c81dc45123fb08e2904b8cc958a5e4
+  # - fix Job type to make some fields optional
+  commit: a1db0c511f1b3af37d8509bf005c07a5152049f9
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
