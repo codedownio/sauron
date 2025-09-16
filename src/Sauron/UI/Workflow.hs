@@ -3,8 +3,10 @@
 module Sauron.UI.Workflow (
   workflowLine
   , workflowStatusToIcon
+  , jobLine
 
   , workflowInner
+  , jobInner
   ) where
 
 import Brick
@@ -45,6 +47,13 @@ workflowLine toggled (WorkflowRun {..}) = hBox [
   ]
   where
     runTime = diffUTCTime workflowRunUpdatedAt workflowRunStartedAt
+
+jobLine :: Bool -> Job -> Widget n
+jobLine toggled job = hBox [
+  withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
+  , withAttr normalAttr $ str $ show job
+  , padLeft (Pad 1) $ greenCheck
+  ]
 
 
 workflowStatusToIcon :: WorkflowStatus -> Widget n
@@ -118,3 +127,9 @@ workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobs
             , padLeft (Pad 1) $ str $ show job  -- TODO: extract job name when field names are known
             ]
       _ -> str "Jobs: (Unknown format)"
+
+jobInner :: Job -> Fetchable PaginatedItemInner -> Widget n
+jobInner job _jobInner = vBox [
+  withAttr normalAttr $ str $ show job
+  , padTop (Pad 1) $ str "Job details would go here"
+  ]

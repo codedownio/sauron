@@ -93,30 +93,35 @@ data PaginatedType =
   PaginatedIssues
   | PaginatedPulls
   | PaginatedWorkflows
+  | PaginatedJobs
   deriving (Show, Eq)
 
 data PaginatedItems =
   PaginatedItemsIssues (SearchResult Issue)
   | PaginatedItemsPulls (SearchResult Issue)
   | PaginatedItemsWorkflows (WithTotalCount WorkflowRun)
+  | PaginatedItemsJobs (WithTotalCount Job)
   deriving (Show, Eq)
 
 data PaginatedItem =
   PaginatedItemIssue Issue
   | PaginatedItemPull Issue
   | PaginatedItemWorkflow WorkflowRun
+  | PaginatedItemJob Job
   deriving (Show, Eq)
 
 data PaginatedItemInner =
   PaginatedItemInnerIssue (V.Vector IssueComment)
   | PaginatedItemInnerPull (V.Vector IssueComment)
   | PaginatedItemInnerWorkflow (WithTotalCount Job)
+  | PaginatedItemInnerJob Job
   deriving (Show, Eq)
 
 paginatedItemsToList :: PaginatedItems -> [PaginatedItem]
 paginatedItemsToList (PaginatedItemsIssues (SearchResult _ xs)) = fmap PaginatedItemIssue $ V.toList xs
 paginatedItemsToList (PaginatedItemsPulls (SearchResult _ xs)) = fmap PaginatedItemPull $ V.toList xs
 paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
+paginatedItemsToList (PaginatedItemsJobs (WithTotalCount xs _)) = fmap PaginatedItemJob $ V.toList xs
 
 data Search = SearchText Text
             | SearchNone

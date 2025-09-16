@@ -15,6 +15,7 @@ module Sauron.Actions (
   , fetchIssue
 
   , fetchWorkflowJobs
+  , fetchJobs
 
   , hasStartedInitialFetch
   , refresh
@@ -147,16 +148,18 @@ fetchWorkflowJobs owner name workflowRunId inner = do
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerWorkflow (responseBody v)))
 
-fetchPaginated :: (
+fetchPaginated' :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
-  ) => (FetchCount -> Request k res)
-    -> (res -> PaginatedItems)
-    -> TVar MainListElemVariable
-    -> m ()
-fetchPaginated mkReq wrapResponse childrenVar = do
+  )
+  => (FetchCount -> Request k res)
+  -> (res -> PaginatedItems)
+  -> (Int -> [PaginatedItem] -> [Int] -> STM [MainListElemVariable])
+  -> TVar MainListElemVariable
+  -> m ()
+fetchPaginated' mkReq wrapResponse makeChildren parentVar = do
   BaseContext {auth, getIdentifier, manager} <- ask
 
-  MainListElemPaginated {..} <- readTVarIO childrenVar
+  MainListElemPaginated {..} <- readTVarIO parentVar
 
   PageInfo {pageInfoCurrentPage} <- readTVarIO _pageInfo
 
@@ -189,18 +192,67 @@ fetchPaginated mkReq wrapResponse childrenVar = do
             , pageInfoLastPage = pageLinksLast >>= parsePageFromUri
             }
 
-          itemChildren <- forM (zip paginatedItems identifiers) $ \(iss, identifier) -> do
-            itemVar <- newTVar (Fetched iss)
-            itemInnerVar <- newTVar NotFetched
-            toggledVar' <- newTVar False
-            pure $ MainListElemItem {
-              _item = itemVar
-              , _itemInner = itemInnerVar
-              , _toggled = toggledVar'
-              , _depth = 3
-              , _ident = identifier
-              }
+          itemChildren <- makeChildren _depth paginatedItems identifiers
           writeTVar _children itemChildren
+
+fetchPaginated :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
+  ) => (FetchCount -> Request k res)
+    -> (res -> PaginatedItems)
+    -> TVar MainListElemVariable
+    -> m ()
+fetchPaginated mkReq wrapResponse = fetchPaginated' mkReq wrapResponse makeItemChildren
+  where
+    makeItemChildren parentDepth paginatedItems identifiers = do
+      forM (zip paginatedItems identifiers) $ \(iss, identifier) -> do
+        itemVar <- newTVar (Fetched iss)
+        itemInnerVar <- newTVar NotFetched
+        toggledVar' <- newTVar False
+        pure $ MainListElemItem {
+          _item = itemVar
+          , _itemInner = itemInnerVar
+          , _toggled = toggledVar'
+          , _depth = parentDepth + 1
+          , _ident = identifier
+          }
+
+-- fetchPaginatedPaginated :: (
+--   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
+--   )
+--   => PaginatedType
+--   -> (FetchCount -> Request k res)
+--   -> (res -> PaginatedItems)
+--   -> TVar MainListElemVariable
+--   -> m ()
+-- fetchPaginatedPaginated typ mkReq wrapResponse childrenVar = undefined -- fetchPaginated' mkReq wrapResponse makeItemChildren childrenVar
+--   where
+--     makeItemChildren paginatedItems identifiers = do
+--       forM (zip paginatedItems identifiers) $ \(iss, identifier) -> do
+--         var <- newTVarIO NotFetched
+--         toggledVar <- newTVarIO False
+--         childrenVar <- atomically $ makeItemChildren
+--         searchVar <- newTVarIO SearchNone
+--         pageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+
+--         BaseContext {..} <- ask
+
+--         pure $ MainListElemPaginated {
+--           _typ = typ
+--           , _items = var
+--           , _label = "Workflows"
+--           , _urlSuffix = "actions"
+--           , _toggled = toggledVar
+--           , _children = childrenVar
+--           , _search = searchVar
+--           , _pageInfo = pageInfoVar
+--           , _depth = parentDepth + 1
+--           , _ident = identifier
+--           }
+
+fetchJobs :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
+  ) => Name Owner -> Name Repo -> Id WorkflowRun -> TVar MainListElemVariable -> m ()
+fetchJobs owner name workflowRunId = fetchPaginated (jobsForWorkflowRunR owner name workflowRunId) PaginatedItemsJobs
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -217,7 +269,7 @@ fetchIssue owner name issueNumber issueVar = do
 
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> MainListElemVariable -> m ()
 refresh _ (MainListElemHeading {}) _ = return () -- TODO: refresh all repos
-refresh bc (MainListElemRepo {_namespaceName=(owner, name), ..}) _ = liftIO $ do
+refresh bc (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) _ = liftIO $ do
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
   void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
   void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
@@ -225,10 +277,12 @@ refresh bc (MainListElemPaginated {..}) (MainListElemRepo {_namespaceName=(owner
   PaginatedIssues -> void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
   PaginatedPulls -> void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
   PaginatedWorkflows -> void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
+  PaginatedJobs -> return () -- Jobs are fetched when workflow items are expanded
 refresh bc (MainListElemItem {_item, ..}) (MainListElemRepo {_namespaceName=(owner, name)}) = readTVarIO _item >>= \case
   Fetched (PaginatedItemIssue (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _itemInner) bc
   Fetched (PaginatedItemPull (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name issueNumber _itemInner) bc
   Fetched (PaginatedItemWorkflow (WorkflowRun {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId _itemInner) bc
+  Fetched (PaginatedItemJob _) -> return ()
   _ -> return ()
 refresh _ _ _ = return ()
 

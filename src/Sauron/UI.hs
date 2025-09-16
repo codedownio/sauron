@@ -58,6 +58,7 @@ listDrawElement appState ix isSelected x@(MainListElemPaginated {..}) = wrapper 
         Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
         Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
         Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
+        Fetched (PaginatedItemsJobs xs) -> str [i|(#{withTotalCountTotalCount xs})|]
     , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
     ]
   ]
@@ -66,6 +67,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {..}) = wrapper ix is
     Fetched (PaginatedItemIssue issue) -> issueLine (_appNow appState) _toggled issue
     Fetched (PaginatedItemPull pull) -> pullLine (_appNow appState) _toggled pull
     Fetched (PaginatedItemWorkflow wf) -> workflowLine _toggled wf
+    Fetched (PaginatedItemJob job) -> jobLine _toggled job
     _ -> str ""
   , do
       guard _toggled
@@ -82,6 +84,10 @@ listDrawElement appState ix isSelected x@(MainListElemItem {..}) = wrapper ix is
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
               workflowInner wf _itemInner
+        PaginatedItemJob job ->
+          return $ padLeft (Pad 4) $
+            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+              jobInner job _itemInner
   ]
 
 wrapper :: Int -> Bool -> MainListElem' f -> [Maybe (Widget ClickableName)] -> Widget ClickableName
