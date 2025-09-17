@@ -10,7 +10,6 @@ module Sauron.Actions (
   , fetchRepo
 
   , fetchWorkflows
-  , fetchWorkflowsWithJobs
 
   , fetchIssues
   , fetchIssue
@@ -142,12 +141,6 @@ fetchWorkflowJobs owner name workflowRunId inner = do
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerWorkflow (responseBody v)))
 
-fetchWorkflowsWithJobs :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
-fetchWorkflowsWithJobs owner name =
-  fetchPaginatedPaginated PaginatedJobs "Jobs" "" (\fc -> workflowRunsR owner name mempty fc) PaginatedItemsWorkflows
-
 fetchJobs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
   ) => Name Owner -> Name Repo -> Id WorkflowRun -> TVar MainListElemVariable -> m ()
@@ -166,24 +159,49 @@ fetchIssue owner name issueNumber issueVar = do
       Right x -> atomically $ do
         writeTVar issueVar (Fetched (responseBody x))
 
-refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> MainListElemVariable -> m ()
-refresh _ (MainListElemHeading {}) _ = return () -- TODO: refresh all repos
-refresh bc (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) _ = liftIO $ do
+refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> NonEmpty MainListElemVariable -> m ()
+refresh _ (MainListElemHeading {}) _parents = return () -- TODO: refresh all repos
+refresh bc (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) _parents = liftIO $ do
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
   void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
-  void $ async $ liftIO $ runReaderT (fetchWorkflowsWithJobs owner name _workflowsChild) bc
-refresh bc (MainListElemPaginated {..}) (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) = liftIO $ case _typ of
-  PaginatedIssues -> void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
-  PaginatedPulls -> void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
-  PaginatedWorkflows -> void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
-  PaginatedJobs -> return () -- Jobs are fetched when workflow items are expanded
-refresh bc (MainListElemItem {_item, ..}) (MainListElemRepo {_namespaceName=(owner, name)}) = readTVarIO _item >>= \case
+  void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
+
+refresh bc (MainListElemPaginated {_typ=PaginatedIssues}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name), _issuesChild})) = liftIO $
+   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
+refresh bc (MainListElemPaginated {_typ=PaginatedPulls}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name), _pullsChild})) = liftIO $
+   void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
+refresh bc (MainListElemPaginated {_typ=PaginatedWorkflows}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name), _workflowsChild})) = liftIO $
+   void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
+refresh bc (MainListElemPaginated {_typ=PaginatedJobs}) (findWorkflowsParent -> Just (MainListElemPaginated {_typ=PaginatedWorkflows})) = liftIO $
+   return ()
+   -- void $ async $ liftIO $ runReaderT (fetchJobs owner name _workflowsChild) bc
+
+refresh bc (MainListElemItem {_item, ..}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) = readTVarIO _item >>= \case
   Fetched (PaginatedItemIssue (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _itemInner) bc
   Fetched (PaginatedItemPull (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name issueNumber _itemInner) bc
   Fetched (PaginatedItemWorkflow (WorkflowRun {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId _itemInner) bc
   Fetched (PaginatedItemJob _) -> return ()
   _ -> return ()
 refresh _ _ _ = return ()
+
+findRepoParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariable
+findRepoParent elems = viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList elems]
+
+findWorkflowsParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariable
+findWorkflowsParent elems = viaNonEmpty head [x | x@(MainListElemPaginated {_typ=PaginatedWorkflows}) <- toList elems]
+
+getSelfVar :: MainListElemVariable -> NonEmpty MainListElemVariable -> Maybe (TVar MainListElemVariable)
+getSelfVar (MainListElemPaginated {_typ=PaginatedIssues}) (findRepoParent -> Just repo) = Just $ _issuesChild repo
+getSelfVar (MainListElemPaginated {_typ=PaginatedPulls}) (findRepoParent -> Just repo) = Just $ _pullsChild repo
+getSelfVar (MainListElemPaginated {_typ=PaginatedWorkflows}) (findRepoParent -> Just repo) = Just $ _workflowsChild repo
+getSelfVar (MainListElemPaginated {_typ=PaginatedJobs}) (findWorkflowsParent -> Just parent) = Nothing
+
+-- getSelfVar (MainListElem {_typ=PaginatedIssues, ..}) (findRepoParent -> Just repo) = Just $ _issuesChild repo
+-- getSelfVar (MainListElem {_typ=PaginatedPulls, ..}) (findRepoParent -> Just repo) = Just $ _pullsChild repo
+-- getSelfVar (MainListElem {_typ=PaginatedWorkflows, ..}) (findRepoParent -> Just repo) = Just $ _workflowsChild repo
+-- getSelfVar (MainListElem {_typ=PaginatedJobs}) (findWorkflowsParent -> Just parent) = Nothing
+
+getSelfVar _ _ = Nothing
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m

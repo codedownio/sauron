@@ -90,7 +90,7 @@ reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
 
   atomically $ writeTVar (_toggled node) True
 
-  refresh baseContext node node
+  refresh baseContext node (node :| [])
 
   return $ V.fromList [node]
 

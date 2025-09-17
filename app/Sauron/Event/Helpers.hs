@@ -16,27 +16,27 @@ import Sauron.Types
 
 withFixedElemAndParents :: (
   MonadIO m
-  ) => AppState -> (MainListElem -> (NonEmpty MainListElemVariable) -> m ()) -> m ()
+  ) => AppState -> (MainListElem -> MainListElemVariable -> NonEmpty MainListElemVariable -> m ()) -> m ()
 withFixedElemAndParents s cb = do
   case listSelectedElement (s ^. appMainList) of
     Nothing -> return ()
     Just (n, fixedElem) ->
       atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
         Nothing -> return ()
-        Just elems -> cb fixedElem elems
+        Just elems -> cb fixedElem (last elems) elems
 
 withNthChildAndMaybeRepoParent :: (
   MonadIO m
   ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe MainListElemVariable -> m ()) -> m ()
 withNthChildAndMaybeRepoParent s cb =
-  withFixedElemAndParents s $ \fixedEl elems ->
+  withFixedElemAndParents s $ \fixedEl _variableEl elems ->
     cb fixedEl (last elems) (viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList elems])
 
 withNthChildAndMaybePaginationParent :: (
   MonadIO m
   ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe MainListElemVariable -> m ()) -> m ()
 withNthChildAndMaybePaginationParent s cb =
-  withFixedElemAndParents s $ \fixedEl elems ->
+  withFixedElemAndParents s $ \fixedEl _variableEl elems ->
     cb fixedEl (last elems) (viaNonEmpty head [x | x@(MainListElemPaginated {}) <- toList elems])
 
 withNthChild :: MonadIO m => AppState -> (MainListElem -> MainListElemVariable -> m ()) -> m ()

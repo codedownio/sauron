@@ -26,12 +26,12 @@ appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (l
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
-    withFixedElemAndParents s $ \_fixedEl parents -> case (viaNonEmpty head [x | x@(MainListElemPaginated {}) <- toList parents], viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList parents]) of
-      (Just el@(MainListElemPaginated {..}), Just repoEl) -> do
+    withFixedElemAndParents s $ \_fixedEl _variableEl parents -> case (viaNonEmpty head [x | x@(MainListElemPaginated {}) <- toList parents], viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList parents]) of
+      (Just el@(MainListElemPaginated {..}), Just _repoEl) -> do
         atomically $ do
           writeTVar _search $ SearchText (formState form)
           writeTVar _pageInfo $ PageInfo 1 Nothing Nothing Nothing Nothing
-        refresh (s ^. appBaseContext) el repoEl
+        refresh (s ^. appBaseContext) el parents
       _ -> modify (appForm .~ Nothing)
     modify (appForm .~ Nothing)
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
@@ -67,8 +67,8 @@ appEvent s (VtyEvent e) = case e of
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
-    withNthChildAndRepoParent s $ \_fixedEl el repoEl ->
-      refresh (s ^. appBaseContext) el repoEl
+    withFixedElemAndParents s $ \_fixedEl el parents ->
+      refresh (s ^. appBaseContext) el parents
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 
@@ -117,13 +117,13 @@ appEvent _ _ = return ()
 
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
-modifyToggled s cb = withNthChildAndRepoParent s $ \fixedEl mle repoElem -> do
+modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do
   isOpen <- liftIO $ atomically $ do
     modifyTVar' (_toggled mle) cb
     readTVar (_toggled mle)
   when isOpen $
     unlessM (hasStartedInitialFetch fixedEl) $
-      refresh (s ^. appBaseContext) mle repoElem
+      refresh (s ^. appBaseContext) mle parents
   where
     hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
     hasStartedInitialFetch (MainListElemHeading {}) = return True

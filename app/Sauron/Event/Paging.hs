@@ -20,7 +20,7 @@ tryNavigatePage s cb = do
       didChange <- atomically $ stateTVar _pageInfo $ \pi ->
         let pi' = cb pi in (pi' /= pi, pi')
       when didChange $
-        refresh (s ^. appBaseContext) el repoEl
+        refresh (s ^. appBaseContext) el (repoEl :| [])
     _ -> return ()
 
 goNextPage :: PageInfo -> PageInfo
