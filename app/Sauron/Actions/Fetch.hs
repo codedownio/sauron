@@ -3,7 +3,6 @@
 module Sauron.Actions.Fetch (
   fetchPaginated'
   , fetchPaginated
-  , fetchPaginatedPaginated
 ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -87,63 +86,3 @@ fetchPaginated mkReq wrapResponse = fetchPaginated' mkReq wrapResponse makeItemC
           , _depth = parentDepth + 1
           , _ident = identifier
           }
-
-fetchPaginatedPaginated :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
-  )
-  => PaginatedType
-  -> Text
-  -> Text
-  -> (FetchCount -> Request k res)
-  -> (res -> PaginatedItems)
-  -> TVar MainListElemVariable
-  -> m ()
-fetchPaginatedPaginated childType childLabel childUrlSuffix mkReq wrapResponse =
-  fetchPaginated' mkReq wrapResponse (makePaginatedChildren childType childLabel childUrlSuffix)
-  where
-    makePaginatedChildren childType' childLabel' childUrlSuffix' parentDepth paginatedItems identifiers = do
-      forM (zip paginatedItems identifiers) $ \(paginatedItem, identifier) -> do
-        itemVar <- newTVar (Fetched paginatedItem)
-        toggledVar <- newTVar False
-
-        -- For workflows, create a child paginated section that will hold jobs
-        case paginatedItem of
-          PaginatedItemWorkflow _ -> do
-            let childIdentifier = identifier * 1000 + 1 -- Simple child ID generation
-            childItemsVar <- newTVar NotFetched
-            childToggledVar <- newTVar False
-            childChildrenVar <- newTVar []
-            childSearchVar <- newTVar SearchNone
-            childPageInfoVar <- newTVar $ PageInfo 1 Nothing Nothing Nothing Nothing
-
-            let childPaginated = MainListElemPaginated {
-                  _typ = childType'
-                  , _items = childItemsVar
-                  , _label = childLabel'
-                  , _urlSuffix = childUrlSuffix'
-                  , _toggled = childToggledVar
-                  , _children = childChildrenVar
-                  , _search = childSearchVar
-                  , _pageInfo = childPageInfoVar
-                  , _depth = parentDepth + 2
-                  , _ident = childIdentifier
-                  }
-
-            itemInnerVar <- newTVar (Fetched (PaginatedItemInnerPaginated childPaginated))
-
-            pure $ MainListElemItem {
-              _item = itemVar
-              , _itemInner = itemInnerVar
-              , _toggled = toggledVar
-              , _depth = parentDepth + 1
-              , _ident = identifier
-              }
-          _ -> do
-            itemInnerVar <- newTVar NotFetched
-            pure $ MainListElemItem {
-              _item = itemVar
-              , _itemInner = itemInnerVar
-              , _toggled = toggledVar
-              , _depth = parentDepth + 1
-              , _ident = identifier
-              }

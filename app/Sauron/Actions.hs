@@ -7,34 +7,19 @@ module Sauron.Actions (
 
   , withScroll
 
-  , fetchRepo
-
-  , fetchWorkflows
-
-  , fetchIssues
-  , fetchIssue
-
-  , fetchWorkflowJobs
-  , fetchJobs
-
   , refresh
   , refreshAll
   ) where
 
 import Brick as B
 import Brick.Widgets.List
-import Control.Exception.Safe (bracketOnError_)
-import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import Data.String.Interpolate
-import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
-import Network.HTTP.Client (responseBody)
 import Relude
-import Sauron.Actions.Fetch
-import Sauron.Actions.Util
+import Sauron.Fetch
 import Sauron.Types
 import UnliftIO.Async
 import UnliftIO.Process
@@ -64,101 +49,6 @@ withScroll s action = do
     Just (_, el) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident el}|])
     _ -> return ()
 
-fetchRepo :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> TVar (Fetchable Repo) -> m ()
-fetchRepo owner name repoVar = do
-  BaseContext {auth} <- ask
-  bracketOnError_ (atomically $ writeTVar repoVar Fetching)
-                  (atomically $ writeTVar repoVar (Errored "Repo fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ github auth (repositoryR owner name)) >>= \case
-      Left err -> atomically $ writeTVar repoVar (Errored (show err))
-      Right x -> atomically $ writeTVar repoVar (Fetched x)
-
-fetchIssues :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
-fetchIssues owner name childrenVar = do
-  extraTerms <- readTVarIO childrenVar >>= (readTVarIO . _search) >>= \case
-    SearchNone -> pure []
-    SearchText t -> pure $ T.words t
-
-  let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
-
-  fetchPaginated (searchIssuesR fullQuery) PaginatedItemsIssues childrenVar
-
-fetchPulls :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
-fetchPulls owner name childrenVar = do
-  extraTerms <- readTVarIO childrenVar >>= (readTVarIO . _search) >>= \case
-    SearchNone -> pure []
-    SearchText t -> pure $ T.words t
-
-  let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
-
-  fetchPaginated (searchIssuesR fullQuery) PaginatedItemsPulls childrenVar
-
-fetchWorkflows :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
-fetchWorkflows owner name childrenVar = do
-  fetchPaginated (workflowRunsR owner name mempty) PaginatedItemsWorkflows childrenVar
-
-fetchIssueComments :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable PaginatedItemInner) -> m ()
-fetchIssueComments owner name issueNumber inner = do
-  BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar inner Fetching)
-                  (atomically $ writeTVar inner (Errored "Issue comments fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
-      Left err -> atomically $ writeTVar inner (Errored (show err))
-      Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerIssue (responseBody v)))
-
-fetchPullComments :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable PaginatedItemInner) -> m ()
-fetchPullComments owner name issueNumber inner = do
-  BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar inner Fetching)
-                  (atomically $ writeTVar inner (Errored "Pull comments fetch failed with exception.")) $
-    -- pullRequestCommentsR returns comments on the "unified diff"
-    -- there are also "commit comments" and "issue comments".
-    -- The last one are the most common on PRs, so we use commentsR
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
-      Left err -> atomically $ writeTVar inner (Errored (show err))
-      Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerPull (responseBody v)))
-
-fetchWorkflowJobs :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Id WorkflowRun -> TVar (Fetchable PaginatedItemInner) -> m ()
-fetchWorkflowJobs owner name workflowRunId inner = do
-  BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar inner Fetching)
-                  (atomically $ writeTVar inner (Errored "Workflow jobs fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
-      Left err -> atomically $ writeTVar inner (Errored (show err))
-      Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemInnerWorkflow (responseBody v)))
-
-fetchJobs :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> Id WorkflowRun -> TVar MainListElemVariable -> m ()
-fetchJobs owner name workflowRunId = fetchPaginated (jobsForWorkflowRunR owner name workflowRunId) PaginatedItemsJobs
-
-fetchIssue :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable Issue) -> m ()
-fetchIssue owner name issueNumber issueVar = do
-  BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar issueVar Fetching)
-                  (atomically $ writeTVar issueVar (Errored "Workflows fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
-      Left err -> atomically $ do
-        writeTVar issueVar (Errored (show err))
-      Right x -> atomically $ do
-        writeTVar issueVar (Fetched (responseBody x))
-
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> NonEmpty MainListElemVariable -> m ()
 refresh _ (MainListElemHeading {}) _parents = return () -- TODO: refresh all repos
 refresh bc (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) _parents = liftIO $ do
@@ -172,9 +62,14 @@ refresh bc (MainListElemPaginated {_typ=PaginatedPulls}) (findRepoParent -> Just
    void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
 refresh bc (MainListElemPaginated {_typ=PaginatedWorkflows}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name), _workflowsChild})) = liftIO $
    void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
-refresh bc (MainListElemPaginated {_typ=PaginatedJobs}) (findWorkflowsParent -> Just (MainListElemPaginated {_typ=PaginatedWorkflows})) = liftIO $
-   return ()
-   -- void $ async $ liftIO $ runReaderT (fetchJobs owner name _workflowsChild) bc
+refresh bc (MainListElemPaginated {_typ=PaginatedJobs}) parents = case (findRepoParent parents, findWorkflowsParent parents) of
+  (Just (MainListElemRepo {_namespaceName=(owner, name)}), Just (MainListElemPaginated {_typ=PaginatedWorkflows})) -> liftIO $
+     void $ async $ liftIO $ runReaderT (fetchJobs owner name workflowId readSelf writeSelf) bc
+      where
+        workflowId = undefined
+        readSelf = undefined
+        writeSelf = undefined
+  _ -> return ()
 
 refresh bc (MainListElemItem {_item, ..}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) = readTVarIO _item >>= \case
   Fetched (PaginatedItemIssue (Issue {..})) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _itemInner) bc
@@ -191,9 +86,9 @@ findWorkflowsParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariab
 findWorkflowsParent elems = viaNonEmpty head [x | x@(MainListElemPaginated {_typ=PaginatedWorkflows}) <- toList elems]
 
 getSelfVar :: MainListElemVariable -> NonEmpty MainListElemVariable -> Maybe (TVar MainListElemVariable)
-getSelfVar (MainListElemPaginated {_typ=PaginatedIssues}) (findRepoParent -> Just repo) = Just $ _issuesChild repo
-getSelfVar (MainListElemPaginated {_typ=PaginatedPulls}) (findRepoParent -> Just repo) = Just $ _pullsChild repo
-getSelfVar (MainListElemPaginated {_typ=PaginatedWorkflows}) (findRepoParent -> Just repo) = Just $ _workflowsChild repo
+getSelfVar (MainListElemPaginated {_typ=PaginatedIssues}) (findRepoParent -> Just r) = Just $ _issuesChild r
+getSelfVar (MainListElemPaginated {_typ=PaginatedPulls}) (findRepoParent -> Just r) = Just $ _pullsChild r
+getSelfVar (MainListElemPaginated {_typ=PaginatedWorkflows}) (findRepoParent -> Just r) = Just $ _workflowsChild r
 getSelfVar (MainListElemPaginated {_typ=PaginatedJobs}) (findWorkflowsParent -> Just parent) = Nothing
 
 -- getSelfVar (MainListElem {_typ=PaginatedIssues, ..}) (findRepoParent -> Just repo) = Just $ _issuesChild repo
