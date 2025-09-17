@@ -165,7 +165,6 @@ data MainListElem' f =
       _typ :: PaginatedType
       , _items :: Switchable f (Fetchable PaginatedItems)
 
-      , _label :: Text
       , _urlSuffix :: Text
 
       , _toggled :: Switchable f Bool
@@ -206,7 +205,7 @@ data AppEvent =
 instance Show (MainListElem' f) where
   show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
   show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
-  show (MainListElemPaginated {..}) = [i|Paginated<#{_label}>|]
+  show (MainListElemPaginated {..}) = [i|Paginated<#{_typ}>|]
   show (MainListElemItem {}) = [i|Item|]
 
 data AppState = AppState {

@@ -47,21 +47,21 @@ listDrawElement _appState ix isSelected x@(MainListElemHeading {..}) = wrapper i
 listDrawElement _appState ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled _namespaceName _repo _healthCheck
   ]
-listDrawElement appState ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSelected x [
-  Just $ hBox $ catMaybes [
-    Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-    , Just $ padRight (Pad 1) $ str $ toString _label
-    , Just $ case _items of
-        NotFetched -> str "(Not fetched)"
-        Fetching -> str "(Fetching)"
-        Errored msg -> str [i|Errored: #{msg}|]
-        Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
-        Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
-        Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
-        Fetched (PaginatedItemsJobs xs) -> str [i|(#{withTotalCountTotalCount xs})|]
-    , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
-    ]
-  ]
+-- listDrawElement appState ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSelected x [
+--   Just $ hBox $ catMaybes [
+--     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+--     , Just $ padRight (Pad 1) $ str $ toString _label
+--     , Just $ case _items of
+--         NotFetched -> str "(Not fetched)"
+--         Fetching -> str "(Fetching)"
+--         Errored msg -> str [i|Errored: #{msg}|]
+--         Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
+--         Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
+--         Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
+--         Fetched (PaginatedItemsJobs xs) -> str [i|(#{withTotalCountTotalCount xs})|]
+--     , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
+--     ]
+--   ]
 listDrawElement appState ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
   Just $ case _item of
     Fetched (PaginatedItemIssue issue) -> issueLine (_appNow appState) _toggled issue

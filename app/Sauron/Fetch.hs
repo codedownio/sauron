@@ -83,7 +83,6 @@ fetchWorkflows owner name childrenVar =
         return $ MainListElemPaginated {
           _typ = PaginatedJobs
           , _items = childItemsVar
-          , _label = "asdf"
           , _urlSuffix = "workflows"
           , _toggled = childToggledVar
           , _children = childChildrenVar

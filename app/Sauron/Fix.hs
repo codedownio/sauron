@@ -57,7 +57,6 @@ fixMainListElem (MainListElemPaginated {..}) = do
     _typ = _typ
     , _items = itemsFixed
 
-    , _label = _label
     , _urlSuffix = _urlSuffix
     , _toggled = toggledFixed
     , _children = childrenFixed

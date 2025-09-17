@@ -33,7 +33,6 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   issuesChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedIssues
     , _items = issuesVar
-    , _label = "Issues"
     , _urlSuffix = "issues"
     , _toggled = issuesToggledVar
     , _children = issuesChildrenVar
@@ -52,7 +51,6 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   pullsChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedPulls
     , _items = pullsVar
-    , _label = "Pulls"
     , _urlSuffix = "pulls"
     , _toggled = pullsToggledVar
     , _children = pullsChildrenVar
@@ -71,7 +69,6 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   workflowsChildVar <- newTVarIO $ MainListElemPaginated {
     _typ = PaginatedWorkflows
     , _items = workflowsVar
-    , _label = "Workflows"
     , _urlSuffix = "actions"
     , _toggled = workflowsToggledVar
     , _children = workflowsChildrenVar
