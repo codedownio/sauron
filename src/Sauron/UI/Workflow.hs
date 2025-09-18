@@ -4,6 +4,8 @@ module Sauron.UI.Workflow (
   workflowLine
   , workflowStatusToIcon
   , workflowInner
+
+  , statusToIcon
   ) where
 
 import Brick
@@ -27,7 +29,7 @@ workflowLine toggled (WorkflowRun {..}) = vBox [line1, line2]
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString workflowRunDisplayTitle
-      , padLeft (Pad 1) $ getIcon $ fromMaybe workflowRunStatus workflowRunConclusion
+      , padLeft (Pad 1) $ statusToIcon $ fromMaybe workflowRunStatus workflowRunConclusion
       , padLeft Max $ hBox [
           withAttr branchAttr $ str (toString workflowRunHeadBranch)
           , str " "
@@ -56,8 +58,8 @@ workflowStatusToIcon WorkflowCancelled = cancelled
 workflowStatusToIcon WorkflowNeutral = neutral
 workflowStatusToIcon WorkflowUnknown = unknown
 
-getIcon :: Text -> Widget n
-getIcon = workflowStatusToIcon . chooseWorkflowStatus
+statusToIcon :: Text -> Widget n
+statusToIcon = workflowStatusToIcon . chooseWorkflowStatus
 
 cancelled = withAttr cancelledAttr (str "⊘")
 greenCheck = withAttr greenCheckAttr (str "✓")
@@ -119,4 +121,3 @@ workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobs
             , padLeft (Pad 1) $ str $ show job  -- TODO: extract job name when field names are known
             ]
       _ -> str "Jobs: (Unknown format)"
-
