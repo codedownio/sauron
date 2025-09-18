@@ -23,7 +23,9 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
         tell (expandNodes _workflowsChild)
     expandNodes x@(MainListElemItem {..}) = execWriter $ do
       tell [x]
-      when _toggled $ tell _children
+      when _toggled $ do
+        forM_ _children $ \child -> do
+          tell (expandNodes child)
 
 -- * Computing nth child in the presence of expanding
 
