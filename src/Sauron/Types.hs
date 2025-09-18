@@ -185,7 +185,7 @@ instance Show (MainListElem' Variable) where
 instance Show (MainListElem' Fixed) where
   show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
   show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
-  show (MainListElemItem {..}) = [i|Item<#{_typ}, #{_state}>|]
+  show (MainListElemItem {..}) = [i|Item<#{_typ}, #{_state}, #{_children}>|]
 
 data AppState = AppState {
   _appUser :: User

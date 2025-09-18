@@ -93,7 +93,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SinglePull iss
 
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedWorkflows, ..}) = wrapper ix isSelected x [
   Just $ case _state of
-    Fetched (PaginatedItemsWorkflows (WithTotalCount _xs totalCount)) -> paginatedHeading x appState "Workflows" (str [i|(#{totalCount})|])
+    Fetched (PaginatedItemsWorkflows (WithTotalCount _xs totalCount)) -> paginatedHeading x appState "Actions" (str [i|(#{totalCount})|])
     _ -> str ""
   ]
 listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflow wf), ..}) = wrapper ix isSelected x [

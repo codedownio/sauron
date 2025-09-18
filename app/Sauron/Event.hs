@@ -9,6 +9,7 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
+import Data.String.Interpolate
 import GitHub
 import qualified Graphics.Vty as V
 import Lens.Micro
@@ -49,13 +50,19 @@ appEvent s (VtyEvent e) = case e of
   -- Scrolling in toggled items
   -- Wanted to make these uniformly Ctrl+whatever, but Ctrl+PageUp/PageDown was causing it to get KEsc and exit (?)
   V.EvKey V.KUp [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
-  V.EvKey (V.KChar 'p') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
+  -- V.EvKey (V.KChar 'p') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
   V.EvKey V.KDown [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp 1
   V.EvKey (V.KChar 'n') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp 1
   V.EvKey (V.KChar 'v') [V.MMeta] -> withScroll s $ \vp -> vScrollPage vp Up
   V.EvKey (V.KChar 'v') [V.MCtrl] -> withScroll s $ \vp -> vScrollPage vp Down
   V.EvKey V.KHome [V.MCtrl] -> withScroll s $ \vp -> vScrollToBeginning vp
   V.EvKey V.KEnd [V.MCtrl] -> withScroll s $ \vp -> vScrollToEnd vp
+
+  V.EvKey (V.KChar 'k') [V.MCtrl] -> vScrollPage (viewportScroll (InnerViewport "viewport_debugging")) Up
+  V.EvKey (V.KChar 'l') [V.MCtrl] -> vScrollPage (viewportScroll (InnerViewport "viewport_debugging")) Down
+
+  V.EvKey (V.KChar 'p') [V.MCtrl] -> vScrollBy (viewportScroll (InnerViewport "viewport_debugging")) 1
+  V.EvKey (V.KChar 'o') [V.MCtrl] -> vScrollBy (viewportScroll (InnerViewport "viewport_debugging")) (-1)
 
   -- Column 2
   V.EvKey c [V.MMeta] | c == browserToHomeKey ->
@@ -74,12 +81,10 @@ appEvent s (VtyEvent e) = case e of
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 
   V.EvKey c [] | c == openSelectedKey ->
-    withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case fixedEl of
-      MainListElemRepo {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)}))} -> openBrowserToUrl (toString url)
-      MainListElemItem {_urlSuffix} -> case repoEl of
-        MainListElemRepo {_repo} -> readTVarIO _repo >>= \case
-          Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> toString _urlSuffix)
-          _ -> return ()
+    withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case (fixedEl, repoEl) of
+      (MainListElemRepo {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)}))}, _) -> openBrowserToUrl (toString url)
+      (MainListElemItem {_urlSuffix, _typ}, MainListElemRepo {_repo}) -> readTVarIO _repo >>= \case
+        Fetched (Repo {repoHtmlUrl=(URL url)})-> openBrowserToUrl (getNodeUrl (toString url) _typ)
         _ -> return ()
       _ -> return ()
 
@@ -127,10 +132,24 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do
   where
     hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
     hasStartedInitialFetch (MainListElemHeading {}) = return True
-    hasStartedInitialFetch (MainListElemRepo {..}) = and <$> (mapM hasStartedInitialFetch [_issuesChild, _pullsChild, _workflowsChild])
+    hasStartedInitialFetch (MainListElemRepo {..}) = and <$> mapM hasStartedInitialFetch [_issuesChild, _pullsChild, _workflowsChild]
     hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _state)
 
     isFetchingOrFetched :: Fetchable a -> Bool
     isFetchingOrFetched (Fetched {}) = True
     isFetchingOrFetched (Fetching {}) = True
     isFetchingOrFetched _ = False
+
+
+getNodeUrl :: String -> NodeType -> String
+getNodeUrl repoBaseUrl PaginatedIssues = repoBaseUrl <> "/issues"
+getNodeUrl repoBaseUrl PaginatedPulls = repoBaseUrl <> "/pulls"
+getNodeUrl repoBaseUrl PaginatedWorkflows = repoBaseUrl <> "/actions"
+getNodeUrl repoBaseUrl (SingleIssue (Issue {..})) = case issueHtmlUrl of
+  Just url -> toString $ getUrl url
+  Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber}|]
+getNodeUrl repoBaseUrl (SinglePull (Issue {..})) = case issueHtmlUrl of
+  Just url -> toString $ getUrl url
+  Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber}|]
+getNodeUrl _repoBaseUrl (SingleWorkflow (WorkflowRun {..})) = toString $ getUrl workflowRunHtmlUrl
+getNodeUrl _repoBaseUrl (SingleJob (Job {..})) = toString $ getUrl jobHtmlUrl
