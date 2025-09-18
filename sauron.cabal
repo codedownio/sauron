@@ -33,6 +33,7 @@ library
       Sauron.UI.Border
       Sauron.UI.BottomBar
       Sauron.UI.Issue
+      Sauron.UI.Job
       Sauron.UI.Keys
       Sauron.UI.Markdown
       Sauron.UI.Markdown.Footnotes

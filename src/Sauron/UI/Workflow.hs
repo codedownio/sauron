@@ -3,10 +3,7 @@
 module Sauron.UI.Workflow (
   workflowLine
   , workflowStatusToIcon
-  , jobLine
-
   , workflowInner
-  , jobInner
   ) where
 
 import Brick
@@ -23,37 +20,32 @@ import Sauron.UI.Util.TimeDiff
 -- WorkflowRun {workflowRunWorkflowRunId = Id 7403805672, workflowRunName = N "ci", workflowRunHeadBranch = migrate-debug, workflowRunHeadSha = "1367fa30fc409d198e18afa95bda04d26387925e", workflowRunPath = ".github/workflows/ci.yml", workflowRunDisplayTitle = More database stuff noci, workflowRunRunNumber = 2208, workflowRunEvent = "push", workflowRunStatus = "completed", workflowRunConclusion = Just skipped, workflowRunWorkflowId = 6848152, workflowRunUrl = URL https://api.github.com/repos/codedownio/codedown/actions/runs/7403805672, workflowRunHtmlUrl = URL https://github.com/codedownio/codedown/actions/runs/7403805672, workflowRunCreatedAt = 2024-01-04 00:10:06 UTC, workflowRunUpdatedAt = 2024-01-04 00:10:10 UTC, workflowRunActor = SimpleUser simpleUserId = Id 1634990, simpleUserLogin = N thomasjm, simpleUserAvatarUrl = URL "https://avatars.githubusercontent.com/u/1634990?v=4", simpleUserUrl = URL "https://api.github.com/users/thomasjm", workflowRunAttempt = 1, workflowRunStartedAt = 2024-01-04 00:10:06 UTC}
 
 workflowLine :: Bool -> WorkflowRun -> Widget n
-workflowLine toggled (WorkflowRun {..}) = hBox [
-  withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
-
-  -- workflow-run-name (#42): title
-  , withAttr normalAttr $ str $ toString $ untagName workflowRunName
-  , str " ("
-  , withAttr hashAttr $ str "#"
-  , withAttr hashNumberAttr $ str $ show workflowRunRunNumber
-  , str "): "
-  , str $ toString workflowRunDisplayTitle
-
-  -- status
-  , padLeft (Pad 1) $ getIcon $ fromMaybe workflowRunStatus workflowRunConclusion
-
-  -- space
-  , padLeft Max (str " ")
-
-  -- branch
-  , padLeft (Pad 1) $ withAttr branchAttr $ str (toString workflowRunHeadBranch)
-  , str " / "
-  , str [i|#{timeDiff runTime}|]
-  ]
+workflowLine toggled (WorkflowRun {..}) = vBox [line1, line2]
   where
     runTime = diffUTCTime workflowRunUpdatedAt workflowRunStartedAt
 
-jobLine :: Bool -> Job -> Widget n
-jobLine toggled job = hBox [
-  withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
-  , withAttr normalAttr $ str $ show job
-  , padLeft (Pad 1) $ greenCheck
-  ]
+    line1 = hBox [
+      withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
+      , withAttr normalAttr $ str $ toString workflowRunDisplayTitle
+      , padLeft Max $ hBox [
+          withAttr branchAttr $ str (toString workflowRunHeadBranch)
+          , str " "
+          , str [i|#{timeDiff runTime}|]
+        ]
+      ]
+
+    line2 = padRight Max $ padLeft (Pad 4) $ hBox [
+      withAttr normalAttr $ str $ toString $ untagName workflowRunName
+      , str " "
+      , withAttr hashAttr $ str "#"
+      , withAttr hashNumberAttr $ str $ show workflowRunRunNumber
+      , str ": Commit "
+      , withAttr hashAttr $ str $ take 7 $ toString workflowRunHeadSha
+      , str " pushed by "
+      , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
+      , padLeft (Pad 1) $ getIcon $ fromMaybe workflowRunStatus workflowRunConclusion
+      ]
+
 
 
 workflowStatusToIcon :: WorkflowStatus -> Widget n
@@ -128,8 +120,3 @@ workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobs
             ]
       _ -> str "Jobs: (Unknown format)"
 
-jobInner :: Job -> Fetchable NodeState -> Widget n
-jobInner job _jobInner = vBox [
-  withAttr normalAttr $ str $ show job
-  , padTop (Pad 1) $ str "Job details would go here"
-  ]

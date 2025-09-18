@@ -18,6 +18,7 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Border
 import Sauron.UI.BottomBar
 import Sauron.UI.Issue
+import Sauron.UI.Job
 import Sauron.UI.Pagination
 import Sauron.UI.Pull
 import Sauron.UI.Repo

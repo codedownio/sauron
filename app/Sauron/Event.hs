@@ -50,7 +50,7 @@ appEvent s (VtyEvent e) = case e of
   -- Scrolling in toggled items
   -- Wanted to make these uniformly Ctrl+whatever, but Ctrl+PageUp/PageDown was causing it to get KEsc and exit (?)
   V.EvKey V.KUp [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
-  -- V.EvKey (V.KChar 'p') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
+  V.EvKey (V.KChar 'p') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
   V.EvKey V.KDown [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp 1
   V.EvKey (V.KChar 'n') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp 1
   V.EvKey (V.KChar 'v') [V.MMeta] -> withScroll s $ \vp -> vScrollPage vp Up
@@ -58,20 +58,19 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey V.KHome [V.MCtrl] -> withScroll s $ \vp -> vScrollToBeginning vp
   V.EvKey V.KEnd [V.MCtrl] -> withScroll s $ \vp -> vScrollToEnd vp
 
-  V.EvKey (V.KChar 'k') [V.MCtrl] -> vScrollPage (viewportScroll (InnerViewport "viewport_debugging")) Up
-  V.EvKey (V.KChar 'l') [V.MCtrl] -> vScrollPage (viewportScroll (InnerViewport "viewport_debugging")) Down
-
-  V.EvKey (V.KChar 'p') [V.MCtrl] -> vScrollBy (viewportScroll (InnerViewport "viewport_debugging")) 1
-  V.EvKey (V.KChar 'o') [V.MCtrl] -> vScrollBy (viewportScroll (InnerViewport "viewport_debugging")) (-1)
+  -- V.EvKey (V.KChar 'k') [V.MCtrl] -> vScrollPage (viewportScroll (InnerViewport "viewport_debugging")) Up
+  -- V.EvKey (V.KChar 'l') [V.MCtrl] -> vScrollPage (viewportScroll (InnerViewport "viewport_debugging")) Down
+  -- V.EvKey (V.KChar 'p') [V.MCtrl] -> vScrollBy (viewportScroll (InnerViewport "viewport_debugging")) 1
+  -- V.EvKey (V.KChar 'o') [V.MCtrl] -> vScrollBy (viewportScroll (InnerViewport "viewport_debugging")) (-1)
 
   -- Column 2
-  V.EvKey c [V.MMeta] | c == browserToHomeKey ->
+  V.EvKey c [] | c == browserToHomeKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url)
-  V.EvKey c [V.MMeta] | c == browserToIssuesKey ->
+  V.EvKey c [] | c == browserToIssuesKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "issues")
-  V.EvKey c [V.MMeta] | c == browserToPullsKey ->
+  V.EvKey c [] | c == browserToPullsKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "pulls")
-  V.EvKey c [V.MMeta] | c == browserToActionsKey ->
+  V.EvKey c [] | c == browserToActionsKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
