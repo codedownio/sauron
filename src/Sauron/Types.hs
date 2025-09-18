@@ -94,7 +94,6 @@ data NodeType =
   PaginatedIssues
   | PaginatedPulls
   | PaginatedWorkflows
-  | PaginatedJobs
 
   | SingleIssue Issue
   | SinglePull Issue

@@ -62,14 +62,6 @@ refresh bc (MainListElemItem {_typ=PaginatedPulls}) (findRepoParent -> Just (Mai
    void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
 refresh bc (MainListElemItem {_typ=PaginatedWorkflows}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name), _workflowsChild})) = liftIO $
    void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
--- refresh bc (MainListElemItem {_typ=PaginatedJobs}) parents = case (findRepoParent parents, findWorkflowsParent parents) of
---   (Just (MainListElemRepo {_namespaceName=(owner, name)}), Just (MainListElemItem {_typ=PaginatedWorkflows})) -> liftIO $
---      void $ async $ liftIO $ runReaderT (fetchJobs owner name workflowId readSelf writeSelf) bc
---       where
---         workflowId = undefined
---         readSelf = undefined
---         writeSelf = undefined
---   _ -> return ()
 
 refresh bc (MainListElemItem {_typ=(SingleIssue (Issue {..})), _state}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
@@ -92,11 +84,9 @@ findRepoParent elems = viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList e
 -- getSelfVar (MainListElemItem {_typ=PaginatedIssues}) (findRepoParent -> Just r) = Just $ _issuesChild r
 -- getSelfVar (MainListElemItem {_typ=PaginatedPulls}) (findRepoParent -> Just r) = Just $ _pullsChild r
 -- getSelfVar (MainListElemItem {_typ=PaginatedWorkflows}) (findRepoParent -> Just r) = Just $ _workflowsChild r
--- getSelfVar (MainListElemItem {_typ=PaginatedJobs}) (findWorkflowsParent -> Just parent) = Nothing
 -- -- getSelfVar (MainListElem {_typ=PaginatedIssues, ..}) (findRepoParent -> Just repo) = Just $ _issuesChild repo
 -- -- getSelfVar (MainListElem {_typ=PaginatedPulls, ..}) (findRepoParent -> Just repo) = Just $ _pullsChild repo
 -- -- getSelfVar (MainListElem {_typ=PaginatedWorkflows, ..}) (findRepoParent -> Just repo) = Just $ _workflowsChild repo
--- -- getSelfVar (MainListElem {_typ=PaginatedJobs}) (findWorkflowsParent -> Just parent) = Nothing
 -- getSelfVar _ _ = Nothing
 
 refreshAll :: (

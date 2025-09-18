@@ -31,7 +31,7 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = [vBox [
                  topBox app
                  , borderWithCounts app
-                 -- , strWrap (show (app ^. appMainList))
+                 , strWrap (show (app ^. appMainList))
                  , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
                  , clickable InfoBar $ bottomBar app
                  ]
@@ -107,7 +107,19 @@ listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflo
         _ -> return $ str ""
   ]
 
-listDrawElement _appState _ix _isSelected (MainListElemItem {}) = str ""
+-- * Jobs
+
+listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job), ..}) = wrapper ix isSelected x [
+  Just $ jobLine _toggled job
+  , do
+      guard _toggled
+      guardFetched _state $ \case
+        PaginatedItemJob _ ->
+          return $ padLeft (Pad 4) $
+            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+              jobInner job _state
+        _ -> return $ str ""
+  ]
 
 
 paginatedHeading ::
