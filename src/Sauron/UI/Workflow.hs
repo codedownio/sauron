@@ -27,6 +27,7 @@ workflowLine toggled (WorkflowRun {..}) = vBox [line1, line2]
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString workflowRunDisplayTitle
+      , padLeft (Pad 1) $ getIcon $ fromMaybe workflowRunStatus workflowRunConclusion
       , padLeft Max $ hBox [
           withAttr branchAttr $ str (toString workflowRunHeadBranch)
           , str " "
@@ -43,7 +44,6 @@ workflowLine toggled (WorkflowRun {..}) = vBox [line1, line2]
       , withAttr hashAttr $ str $ take 7 $ toString workflowRunHeadSha
       , str " pushed by "
       , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
-      , padLeft (Pad 1) $ getIcon $ fromMaybe workflowRunStatus workflowRunConclusion
       ]
 
 
