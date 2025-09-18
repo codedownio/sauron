@@ -31,7 +31,8 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = [vBox [
                  topBox app
                  , borderWithCounts app
-                 , strWrap (show (app ^. appMainList))
+                 -- , fixedHeightOrViewportPercent (InnerViewport [i|viewport_debugging|]) 50 $
+                 --     vBox [border $ strWrap (show item <> "\n") | item <- toList (app ^. appMainList)]
                  , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
                  , clickable InfoBar $ bottomBar app
                  ]
