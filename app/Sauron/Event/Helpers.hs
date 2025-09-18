@@ -37,7 +37,7 @@ withNthChildAndMaybePaginationParent :: (
   ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe MainListElemVariable -> m ()) -> m ()
 withNthChildAndMaybePaginationParent s cb =
   withFixedElemAndParents s $ \fixedEl _variableEl elems ->
-    cb fixedEl (last elems) (viaNonEmpty head [x | x@(MainListElemPaginated {}) <- toList elems])
+    cb fixedEl (last elems) (viaNonEmpty head [x | x@(MainListElemItem {}) <- toList elems])
 
 withNthChild :: MonadIO m => AppState -> (MainListElem -> MainListElemVariable -> m ()) -> m ()
 withNthChild s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el _ -> cb fixedEl el
@@ -76,8 +76,8 @@ withNthChildAndRepoParent s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el 
 --     Nothing -> loop xs
 --   [] -> pure Nothing
 
-openBrowserToItem :: MonadIO m => PaginatedItem -> m ()
-openBrowserToItem (PaginatedItemIssue (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
-openBrowserToItem (PaginatedItemPull (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
-openBrowserToItem (PaginatedItemWorkflow (WorkflowRun {workflowRunHtmlUrl=url})) = openBrowserToUrl (toString (getUrl url))
+openBrowserToItem :: MonadIO m => NodeState -> m ()
+-- openBrowserToItem (PaginatedItemIssue (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
+-- openBrowserToItem (PaginatedItemPull (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
+-- openBrowserToItem (PaginatedItemWorkflow (WorkflowRun {workflowRunHtmlUrl=url})) = openBrowserToUrl (toString (getUrl url))
 openBrowserToItem _ = return ()

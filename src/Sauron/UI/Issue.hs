@@ -10,6 +10,7 @@ import Brick
 import Brick.Widgets.Border
 import Data.String.Interpolate
 import Data.Time
+import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
 import Relude
@@ -38,7 +39,7 @@ issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) = vBox [lin
       , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
-issueInner :: UTCTime -> Issue -> Text -> Fetchable PaginatedItemInner -> Widget n
+issueInner :: UTCTime -> Issue -> Text -> Fetchable (V.Vector IssueComment) -> Widget n
 -- issueInner body = vBox [strWrap (toString body)]
 issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) body inner = vBox (firstCell : comments)
   where
@@ -48,7 +49,7 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
 
     comments :: [Widget n]
     comments = case inner of
-      Fetched (PaginatedItemInnerIssue cs) -> fmap renderComment (toList cs)
+      Fetched cs -> fmap renderComment (toList cs)
       _ -> []
 
     -- TODO: use issueCommentUpdatedAt

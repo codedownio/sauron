@@ -147,8 +147,14 @@ buildBaseContext = do
 
   manager <- newManager tlsManagerSettings
 
-  idRef <- newIORef 0
-  let getIdentifier = atomicModifyIORef' idRef (\x -> (x + 1, x))
+  idRef <- newTVarIO 0
+
+  let getIdentifierSTM = do
+        ret <- readTVar idRef
+        writeTVar idRef (ret + 1)
+        return ret
+
+  let getIdentifier = liftIO $ atomically getIdentifierSTM
 
   return $ BaseContext {
     requestSemaphore = githubApiSemaphore
@@ -156,4 +162,5 @@ buildBaseContext = do
     , debugFn = debugFn
     , manager = manager
     , getIdentifier = getIdentifier
+    , getIdentifierSTM = getIdentifierSTM
     }

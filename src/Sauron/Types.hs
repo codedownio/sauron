@@ -33,6 +33,7 @@ data BaseContext = BaseContext {
   , debugFn :: Text -> IO ()
   , manager :: Manager
   , getIdentifier :: IO Int
+  , getIdentifierSTM :: STM Int
   }
 
 data ClickableName =
@@ -89,40 +90,36 @@ data HealthCheckResult =
   | HealthCheckUnhealthy Text
   deriving (Show, Eq)
 
-data PaginatedType =
+data NodeType =
   PaginatedIssues
   | PaginatedPulls
   | PaginatedWorkflows
   | PaginatedJobs
+
+  | SingleIssue Issue
+  | SinglePull Issue
+  | SingleWorkflow WorkflowRun
+  | SingleJob
   deriving (Show, Eq)
 
-data PaginatedItems =
+data NodeState =
   PaginatedItemsIssues (SearchResult Issue)
   | PaginatedItemsPulls (SearchResult Issue)
   | PaginatedItemsWorkflows (WithTotalCount WorkflowRun)
   | PaginatedItemsJobs (WithTotalCount Job)
-  deriving (Show, Eq)
 
-data PaginatedItem =
-  PaginatedItemIssue Issue
-  | PaginatedItemPull Issue
-  | PaginatedItemWorkflow WorkflowRun
+  | PaginatedItemIssue (V.Vector IssueComment)
+  | PaginatedItemPull (V.Vector IssueComment)
+  | PaginatedItemWorkflow (WithTotalCount Job)
   | PaginatedItemJob Job
   deriving (Show, Eq)
 
-data PaginatedItemInner =
-  PaginatedItemInnerIssue (V.Vector IssueComment)
-  | PaginatedItemInnerPull (V.Vector IssueComment)
-  | PaginatedItemInnerWorkflow (WithTotalCount Job)
-  | PaginatedItemInnerJob Job
-  | PaginatedItemInnerPaginated (MainListElem' Variable)
-  deriving (Show)
-
-paginatedItemsToList :: PaginatedItems -> [PaginatedItem]
-paginatedItemsToList (PaginatedItemsIssues (SearchResult _ xs)) = fmap PaginatedItemIssue $ V.toList xs
-paginatedItemsToList (PaginatedItemsPulls (SearchResult _ xs)) = fmap PaginatedItemPull $ V.toList xs
-paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
-paginatedItemsToList (PaginatedItemsJobs (WithTotalCount xs _)) = fmap PaginatedItemJob $ V.toList xs
+paginatedItemsToList :: NodeState -> [NodeState]
+paginatedItemsToList = undefined
+-- paginatedItemsToList (PaginatedItemsIssues (SearchResult _ xs)) = fmap PaginatedItemIssue $ V.toList xs
+-- paginatedItemsToList (PaginatedItemsPulls (SearchResult _ xs)) = fmap PaginatedItemPull $ V.toList xs
+-- paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
+-- paginatedItemsToList (PaginatedItemsJobs (WithTotalCount xs _)) = fmap PaginatedItemJob $ V.toList xs
 
 data Search = SearchText Text
             | SearchNone
@@ -135,6 +132,9 @@ data PageInfo = PageInfo {
   , pageInfoNextPage :: Maybe Int
   , pageInfoLastPage :: Maybe Int
   } deriving (Show, Eq)
+
+emptyPageInfo :: PageInfo
+emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
 data MainListElem' f =
   MainListElemHeading {
@@ -161,9 +161,9 @@ data MainListElem' f =
       , _depth :: Int
       , _ident :: Int
       }
-  | MainListElemPaginated {
-      _typ :: PaginatedType
-      , _items :: Switchable f (Fetchable PaginatedItems)
+  | MainListElemItem {
+      _typ :: NodeType
+      , _state :: Switchable f (Fetchable NodeState)
 
       , _urlSuffix :: Text
 
@@ -176,37 +176,24 @@ data MainListElem' f =
       , _depth :: Int
       , _ident :: Int
       }
-  | MainListElemItem {
-      _item :: Switchable f (Fetchable PaginatedItem)
-      , _itemInner :: Switchable f (Fetchable PaginatedItemInner)
-
-      , _toggled :: Switchable f Bool
-
-      , _depth :: Int
-      , _ident :: Int
-      }
 
 type MainListElem = MainListElem' Fixed
 type MainListElemVariable = MainListElem' Variable
-
-instance Eq PaginatedItemInner where
-  (PaginatedItemInnerIssue a) == (PaginatedItemInnerIssue b) = a == b
-  (PaginatedItemInnerPull a) == (PaginatedItemInnerPull b) = a == b
-  (PaginatedItemInnerWorkflow a) == (PaginatedItemInnerWorkflow b) = a == b
-  (PaginatedItemInnerJob a) == (PaginatedItemInnerJob b) = a == b
-  (PaginatedItemInnerPaginated _) == (PaginatedItemInnerPaginated _) = False -- Different variables can't be compared
-  _ == _ = False
 
 deriving instance Eq MainListElem
 
 data AppEvent =
   ListUpdate (V.Vector MainListElem)
 
-instance Show (MainListElem' f) where
+instance Show (MainListElem' Variable) where
   show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
   show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
-  show (MainListElemPaginated {..}) = [i|Paginated<#{_typ}>|]
-  show (MainListElemItem {}) = [i|Item|]
+  show (MainListElemItem {..}) = [i|Item<#{_typ}>|]
+
+instance Show (MainListElem' Fixed) where
+  show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
+  show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
+  show (MainListElemItem {..}) = [i|Item<#{_typ}, #{_state}>|]
 
 data AppState = AppState {
   _appUser :: User

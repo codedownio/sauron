@@ -31,6 +31,7 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = [vBox [
                  topBox app
                  , borderWithCounts app
+                 , strWrap (show (app ^. appMainList))
                  , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
                  , clickable InfoBar $ bottomBar app
                  ]
@@ -47,47 +48,66 @@ listDrawElement _appState ix isSelected x@(MainListElemHeading {..}) = wrapper i
 listDrawElement _appState ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled _namespaceName _repo _healthCheck
   ]
--- listDrawElement appState ix isSelected x@(MainListElemPaginated {..}) = wrapper ix isSelected x [
---   Just $ hBox $ catMaybes [
---     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
---     , Just $ padRight (Pad 1) $ str $ toString _label
---     , Just $ case _items of
---         NotFetched -> str "(Not fetched)"
---         Fetching -> str "(Fetching)"
---         Errored msg -> str [i|Errored: #{msg}|]
---         Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
---         Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> str [i|(#{totalCount})|]
---         Fetched (PaginatedItemsWorkflows xs) -> str [i|(#{withTotalCountTotalCount xs})|]
---         Fetched (PaginatedItemsJobs xs) -> str [i|(#{withTotalCountTotalCount xs})|]
---     , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
---     ]
---   ]
-listDrawElement appState ix isSelected x@(MainListElemItem {..}) = wrapper ix isSelected x [
-  Just $ case _item of
-    Fetched (PaginatedItemIssue issue) -> issueLine (_appNow appState) _toggled issue
-    Fetched (PaginatedItemPull pull) -> pullLine (_appNow appState) _toggled pull
-    Fetched (PaginatedItemWorkflow wf) -> workflowLine _toggled wf
-    Fetched (PaginatedItemJob job) -> jobLine _toggled job
+
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedIssues, ..}) = wrapper ix isSelected x [
+  Just $ case _state of
+    Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount})|])
     _ -> str ""
+  ]
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleIssue issue), ..}) = wrapper ix isSelected x [
+  Just $ issueLine (_appNow appState) _toggled issue
   , do
       guard _toggled
-      guardFetched _item $ \case
-        PaginatedItemIssue iss@(Issue {..}) -> guardJust issueBody $ \body ->
+      guardFetched _state $ \case
+        PaginatedItemIssue comments -> guardJust (issueBody issue) $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              issueInner (_appNow appState) iss body _itemInner
-        PaginatedItemPull pr@(Issue {..}) -> guardJust issueBody $ \body ->
+              issueInner (_appNow appState) issue body (Fetched comments)
+        _ -> return $ str ""
+  ]
+
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedPulls, ..}) = wrapper ix isSelected x [
+  Just $ case _state of
+    Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> paginatedHeading x appState "Pulls" (str [i|(#{totalCount})|])
+    _ -> str ""
+  ]
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SinglePull issue), ..}) = wrapper ix isSelected x [
+  Just $ pullLine (_appNow appState) _toggled issue
+  , do
+      guard _toggled
+      guardFetched _state $ \case
+        PaginatedItemPull comments -> guardJust (issueBody issue) $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              pullInner (_appNow appState) pr body _itemInner
-        PaginatedItemWorkflow wf@(WorkflowRun {}) ->
+              issueInner (_appNow appState) issue body (Fetched comments)
+        _ -> return $ str ""
+  ]
+
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedWorkflows, ..}) = wrapper ix isSelected x [
+  Just $ case _state of
+    Fetched (PaginatedItemsWorkflows (WithTotalCount _xs totalCount)) -> paginatedHeading x appState "Workflows" (str [i|(#{totalCount})|])
+    _ -> str ""
+  ]
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflow wf), ..}) = wrapper ix isSelected x [
+  Just $ workflowLine _toggled wf
+  , do
+      guard _toggled
+      guardFetched _state $ \case
+        PaginatedItemWorkflow _ ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              workflowInner wf _itemInner
-        PaginatedItemJob job ->
-          return $ padLeft (Pad 4) $
-            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              jobInner job _itemInner
+              workflowInner wf _state
+        _ -> return $ str ""
+  ]
+
+listDrawElement _appState _ix _isSelected x@(MainListElemItem {..}) = str ""
+
+
+paginatedHeading (MainListElemItem {..}) appState label countInParens = hBox $ catMaybes [
+  Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+  , Just $ padRight (Pad 1) $ str label
+  , Just $ countInParens
+  , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
   ]
 
 wrapper :: Int -> Bool -> MainListElem' f -> [Maybe (Widget ClickableName)] -> Widget ClickableName

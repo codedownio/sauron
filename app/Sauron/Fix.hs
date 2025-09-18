@@ -44,8 +44,8 @@ fixMainListElem (MainListElemRepo {..}) = do
     , _depth = _depth
     , _ident = _ident
     }
-fixMainListElem (MainListElemPaginated {..}) = do
-  itemsFixed <- readTVar _items
+fixMainListElem (MainListElemItem {..}) = do
+  stateFixed <- readTVar _state
 
   toggledFixed <- readTVar _toggled
   childrenFixed <- readTVar _children >>= mapM fixMainListElem
@@ -53,9 +53,9 @@ fixMainListElem (MainListElemPaginated {..}) = do
   searchFixed <- readTVar _search
   pageInfoFixed <- readTVar _pageInfo
 
-  return $ MainListElemPaginated {
+  return $ MainListElemItem {
     _typ = _typ
-    , _items = itemsFixed
+    , _state = stateFixed
 
     , _urlSuffix = _urlSuffix
     , _toggled = toggledFixed
@@ -63,21 +63,6 @@ fixMainListElem (MainListElemPaginated {..}) = do
 
     , _search = searchFixed
     , _pageInfo = pageInfoFixed
-
-    , _depth = _depth
-    , _ident = _ident
-    }
-fixMainListElem (MainListElemItem {..}) = do
-  itemFixed <- readTVar _item
-  itemInnerFixed <- readTVar _itemInner
-
-  toggledFixed <- readTVar _toggled
-
-  return $ MainListElemItem {
-    _item = itemFixed
-    , _itemInner = itemInnerFixed
-
-    , _toggled = toggledFixed
 
     , _depth = _depth
     , _ident = _ident

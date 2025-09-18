@@ -21,12 +21,9 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
         tell (expandNodes _issuesChild)
         tell (expandNodes _pullsChild)
         tell (expandNodes _workflowsChild)
-    expandNodes x@(MainListElemPaginated {..}) = execWriter $ do
+    expandNodes x@(MainListElemItem {..}) = execWriter $ do
       tell [x]
       when _toggled $ tell _children
-
-    expandNodes x@(MainListElemItem {}) = [x]
-
 
 -- * Computing nth child in the presence of expanding
 
@@ -45,7 +42,7 @@ nthChildList n [] = pure $ Left n
 
 nthChild :: Int -> MainListElemVariable -> STM (Either Int (NonEmpty MainListElemVariable))
 nthChild 0 el = pure $ Right (el :| [])
-nthChild n el@(MainListElemPaginated {..}) = readTVar _toggled >>= \case
+nthChild n el@(MainListElemItem {..}) = readTVar _toggled >>= \case
   True -> (fmap ((el :|) . toList)) <$> (readTVar _children >>= nthChildList (n - 1))
   False -> pure $ Left (n - 1)
 nthChild n el@(MainListElemRepo {..}) = readTVar _toggled >>= \case

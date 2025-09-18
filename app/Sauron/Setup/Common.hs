@@ -30,9 +30,9 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   issuesSearchVar <- newTVarIO $ SearchText "is:issue is:open"
   issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   issuesIdentifier <- liftIO getIdentifier
-  issuesChildVar <- newTVarIO $ MainListElemPaginated {
+  issuesChildVar <- newTVarIO $ MainListElemItem {
     _typ = PaginatedIssues
-    , _items = issuesVar
+    , _state = issuesVar
     , _urlSuffix = "issues"
     , _toggled = issuesToggledVar
     , _children = issuesChildrenVar
@@ -48,9 +48,9 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   pullsSearchVar <- newTVarIO $ SearchText "is:pr is:open"
   pullsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   pullsIdentifier <- liftIO getIdentifier
-  pullsChildVar <- newTVarIO $ MainListElemPaginated {
+  pullsChildVar <- newTVarIO $ MainListElemItem {
     _typ = PaginatedPulls
-    , _items = pullsVar
+    , _state = pullsVar
     , _urlSuffix = "pulls"
     , _toggled = pullsToggledVar
     , _children = pullsChildrenVar
@@ -66,9 +66,9 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   workflowsSearchVar <- newTVarIO SearchNone
   workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   workflowsIdentifier <- liftIO getIdentifier
-  workflowsChildVar <- newTVarIO $ MainListElemPaginated {
+  workflowsChildVar <- newTVarIO $ MainListElemItem {
     _typ = PaginatedWorkflows
-    , _items = workflowsVar
+    , _state = workflowsVar
     , _urlSuffix = "actions"
     , _toggled = workflowsToggledVar
     , _children = workflowsChildrenVar

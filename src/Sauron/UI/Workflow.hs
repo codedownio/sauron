@@ -74,7 +74,7 @@ ellipses = withAttr ellipsesAttr (str "⋯")
 neutral = withAttr neutralAttr (str "-")
 unknown = withAttr unknownAttr (str "?")
 
-workflowInner :: WorkflowRun -> Fetchable PaginatedItemInner -> Widget n
+workflowInner :: WorkflowRun -> Fetchable NodeState -> Widget n
 workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobsSection]
   where
     runTime = diffUTCTime workflowRunUpdatedAt workflowRunStartedAt
@@ -116,7 +116,7 @@ workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobs
       NotFetched -> str "Jobs: (Not fetched)"
       Fetching -> str "Jobs: (Fetching...)"
       Errored err -> str [i|Jobs error: #{err}|]
-      Fetched (PaginatedItemInnerWorkflow (WithTotalCount jobs totalCount)) ->
+      Fetched (PaginatedItemsWorkflows (WithTotalCount jobs totalCount)) ->
         vBox [
           str [i|Jobs (#{totalCount}):|]
           , padLeft (Pad 2) $ vBox $ map renderJobSimple (V.toList jobs)
@@ -128,7 +128,7 @@ workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobs
             ]
       _ -> str "Jobs: (Unknown format)"
 
-jobInner :: Job -> Fetchable PaginatedItemInner -> Widget n
+jobInner :: Job -> Fetchable NodeState -> Widget n
 jobInner job _jobInner = vBox [
   withAttr normalAttr $ str $ show job
   , padTop (Pad 1) $ str "Job details would go here"

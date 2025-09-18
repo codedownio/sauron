@@ -16,7 +16,7 @@ import UnliftIO.STM (stateTVar)
 tryNavigatePage :: MonadIO m => AppState -> (PageInfo -> PageInfo) -> m ()
 tryNavigatePage s cb = do
   withNthChildAndRepoParent s $ \_fixedEl el repoEl -> case el of
-    MainListElemPaginated {_pageInfo} -> do
+    MainListElemItem {_pageInfo} -> do
       didChange <- atomically $ stateTVar _pageInfo $ \pi ->
         let pi' = cb pi in (pi' /= pi, pi')
       when didChange $

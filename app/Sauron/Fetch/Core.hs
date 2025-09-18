@@ -1,8 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Sauron.Actions.Fetch (
+module Sauron.Fetch.Core (
   fetchPaginated'
-  , fetchPaginated
+  , fetchPaginated''
 ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -23,22 +23,22 @@ fetchPaginated' :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
   )
   => (FetchCount -> Request k res)
-  -> (res -> PaginatedItems)
-  -> (Int -> [PaginatedItem] -> [Int] -> STM [MainListElemVariable])
+  -> (res -> NodeState)
+  -> (Int -> [NodeState] -> [Int] -> STM [MainListElemVariable])
   -> TVar MainListElemVariable
   -> m ()
 fetchPaginated' mkReq wrapResponse makeChildren parentVar = do
   BaseContext {auth, getIdentifier, manager} <- ask
 
-  MainListElemPaginated {..} <- readTVarIO parentVar
+  MainListElemItem {..} <- readTVarIO parentVar
 
   PageInfo {pageInfoCurrentPage} <- readTVarIO _pageInfo
 
-  bracketOnError_ (atomically $ writeTVar _items Fetching)
-                  (atomically $ writeTVar _items (Errored "Workflows fetch failed with exception.")) $
+  bracketOnError_ (atomically $ writeTVar _state Fetching)
+                  (atomically $ writeTVar _state (Errored "Fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just pageInfoCurrentPage))))) >>= \case
       Left err -> atomically $ do
-        writeTVar _items (Errored (show err))
+        writeTVar _state (Errored (show err))
         writeTVar _children []
 
       Right x -> do
@@ -46,7 +46,7 @@ fetchPaginated' mkReq wrapResponse makeChildren parentVar = do
         identifiers <- replicateM (L.length paginatedItems) (liftIO getIdentifier)
 
         atomically $ do
-          writeTVar _items (Fetched (wrapResponse (responseBody x)))
+          writeTVar _state (Fetched (wrapResponse (responseBody x)))
 
           let PageLinks {..} = parsePageLinks x
           let parsePageFromUri :: NURI.URI -> Maybe Int
@@ -66,23 +66,40 @@ fetchPaginated' mkReq wrapResponse makeChildren parentVar = do
           itemChildren <- makeChildren _depth paginatedItems identifiers
           writeTVar _children itemChildren
 
-fetchPaginated :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m, FromJSON res
-  ) => (FetchCount -> Request k res)
-    -> (res -> PaginatedItems)
-    -> TVar MainListElemVariable
-    -> m ()
-fetchPaginated mkReq wrapResponse = fetchPaginated' mkReq wrapResponse makeItemChildren
-  where
-    makeItemChildren parentDepth paginatedItems identifiers = do
-      forM (zip paginatedItems identifiers) $ \(iss, identifier) -> do
-        itemVar <- newTVar (Fetched iss)
-        itemInnerVar <- newTVar NotFetched
-        toggledVar' <- newTVar False
-        pure $ MainListElemItem {
-          _item = itemVar
-          , _itemInner = itemInnerVar
-          , _toggled = toggledVar'
-          , _depth = parentDepth + 1
-          , _ident = identifier
-          }
+fetchPaginated'' :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m, FromJSON res
+  )
+  => (FetchCount -> Request k res)
+  -> TVar PageInfo
+  -> (Fetchable a -> STM ())
+  -> (Either Text (res, PageInfo) -> STM ())
+  -> m ()
+fetchPaginated'' mkReq pageInfoVar writeFetchable cb = do
+  BaseContext {auth, manager} <- ask
+
+  PageInfo {pageInfoCurrentPage} <- readTVarIO pageInfoVar
+
+  bracketOnError_ (atomically $ writeFetchable Fetching)
+                  (atomically $ writeFetchable (Errored "Fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just pageInfoCurrentPage))))) >>= \case
+      Left err -> atomically $ do
+        cb $ Left (show err)
+
+      Right x -> do
+        atomically $ do
+          let PageLinks {..} = parsePageLinks x
+          let parsePageFromUri :: NURI.URI -> Maybe Int
+              parsePageFromUri uri = do
+                let q = NURI.uriQuery uri
+                let parsed :: [QueryItem] = parseQuery (encodeUtf8 q)
+                result :: ByteString <- join $ L.lookup "page" parsed
+                readMaybe (decodeUtf8 result)
+          let pgInfo = PageInfo {
+                pageInfoCurrentPage = pageInfoCurrentPage
+                , pageInfoFirstPage = pageLinksFirst >>= parsePageFromUri
+                , pageInfoPrevPage = pageLinksPrev >>= parsePageFromUri
+                , pageInfoNextPage = pageLinksNext >>= parsePageFromUri
+                , pageInfoLastPage = pageLinksLast >>= parsePageFromUri
+                }
+
+          cb $ Right (responseBody x, pgInfo)

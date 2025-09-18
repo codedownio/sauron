@@ -26,8 +26,8 @@ appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (l
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
-    withFixedElemAndParents s $ \_fixedEl _variableEl parents -> case (viaNonEmpty head [x | x@(MainListElemPaginated {}) <- toList parents], viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList parents]) of
-      (Just el@(MainListElemPaginated {..}), Just _repoEl) -> do
+    withFixedElemAndParents s $ \_fixedEl _variableEl parents -> case (viaNonEmpty head [x | x@(MainListElemItem {}) <- toList parents], viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList parents]) of
+      (Just el@(MainListElemItem {..}), Just _repoEl) -> do
         atomically $ do
           writeTVar _search $ SearchText (formState form)
           writeTVar _pageInfo $ PageInfo 1 Nothing Nothing Nothing Nothing
@@ -75,8 +75,7 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey c [] | c == openSelectedKey ->
     withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case fixedEl of
       MainListElemRepo {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)}))} -> openBrowserToUrl (toString url)
-      MainListElemItem {_item=(Fetched x)} -> openBrowserToItem x
-      MainListElemPaginated {_urlSuffix} -> case repoEl of
+      MainListElemItem {_urlSuffix} -> case repoEl of
         MainListElemRepo {_repo} -> readTVarIO _repo >>= \case
           Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> toString _urlSuffix)
           _ -> return ()
@@ -91,7 +90,7 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == editSearchKey -> do
     withNthChildAndMaybePaginationParent s $ \_fixedEl _el paginationElem -> case paginationElem of
-      Just (MainListElemPaginated {_ident, _search}) -> do
+      Just (MainListElemItem {_ident, _search}) -> do
         search' <- readTVarIO _search
         modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
       _ -> return ()
@@ -127,9 +126,8 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do
   where
     hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
     hasStartedInitialFetch (MainListElemHeading {}) = return True
-    hasStartedInitialFetch (MainListElemRepo {..}) = and <$> (mapM hasStartedInitialFetch [_issuesChild, _workflowsChild])
-    hasStartedInitialFetch (MainListElemPaginated {..}) = return $ isFetchingOrFetched _items
-    hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _item && isFetchingOrFetched _itemInner)
+    hasStartedInitialFetch (MainListElemRepo {..}) = and <$> (mapM hasStartedInitialFetch [_issuesChild, _pullsChild, _workflowsChild])
+    hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _state)
 
     isFetchingOrFetched :: Fetchable a -> Bool
     isFetchingOrFetched (Fetched {}) = True
