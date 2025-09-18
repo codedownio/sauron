@@ -9,7 +9,6 @@ import Data.Function
 import GitHub
 import Lens.Micro
 import Relude hiding (Down, pred)
-import Sauron.Actions
 import Sauron.Expanding
 import Sauron.Types
 
@@ -75,9 +74,3 @@ withNthChildAndRepoParent s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el 
 --     Just x' -> pure (Just x')
 --     Nothing -> loop xs
 --   [] -> pure Nothing
-
-openBrowserToItem :: MonadIO m => NodeState -> m ()
--- openBrowserToItem (PaginatedItemIssue (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
--- openBrowserToItem (PaginatedItemPull (Issue {issueHtmlUrl=(Just url)})) = openBrowserToUrl (toString (getUrl url))
--- openBrowserToItem (PaginatedItemWorkflow (WorkflowRun {workflowRunHtmlUrl=url})) = openBrowserToUrl (toString (getUrl url))
-openBrowserToItem _ = return ()

@@ -15,7 +15,6 @@ module Sauron.Fetch (
   , fetchIssueComments
 
   , fetchWorkflowJobs
-  , fetchJobs
   ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -109,13 +108,11 @@ fetchIssueComments :: (
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable NodeState) -> m ()
 fetchIssueComments owner name issueNumber inner = do
   BaseContext {auth, manager} <- ask
-
   bracketOnError_ (atomically $ writeTVar inner Fetching)
                   (atomically $ writeTVar inner (Errored "Issue comments fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
-      Right v -> do
-        atomically $ writeTVar inner (Fetched (PaginatedItemIssue (responseBody v)))
+      Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemIssue (responseBody v)))
 
 fetchPullComments :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -133,19 +130,20 @@ fetchPullComments owner name issueNumber inner = do
 
 fetchWorkflowJobs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Id WorkflowRun -> TVar (Fetchable NodeState) -> m ()
-fetchWorkflowJobs owner name workflowRunId inner = do
-  BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar inner Fetching)
-                  (atomically $ writeTVar inner (Errored "Workflow jobs fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
-      Left err -> atomically $ writeTVar inner (Errored (show err))
-      Right v -> atomically $ writeTVar inner (Fetched (PaginatedItemWorkflow (responseBody v)))
+  ) => Name Owner -> Name Repo -> Id WorkflowRun -> MainListElemVariable -> m ()
+fetchWorkflowJobs owner name workflowRunId (MainListElemItem {..}) = do
+  bc <- ask
 
-fetchJobs :: (
-  -- MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> Id WorkflowRun -> STM MainListElemVariable -> (MainListElemVariable -> STM ()) -> m ()
-fetchJobs _owner _name _workflowRunId _readSelf _writeSelf = undefined -- fetchPaginated (jobsForWorkflowRunR owner name workflowRunId) PaginatedItemsJobs
+  fetchPaginated'' (jobsForWorkflowRunR owner name workflowRunId) _pageInfo (writeTVar _state) $ \case
+    Left err -> do
+      writeTVar _state (Errored (show err))
+      writeTVar _children []
+    Right (wtc@(WithTotalCount results _totalCount), newPageInfo) -> do
+      writeTVar _pageInfo newPageInfo
+      writeTVar _state (Fetched (PaginatedItemsJobs wtc))
+      (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) ->
+        makeEmptyElem bc (SingleJob job) "" (_depth + 1)
+fetchWorkflowJobs _owner _name _workflowRunId _ = return ()
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -165,9 +163,9 @@ fetchIssue owner name issueNumber issueVar = do
 
 
 makeEmptyElem :: BaseContext -> NodeType -> Text -> Int -> STM MainListElemVariable
-makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth = do
+makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
   stateVar <- newTVar NotFetched
-  ident <- getIdentifierSTM
+  ident' <- getIdentifierSTM
   toggledVar <- newTVar False
   childrenVar <- newTVar []
   searchVar <- newTVar $ SearchNone
@@ -184,6 +182,6 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth = do
     , _search = searchVar
     , _pageInfo = pageInfoVar
 
-    , _depth = depth
-    , _ident = ident
+    , _depth = depth'
+    , _ident = ident'
 }

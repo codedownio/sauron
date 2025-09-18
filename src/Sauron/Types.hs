@@ -99,7 +99,7 @@ data NodeType =
   | SingleIssue Issue
   | SinglePull Issue
   | SingleWorkflow WorkflowRun
-  | SingleJob
+  | SingleJob Job
   deriving (Show, Eq)
 
 data NodeState =
@@ -113,13 +113,6 @@ data NodeState =
   | PaginatedItemWorkflow (WithTotalCount Job)
   | PaginatedItemJob Job
   deriving (Show, Eq)
-
-paginatedItemsToList :: NodeState -> [NodeState]
-paginatedItemsToList = undefined
--- paginatedItemsToList (PaginatedItemsIssues (SearchResult _ xs)) = fmap PaginatedItemIssue $ V.toList xs
--- paginatedItemsToList (PaginatedItemsPulls (SearchResult _ xs)) = fmap PaginatedItemPull $ V.toList xs
--- paginatedItemsToList (PaginatedItemsWorkflows (WithTotalCount xs _)) = fmap PaginatedItemWorkflow $ V.toList xs
--- paginatedItemsToList (PaginatedItemsJobs (WithTotalCount xs _)) = fmap PaginatedItemJob $ V.toList xs
 
 data Search = SearchText Text
             | SearchNone

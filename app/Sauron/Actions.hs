@@ -62,34 +62,31 @@ refresh bc (MainListElemItem {_typ=PaginatedPulls}) (findRepoParent -> Just (Mai
    void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
 refresh bc (MainListElemItem {_typ=PaginatedWorkflows}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name), _workflowsChild})) = liftIO $
    void $ async $ liftIO $ runReaderT (fetchWorkflows owner name _workflowsChild) bc
-refresh bc (MainListElemItem {_typ=PaginatedJobs}) parents = case (findRepoParent parents, findWorkflowsParent parents) of
-  (Just (MainListElemRepo {_namespaceName=(owner, name)}), Just (MainListElemItem {_typ=PaginatedWorkflows})) -> liftIO $
-     void $ async $ liftIO $ runReaderT (fetchJobs owner name workflowId readSelf writeSelf) bc
-      where
-        workflowId = undefined
-        readSelf = undefined
-        writeSelf = undefined
-  _ -> return ()
+-- refresh bc (MainListElemItem {_typ=PaginatedJobs}) parents = case (findRepoParent parents, findWorkflowsParent parents) of
+--   (Just (MainListElemRepo {_namespaceName=(owner, name)}), Just (MainListElemItem {_typ=PaginatedWorkflows})) -> liftIO $
+--      void $ async $ liftIO $ runReaderT (fetchJobs owner name workflowId readSelf writeSelf) bc
+--       where
+--         workflowId = undefined
+--         readSelf = undefined
+--         writeSelf = undefined
+--   _ -> return ()
 
-refresh bc (MainListElemItem {_typ=(SingleIssue (Issue {..})), _state, ..}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) = readTVarIO _state >>= \case
-  Fetched (PaginatedItemIssue _) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
-  _ -> return ()
+refresh bc (MainListElemItem {_typ=(SingleIssue (Issue {..})), _state}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
 
-refresh bc (MainListElemItem {_typ=(SinglePull (Issue {..})), _state, ..}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) = readTVarIO _state >>= \case
-  Fetched (PaginatedItemPull _) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
-  _ -> return ()
+refresh bc (MainListElemItem {_typ=(SinglePull (Issue {..})), _state}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
 
-refresh bc (MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {..})), _state, ..}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) = readTVarIO _state >>= \case
-  Fetched (PaginatedItemPull _) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId _state) bc
-  _ -> return ()
+refresh bc item@(MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {..})), _state}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId item) bc
 
 refresh _ _ _ = return ()
 
 findRepoParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariable
 findRepoParent elems = viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList elems]
 
-findWorkflowsParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariable
-findWorkflowsParent elems = viaNonEmpty head [x | x@(MainListElemItem {_typ=PaginatedWorkflows}) <- toList elems]
+-- findWorkflowsParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariable
+-- findWorkflowsParent elems = viaNonEmpty head [x | x@(MainListElemItem {_typ=PaginatedWorkflows}) <- toList elems]
 
 -- getSelfVar :: MainListElemVariable -> NonEmpty MainListElemVariable -> Maybe (TVar MainListElemVariable)
 -- getSelfVar (MainListElemItem {_typ=PaginatedIssues}) (findRepoParent -> Just r) = Just $ _issuesChild r
@@ -114,5 +111,4 @@ refreshAll elems = do
       MainListElemRepo {_namespaceName=(owner, name), ..} -> do
         fetchRepo owner name _repo
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
-      MainListElemItem {} -> return ()
       MainListElemItem {} -> return ()

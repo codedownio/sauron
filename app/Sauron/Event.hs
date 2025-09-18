@@ -20,6 +20,7 @@ import Sauron.Types
 import Sauron.UI.Keys
 import System.FilePath
 
+
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
 appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (listSelected $ s ^. appMainList))
 
