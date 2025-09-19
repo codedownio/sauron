@@ -31,7 +31,6 @@ workflowLine animationCounter toggled (WorkflowRun {..}) = vBox [line1, line2]
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString workflowRunDisplayTitle
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe workflowRunStatus workflowRunConclusion
-      , padLeft (Pad 1) $ withAttr hashAttr $ str [i|[#{workflowRunStatus}#{maybe "" (\c -> "/" <> c) workflowRunConclusion}]|]
       , padLeft Max $ hBox [
           withAttr branchAttr $ str (toString workflowRunHeadBranch)
           , str " "
@@ -63,12 +62,11 @@ workflowStatusToIcon WorkflowUnknown = unknown
 statusToIcon :: Text -> Widget n
 statusToIcon = workflowStatusToIcon . chooseWorkflowStatus
 
--- Animation functions
 spinningIcons :: [String]
 spinningIcons = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"]
 
 getSpinningIcon :: Int -> Widget n
-getSpinningIcon counter = 
+getSpinningIcon counter =
   let iconIndex = counter `mod` length spinningIcons
       icon = case drop iconIndex spinningIcons of
         (x:_) -> x
