@@ -86,6 +86,19 @@ fetchPulls owner name selfVar = do
       (writeTVar _children =<<) $ forM (V.toList results) $ \issue@(Issue {..}) ->
         makeEmptyElem bc (SinglePull issue) ("/pull/" <> show issueNumber) (_depth + 1)
 
+fetchIssue :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable Issue) -> m ()
+fetchIssue owner name issueNumber issueVar = do
+  BaseContext {auth, manager} <- ask
+  bracketOnError_ (atomically $ writeTVar issueVar Fetching)
+                  (atomically $ writeTVar issueVar (Errored "Workflows fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
+      Left err -> atomically $ do
+        writeTVar issueVar (Errored (show err))
+      Right x -> atomically $ do
+        writeTVar issueVar (Fetched (responseBody x))
+
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
   ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
@@ -132,32 +145,33 @@ fetchWorkflowJobs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Id WorkflowRun -> MainListElemVariable -> m ()
 fetchWorkflowJobs owner name workflowRunId (MainListElemItem {..}) = do
-  bc <- ask
-
-  fetchPaginated'' (jobsForWorkflowRunR owner name workflowRunId) _pageInfo (writeTVar _state) $ \case
-    Left err -> do
-      writeTVar _state (Errored (show err))
-      writeTVar _children []
-    Right (wtc@(WithTotalCount results _totalCount), newPageInfo) -> do
-      writeTVar _pageInfo newPageInfo
-      writeTVar _state (Fetched (PaginatedItemsJobs wtc))
-      (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) ->
-        makeEmptyElem bc (SingleJob job) "" (_depth + 1)
+  bc@(BaseContext {auth, manager}) <- ask
+  bracketOnError_ (atomically $ writeTVar _state Fetching)
+                  (atomically $ writeTVar _state (Errored "Workflow jobs fetch failed with exception.")) $
+    -- pullRequestCommentsR returns comments on the "unified diff"
+    -- there are also "commit comments" and "issue comments".
+    -- The last one are the most common on PRs, so we use commentsR
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
+      Left err -> do
+        -- traceM [i|Error fetching workflow jobs: #{err}|]
+        atomically $ writeTVar _state (Errored (show err))
+      Right (responseBody -> wtc@(WithTotalCount results _totalCount)) -> atomically $ do
+        writeTVar _state (Fetched (PaginatedItemsJobs wtc))
+        (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) -> do
+          makeEmptyElem bc (SingleJob job) "" (_depth + 1)
+          -- writeTVar (_state child) (PaginatedItemJob)
+  -- TODO: do pagination for these jobs? The web UI doesn't seem to...
+  -- bc <- ask
+  -- fetchPaginated'' (jobsForWorkflowRunR owner name workflowRunId) _pageInfo (writeTVar _state) $ \case
+  --   Left err -> do
+  --     writeTVar _state (Errored (show err))
+  --     writeTVar _children []
+  --   Right (wtc@(WithTotalCount results _totalCount), newPageInfo) -> do
+  --     writeTVar _pageInfo newPageInfo
+  --     writeTVar _state (Fetched (PaginatedItemsJobs wtc))
+  --     (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) ->
+  --       makeEmptyElem bc (SingleJob job) "" (_depth + 1)
 fetchWorkflowJobs _owner _name _workflowRunId _ = return ()
-
-fetchIssue :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable Issue) -> m ()
-fetchIssue owner name issueNumber issueVar = do
-  BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar issueVar Fetching)
-                  (atomically $ writeTVar issueVar (Errored "Workflows fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
-      Left err -> atomically $ do
-        writeTVar issueVar (Errored (show err))
-      Right x -> atomically $ do
-        writeTVar issueVar (Fetched (responseBody x))
-
 
 -- * Util
 

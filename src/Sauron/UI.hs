@@ -121,14 +121,12 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflow
 
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job), ..}) = wrapper ix isSelected x [
   Just $ jobLine (_appAnimationCounter appState) _toggled job
+  -- , Just $ str [i|JOB toggled: #{_toggled}. state: #{_state}|]
   , do
       guard _toggled
-      guardFetched _state $ \case
-        PaginatedItemJob _ ->
-          return $ padLeft (Pad 4) $
-            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              jobInner job _state
-        _ -> return $ str ""
+      return $ padLeft (Pad 4) $
+        fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+          jobInner (_appAnimationCounter appState) job
   ]
 
 

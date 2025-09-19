@@ -6,11 +6,10 @@ module Sauron.UI.Job (
   ) where
 
 import Brick
-import Data.String.Interpolate
 import Data.Time.Clock
+import qualified Data.Vector as V
 import GitHub
 import Relude
-import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Util.TimeDiff
 import Sauron.UI.Workflow (statusToIconAnimated)
@@ -22,7 +21,6 @@ jobLine animationCounter toggled (Job {..}) = vBox [line1, line2]
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString $ untagName jobName
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStatus jobConclusion
-      , padLeft (Pad 1) $ withAttr hashAttr $ str [i|[#{jobStatus}#{maybe "" (\c -> "/" <> c) jobConclusion}]|]
       , padLeft Max $ str $ calculateDuration jobStartedAt jobCompletedAt
       ]
 
@@ -30,19 +28,28 @@ jobLine animationCounter toggled (Job {..}) = vBox [line1, line2]
       runnerNameWidget jobRunnerName
       ]
 
-calculateDuration :: UTCTime -> Maybe UTCTime -> String
-calculateDuration started (Just completed) = timeDiff $ diffUTCTime completed started
-calculateDuration _ Nothing = "running"
+    calculateDuration :: UTCTime -> Maybe UTCTime -> String
+    calculateDuration started (Just completed) = timeDiff $ diffUTCTime completed started
+    calculateDuration _ Nothing = "running"
 
-runnerNameWidget :: Maybe Text -> Maybe (Widget n)
-runnerNameWidget (Just name) = Just $ hBox [
-  str "Runner: "
-  , withAttr normalAttr $ str (toString name)
-  ]
-runnerNameWidget Nothing = Nothing
+    runnerNameWidget :: Maybe Text -> Maybe (Widget n)
+    runnerNameWidget (Just name) = Just $ hBox [
+      str "Runner: "
+      , withAttr normalAttr $ str (toString name)
+      ]
+    runnerNameWidget Nothing = Nothing
 
-jobInner :: Job -> Fetchable NodeState -> Widget n
-jobInner job _jobInner = vBox [
-  withAttr normalAttr $ str $ show job
-  , padTop (Pad 1) $ str "Job details would go here"
+jobInner :: Int -> Job -> Widget n
+jobInner animationCounter (Job {..}) = vBox [
+  if V.null jobSteps
+    then str "No steps available"
+    else vBox $ map renderJobStep (V.toList jobSteps)
   ]
+  where
+    renderJobStep :: JobStep -> Widget n
+    renderJobStep step@(JobStep {..}) = hBox [
+      -- TODO: show the jobStepName name, similar to how the workflow or job name is shown
+      str "TODO"
+      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStepStatus jobStepConclusion
+      , padLeft (Pad 1) $ withAttr normalAttr $ str $ take 80 $ show step  -- Truncate long step info
+      ]
