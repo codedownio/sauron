@@ -76,11 +76,11 @@ getSpinningIcon counter =
   in withAttr queuedAttr (str icon)
 
 statusToIconAnimated :: Int -> Text -> Widget n
-statusToIconAnimated counter status
-  | status == "queued" = queuedIcon
-  | status == "in_progress" = getSpinningIcon counter
-  | status == "running" = getSpinningIcon counter
-  | otherwise = case chooseWorkflowStatus status of
+statusToIconAnimated counter status'
+  | status' == "queued" = queuedIcon
+  | status' == "in_progress" = getSpinningIcon counter
+  | status' == "running" = getSpinningIcon counter
+  | otherwise = case chooseWorkflowStatus status' of
       WorkflowSuccess -> greenCheck
       WorkflowPending -> getSpinningIcon counter
       WorkflowFailed -> redX
