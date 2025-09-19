@@ -47,9 +47,7 @@ jobInner animationCounter (Job {..}) = vBox [
   ]
   where
     renderJobStep :: JobStep -> Widget n
-    renderJobStep step@(JobStep {..}) = hBox [
-      -- TODO: show the jobStepName name, similar to how the workflow or job name is shown
-      str "TODO"
+    renderJobStep (JobStep {..}) = hBox [
+      withAttr normalAttr $ str $ toString $ untagName jobStepName
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStepStatus jobStepConclusion
-      , padLeft (Pad 1) $ withAttr normalAttr $ str $ take 80 $ show step  -- Truncate long step info
       ]
