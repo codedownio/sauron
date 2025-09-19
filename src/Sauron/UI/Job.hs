@@ -6,10 +6,12 @@ module Sauron.UI.Job (
   ) where
 
 import Brick
+import Data.Time.Clock
 import GitHub
 import Relude
 import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
+import Sauron.UI.Util.TimeDiff
 import Sauron.UI.Workflow (statusToIcon)
 
 jobLine :: Bool -> Job -> Widget n
@@ -19,12 +21,16 @@ jobLine toggled (Job {..}) = vBox [line1, line2]
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString $ untagName jobName
       , padLeft (Pad 1) $ statusToIcon $ fromMaybe jobStatus jobConclusion
-      , padLeft Max $ str "2m 34s"  -- Placeholder duration
+      , padLeft Max $ str $ calculateDuration jobStartedAt jobCompletedAt
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox $ catMaybes [
       runnerNameWidget jobRunnerName
       ]
+
+calculateDuration :: UTCTime -> Maybe UTCTime -> String
+calculateDuration started (Just completed) = timeDiff $ diffUTCTime completed started
+calculateDuration _ Nothing = "running"
 
 runnerNameWidget :: Maybe Text -> Maybe (Widget n)
 runnerNameWidget (Just name) = Just $ hBox [
