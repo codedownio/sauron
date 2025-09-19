@@ -29,6 +29,7 @@ dependencies:
 - containers
 - github
 - http-client
+- http-conduit
 - http-types
 - microlens
 - mtl

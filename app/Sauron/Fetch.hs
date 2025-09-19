@@ -15,6 +15,7 @@ module Sauron.Fetch (
   , fetchIssueComments
 
   , fetchWorkflowJobs
+  , fetchJobLogs
   ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -24,7 +25,8 @@ import Data.String.Interpolate
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub
-import Network.HTTP.Client (responseBody)
+import Network.HTTP.Conduit
+import qualified Network.URI as URI
 import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
@@ -172,6 +174,21 @@ fetchWorkflowJobs owner name workflowRunId (MainListElemItem {..}) = do
   --     (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) ->
   --       makeEmptyElem bc (SingleJob job) "" (_depth + 1)
 fetchWorkflowJobs _owner _name _workflowRunId _ = return ()
+
+fetchJobLogs :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Job -> TVar (Fetchable NodeState) -> m ()
+fetchJobLogs owner name (Job {jobId}) inner = do
+  BaseContext {auth, manager} <- ask
+  bracketOnError_ (atomically $ writeTVar inner Fetching)
+                  (atomically $ writeTVar inner (Errored "Job logs fetch failed with exception.")) $ do
+    -- First, get the download URI
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
+      Left err -> atomically $ writeTVar inner (Errored (show err))
+      Right response -> do
+        let uri = responseBody response
+        logs <- simpleHttp (URI.uriToString id uri "")
+        atomically $ writeTVar inner (Fetched (PaginatedItemJob (fmap toString $ T.splitOn "\n" (decodeUtf8 logs))))
 
 -- * Util
 

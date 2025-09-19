@@ -126,8 +126,12 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job)
       guard _toggled
       return $ padLeft (Pad 4) $
         fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-          jobInner (_appAnimationCounter appState) job
+          jobInner (_appAnimationCounter appState) job maybeJobLogs
   ]
+  where
+    maybeJobLogs = case _state of
+      Fetched (PaginatedItemJob logs) -> Just logs
+      _ -> Nothing
 
 
 paginatedHeading ::

@@ -110,7 +110,7 @@ data NodeState =
   | PaginatedItemIssue (V.Vector IssueComment)
   | PaginatedItemPull (V.Vector IssueComment)
   | PaginatedItemWorkflow (WithTotalCount Job)
-  | PaginatedItemJob Job
+  | PaginatedItemJob [String]
   deriving (Show, Eq)
 
 data Search = SearchText Text

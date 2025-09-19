@@ -39,11 +39,14 @@ jobLine animationCounter toggled (Job {..}) = vBox [line1, line2]
       ]
     runnerNameWidget Nothing = Nothing
 
-jobInner :: Int -> Job -> Widget n
-jobInner animationCounter (Job {..}) = vBox [
+jobInner :: Int -> Job -> Maybe [String] -> Widget n
+jobInner animationCounter (Job {..}) maybeJobLogs = vBox [
   if V.null jobSteps
     then str "No steps available"
     else vBox $ map renderJobStep (V.toList jobSteps)
+  , case maybeJobLogs of
+      Nothing -> str "No logs"
+      Just xs -> vBox (fmap strWrap xs)
   ]
   where
     renderJobStep :: JobStep -> Widget n
