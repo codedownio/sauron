@@ -23,7 +23,8 @@ extra-deps:
   # sauron-sep18-2025 branch, which has some changes from upstream:
   # - fixes for search query escaping
   # - fix Job type to make some fields optional
-  commit: 29bf5ec2c315f7defea6f305661d8a11c723e180
+  # - fix JobStep type to make some fields optional
+  commit: 982f19a11732b8d043911fbc3f95181a4d3a70de
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf

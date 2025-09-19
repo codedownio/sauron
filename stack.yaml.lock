@@ -19,15 +19,15 @@ packages:
   original:
     hackage: brick-skylighting-1.0@sha256:64764b6be36c05261959f68ed38b9cb37e1acb6180a3bde5dd98255f62ea7e3b,1812
 - completed:
-    commit: 29bf5ec2c315f7defea6f305661d8a11c723e180
+    commit: 982f19a11732b8d043911fbc3f95181a4d3a70de
     git: https://github.com/codedownio/github.git
     name: github
     pantry-tree:
-      sha256: ddcd0358323124e1a281243b5c14af4522268b24920dc67c61f648fdf4166ff9
+      sha256: 7c64a9401c68570908b9cc25574f2f95197b88725b1e1db1a8c7ed51c5236ab2
       size: 19296
     version: 0.30.0.1
   original:
-    commit: 29bf5ec2c315f7defea6f305661d8a11c723e180
+    commit: 982f19a11732b8d043911fbc3f95181a4d3a70de
     git: https://github.com/codedownio/github.git
 - completed:
     commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
