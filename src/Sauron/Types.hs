@@ -176,6 +176,7 @@ deriving instance Eq MainListElem
 
 data AppEvent =
   ListUpdate (V.Vector MainListElem)
+  | AnimationTick
 
 instance Show (MainListElem' Variable) where
   show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
@@ -196,6 +197,7 @@ data AppState = AppState {
   , _appNow :: UTCTime
 
   , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
+  , _appAnimationCounter :: Int
   }
 
 

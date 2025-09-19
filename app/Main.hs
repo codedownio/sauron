@@ -89,10 +89,17 @@ main = do
           , _appNow = now
 
           , _appForm = Nothing
+          , _appAnimationCounter = 0
         }
 
 
   eventChan <- newBChan 10
+
+  -- Animation timer thread
+  _ <- async $
+    forever $ do
+      threadDelay 200000  -- 200ms delay for animation
+      writeBChan eventChan AnimationTick
 
   listElemsVar <- newTVarIO listElemsFixed
   eventAsync <- async $

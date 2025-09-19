@@ -25,6 +25,8 @@ import System.FilePath
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
 appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (listSelected $ s ^. appMainList))
 
+appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
+
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do

@@ -3,6 +3,7 @@ resolver: nightly-2025-05-28
 
 packages:
 - .
+# - /home/tom/tools/github
 
 nix:
   pure: false
@@ -19,11 +20,10 @@ extra-deps:
 # - github-0.29
 
 - git: https://github.com/codedownio/github.git
-  # main branch, which has some changes from upstream:
+  # sauron-sep18-2025 branch, which has some changes from upstream:
   # - fixes for search query escaping
-  # - support for detailed pagination
   # - fix Job type to make some fields optional
-  commit: a1db0c511f1b3af37d8509bf005c07a5152049f9
+  commit: 29bf5ec2c315f7defea6f305661d8a11c723e180
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf

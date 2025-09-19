@@ -47,6 +47,7 @@ mainAttrMap = attrMap V.defAttr ([
   , (ellipsesAttr, fg midGray)
   , (neutralAttr, fg midGray)
   , (unknownAttr, fg V.white)
+  , (queuedAttr, fg githubOrange)
 
   -- Progress bar
   , (progressCompleteAttr, bg (V.Color240 235))
@@ -115,6 +116,7 @@ redXAttr = mkAttrName "redX"
 ellipsesAttr = mkAttrName "ellipses"
 neutralAttr = mkAttrName "neutral"
 unknownAttr = mkAttrName "neutral"
+queuedAttr = mkAttrName "queued"
 
 -- * General UI
 
@@ -152,6 +154,8 @@ solarizedViolet = V.rgbColor 0x6c 0x71 0xc4
 solarizedBlue = V.rgbColor 0x26 0x8b 0xd2
 solarizedCyan = V.rgbColor 0x2a 0xa1 0x98
 solarizedGreen = V.rgbColor 0x85 0x99 0x00
+
+githubOrange = V.rgbColor 0xd2 0x99 0x22
 
 dimGray = grayAt 25
 midGray = grayAt 50

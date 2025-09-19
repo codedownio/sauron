@@ -6,21 +6,23 @@ module Sauron.UI.Job (
   ) where
 
 import Brick
+import Data.String.Interpolate
 import Data.Time.Clock
 import GitHub
 import Relude
 import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Util.TimeDiff
-import Sauron.UI.Workflow (statusToIcon)
+import Sauron.UI.Workflow (statusToIconAnimated)
 
-jobLine :: Bool -> Job -> Widget n
-jobLine toggled (Job {..}) = vBox [line1, line2]
+jobLine :: Int -> Bool -> Job -> Widget n
+jobLine animationCounter toggled (Job {..}) = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString $ untagName jobName
-      , padLeft (Pad 1) $ statusToIcon $ fromMaybe jobStatus jobConclusion
+      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStatus jobConclusion
+      , padLeft (Pad 1) $ withAttr hashAttr $ str [i|[#{jobStatus}#{maybe "" (\c -> "/" <> c) jobConclusion}]|]
       , padLeft Max $ str $ calculateDuration jobStartedAt jobCompletedAt
       ]
 

@@ -57,6 +57,8 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedIssues
   Just $ case _state of
     Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount})|])
     Fetching -> paginatedHeading x appState "Issues" (str [i|(...)|])
+    NotFetched -> paginatedHeading x appState "Issues" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading x appState "Issues" (str [i|(error fetching: #{err})|])
     _ -> str ""
   ]
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleIssue issue), ..}) = wrapper ix isSelected x [
@@ -76,6 +78,9 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleIssue is
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedPulls, ..}) = wrapper ix isSelected x [
   Just $ case _state of
     Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> paginatedHeading x appState "Pulls" (str [i|(#{totalCount})|])
+    Fetching -> paginatedHeading x appState "Pulls" (str [i|(...)|])
+    NotFetched -> paginatedHeading x appState "Pulls" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading x appState "Pulls" (str [i|(error fetching: #{err})|])
     _ -> str ""
   ]
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SinglePull issue), ..}) = wrapper ix isSelected x [
@@ -95,10 +100,13 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SinglePull iss
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedWorkflows, ..}) = wrapper ix isSelected x [
   Just $ case _state of
     Fetched (PaginatedItemsWorkflows (WithTotalCount _xs totalCount)) -> paginatedHeading x appState "Actions" (str [i|(#{totalCount})|])
+    Fetching -> paginatedHeading x appState "Actions" (str [i|(...)|])
+    NotFetched -> paginatedHeading x appState "Actions" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading x appState "Actions" (str [i|(error fetching: #{err})|])
     _ -> str ""
   ]
-listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflow wf), ..}) = wrapper ix isSelected x [
-  Just $ workflowLine _toggled wf
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflow wf), ..}) = wrapper ix isSelected x [
+  Just $ workflowLine (_appAnimationCounter appState) _toggled wf
   , do
       guard _toggled
       guardFetched _state $ \case
@@ -111,8 +119,8 @@ listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflo
 
 -- * Jobs
 
-listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job), ..}) = wrapper ix isSelected x [
-  Just $ jobLine _toggled job
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job), ..}) = wrapper ix isSelected x [
+  Just $ jobLine (_appAnimationCounter appState) _toggled job
   , do
       guard _toggled
       guardFetched _state $ \case
