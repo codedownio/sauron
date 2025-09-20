@@ -29,8 +29,6 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
 
 -- * Computing nth child in the presence of expanding
 
--- TODO: make this also return the sequence of parent nodes
-
 nthChildVector :: Int -> V.Vector MainListElemVariable -> STM (Maybe (NonEmpty MainListElemVariable))
 nthChildVector n elems = nthChildList n (V.toList elems) >>= \case
   Left _ -> pure Nothing
