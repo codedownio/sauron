@@ -14,14 +14,12 @@ import UnliftIO.STM (stateTVar)
 
 
 tryNavigatePage :: MonadIO m => AppState -> (PageInfo -> PageInfo) -> m ()
-tryNavigatePage s cb = do
-  withNthChildAndRepoParent s $ \_fixedEl el repoEl -> case el of
-    MainListElemItem {_pageInfo} -> do
-      didChange <- atomically $ stateTVar _pageInfo $ \pi ->
-        let pi' = cb pi in (pi' /= pi, pi')
-      when didChange $
-        refresh (s ^. appBaseContext) el (repoEl :| [])
-    _ -> return ()
+tryNavigatePage s cb =
+  withNthChildAndRepoParent s $ \_fixedEl el@(MainListElemItem {_pageInfo}) repoEl -> do
+    didChange <- atomically $ stateTVar _pageInfo $ \pi ->
+      let pi' = cb pi in (pi' /= pi, pi')
+    when didChange $
+      refresh (s ^. appBaseContext) el (repoEl :| [])
 
 goNextPage :: PageInfo -> PageInfo
 goNextPage pi@(PageInfo {..}) = pi {

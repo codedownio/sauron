@@ -14,12 +14,6 @@ import Sauron.Types
 getExpandedList :: V.Vector MainListElem -> V.Vector MainListElem
 getExpandedList = V.fromList . concatMap expandNodes . V.toList
   where
-    expandNodes x@(MainListElemRepo {..}) = execWriter $ do
-      tell [x]
-      when _toggled $ do
-        tell (expandNodes _issuesChild)
-        tell (expandNodes _pullsChild)
-        tell (expandNodes _workflowsChild)
     expandNodes x@(MainListElemItem {..}) = execWriter $ do
       tell [x]
       when _toggled $ do
@@ -43,11 +37,4 @@ nthChild :: Int -> MainListElemVariable -> STM (Either Int (NonEmpty MainListEle
 nthChild 0 el = pure $ Right (el :| [])
 nthChild n el@(MainListElemItem {..}) = readTVar _toggled >>= \case
   True -> (fmap ((el :|) . toList)) <$> (readTVar _children >>= nthChildList (n - 1))
-  False -> pure $ Left (n - 1)
-nthChild n el@(MainListElemRepo {..}) = readTVar _toggled >>= \case
-  True -> do
-    ic <- readTVar _issuesChild
-    pc <- readTVar _pullsChild
-    wc <- readTVar _workflowsChild
-    (fmap ((el :|) . toList)) <$> nthChildList (n - 1) [ic, pc, wc]
   False -> pure $ Left (n - 1)

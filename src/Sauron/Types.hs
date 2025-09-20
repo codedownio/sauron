@@ -63,6 +63,12 @@ data Fetchable a =
   | Fetched a
   deriving (Show, Eq)
 
+instance Functor Fetchable where
+  fmap _ NotFetched = NotFetched
+  fmap _ Fetching = Fetching
+  fmap _ (Errored e) = Errored e
+  fmap f (Fetched a) = Fetched (f a)
+
 data WorkflowStatus =
   WorkflowSuccess
   | WorkflowPending
@@ -106,6 +112,7 @@ data NodeType =
   | SingleJob Job
   | JobLogGroupNode JobLogGroup
   | HeadingNode Text
+  | RepoNode (Name Owner) (Name Repo)
   deriving (Show, Eq)
 
 data NodeState =
@@ -120,6 +127,7 @@ data NodeState =
   | PaginatedItemJob [JobLogGroup]
   | JobLogGroupState
   | HeadingState
+  | RepoState Repo
   deriving (Show, Eq)
 
 data Search = SearchText Text
@@ -138,24 +146,7 @@ emptyPageInfo :: PageInfo
 emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
 data MainListElem' f =
-  MainListElemRepo {
-      _namespaceName :: (Name Owner, Name Repo)
-      , _repo :: Switchable f (Fetchable Repo)
-
-      -- TODO: move the healthCheck thread inside the _repo?
-      -- kill it and restart when the repo is refreshed?
-      , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
-      , _healthCheckThread :: Maybe (Async ())
-
-      , _toggled :: Switchable f Bool
-      , _issuesChild :: Switchable f (MainListElem' f)
-      , _pullsChild :: Switchable f (MainListElem' f)
-      , _workflowsChild :: Switchable f (MainListElem' f)
-
-      , _depth :: Int
-      , _ident :: Int
-      }
-  | MainListElemItem {
+  MainListElemItem {
       _typ :: NodeType
       , _state :: Switchable f (Fetchable NodeState)
 
@@ -166,6 +157,10 @@ data MainListElem' f =
 
       , _search :: Switchable f Search
       , _pageInfo :: Switchable f PageInfo
+
+      -- Health check fields (used for repos, unused for other node types)
+      , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
+      , _healthCheckThread :: Maybe (Async ())
 
       , _depth :: Int
       , _ident :: Int
@@ -181,11 +176,9 @@ data AppEvent =
   | AnimationTick
 
 instance Show (MainListElem' Variable) where
-  show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
   show (MainListElemItem {..}) = [i|Item<#{_typ}>|]
 
 instance Show (MainListElem' Fixed) where
-  show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
   show (MainListElemItem {..}) = [i|Item<#{_typ}, #{_state}, #{_children}>|]
 
 data AppState = AppState {

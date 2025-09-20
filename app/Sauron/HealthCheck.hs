@@ -22,7 +22,7 @@ import UnliftIO.Concurrent
 newHealthCheckThread ::
   BaseContext
   -> (Name Owner, Name Repo)
-  -> TVar (Fetchable Repo)
+  -> TVar (Fetchable NodeState)
   -> TVar (Fetchable HealthCheckResult)
   -> PeriodSpec
   -> IO (Async ())
@@ -32,7 +32,7 @@ newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar heal
     -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?
     defaultBranch <- atomically $ do
       readTVar repoVar >>= \case
-        Fetched (Repo {repoDefaultBranch=(Just branch)}) -> pure branch
+        Fetched (RepoState (Repo {repoDefaultBranch=(Just branch)})) -> pure branch
         _ -> retry
 
     liftIO $ flip runReaderT baseContext $

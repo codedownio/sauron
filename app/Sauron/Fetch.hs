@@ -36,26 +36,25 @@ import Sauron.Types
 
 fetchRepo :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> TVar (Fetchable Repo) -> m ()
+  ) => Name Owner -> Name Repo -> TVar (Fetchable NodeState) -> m ()
 fetchRepo owner name repoVar = do
   BaseContext {auth} <- ask
   bracketOnError_ (atomically $ writeTVar repoVar Fetching)
                   (atomically $ writeTVar repoVar (Errored "Repo fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ github auth (repositoryR owner name)) >>= \case
       Left err -> atomically $ writeTVar repoVar (Errored (show err))
-      Right x -> atomically $ writeTVar repoVar (Fetched x)
+      Right x -> atomically $ writeTVar repoVar (Fetched (RepoState x))
 
 fetchIssues :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
-fetchIssues owner name issuesVar = do
-  extraTerms <- readTVarIO issuesVar >>= (readTVarIO . _search) >>= \case
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> MainListElemVariable -> m ()
+fetchIssues owner name (MainListElemItem {..}) = do
+  extraTerms <- readTVarIO _search >>= \case
     SearchNone -> pure []
     SearchText t -> pure $ T.words t
   let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
 
   bc <- ask
-  MainListElemItem {..} <- readTVarIO issuesVar
 
   fetchPaginated'' (searchIssuesR fullQuery) _pageInfo (writeTVar _state) $ \case
     Left err -> do
@@ -68,16 +67,15 @@ fetchIssues owner name issuesVar = do
         makeEmptyElem bc (SingleIssue issue) ("/issue/" <> show issueNumber) (_depth + 1)
 
 fetchPulls :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
-fetchPulls owner name selfVar = do
-  extraTerms <- readTVarIO selfVar >>= (readTVarIO . _search) >>= \case
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> MainListElemVariable -> m ()
+fetchPulls owner name (MainListElemItem {..}) = do
+  extraTerms <- readTVarIO _search >>= \case
     SearchNone -> pure []
     SearchText t -> pure $ T.words t
   let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
 
   bc <- ask
-  MainListElemItem {..} <- readTVarIO selfVar
 
   fetchPaginated'' (searchIssuesR fullQuery) _pageInfo (writeTVar _state) $ \case
     Left err -> do
@@ -103,12 +101,10 @@ fetchIssue owner name issueNumber issueVar = do
         writeTVar issueVar (Fetched (responseBody x))
 
 fetchWorkflows :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, MonadFail m
-  ) => Name Owner -> Name Repo -> TVar MainListElemVariable -> m ()
-fetchWorkflows owner name selfVar = do
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> MainListElemVariable -> m ()
+fetchWorkflows owner name (MainListElemItem {..}) = do
   bc <- ask
-  MainListElemItem {..} <- readTVarIO selfVar
-
   fetchPaginated'' (workflowRunsR owner name mempty) _pageInfo (writeTVar _state) $ \case
     Left err -> do
       writeTVar _state (Errored (show err))
@@ -174,7 +170,6 @@ fetchWorkflowJobs owner name workflowRunId (MainListElemItem {..}) = do
   --     writeTVar _state (Fetched (PaginatedItemsJobs wtc))
   --     (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) ->
   --       makeEmptyElem bc (SingleJob job) "" (_depth + 1)
-fetchWorkflowJobs _owner _name _workflowRunId _ = return ()
 
 fetchJobLogs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -201,11 +196,7 @@ fetchJobLogs owner name (Job {jobId}) (MainListElemItem {..}) = do
           writeTVar _state (Fetched (PaginatedItemJob parsedLogs))
           writeTVar _children children'
 
-
-fetchJobLogs _owner _name _ _ = return ()
-
 -- * Util
-
 
 makeEmptyElem :: BaseContext -> NodeType -> Text -> Int -> STM MainListElemVariable
 makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
@@ -215,6 +206,7 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
   childrenVar <- newTVar []
   searchVar <- newTVar $ SearchNone
   pageInfoVar <- newTVar emptyPageInfo
+  healthCheckVar <- newTVar NotFetched
   return $ MainListElemItem {
     _typ = typ'
     , _state = stateVar
@@ -226,6 +218,9 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
 
     , _search = searchVar
     , _pageInfo = pageInfoVar
+
+    , _healthCheck = healthCheckVar
+    , _healthCheckThread = Nothing
 
     , _depth = depth'
     , _ident = ident'
@@ -246,6 +241,7 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
       childElems <- mapM (createJobLogGroupChildren bc (depth' + 1)) children'
       newTVar childElems
 
+  healthCheckVar2 <- newTVar NotFetched
   return $ MainListElemItem {
     _typ = nodeType
     , _state = stateVar
@@ -254,6 +250,8 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
     , _children = childrenVar
     , _search = searchVar
     , _pageInfo = pageInfoVar
+    , _healthCheck = healthCheckVar2
+    , _healthCheckThread = Nothing
     , _depth = depth'
     , _ident = ident'
   }

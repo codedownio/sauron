@@ -31,7 +31,7 @@ appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
-    withFixedElemAndParents s $ \_fixedEl _variableEl parents -> case (viaNonEmpty head [x | x@(MainListElemItem {}) <- toList parents], viaNonEmpty head [x | x@(MainListElemRepo {}) <- toList parents]) of
+    withFixedElemAndParents s $ \_fixedEl _variableEl parents -> case (viaNonEmpty head [x | x@(MainListElemItem {}) <- toList parents], viaNonEmpty head [x | x@(MainListElemItem {_typ=(RepoNode {})}) <- toList parents]) of
       (Just el@(MainListElemItem {..}), Just _repoEl) -> do
         atomically $ do
           writeTVar _search $ SearchText (formState form)
@@ -84,9 +84,9 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == openSelectedKey ->
     withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case (fixedEl, repoEl) of
-      (MainListElemRepo {_repo=(Fetched (Repo {repoHtmlUrl=(URL url)}))}, _) -> openBrowserToUrl (toString url)
-      (MainListElemItem {_urlSuffix, _typ}, MainListElemRepo {_repo}) -> readTVarIO _repo >>= \case
-        Fetched (Repo {repoHtmlUrl=(URL url)})-> openBrowserToUrl (getNodeUrl (toString url) _typ)
+      (MainListElemItem {_typ=(RepoNode {}), _state = (Fetched (RepoState (Repo {repoHtmlUrl=(URL url)})))}, _) -> openBrowserToUrl (toString url)
+      (MainListElemItem {_urlSuffix, _typ}, MainListElemItem {_typ=(RepoNode {}), _state}) -> readTVarIO _state >>= \case
+        Fetched (RepoState (Repo {repoHtmlUrl=(URL url)})) -> openBrowserToUrl (getNodeUrl (toString url) _typ)
         _ -> return ()
       _ -> return ()
 
@@ -142,8 +142,8 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do
       refresh (s ^. appBaseContext) mle parents
   where
     hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
-    hasStartedInitialFetch (MainListElemRepo {..}) = and <$> mapM hasStartedInitialFetch [_issuesChild, _pullsChild, _workflowsChild]
-    hasStartedInitialFetch (MainListElemItem {_typ = HeadingNode _}) = return True
+    hasStartedInitialFetch (MainListElemItem {_typ=(RepoNode {}), _children}) = and <$> mapM hasStartedInitialFetch _children
+    hasStartedInitialFetch (MainListElemItem {_typ=(HeadingNode {})}) = return True
     hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _state)
 
     isFetchingOrFetched :: Fetchable a -> Bool
@@ -165,4 +165,5 @@ getNodeUrl repoBaseUrl (SinglePull (Issue {..})) = case issueHtmlUrl of
 getNodeUrl _repoBaseUrl (SingleWorkflow (WorkflowRun {..})) = toString $ getUrl workflowRunHtmlUrl
 getNodeUrl _repoBaseUrl (SingleJob (Job {..})) = toString $ getUrl jobHtmlUrl
 getNodeUrl _repoBaseUrl (JobLogGroupNode _) = ""
+getNodeUrl repoBaseUrl (RepoNode _ _) = repoBaseUrl
 getNodeUrl _repoBaseUrl (HeadingNode _) = ""

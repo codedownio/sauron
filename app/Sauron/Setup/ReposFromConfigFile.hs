@@ -59,6 +59,7 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           Nothing -> tell repoNodes
           Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l) -> do
             childrenVar <- newTVarIO repoNodes
+            headingHealthCheckVar <- newTVarIO NotFetched
             let headingNode = MainListElemItem {
               _typ = HeadingNode l
               , _state = statusVar
@@ -67,6 +68,8 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
               , _children = childrenVar
               , _search = searchVar
               , _pageInfo = pageInfoVar
+              , _healthCheck = headingHealthCheckVar
+              , _healthCheckThread = Nothing
               , _depth = 0
               , _ident = identifier
               }

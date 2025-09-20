@@ -15,7 +15,7 @@ import UnliftIO.Async
 newRepoNode ::
   (MonadIO m)
   => (Name Owner, Name Repo)
-  -> TVar (Fetchable Repo)
+  -> TVar (Fetchable NodeState)
   -> TVar (Fetchable HealthCheckResult)
   -> Maybe (Async ())
   -> Int
@@ -29,8 +29,9 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   issuesChildrenVar <- newTVarIO []
   issuesSearchVar <- newTVarIO $ SearchText "is:issue is:open"
   issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  issuesHealthCheckVar <- newTVarIO NotFetched
   issuesIdentifier <- liftIO getIdentifier
-  issuesChildVar <- newTVarIO $ MainListElemItem {
+  let issuesChild = MainListElemItem {
     _typ = PaginatedIssues
     , _state = issuesVar
     , _urlSuffix = "issues"
@@ -38,6 +39,8 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _children = issuesChildrenVar
     , _search = issuesSearchVar
     , _pageInfo = issuesPageInfoVar
+    , _healthCheck = issuesHealthCheckVar
+    , _healthCheckThread = Nothing
     , _depth = repoDepth + 1
     , _ident = issuesIdentifier
     }
@@ -47,8 +50,9 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   pullsChildrenVar <- newTVarIO []
   pullsSearchVar <- newTVarIO $ SearchText "is:pr is:open"
   pullsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  pullsHealthCheckVar <- newTVarIO NotFetched
   pullsIdentifier <- liftIO getIdentifier
-  pullsChildVar <- newTVarIO $ MainListElemItem {
+  let pullsChild = MainListElemItem {
     _typ = PaginatedPulls
     , _state = pullsVar
     , _urlSuffix = "pulls"
@@ -56,6 +60,8 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _children = pullsChildrenVar
     , _search = pullsSearchVar
     , _pageInfo = pullsPageInfoVar
+    , _healthCheck = pullsHealthCheckVar
+    , _healthCheckThread = Nothing
     , _depth = repoDepth + 1
     , _ident = pullsIdentifier
     }
@@ -65,8 +71,9 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   workflowsChildrenVar <- newTVarIO []
   workflowsSearchVar <- newTVarIO SearchNone
   workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  workflowsHealthCheckVar <- newTVarIO NotFetched
   workflowsIdentifier <- liftIO getIdentifier
-  workflowsChildVar <- newTVarIO $ MainListElemItem {
+  let workflowsChild = MainListElemItem {
     _typ = PaginatedWorkflows
     , _state = workflowsVar
     , _urlSuffix = "actions"
@@ -74,23 +81,26 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _children = workflowsChildrenVar
     , _search = workflowsSearchVar
     , _pageInfo = workflowsPageInfoVar
+    , _healthCheck = workflowsHealthCheckVar
+    , _healthCheckThread = Nothing
     , _depth = repoDepth + 1
     , _ident = workflowsIdentifier
     }
 
   repoIdentifier <- liftIO getIdentifier
-  return $ MainListElemRepo {
-    _namespaceName = nsName
-    , _repo = repoVar
-
+  childrenVar <- newTVarIO [issuesChild, pullsChild, workflowsChild]
+  searchVar <- newTVarIO SearchNone
+  pageInfoVar <- newTVarIO emptyPageInfo
+  return $ MainListElemItem {
+    _typ = RepoNode (fst nsName) (snd nsName)
+    , _state = repoVar
+    , _urlSuffix = ""
+    , _toggled = toggledVar
+    , _children = childrenVar
+    , _search = searchVar
+    , _pageInfo = pageInfoVar
     , _healthCheck = healthCheckVar
     , _healthCheckThread = hcThread
-
-    , _toggled = toggledVar
-    , _issuesChild = issuesChildVar
-    , _pullsChild = pullsChildVar
-    , _workflowsChild = workflowsChildVar
-
     , _depth = repoDepth
     , _ident = repoIdentifier
     }

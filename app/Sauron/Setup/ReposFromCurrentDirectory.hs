@@ -85,8 +85,8 @@ reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
   repoVar <- newTVarIO NotFetched
   healthCheckVar <- newTVarIO NotFetched
   let period = defaultHealthCheckPeriodUs
-  hcThread <- Just <$> newHealthCheckThread baseContext nsName repoVar healthCheckVar period
-  node <- newRepoNode nsName repoVar healthCheckVar hcThread 0 (getIdentifier baseContext)
+  hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar period
+  node <- newRepoNode nsName repoVar healthCheckVar (Just hcThread) 0 (getIdentifier baseContext)
 
   atomically $ writeTVar (_toggled node) True
 

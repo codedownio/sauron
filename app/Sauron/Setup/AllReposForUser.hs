@@ -32,7 +32,7 @@ allReposForUser baseContext defaultHealthCheckPeriodUs (N userLoginUnwrapped) = 
 
   (V.fromList <$>) $ forM (V.toList repos) $ \r -> do
     let nsName = (simpleOwnerLogin $ repoOwner r, repoName r)
-    repoVar <- newTVarIO (Fetched r)
+    repoStateVar <- newTVarIO (Fetched (RepoState r))
     healthCheckVar <- newTVarIO NotFetched
-    hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar defaultHealthCheckPeriodUs
-    newRepoNode nsName repoVar healthCheckVar (Just hcThread) 0 getIdentifier
+    hcThread <- newHealthCheckThread baseContext nsName repoStateVar healthCheckVar defaultHealthCheckPeriodUs
+    newRepoNode nsName repoStateVar healthCheckVar (Just hcThread) 0 getIdentifier

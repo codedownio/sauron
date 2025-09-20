@@ -20,7 +20,7 @@ bottomBar s = Widget Greedy Fixed $ do
   case listSelectedElement (s ^. appMainList) of
     Nothing -> render $ hBox [str ""]
 
-    Just (_, MainListElemRepo {_repo=(Fetched r)}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
+    Just (_, MainListElemItem {_typ=(RepoNode {}), _state = (Fetched (RepoState r))}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
       where
         issuesPhrase = case repoOpenIssuesCount r of
           0 -> Nothing
@@ -33,6 +33,5 @@ bottomBar s = Widget Greedy Fixed $ do
         --   n -> Just [i|#{n} PRs|]
 
         phrases = catMaybes [issuesPhrase]
-    Just (_, MainListElemRepo {_repo=_}) -> render $ hBox [str ""]
 
     Just (_, MainListElemItem {}) -> render $ hBox [str ""]

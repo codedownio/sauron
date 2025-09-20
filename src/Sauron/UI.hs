@@ -40,9 +40,18 @@ drawUI app = [vBox [
              ]
 
 listDrawElement :: AppState -> Int -> Bool -> MainListElem -> Widget ClickableName
-listDrawElement _appState ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
-  Just $ renderRepoLine _toggled _namespaceName _repo _healthCheck
+
+-- * Repos
+
+listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(RepoNode owner name), ..}) = wrapper ix isSelected x [
+  Just $ renderRepoLine _toggled (owner, name) (extractRepo _state) _healthCheck
   ]
+  where
+    extractRepo (Fetched (RepoState r)) = Fetched r
+    extractRepo (Fetching) = Fetching
+    extractRepo (NotFetched) = NotFetched
+    extractRepo (Errored err) = Errored err
+    extractRepo _ = NotFetched
 
 -- * Issues
 
@@ -163,7 +172,6 @@ paginatedHeading (MainListElemItem {..}) appState l countInParens = hBox $ catMa
   , Just $ countInParens
   , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
   ]
-paginatedHeading _ _appState _label _countInParens = hBox []
 
 wrapper :: Int -> Bool -> MainListElem' f -> [Maybe (Widget ClickableName)] -> Widget ClickableName
 wrapper ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes
