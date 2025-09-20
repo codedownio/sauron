@@ -30,6 +30,7 @@ import qualified Network.URI as URI
 import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
+import Sauron.Fetch.ParseJobLogs
 import Sauron.Types
 
 
@@ -177,18 +178,27 @@ fetchWorkflowJobs _owner _name _workflowRunId _ = return ()
 
 fetchJobLogs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Job -> TVar (Fetchable NodeState) -> m ()
-fetchJobLogs owner name (Job {jobId}) inner = do
+  ) => Name Owner -> Name Repo -> Job -> MainListElemVariable -> m ()
+fetchJobLogs owner name (Job {jobId}) (MainListElemItem {..}) = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar inner Fetching)
-                  (atomically $ writeTVar inner (Errored "Job logs fetch failed with exception.")) $ do
+  bracketOnError_ (atomically $ writeTVar _state Fetching)
+                  (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
     -- First, get the download URI
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
-      Left err -> atomically $ writeTVar inner (Errored (show err))
+      Left err -> atomically $ writeTVar _state (Errored (show err))
       Right response -> do
         let uri = responseBody response
+        traceM [i|Jobs URI: #{uri}|]
         logs <- simpleHttp (URI.uriToString id uri "")
-        atomically $ writeTVar inner (Fetched (PaginatedItemJob (fmap toString $ T.splitOn "\n" (decodeUtf8 logs))))
+
+        let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
+        traceM [i|parsedLogs: #{parsedLogs}|]
+
+        atomically $ writeTVar _state (Fetched (PaginatedItemJob (fmap toString $ T.splitOn "\n" (decodeUtf8 logs))))
+
+        -- TODO:
+
+fetchJobLogs _owner _name _ _ = return ()
 
 -- * Util
 

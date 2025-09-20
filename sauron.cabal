@@ -108,6 +108,7 @@ executable sauron
       Sauron.Event.Paging
       Sauron.Fetch
       Sauron.Fetch.Core
+      Sauron.Fetch.ParseJobLogs
       Sauron.Fix
       Sauron.HealthCheck
       Sauron.Options

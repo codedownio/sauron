@@ -69,8 +69,8 @@ refresh bc (MainListElemItem {_typ=(SinglePull (Issue {..})), _state}) (findRepo
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
 refresh bc item@(MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {..})), _state}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId item) bc
-refresh bc (MainListElemItem {_typ=(SingleJob job@(Job {})), _state}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job _state) bc
+refresh bc item@(MainListElemItem {_typ=(SingleJob job@(Job {})), _state}) (findRepoParent -> Just (MainListElemRepo {_namespaceName=(owner, name)})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job item) bc
 
 refresh _ _ _ = return ()
 
