@@ -139,10 +139,10 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(JobLogGroupNod
   ]
 
 jobLogGroupLine :: Bool -> JobLogGroup -> Widget n
-jobLogGroupLine toggled (JobLogLine timestamp content) = hBox [
+jobLogGroupLine toggled (JobLogLines timestamp contents) = vBox $ map (\content -> hBox [
   str "  ",
   withAttr normalAttr $ str $ toString content
-  ]
+  ]) contents
 jobLogGroupLine toggled (JobLogGroup timestamp title _children) = hBox [
   withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] "),
   withAttr normalAttr $ str $ toString title

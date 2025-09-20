@@ -35,18 +35,39 @@ parseJobLogs logLines = fst $ parseLines logLines []
 
 parseLines :: [Text] -> [(UTCTime, Text)] -> ([JobLogGroup], [Text])
 parseLines [] groupStack = (closeAllGroups groupStack, [])
-parseLines (line:rest) groupStack
+parseLines inputLines groupStack = parseWithAccumulation inputLines groupStack []
+
+parseWithAccumulation :: [Text] -> [(UTCTime, Text)] -> [(UTCTime, Text)] -> ([JobLogGroup], [Text])
+parseWithAccumulation [] groupStack accumulatedLines = 
+  let result = if null accumulatedLines 
+               then []
+               else [createJobLogLines accumulatedLines]
+  in (result <> closeAllGroups groupStack, [])
+
+parseWithAccumulation (line:rest) groupStack accumulatedLines
   | Just (timestamp, groupTitle) <- parseGroupStart line =
-      let (children, remainingLines) = parseLines rest ((timestamp, groupTitle) : groupStack)
+      let result = if null accumulatedLines 
+                   then []
+                   else [createJobLogLines accumulatedLines]
+          (children, remainingLines) = parseWithAccumulation rest ((timestamp, groupTitle) : groupStack) []
       in case remainingLines of
-           [] -> ([JobLogGroup timestamp groupTitle children], [])
-           _ -> let (siblings, finalLines) = parseLines remainingLines groupStack
-                in (JobLogGroup timestamp groupTitle children : siblings, finalLines)
-  | isGroupEnd line = ([], rest)
+           [] -> (result <> [JobLogGroup timestamp groupTitle children], [])
+           _ -> let (siblings, finalLines) = parseWithAccumulation remainingLines groupStack []
+                in (result <> [JobLogGroup timestamp groupTitle children] <> siblings, finalLines)
+  
+  | isGroupEnd line = 
+      let result = if null accumulatedLines 
+                   then []
+                   else [createJobLogLines accumulatedLines]
+      in (result, rest)
+  
   | otherwise =
       let (timestamp, content) = parseTimestampAndContent line
-          (siblings, remainingLines) = parseLines rest groupStack
-      in (JobLogLine timestamp content : siblings, remainingLines)
+      in parseWithAccumulation rest groupStack (accumulatedLines <> [(timestamp, content)])
+
+createJobLogLines :: [(UTCTime, Text)] -> JobLogGroup
+createJobLogLines [] = JobLogLines (UTCTime (fromGregorian 1970 1 1) 0) []
+createJobLogLines ((timestamp, content):rest) = JobLogLines timestamp (content : map snd rest)
 
 parseGroupStart :: Text -> Maybe (UTCTime, Text)
 parseGroupStart line =

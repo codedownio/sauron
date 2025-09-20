@@ -188,11 +188,11 @@ fetchJobLogs owner name (Job {jobId}) (MainListElemItem {..}) = do
       Left err -> atomically $ writeTVar _state (Errored (show err))
       Right response -> do
         let uri = responseBody response
-        traceM [i|Jobs URI: #{uri}|]
+        -- traceM [i|Jobs URI: #{uri}|]
         logs <- simpleHttp (URI.uriToString id uri "")
 
         let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
-        traceM [i|parsedLogs: #{parsedLogs}|]
+        -- traceM [i|parsedLogs: #{parsedLogs}|]
 
         bc <- ask
         children <- liftIO $ atomically $ mapM (createJobLogGroupChildren bc (_depth + 1)) parsedLogs
@@ -241,7 +241,7 @@ createJobLogGroupChildren bc depth jobLogGroup = do
   pageInfoVar <- newTVar emptyPageInfo
 
   childrenVar <- case jobLogGroup of
-    JobLogLine _ _ -> newTVar []
+    JobLogLines _ _ -> newTVar []
     JobLogGroup _ _ children -> do
       childElems <- mapM (createJobLogGroupChildren bc (depth + 1)) children
       newTVar childElems

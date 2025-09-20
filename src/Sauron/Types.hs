@@ -26,7 +26,7 @@ data SortBy = SortByStars | SortByPushed | SortByUpdated
   deriving (Eq)
 
 data JobLogGroup =
-  JobLogLine UTCTime Text
+  JobLogLines UTCTime [Text]
   | JobLogGroup UTCTime Text [JobLogGroup]
   deriving (Show, Eq)
 

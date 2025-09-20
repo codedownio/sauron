@@ -57,7 +57,7 @@ jobInner animationCounter (Job {..}) maybeJobLogs = vBox [
       ]
 
     renderJobLogGroup :: JobLogGroup -> Widget n
-    renderJobLogGroup (JobLogLine _timestamp content) = str $ toString content
+    renderJobLogGroup (JobLogLines _timestamp contents) = vBox $ map (str . toString) contents
     renderJobLogGroup (JobLogGroup _timestamp title children) = vBox [
       withAttr normalAttr $ str $ "Group: " <> toString title,
       padLeft (Pad 2) $ vBox (map renderJobLogGroup children)
