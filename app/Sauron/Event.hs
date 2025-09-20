@@ -143,7 +143,7 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do
   where
     hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
     hasStartedInitialFetch (MainListElemRepo {..}) = and <$> mapM hasStartedInitialFetch [_issuesChild, _pullsChild, _workflowsChild]
-    hasStartedInitialFetch (MainListElemItem {_typ = HeadingNode _, ..}) = return True
+    hasStartedInitialFetch (MainListElemItem {_typ = HeadingNode _}) = return True
     hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _state)
 
     isFetchingOrFetched :: Fetchable a -> Bool

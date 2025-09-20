@@ -50,7 +50,7 @@ withScroll s action = do
     _ -> return ()
 
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> NonEmpty MainListElemVariable -> m ()
-refresh _ (MainListElemItem {_typ = HeadingNode _, ..}) _parents = return () -- Headings don't need refreshing
+refresh _ (MainListElemItem {_typ = HeadingNode _}) _parents = return () -- Headings don't need refreshing
 refresh bc (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) _parents = liftIO $ do
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
   void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
@@ -107,7 +107,7 @@ collectAllRepos :: [MainListElemVariable] -> IO [MainListElemVariable]
 collectAllRepos = fmap concat . mapM collectFromNode
   where
     collectFromNode :: MainListElemVariable -> IO [MainListElemVariable]
-    collectFromNode repo@(MainListElemRepo {}) = return [repo]
-    collectFromNode (MainListElemItem {_children, ..}) = do
-      children <- readTVarIO _children
-      collectAllRepos children
+    collectFromNode repoNode@(MainListElemRepo {}) = return [repoNode]
+    collectFromNode (MainListElemItem {_children}) = do
+      childNodes <- readTVarIO _children
+      collectAllRepos childNodes

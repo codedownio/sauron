@@ -51,4 +51,3 @@ nthChild n el@(MainListElemRepo {..}) = readTVar _toggled >>= \case
     wc <- readTVar _workflowsChild
     (fmap ((el :|) . toList)) <$> nthChildList (n - 1) [ic, pc, wc]
   False -> pure $ Left (n - 1)
-nthChild n _ = pure $ Left (n - 1)

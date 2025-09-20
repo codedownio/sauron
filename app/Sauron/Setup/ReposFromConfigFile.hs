@@ -34,22 +34,10 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           Just l -> do
             toggledVar <- newTVarIO True
             statusVar <- newTVarIO NotFetched
-            childrenVar <- newTVarIO []
             searchVar <- newTVarIO SearchNone
             pageInfoVar <- newTVarIO emptyPageInfo
             identifier <- liftIO $ getIdentifier baseContext
-            let headingNode = MainListElemItem {
-              _typ = HeadingNode l
-              , _state = statusVar
-              , _urlSuffix = ""
-              , _toggled = toggledVar
-              , _children = childrenVar
-              , _search = searchVar
-              , _pageInfo = pageInfoVar
-              , _depth = 0
-              , _ident = identifier
-              }
-            pure (1, Just (headingNode, childrenVar))
+            pure (1, Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l))
 
         repoNodes <- forM sectionRepos $ \r -> do
           let nsName = case r of
@@ -69,6 +57,17 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
 
         case maybeHeadingNode of
           Nothing -> tell repoNodes
-          Just (headingNode, childrenVar) -> do
-            liftIO $ atomically $ writeTVar childrenVar repoNodes
+          Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l) -> do
+            childrenVar <- newTVarIO repoNodes
+            let headingNode = MainListElemItem {
+              _typ = HeadingNode l
+              , _state = statusVar
+              , _urlSuffix = ""
+              , _toggled = toggledVar
+              , _children = childrenVar
+              , _search = searchVar
+              , _pageInfo = pageInfoVar
+              , _depth = 0
+              , _ident = identifier
+              }
             tell [headingNode]
