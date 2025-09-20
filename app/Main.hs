@@ -71,7 +71,7 @@ main = do
       Just (namespace, name) -> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
       Nothing -> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
-  -- Kick off fetches for repos, workflows
+  -- Kick off initial fetches
   runReaderT (refreshAll listElems) baseContext
 
   listElemsFixed :: V.Vector MainListElem <- atomically $ mapM fixMainListElem listElems
@@ -83,7 +83,7 @@ main = do
           _appUser = currentUser
           , _appBaseContext = baseContext
           , _appMainListVariable = listElems
-          , _appMainList = list MainList listElemsFixed 1
+          , _appMainList = list MainList (getExpandedList listElemsFixed) 1
 
           , _appSortBy = SortByStars
           , _appNow = now

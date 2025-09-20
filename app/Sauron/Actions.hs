@@ -50,10 +50,10 @@ withScroll s action = do
     _ -> return ()
 
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> NonEmpty MainListElemVariable -> m ()
-refresh _ (MainListElemItem {_typ=HeadingNode _}) _parents = return () -- Headings don't need refreshing
-refresh bc repoNode@(MainListElemItem {_typ=(RepoNode {}), _children}) _parents = liftIO $ do
-  childElems <- readTVarIO _children
-  forM_ childElems (\child -> refresh bc child (repoNode :| toList _parents))
+refresh bc item@(MainListElemItem {_typ=(HeadingNode {}), _children}) _parents =
+  readTVarIO _children >>= mapM_ (\child -> refresh bc child (item :| toList _parents))
+refresh bc repoNode@(MainListElemItem {_typ=(RepoNode {}), _children}) _parents =
+  liftIO $ readTVarIO _children >>= mapM_ (\child -> refresh bc child (repoNode :| toList _parents))
 
 refresh bc item@(MainListElemItem {_typ=PaginatedIssues}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name, _children})) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
@@ -66,7 +66,7 @@ refresh bc (MainListElemItem {_typ=(SingleIssue (Issue {..})), _state}) (findRep
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
 refresh bc (MainListElemItem {_typ=(SinglePull (Issue {..})), _state}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name})) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name issueNumber _state) bc
-refresh bc item@(MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {workflowRunWorkflowRunId})), _state}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name})) =
+refresh bc item@(MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {workflowRunWorkflowRunId})), _state}) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId item) bc
 refresh bc item@(MainListElemItem {_typ=(SingleJob job@(Job {})), _state}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name})) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job item) bc
@@ -93,11 +93,12 @@ refreshAll elems = do
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
       _ -> return () -- Should never happen since collectAllRepos only returns repos
 
-collectAllRepos :: [MainListElemVariable] -> IO [MainListElemVariable]
-collectAllRepos = fmap concat . mapM collectFromNode
   where
-    collectFromNode :: MainListElemVariable -> IO [MainListElemVariable]
-    collectFromNode repoNode@(MainListElemItem {_typ=(RepoNode _ _)}) = return [repoNode]
-    collectFromNode (MainListElemItem {_children}) = do
-      childNodes <- readTVarIO _children
-      collectAllRepos childNodes
+    collectAllRepos :: [MainListElemVariable] -> IO [MainListElemVariable]
+    collectAllRepos = fmap concat . mapM collectFromNode
+      where
+        collectFromNode :: MainListElemVariable -> IO [MainListElemVariable]
+        collectFromNode repoNode@(MainListElemItem {_typ=(RepoNode _ _)}) = return [repoNode]
+        collectFromNode (MainListElemItem {_children}) = do
+          childNodes <- readTVarIO _children
+          collectAllRepos childNodes
