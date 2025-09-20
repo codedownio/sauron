@@ -50,7 +50,7 @@ withScroll s action = do
     _ -> return ()
 
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> NonEmpty MainListElemVariable -> m ()
-refresh _ (MainListElemHeading {}) _parents = return () -- TODO: refresh all repos
+refresh _ (MainListElemItem {_typ = HeadingNode _, ..}) _parents = return () -- Headings don't need refreshing
 refresh bc (MainListElemRepo {_namespaceName=(owner, name), _issuesChild, _pullsChild, _workflowsChild}) _parents = liftIO $ do
   void $ async $ liftIO $ runReaderT (fetchIssues owner name _issuesChild) bc
   void $ async $ liftIO $ runReaderT (fetchPulls owner name _pullsChild) bc
@@ -94,11 +94,20 @@ refreshAll :: (
   ) => V.Vector MainListElemVariable -> m ()
 refreshAll elems = do
   baseContext <- ask
+  allRepos <- liftIO $ collectAllRepos (V.toList elems)
 
   liftIO $ flip runReaderT baseContext $
-    void $ async $ forConcurrently (V.toList elems) $ \case
-      MainListElemHeading {} -> return ()
+    void $ async $ forConcurrently allRepos $ \case
       MainListElemRepo {_namespaceName=(owner, name), ..} -> do
         fetchRepo owner name _repo
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
-      MainListElemItem {} -> return ()
+      _ -> return () -- Should never happen since collectAllRepos only returns repos
+
+collectAllRepos :: [MainListElemVariable] -> IO [MainListElemVariable]
+collectAllRepos = fmap concat . mapM collectFromNode
+  where
+    collectFromNode :: MainListElemVariable -> IO [MainListElemVariable]
+    collectFromNode repo@(MainListElemRepo {}) = return [repo]
+    collectFromNode (MainListElemItem {_children, ..}) = do
+      children <- readTVarIO _children
+      collectAllRepos children

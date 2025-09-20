@@ -29,22 +29,29 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
       putStrLn [i|Got config: #{config}|]
 
       (V.fromList <$>) $ execWriterT $ forM (fromMaybe [] configSections) $ \(ConfigSection {..}) -> do
-        repoDepth <- case sectionDisplayName of
-          Nothing -> pure 0
+        (repoDepth, maybeHeadingNode) <- case sectionDisplayName of
+          Nothing -> pure (0, Nothing)
           Just l -> do
             toggledVar <- newTVarIO True
             statusVar <- newTVarIO NotFetched
+            childrenVar <- newTVarIO []
+            searchVar <- newTVarIO SearchNone
+            pageInfoVar <- newTVarIO emptyPageInfo
             identifier <- liftIO $ getIdentifier baseContext
-            tell [MainListElemHeading {
-              _label = l
-              , _depth = 0
+            let headingNode = MainListElemItem {
+              _typ = HeadingNode l
+              , _state = statusVar
+              , _urlSuffix = ""
               , _toggled = toggledVar
-              , _status = statusVar
+              , _children = childrenVar
+              , _search = searchVar
+              , _pageInfo = pageInfoVar
+              , _depth = 0
               , _ident = identifier
-              }]
-            pure 1
+              }
+            pure (1, Just (headingNode, childrenVar))
 
-        forM sectionRepos $ \r -> do
+        repoNodes <- forM sectionRepos $ \r -> do
           let nsName = case r of
                 ConfigRepoSingle owner name _repoSettings -> (mkName (Proxy @Owner) owner, mkName (Proxy @Repo) name)
                 ConfigRepoWildcard {} -> error "No"
@@ -58,5 +65,10 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
               let period = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
               Just <$> lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar period)
             ConfigRepoWildcard {} -> pure Nothing
-          node <- newRepoNode nsName repoVar healthCheckVar hcThread repoDepth (getIdentifier baseContext)
-          tell [node]
+          newRepoNode nsName repoVar healthCheckVar hcThread repoDepth (getIdentifier baseContext)
+
+        case maybeHeadingNode of
+          Nothing -> tell repoNodes
+          Just (headingNode, childrenVar) -> do
+            liftIO $ atomically $ writeTVar childrenVar repoNodes
+            tell [headingNode]

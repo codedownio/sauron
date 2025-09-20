@@ -126,7 +126,6 @@ keyIndicatorContextual app p key msg = case p app of
 --   pure $ isJust maybeRepo
 someRepoSelected s = case listSelectedElement (s ^. appMainList) of
   Nothing -> False
-  Just (_n, MainListElemHeading {}) -> False
   Just _ -> True
 
 

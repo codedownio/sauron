@@ -142,8 +142,8 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do
       refresh (s ^. appBaseContext) mle parents
   where
     hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
-    hasStartedInitialFetch (MainListElemHeading {}) = return True
     hasStartedInitialFetch (MainListElemRepo {..}) = and <$> mapM hasStartedInitialFetch [_issuesChild, _pullsChild, _workflowsChild]
+    hasStartedInitialFetch (MainListElemItem {_typ = HeadingNode _, ..}) = return True
     hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _state)
 
     isFetchingOrFetched :: Fetchable a -> Bool
@@ -165,3 +165,4 @@ getNodeUrl repoBaseUrl (SinglePull (Issue {..})) = case issueHtmlUrl of
 getNodeUrl _repoBaseUrl (SingleWorkflow (WorkflowRun {..})) = toString $ getUrl workflowRunHtmlUrl
 getNodeUrl _repoBaseUrl (SingleJob (Job {..})) = toString $ getUrl jobHtmlUrl
 getNodeUrl _repoBaseUrl (JobLogGroupNode _) = ""
+getNodeUrl _repoBaseUrl (HeadingNode _) = ""

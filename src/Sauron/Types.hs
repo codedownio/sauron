@@ -105,6 +105,7 @@ data NodeType =
   | SingleWorkflow WorkflowRun
   | SingleJob Job
   | JobLogGroupNode JobLogGroup
+  | HeadingNode Text
   deriving (Show, Eq)
 
 data NodeState =
@@ -118,6 +119,7 @@ data NodeState =
   | PaginatedItemWorkflow (WithTotalCount Job)
   | PaginatedItemJob [JobLogGroup]
   | JobLogGroupState
+  | HeadingState
   deriving (Show, Eq)
 
 data Search = SearchText Text
@@ -136,14 +138,7 @@ emptyPageInfo :: PageInfo
 emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
 data MainListElem' f =
-  MainListElemHeading {
-      _label :: Text
-      , _depth :: Int
-      , _toggled :: Switchable f Bool
-      , _status :: Switchable f (Fetchable ())
-      , _ident :: Int
-      }
-  | MainListElemRepo {
+  MainListElemRepo {
       _namespaceName :: (Name Owner, Name Repo)
       , _repo :: Switchable f (Fetchable Repo)
 
@@ -186,12 +181,10 @@ data AppEvent =
   | AnimationTick
 
 instance Show (MainListElem' Variable) where
-  show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
   show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
   show (MainListElemItem {..}) = [i|Item<#{_typ}>|]
 
 instance Show (MainListElem' Fixed) where
-  show (MainListElemHeading {..}) = [i|Heading<#{_label}>|]
   show (MainListElemRepo {_namespaceName=(owner, name)}) = [i|Repo<#{owner}, #{name}>|]
   show (MainListElemItem {..}) = [i|Item<#{_typ}, #{_state}, #{_children}>|]
 

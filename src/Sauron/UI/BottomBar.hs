@@ -20,8 +20,6 @@ bottomBar s = Widget Greedy Fixed $ do
   case listSelectedElement (s ^. appMainList) of
     Nothing -> render $ hBox [str ""]
 
-    Just (_, MainListElemHeading {}) -> render $ hBox [str ""]
-
     Just (_, MainListElemRepo {_repo=(Fetched r)}) -> render $ hBox [str (T.unpack (T.intercalate ", " phrases))]
       where
         issuesPhrase = case repoOpenIssuesCount r of

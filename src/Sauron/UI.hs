@@ -40,13 +40,6 @@ drawUI app = [vBox [
              ]
 
 listDrawElement :: AppState -> Int -> Bool -> MainListElem -> Widget ClickableName
-listDrawElement _appState ix isSelected x@(MainListElemHeading {..}) = wrapper ix isSelected x [
-  Just $ hBox $ catMaybes [
-    Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-    , Just (hBox [str (toString _label)])
-    , Just (padLeft Max (str " "))
-    ]
-  ]
 listDrawElement _appState ix isSelected x@(MainListElemRepo {..}) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled _namespaceName _repo _healthCheck
   ]
@@ -136,6 +129,16 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job)
 
 listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(JobLogGroupNode jobLogGroup), ..}) = wrapper ix isSelected x [
   Just $ jobLogGroupLine _toggled jobLogGroup
+  ]
+
+-- * Headings
+
+listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(HeadingNode label), ..}) = wrapper ix isSelected x [
+  Just $ hBox $ catMaybes [
+    Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+    , Just (hBox [str (toString label)])
+    , Just (padLeft Max (str " "))
+    ]
   ]
 
 jobLogGroupLine :: Bool -> JobLogGroup -> Widget n

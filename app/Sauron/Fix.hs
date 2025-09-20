@@ -8,17 +8,6 @@ import Sauron.Types
 
 
 fixMainListElem :: MainListElemVariable -> STM MainListElem
-fixMainListElem (MainListElemHeading {..}) = do
-  statusFixed <- readTVar _status
-  toggledFixed <- readTVar _toggled
-
-  return $ MainListElemHeading {
-    _label = _label
-    , _depth = _depth
-    , _toggled = toggledFixed
-    , _status = statusFixed
-    , _ident = _ident
-    }
 fixMainListElem (MainListElemRepo {..}) = do
   repoFixed <- readTVar _repo
 

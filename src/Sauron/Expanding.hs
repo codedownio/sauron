@@ -14,7 +14,6 @@ import Sauron.Types
 getExpandedList :: V.Vector MainListElem -> V.Vector MainListElem
 getExpandedList = V.fromList . concatMap expandNodes . V.toList
   where
-    expandNodes x@(MainListElemHeading {}) = [x]
     expandNodes x@(MainListElemRepo {..}) = execWriter $ do
       tell [x]
       when _toggled $ do
