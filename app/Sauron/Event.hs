@@ -9,7 +9,6 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
-import qualified Data.List.NonEmpty as NE
 import Data.String.Interpolate
 import qualified Data.Vector as Vec
 import GitHub
@@ -123,26 +122,15 @@ appEvent _s (MouseDown (ListRow n) V.BLeft _ _) = do
 appEvent _ _ = return ()
 
 handleLeftArrow :: AppState -> EventM ClickableName AppState ()
-handleLeftArrow s = withFixedElemAndParents s $ \fixedEl mle parents -> do
-  isToggled <- liftIO $ atomically $ readTVar (_toggled mle)
-  if isToggled then
-    -- Node is open, close it
-    liftIO $ atomically $ writeTVar (_toggled mle) False
-  else
-    -- Node is already closed, move to parent
-    case toList parents of
-      [] -> return () -- No parent chain
-      [_] -> return () -- Only one element (current), no parent
-      xs -> case Relude.reverse xs of
-        [] -> return () -- Should not happen
-        [_] -> return () -- Only current element
-        (_:parent:_) -> do
-          -- Find the parent element in the expanded list and move to it
-          expandedList <- gets (^. appMainList)
-          let targetIdent = _ident parent
-          case Vec.findIndex (\item -> _ident item == targetIdent) (listElements expandedList) of
-            Just index -> modify (appMainList %~ listMoveTo index)
-            Nothing -> return () -- Element not found in expanded list
+handleLeftArrow s = withFixedElemAndParents s $ \_ mle parents -> do
+  liftIO (atomically $ readTVar (_toggled mle)) >>= \case
+    True -> liftIO $ atomically $ writeTVar (_toggled mle) False
+    False -> case Relude.reverse (toList parents) of
+      _:parent:_ -> do
+        expandedList <- gets (^. appMainList)
+        forM_ (Vec.findIndex ((_ident parent ==) . _ident) (listElements expandedList)) $
+          \index -> modify (appMainList %~ listMoveTo index)
+      _ -> return ()
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
 modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do

@@ -195,11 +195,11 @@ fetchJobLogs owner name (Job {jobId}) (MainListElemItem {..}) = do
         -- traceM [i|parsedLogs: #{parsedLogs}|]
 
         bc <- ask
-        children <- liftIO $ atomically $ mapM (createJobLogGroupChildren bc (_depth + 1)) parsedLogs
+        children' <- liftIO $ atomically $ mapM (createJobLogGroupChildren bc (_depth + 1)) parsedLogs
 
         atomically $ do
           writeTVar _state (Fetched (PaginatedItemJob parsedLogs))
-          writeTVar _children children
+          writeTVar _children children'
 
 
 fetchJobLogs _owner _name _ _ = return ()
@@ -232,7 +232,7 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
 }
 
 createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM MainListElemVariable
-createJobLogGroupChildren bc depth jobLogGroup = do
+createJobLogGroupChildren bc depth' jobLogGroup = do
   let nodeType = JobLogGroupNode jobLogGroup
   stateVar <- newTVar (Fetched JobLogGroupState)
   ident' <- getIdentifierSTM bc
@@ -242,8 +242,8 @@ createJobLogGroupChildren bc depth jobLogGroup = do
 
   childrenVar <- case jobLogGroup of
     JobLogLines _ _ -> newTVar []
-    JobLogGroup _ _ children -> do
-      childElems <- mapM (createJobLogGroupChildren bc (depth + 1)) children
+    JobLogGroup _ _ children' -> do
+      childElems <- mapM (createJobLogGroupChildren bc (depth' + 1)) children'
       newTVar childElems
 
   return $ MainListElemItem {
@@ -254,6 +254,6 @@ createJobLogGroupChildren bc depth jobLogGroup = do
     , _children = childrenVar
     , _search = searchVar
     , _pageInfo = pageInfoVar
-    , _depth = depth
+    , _depth = depth'
     , _ident = ident'
   }

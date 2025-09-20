@@ -43,7 +43,7 @@ jobLine animationCounter toggled (Job {..}) = vBox [line1, line2]
     runnerNameWidget Nothing = Nothing
 
 jobInner :: Int -> Job -> Maybe [JobLogGroup] -> Widget n
-jobInner animationCounter (Job {..}) maybeJobLogs = vBox [
+jobInner animationCounter (Job {..}) _maybeJobLogs' = vBox [
   vBox $ map renderJobStep (V.toList jobSteps)
   -- , case maybeJobLogs of
   --     Nothing -> str "No logs"
@@ -56,9 +56,9 @@ jobInner animationCounter (Job {..}) maybeJobLogs = vBox [
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStepStatus jobStepConclusion
       ]
 
-    renderJobLogGroup :: JobLogGroup -> Widget n
-    renderJobLogGroup (JobLogLines _timestamp contents) = vBox $ map (str . toString) contents
-    renderJobLogGroup (JobLogGroup _timestamp title children) = vBox [
-      withAttr normalAttr $ str $ "Group: " <> toString title,
-      padLeft (Pad 2) $ vBox (map renderJobLogGroup children)
-      ]
+    -- renderJobLogGroup :: JobLogGroup -> Widget n
+    -- renderJobLogGroup (JobLogLines _timestamp contents) = vBox $ map (str . toString) contents
+    -- renderJobLogGroup (JobLogGroup _timestamp title children) = vBox [
+    --   withAttr normalAttr $ str $ "Group: " <> toString title,
+    --   padLeft (Pad 2) $ vBox (map renderJobLogGroup children)
+    --   ]

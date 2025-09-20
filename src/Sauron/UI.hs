@@ -134,17 +134,17 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job)
 
 -- * Job Log Groups
 
-listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(JobLogGroupNode jobLogGroup), ..}) = wrapper ix isSelected x [
+listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(JobLogGroupNode jobLogGroup), ..}) = wrapper ix isSelected x [
   Just $ jobLogGroupLine _toggled jobLogGroup
   ]
 
 jobLogGroupLine :: Bool -> JobLogGroup -> Widget n
-jobLogGroupLine toggled (JobLogLines timestamp contents) = vBox $ map (\content -> hBox [
+jobLogGroupLine _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox [
   str "  ",
   withAttr normalAttr $ str $ toString content
   ]) contents
-jobLogGroupLine toggled (JobLogGroup timestamp title _children) = hBox [
-  withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] "),
+jobLogGroupLine toggled' (JobLogGroup _timestamp title _children) = hBox [
+  withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
   withAttr normalAttr $ str $ toString title
   ]
 
