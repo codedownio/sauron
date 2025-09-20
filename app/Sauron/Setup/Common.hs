@@ -78,6 +78,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _ident = workflowsIdentifier
     }
 
+  repoIdentifier <- liftIO getIdentifier
   return $ MainListElemRepo {
     _namespaceName = nsName
     , _repo = repoVar
@@ -91,5 +92,5 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _workflowsChild = workflowsChildVar
 
     , _depth = repoDepth
-    , _ident = 0
+    , _ident = repoIdentifier
     }
