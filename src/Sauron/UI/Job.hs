@@ -10,6 +10,7 @@ import Data.Time.Clock
 import qualified Data.Vector as V
 import GitHub
 import Relude
+import Sauron.Types (JobLogGroup(..))
 import Sauron.UI.AttrMap
 import Sauron.UI.Util.TimeDiff
 import Sauron.UI.Workflow (statusToIconAnimated)
@@ -25,7 +26,9 @@ jobLine animationCounter toggled (Job {..}) = vBox [line1, line2]
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox $ catMaybes [
-      runnerNameWidget jobRunnerName
+      do
+        guard toggled
+        runnerNameWidget jobRunnerName
       ]
 
     calculateDuration :: UTCTime -> Maybe UTCTime -> String
@@ -39,18 +42,23 @@ jobLine animationCounter toggled (Job {..}) = vBox [line1, line2]
       ]
     runnerNameWidget Nothing = Nothing
 
-jobInner :: Int -> Job -> Maybe [String] -> Widget n
+jobInner :: Int -> Job -> Maybe [JobLogGroup] -> Widget n
 jobInner animationCounter (Job {..}) maybeJobLogs = vBox [
-  if V.null jobSteps
-    then str "No steps available"
-    else vBox $ map renderJobStep (V.toList jobSteps)
-  , case maybeJobLogs of
-      Nothing -> str "No logs"
-      Just xs -> vBox (fmap strWrap xs)
+  vBox $ map renderJobStep (V.toList jobSteps)
+  -- , case maybeJobLogs of
+  --     Nothing -> str "No logs"
+  --     Just xs -> vBox (map renderJobLogGroup xs)
   ]
   where
     renderJobStep :: JobStep -> Widget n
     renderJobStep (JobStep {..}) = hBox [
       withAttr normalAttr $ str $ toString $ untagName jobStepName
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStepStatus jobStepConclusion
+      ]
+
+    renderJobLogGroup :: JobLogGroup -> Widget n
+    renderJobLogGroup (JobLogLine _timestamp content) = str $ toString content
+    renderJobLogGroup (JobLogGroup _timestamp title children) = vBox [
+      withAttr normalAttr $ str $ "Group: " <> toString title,
+      padLeft (Pad 2) $ vBox (map renderJobLogGroup children)
       ]

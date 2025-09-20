@@ -194,9 +194,13 @@ fetchJobLogs owner name (Job {jobId}) (MainListElemItem {..}) = do
         let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
         traceM [i|parsedLogs: #{parsedLogs}|]
 
-        atomically $ writeTVar _state (Fetched (PaginatedItemJob (fmap toString $ T.splitOn "\n" (decodeUtf8 logs))))
+        bc <- ask
+        children <- liftIO $ atomically $ mapM (createJobLogGroupChildren bc (_depth + 1)) parsedLogs
 
-        -- TODO:
+        atomically $ do
+          writeTVar _state (Fetched (PaginatedItemJob parsedLogs))
+          writeTVar _children children
+
 
 fetchJobLogs _owner _name _ _ = return ()
 
@@ -226,3 +230,30 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
     , _depth = depth'
     , _ident = ident'
 }
+
+createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM MainListElemVariable
+createJobLogGroupChildren bc depth jobLogGroup = do
+  let nodeType = JobLogGroupNode jobLogGroup
+  stateVar <- newTVar (Fetched JobLogGroupState)
+  ident' <- getIdentifierSTM bc
+  toggledVar <- newTVar False
+  searchVar <- newTVar SearchNone
+  pageInfoVar <- newTVar emptyPageInfo
+
+  childrenVar <- case jobLogGroup of
+    JobLogLine _ _ -> newTVar []
+    JobLogGroup _ _ children -> do
+      childElems <- mapM (createJobLogGroupChildren bc (depth + 1)) children
+      newTVar childElems
+
+  return $ MainListElemItem {
+    _typ = nodeType
+    , _state = stateVar
+    , _urlSuffix = ""
+    , _toggled = toggledVar
+    , _children = childrenVar
+    , _search = searchVar
+    , _pageInfo = pageInfoVar
+    , _depth = depth
+    , _ident = ident'
+  }

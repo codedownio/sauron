@@ -25,6 +25,11 @@ import UnliftIO.Async
 data SortBy = SortByStars | SortByPushed | SortByUpdated
   deriving (Eq)
 
+data JobLogGroup =
+  JobLogLine UTCTime Text
+  | JobLogGroup UTCTime Text [JobLogGroup]
+  deriving (Show, Eq)
+
 type Var = TVar
 
 data BaseContext = BaseContext {
@@ -99,6 +104,7 @@ data NodeType =
   | SinglePull Issue
   | SingleWorkflow WorkflowRun
   | SingleJob Job
+  | JobLogGroupNode JobLogGroup
   deriving (Show, Eq)
 
 data NodeState =
@@ -110,7 +116,8 @@ data NodeState =
   | PaginatedItemIssue (V.Vector IssueComment)
   | PaginatedItemPull (V.Vector IssueComment)
   | PaginatedItemWorkflow (WithTotalCount Job)
-  | PaginatedItemJob [String]
+  | PaginatedItemJob [JobLogGroup]
+  | JobLogGroupState
   deriving (Show, Eq)
 
 data Search = SearchText Text

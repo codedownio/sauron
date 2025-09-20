@@ -121,7 +121,6 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflow
 
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job), ..}) = wrapper ix isSelected x [
   Just $ jobLine (_appAnimationCounter appState) _toggled job
-  -- , Just $ str [i|JOB toggled: #{_toggled}. state: #{_state}|]
   , do
       guard _toggled
       return $ padLeft (Pad 4) $
@@ -133,6 +132,21 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job)
       Fetched (PaginatedItemJob logs) -> Just logs
       _ -> Nothing
 
+-- * Job Log Groups
+
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(JobLogGroupNode jobLogGroup), ..}) = wrapper ix isSelected x [
+  Just $ jobLogGroupLine _toggled jobLogGroup
+  ]
+
+jobLogGroupLine :: Bool -> JobLogGroup -> Widget n
+jobLogGroupLine toggled (JobLogLine timestamp content) = hBox [
+  str "  ",
+  withAttr normalAttr $ str $ toString content
+  ]
+jobLogGroupLine toggled (JobLogGroup timestamp title _children) = hBox [
+  withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] "),
+  withAttr normalAttr $ str $ toString title
+  ]
 
 paginatedHeading ::
   MainListElem

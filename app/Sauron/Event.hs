@@ -154,3 +154,4 @@ getNodeUrl repoBaseUrl (SinglePull (Issue {..})) = case issueHtmlUrl of
   Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber}|]
 getNodeUrl _repoBaseUrl (SingleWorkflow (WorkflowRun {..})) = toString $ getUrl workflowRunHtmlUrl
 getNodeUrl _repoBaseUrl (SingleJob (Job {..})) = toString $ getUrl jobHtmlUrl
+getNodeUrl _repoBaseUrl (JobLogGroupNode _) = ""

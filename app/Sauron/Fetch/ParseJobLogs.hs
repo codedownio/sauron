@@ -1,18 +1,12 @@
 
 module Sauron.Fetch.ParseJobLogs (
   parseJobLogs
-  , JobLogGroup(..)
   ) where
 
 import qualified Data.Text as T
 import Data.Time
 import Relude
-
-
-data JobLogGroup =
-  JobLogLine UTCTime Text
-  | JobLogGroup UTCTime Text [JobLogGroup]
-  deriving (Show, Eq)
+import Sauron.Types (JobLogGroup(..))
 
 -- SAMPLE OUTPUT:
 -- 2025-09-19T09:30:24.6153700Z Actions: asdfasdf
