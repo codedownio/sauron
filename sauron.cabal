@@ -44,6 +44,7 @@ library
       Sauron.UI.Pull
       Sauron.UI.Repo
       Sauron.UI.Search
+      Sauron.UI.Statuses
       Sauron.UI.TopBox
       Sauron.UI.Util
       Sauron.UI.Util.TimeDiff

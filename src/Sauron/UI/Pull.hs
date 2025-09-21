@@ -16,8 +16,8 @@ import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
 import Sauron.UI.Markdown
+import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff
-import Sauron.UI.Workflow (fetchableQuarterCircleSpinner)
 
 
 pullLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable a -> Widget n

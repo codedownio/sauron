@@ -24,6 +24,7 @@ import Sauron.UI.Pagination
 import Sauron.UI.Pull
 import Sauron.UI.Repo
 import Sauron.UI.Search
+import Sauron.UI.Statuses (getQuarterCircleSpinner)
 import Sauron.UI.TopBox
 import Sauron.UI.Util
 import Sauron.UI.Workflow
@@ -59,7 +60,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(RepoNode owner
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedIssues, ..}) = wrapper ix isSelected x [
   Just $ case _state of
     Fetched (PaginatedItemsIssues (SearchResult totalCount _xs)) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount})|])
-    Fetching -> paginatedHeading x appState "Issues" (str [i|(...)|])
+    Fetching -> paginatedHeading x appState "Issues" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading x appState "Issues" (str [i|(not fetched)|])
     Errored err -> paginatedHeading x appState "Issues" (str [i|(error fetching: #{err})|])
     _ -> str ""
@@ -81,7 +82,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleIssue is
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedPulls, ..}) = wrapper ix isSelected x [
   Just $ case _state of
     Fetched (PaginatedItemsPulls (SearchResult totalCount _xs)) -> paginatedHeading x appState "Pulls" (str [i|(#{totalCount})|])
-    Fetching -> paginatedHeading x appState "Pulls" (str [i|(...)|])
+    Fetching -> paginatedHeading x appState "Pulls" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading x appState "Pulls" (str [i|(not fetched)|])
     Errored err -> paginatedHeading x appState "Pulls" (str [i|(error fetching: #{err})|])
     _ -> str ""
@@ -103,7 +104,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SinglePull iss
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedWorkflows, ..}) = wrapper ix isSelected x [
   Just $ case _state of
     Fetched (PaginatedItemsWorkflows (WithTotalCount _xs totalCount)) -> paginatedHeading x appState "Actions" (str [i|(#{totalCount})|])
-    Fetching -> paginatedHeading x appState "Actions" (str [i|(...)|])
+    Fetching -> paginatedHeading x appState "Actions" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading x appState "Actions" (str [i|(not fetched)|])
     Errored err -> paginatedHeading x appState "Actions" (str [i|(error fetching: #{err})|])
     _ -> str ""

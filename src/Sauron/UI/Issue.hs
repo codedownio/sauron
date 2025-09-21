@@ -17,8 +17,8 @@ import Relude
 import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Markdown
+import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff
-import Sauron.UI.Workflow (fetchableQuarterCircleSpinner)
 
 
 maxCommentWidth :: Int

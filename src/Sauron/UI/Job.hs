@@ -12,8 +12,8 @@ import GitHub
 import Relude
 import Sauron.Types (JobLogGroup(..), Fetchable(..))
 import Sauron.UI.AttrMap
+import Sauron.UI.Statuses (statusToIconAnimated, fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff
-import Sauron.UI.Workflow (statusToIconAnimated, fetchableQuarterCircleSpinner)
 
 jobLine :: Int -> Bool -> Job -> Fetchable a -> Widget n
 jobLine animationCounter toggled (Job {..}) fetchableState = vBox [line1, line2]

@@ -10,8 +10,9 @@ import GitHub hiding (Status)
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util
-import Sauron.UI.Workflow (workflowStatusToIcon, fetchableQuarterCircleSpinner)
+import Sauron.UI.Workflow (workflowStatusToIcon)
 
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> Fetchable Repo -> Fetchable HealthCheckResult -> Int -> Widget n
