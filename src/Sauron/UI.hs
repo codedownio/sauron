@@ -14,6 +14,7 @@ import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
 import Relude
 import Sauron.Types
+import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
 import Sauron.UI.Border
 import Sauron.UI.BottomBar
@@ -151,10 +152,13 @@ listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(HeadingNode l
   ]
 
 jobLogGroupLine :: Bool -> JobLogGroup -> Widget n
-jobLogGroupLine _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox [
-  str "  ",
-  withAttr normalAttr $ str $ toString content
-  ]) contents
+jobLogGroupLine _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox $
+  str "  " : parseAnsiText content
+  ) contents
+-- jobLogGroupLine _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox [
+--   str "  ",
+--   withAttr normalAttr $ str $ toString content
+--   ]) contents
 jobLogGroupLine toggled' (JobLogGroup _timestamp title _children) = hBox [
   withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
   withAttr normalAttr $ str $ toString title
