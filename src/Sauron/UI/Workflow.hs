@@ -39,7 +39,7 @@ workflowLine animationCounter toggled (WorkflowRun {..}) = vBox [line1, line2]
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox [
-      withAttr normalAttr $ str $ toString $ untagName workflowRunName
+      withAttr boldText $ str $ toString $ untagName workflowRunName
       , str " "
       , withAttr hashAttr $ str "#"
       , withAttr hashNumberAttr $ str $ show workflowRunRunNumber
