@@ -10,18 +10,19 @@ import Data.Time.Clock
 import qualified Data.Vector as V
 import GitHub
 import Relude
-import Sauron.Types (JobLogGroup(..))
+import Sauron.Types (JobLogGroup(..), Fetchable(..))
 import Sauron.UI.AttrMap
 import Sauron.UI.Util.TimeDiff
-import Sauron.UI.Workflow (statusToIconAnimated)
+import Sauron.UI.Workflow (statusToIconAnimated, fetchableQuarterCircleSpinner)
 
-jobLine :: Int -> Bool -> Job -> Widget n
-jobLine animationCounter toggled (Job {..}) = vBox [line1, line2]
+jobLine :: Int -> Bool -> Job -> Fetchable a -> Widget n
+jobLine animationCounter toggled (Job {..}) fetchableState = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString $ untagName jobName
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStatus jobConclusion
+      , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ str $ calculateDuration jobStartedAt jobCompletedAt
       ]
 

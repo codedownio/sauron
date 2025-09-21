@@ -62,6 +62,9 @@ mainAttrMap = attrMap V.defAttr ([
   , (disabledHotkeyAttr, fg midGray)
   , (hotkeyMessageAttr, fg brightWhite)
   , (disabledHotkeyMessageAttr, fg brightGray)
+  
+  -- Spinner
+  , (circleSpinnerAttr, fg brightGray)
 
   -- General UI
   , (branchAttr, fg solarizedBlue)
@@ -96,6 +99,8 @@ hotkeyAttr = mkAttrName "hotkey"
 disabledHotkeyAttr = mkAttrName "disableHotkey"
 hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
+
+circleSpinnerAttr = mkAttrName "circleSpinner"
 
 -- * Search and pagination
 

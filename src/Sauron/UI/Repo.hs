@@ -11,17 +11,18 @@ import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Util
-import Sauron.UI.Workflow
+import Sauron.UI.Workflow (workflowStatusToIcon, fetchableQuarterCircleSpinner)
 
 
-renderRepoLine :: Bool -> (Name Owner, Name Repo) -> Fetchable Repo -> Fetchable HealthCheckResult -> Widget n
-renderRepoLine isToggled (owner, name) fetchableRepo fetchableHealthCheck = hBox $ catMaybes [
+renderRepoLine :: Bool -> (Name Owner, Name Repo) -> Fetchable Repo -> Fetchable HealthCheckResult -> Int -> Widget n
+renderRepoLine isToggled (owner, name) fetchableRepo fetchableHealthCheck animationCounter = hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if isToggled then "[-] " else "[+] ")
   , Just $ hBox [
       withAttr attr (str (toString (untagName owner)))
       , withAttr toggleMarkerAttr $ str " / "
       , withAttr attr (str (toString (untagName name)))
       ]
+  , Just $ fetchableQuarterCircleSpinner animationCounter fetchableRepo
   , healthIndicator fetchableHealthCheck
   , Just (padLeft Max (fetchableStatsBox fetchableRepo))
   ]

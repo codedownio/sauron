@@ -18,17 +18,19 @@ import Sauron.Types hiding (toggled)
 import Sauron.UI.AttrMap
 import Sauron.UI.Markdown
 import Sauron.UI.Util.TimeDiff
+import Sauron.UI.Workflow (fetchableQuarterCircleSpinner)
 
 
 maxCommentWidth :: Int
 maxCommentWidth = 120
 
-issueLine :: UTCTime -> Bool -> Issue -> Widget n
-issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) = vBox [line1, line2]
+issueLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable a -> Widget n
+issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString issueTitle
+      , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ str (if issueComments > 0 then [i|🗨  #{issueComments}|] else "")
       ]
 

@@ -44,8 +44,8 @@ listDrawElement :: AppState -> Int -> Bool -> MainListElem -> Widget ClickableNa
 
 -- * Repos
 
-listDrawElement _appState ix isSelected x@(MainListElemItem {_typ=(RepoNode owner name), ..}) = wrapper ix isSelected x [
-  Just $ renderRepoLine _toggled (owner, name) (extractRepo _state) _healthCheck
+listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(RepoNode owner name), ..}) = wrapper ix isSelected x [
+  Just $ renderRepoLine _toggled (owner, name) (extractRepo _state) _healthCheck (_appAnimationCounter appState)
   ]
   where
     extractRepo (Fetched (RepoState r)) = Fetched r
@@ -65,7 +65,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedIssues
     _ -> str ""
   ]
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleIssue issue), ..}) = wrapper ix isSelected x [
-  Just $ issueLine (_appNow appState) _toggled issue
+  Just $ issueLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
       guardFetched _state $ \case
@@ -87,7 +87,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedPulls,
     _ -> str ""
   ]
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SinglePull issue), ..}) = wrapper ix isSelected x [
-  Just $ pullLine (_appNow appState) _toggled issue
+  Just $ pullLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
       guardFetched _state $ \case
@@ -109,7 +109,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=PaginatedWorkfl
     _ -> str ""
   ]
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflow wf), ..}) = wrapper ix isSelected x [
-  Just $ workflowLine (_appAnimationCounter appState) _toggled wf
+  Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state
   , do
       guard _toggled
       guardFetched _state $ \case
@@ -123,7 +123,7 @@ listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleWorkflow
 -- * Jobs
 
 listDrawElement appState ix isSelected x@(MainListElemItem {_typ=(SingleJob job), ..}) = wrapper ix isSelected x [
-  Just $ jobLine (_appAnimationCounter appState) _toggled job
+  Just $ jobLine (_appAnimationCounter appState) _toggled job _state
   , do
       guard _toggled
       return $ padLeft (Pad 4) $
