@@ -83,55 +83,35 @@ data WorkflowStatus =
   | WorkflowUnknown
   deriving (Show, Eq)
 
-chooseWorkflowStatus :: Text -> WorkflowStatus
-chooseWorkflowStatus "completed" = WorkflowSuccess
-chooseWorkflowStatus "action_required" = WorkflowPending
-chooseWorkflowStatus "cancelled" = WorkflowCancelled
-chooseWorkflowStatus "failure" = WorkflowFailed
-chooseWorkflowStatus "neutral" = WorkflowNeutral
-chooseWorkflowStatus "skipped" = WorkflowCancelled
-chooseWorkflowStatus "stale" = WorkflowNeutral
-chooseWorkflowStatus "success" = WorkflowSuccess
-chooseWorkflowStatus "timed_out" = WorkflowFailed
-chooseWorkflowStatus "in_progress" = WorkflowPending
-chooseWorkflowStatus "queued" = WorkflowPending
-chooseWorkflowStatus "requested" = WorkflowPending
-chooseWorkflowStatus "waiting" = WorkflowPending
-chooseWorkflowStatus "pending" = WorkflowPending
-chooseWorkflowStatus _ = WorkflowUnknown
-
 data HealthCheckResult =
   HealthCheckWorkflowResult WorkflowStatus
   | HealthCheckNoData
   | HealthCheckUnhealthy Text
   deriving (Show, Eq)
 
-data PaginatedIssuesT
-data PaginatedPullsT
-data PaginatedWorkflowsT
-data SingleIssueT
-data SinglePullT
-data SingleWorkflowT
-data SingleJobT
-data JobLogGroupNodeT
-data HeadingNodeT
-data RepoNodeT
+data NodeTyp =
+  PaginatedIssuesT
+  | PaginatedPullsT
+  | PaginatedWorkflowsT
+  | SingleIssueT
+  | SinglePullT
+  | SingleWorkflowT
+  | SingleJobT
+  | JobLogGroupT
+  | HeadingT
+  | RepoT
 
-data NodeType a where
-  PaginatedIssues :: NodeType PaginatedIssuesT
-  PaginatedPulls :: NodeType PaginatedPullsT
-  PaginatedWorkflows :: NodeType PaginatedWorkflowsT
-
-  SingleIssue :: Issue -> NodeType SingleIssueT
-  SinglePull :: Issue -> NodeType SinglePullT
-  SingleWorkflow :: WorkflowRun -> NodeType SingleWorkflowT
-  SingleJob :: Job -> NodeType SingleJobT
-  JobLogGroupNode :: JobLogGroup -> NodeType JobLogGroupNodeT
-  HeadingNode :: Text -> NodeType HeadingNodeT
-  RepoNode :: (Name Owner) -> (Name Repo) -> NodeType RepoNodeT
-
-deriving instance Show (NodeType a)
-deriving instance Eq (NodeType a)
+type family NodeStatic a where
+  NodeStatic PaginatedIssuesT = ()
+  NodeStatic PaginatedPullsT = ()
+  NodeStatic PaginatedWorkflowsT = ()
+  NodeStatic SingleIssueT = Issue
+  NodeStatic SinglePullT = Issue
+  NodeStatic SingleWorkflowT = WorkflowRun
+  NodeStatic SingleJobT = Job
+  NodeStatic JobLogGroupT = JobLogGroup
+  NodeStatic HeadingT = Text
+  NodeStatic RepoT = (Name Owner, Name Repo)
 
 type family NodeState a where
   NodeState PaginatedIssuesT = SearchResult Issue
@@ -141,9 +121,9 @@ type family NodeState a where
   NodeState SinglePullT = V.Vector IssueComment
   NodeState SingleWorkflowT = WithTotalCount Job
   NodeState SingleJobT = [JobLogGroup]
-  NodeState JobLogGroupNodeT = ()
-  NodeState HeadingNodeT = ()
-  NodeState RepoNodeT = Repo
+  NodeState JobLogGroupT = ()
+  NodeState HeadingT = ()
+  NodeState RepoT = Repo
 
 type family NodeChildType f a where
   NodeChildType f PaginatedIssuesT = MainListElem' f SingleIssueT
@@ -152,10 +132,10 @@ type family NodeChildType f a where
   NodeChildType f SingleIssueT = ()
   NodeChildType f SinglePullT = ()
   NodeChildType f SingleWorkflowT = MainListElem' f SingleJobT
-  NodeChildType f SingleJobT = MainListElem' f JobLogGroupNodeT
-  NodeChildType f JobLogGroupNodeT = MainListElem' f JobLogGroupNodeT
-  NodeChildType f HeadingNodeT = SomeMainListElem f
-  NodeChildType f RepoNodeT = SomeMainListElem f
+  NodeChildType f SingleJobT = MainListElem' f JobLogGroupT
+  NodeChildType f JobLogGroupT = MainListElem' f JobLogGroupT
+  NodeChildType f HeadingT = SomeMainListElem f
+  NodeChildType f RepoT = SomeMainListElem f
 
 data Search = SearchText Text
             | SearchNone
@@ -178,35 +158,41 @@ data SomeMainListElem f where
 getExistentialChildren :: NodeState a -> [NodeChildType f a] -> [SomeMainListElem f]
 getExistentialChildren _ _ = []
 
-data MainListElem' f a =
-  MainListElemItem {
-    _typ :: NodeType a
-    , _state :: Switchable f (Fetchable (NodeState a))
+data EntityData f a = EntityData {
+  _static :: NodeStatic a
+  , _state :: Switchable f (Fetchable (NodeState a))
 
-    , _urlSuffix :: Text
+  , _urlSuffix :: Text
 
-    , _toggled :: Switchable f Bool
-    , _children :: Switchable f [NodeChildType f a]
+  , _toggled :: Switchable f Bool
+  , _children :: Switchable f [NodeChildType f a]
 
-    , _search :: Switchable f Search
-    , _pageInfo :: Switchable f PageInfo
+  , _search :: Switchable f Search
+  , _pageInfo :: Switchable f PageInfo
 
-    -- Health check fields (currently used only for repos)
-    , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
-    , _healthCheckThread :: Maybe (Async ())
+  -- Health check fields (currently used only for repos)
+  , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
+  , _healthCheckThread :: Maybe (Async ())
 
-    , _depth :: Int
-    , _ident :: Int
-    }
+  , _depth :: Int
+  , _ident :: Int
+  }
+
+data MainListElem' f (a :: NodeTyp) where
+  PaginatedIssuesNode :: EntityData f 'PaginatedIssuesT -> MainListElem' f 'PaginatedIssuesT
+  PaginatedPullsNode :: EntityData f 'PaginatedPullsT -> MainListElem' f 'PaginatedPullsT
+  PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> MainListElem' f 'PaginatedWorkflowsT
+
+  SingleIssueNode :: EntityData f 'SingleIssueT -> MainListElem' f 'SingleIssueT
+  SinglePullNode :: EntityData f 'SinglePullT -> MainListElem' f 'SinglePullT
+  SingleWorkflowNode :: EntityData f 'SingleWorkflowT -> MainListElem' f 'SingleWorkflowT
+  SingleJobNode :: EntityData f 'SingleJobT -> MainListElem' f 'SingleJobT
+  JobLogGroupNode :: EntityData f 'JobLogGroupT -> MainListElem' f 'JobLogGroupT
+  HeadingNode :: EntityData f 'HeadingT -> MainListElem' f 'HeadingT
+  RepoNode :: EntityData f 'RepoT -> MainListElem' f 'RepoT
 
 type MainListElem = SomeMainListElem Fixed
 type MainListElemVariable = SomeMainListElem Variable
-
-deriving instance (Eq (NodeType a), Eq (NodeChildType Fixed a), Eq (NodeState a)) => Eq (MainListElem' Fixed a)
-instance Eq MainListElem where
-  (SomeMainListElem (x :: a)) == (SomeMainListElem y) = undefined -- case cast y of
-    -- Just (y' :: a) -> x == y'
-    -- Nothing -> False
 
 data AppEvent =
   ListUpdate (V.Vector MainListElem)
@@ -223,8 +209,6 @@ data AppState = AppState {
   , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
   , _appAnimationCounter :: Int
   }
-
-
 
 makeLenses ''AppState
 makeLenses ''MainListElem'

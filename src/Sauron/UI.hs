@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 
 module Sauron.UI (
   drawUI
@@ -46,20 +47,20 @@ listDrawElement :: AppState -> Int -> Bool -> MainListElem -> Widget ClickableNa
 
 -- * Repos
 
-listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(RepoNode owner name), ..} :: MainListElem' Fixed RepoNodeT))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeMainListElem (RepoNode x@(EntityData {_static=(owner, name), ..}))) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled (owner, name) _state _healthCheck (_appAnimationCounter appState)
   ]
 
 -- * Issues
 
-listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedIssues, ..} :: MainListElem' Fixed PaginatedIssuesT))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeMainListElem (PaginatedIssuesNode x@(EntityData {_state}))) = wrapper ix isSelected x [
   Just $ case _state of
     Fetched (SearchResult totalCount _xs) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount})|])
     Fetching -> paginatedHeading x appState "Issues" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading x appState "Issues" (str [i|(not fetched)|])
     Errored err -> paginatedHeading x appState "Issues" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleIssue issue), ..} :: MainListElem' Fixed SingleIssueT))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeMainListElem (SingleIssueNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
   Just $ issueLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
@@ -72,15 +73,15 @@ listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainLi
 
 -- * Pulls
 
-listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedPulls, ..} :: MainListElem' Fixed PaginatedPullsT))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeMainListElem (PaginatedPullsNode ed@(EntityData {_state}))) = wrapper ix isSelected ed [
   Just $ case _state of
-    Fetched (SearchResult totalCount _xs) -> paginatedHeading x appState "Pulls" (str [i|(#{totalCount})|])
-    Fetching -> paginatedHeading x appState "Pulls" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading x appState "Pulls" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading x appState "Pulls" (str [i|(error fetching: #{err})|])
+    Fetched (SearchResult totalCount _xs) -> paginatedHeading ed appState "Pulls" (str [i|(#{totalCount})|])
+    Fetching -> paginatedHeading ed appState "Pulls" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Pulls" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Pulls" (str [i|(error fetching: #{err})|])
     _ -> str ""
   ]
-listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SinglePull issue), ..} :: MainListElem' Fixed SinglePullT))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeMainListElem (SinglePullNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
   Just $ pullLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
@@ -93,14 +94,14 @@ listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainLi
 
 -- * Workflows
 
-listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedWorkflows, ..} :: MainListElem' Fixed PaginatedWorkflowsT))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeMainListElem (PaginatedWorkflowsNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
-    Fetched (WithTotalCount _xs totalCount) -> paginatedHeading x appState "Actions" (str [i|(#{totalCount})|])
-    Fetching -> paginatedHeading x appState "Actions" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading x appState "Actions" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading x appState "Actions" (str [i|(error fetching: #{err})|])
+    Fetched (WithTotalCount _xs totalCount) -> paginatedHeading ed appState "Actions" (str [i|(#{totalCount})|])
+    Fetching -> paginatedHeading ed appState "Actions" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Actions" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Actions" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleWorkflow wf), ..} :: MainListElem' Fixed SingleWorkflowT))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeMainListElem (SingleWorkflowNode ed@(EntityData {_static=wf, ..}))) = wrapper ix isSelected ed [
   Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state
   , do
       guard _toggled
@@ -112,7 +113,7 @@ listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainLi
 
 -- * Jobs
 
-listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleJob job), ..} :: MainListElem' Fixed SingleJobT))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeMainListElem (SingleJobNode ed@(EntityData {_static=job, ..}))) = wrapper ix isSelected ed [
   Just $ jobLine (_appAnimationCounter appState) _toggled job _state
   , do
       guard _toggled
@@ -127,13 +128,13 @@ listDrawElement appState ix isSelected (SomeMainListElem (cast -> Just x@(MainLi
 
 -- * Job Log Groups
 
-listDrawElement _appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(JobLogGroupNode jobLogGroup), ..} :: MainListElem' Fixed JobLogGroupNodeT))) = wrapper ix isSelected x [
+listDrawElement _appState ix isSelected (SomeMainListElem (JobLogGroupNode ed@(EntityData {_static=jobLogGroup, ..}))) = wrapper ix isSelected ed [
   Just $ jobLogGroupLine _toggled jobLogGroup
   ]
 
 -- * Headings
 
-listDrawElement _appState ix isSelected (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(HeadingNode label), ..} :: MainListElem' Fixed HeadingNodeT))) = wrapper ix isSelected x [
+listDrawElement _appState ix isSelected (SomeMainListElem (HeadingNode ed@(EntityData {_static=label, ..}))) = wrapper ix isSelected ed [
   Just $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
     , Just (hBox [str (toString label)])
@@ -145,27 +146,23 @@ jobLogGroupLine :: Bool -> JobLogGroup -> Widget n
 jobLogGroupLine _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox $
   str "  " : parseAnsiText content
   ) contents
--- jobLogGroupLine _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox [
---   str "  ",
---   withAttr normalAttr $ str $ toString content
---   ]) contents
 jobLogGroupLine toggled' (JobLogGroup _timestamp title _children) = hBox [
   withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
   withAttr normalAttr $ str $ toString title
   ]
 
 paginatedHeading ::
-  MainListElem' Fixed a
+  EntityData Fixed a
   -> AppState
   -> String
   -> Widget ClickableName
   -> Widget ClickableName
-paginatedHeading (MainListElemItem {..}) appState l countInParens = hBox $ catMaybes [
+paginatedHeading (EntityData {..}) appState l countInParens = hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
   , Just $ padRight (Pad 1) $ str l
   , Just $ countInParens
   , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
   ]
 
-wrapper :: Int -> Bool -> MainListElem' a f -> [Maybe (Widget ClickableName)] -> Widget ClickableName
+wrapper :: Int -> Bool -> EntityData a f -> [Maybe (Widget ClickableName)] -> Widget ClickableName
 wrapper ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes

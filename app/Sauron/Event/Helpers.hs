@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 
 module Sauron.Event.Helpers where
@@ -28,7 +29,7 @@ withFixedElemAndParents s cb = do
 
 withNthChildAndMaybeRepoParent :: (
   MonadIO m
-  ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe (MainListElem' Variable RepoNodeT) -> m ()) -> m ()
+  ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe (MainListElem' Variable 'RepoNodeT) -> m ()) -> m ()
 withNthChildAndMaybeRepoParent s cb =
   withFixedElemAndParents s $ \fixedEl _variableEl elems ->
     cb fixedEl (last elems) (viaNonEmpty head [x | (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(RepoNode {})} :: MainListElem' Variable RepoNodeT))) <- toList elems])

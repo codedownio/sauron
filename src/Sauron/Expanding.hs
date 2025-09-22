@@ -14,12 +14,11 @@ import Sauron.Types
 getExpandedList :: V.Vector MainListElem -> V.Vector MainListElem
 getExpandedList = V.fromList . concatMap expandNodes . V.toList
   where
-    expandNodes x@(SomeMainListElem (MainListElemItem {..})) = execWriter $ do
+    expandNodes x@(SomeMainListElem (MainListElemItem (EntityData {..}))) = execWriter $ do
       tell [x]
       when _toggled $ do
-        undefined
-        -- forM_ _children $ \child -> do
-        --   tell (expandNodes child)
+        forM_ _children $ \child -> do
+          tell (expandNodes child)
 
 -- * Computing nth child in the presence of expanding
 

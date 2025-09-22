@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -51,27 +52,27 @@ withScroll s action = do
     Just (_, el@(SomeMainListElem (MainListElemItem {..}))) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident}|])
     _ -> return ()
 
-refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> NonEmpty MainListElemVariable -> m ()
-refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(HeadingNode {}), _children} :: MainListElem' Variable HeadingNodeT))) _parents =
-  readTVarIO _children >>= mapM_ (\child -> refresh bc child (item :| toList _parents))
-refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(RepoNode {}), _children} :: MainListElem' Variable RepoNodeT))) _parents =
-  liftIO $ readTVarIO _children >>= mapM_ (\child -> refresh bc child (item :| toList _parents))
+refresh :: (MonadIO m) => BaseContext -> MainListElem' Variable a -> NonEmpty MainListElemVariable -> m ()
+refresh bc item@(MainListElemItem {_key=HeadingNodeT, _typ=(HeadingNode {}), _children} :: MainListElem' Variable HeadingNodeT) _parents =
+  readTVarIO _children >>= mapM_ (\child -> refresh bc child ((SomeMainListElem item) :| toList _parents))
+-- refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(RepoNode {}), _children} :: MainListElem' Variable RepoNodeT))) _parents =
+--   liftIO $ readTVarIO _children >>= mapM_ (\child -> refresh bc child (item :| toList _parents))
 
-refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedIssues} :: MainListElem' Variable PaginatedIssuesT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name x) bc
-refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedPulls} :: MainListElem' Variable PaginatedPullsT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchPulls owner name x) bc
-refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedWorkflows} :: MainListElem' Variable PaginatedWorkflowsT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflows owner name x) bc
+-- refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedIssues} :: MainListElem' Variable PaginatedIssuesT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
+--   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name x) bc
+-- refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedPulls} :: MainListElem' Variable PaginatedPullsT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
+--   liftIO $ void $ async $ liftIO $ runReaderT (fetchPulls owner name x) bc
+-- refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedWorkflows} :: MainListElem' Variable PaginatedWorkflowsT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
+--   liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflows owner name x) bc
 
-refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(SingleIssue (Issue {..})), _state} :: MainListElem' Variable SingleIssueT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
-refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(SinglePull (Issue {..})), _state} :: MainListElem' Variable SinglePullT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name issueNumber _state) bc
-refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {workflowRunWorkflowRunId})), _state} :: MainListElem' Variable SingleWorkflowT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId x) bc
-refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleJob job@(Job {})), _state} :: MainListElem' Variable SingleJobT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job x) bc
+-- refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(SingleIssue (Issue {..})), _state} :: MainListElem' Variable SingleIssueT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
+--   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
+-- refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(SinglePull (Issue {..})), _state} :: MainListElem' Variable SinglePullT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
+--   liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name issueNumber _state) bc
+-- refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {workflowRunWorkflowRunId})), _state} :: MainListElem' Variable SingleWorkflowT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
+--   liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId x) bc
+-- refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleJob job@(Job {})), _state} :: MainListElem' Variable SingleJobT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
+--   liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job x) bc
 
 refresh _ _ _ = return ()
 

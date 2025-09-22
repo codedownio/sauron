@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+{-# LANGUAGE DataKinds #-}
 
 module Sauron.UI.Workflow (
   workflowLine

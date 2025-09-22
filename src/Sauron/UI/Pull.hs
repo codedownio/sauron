@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Sauron.UI.Pull (
@@ -37,7 +38,7 @@ pullLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) animationCou
       , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
-pullInner :: UTCTime -> Issue -> Text -> Fetchable (NodeState SinglePullT) -> Widget n
+pullInner :: UTCTime -> Issue -> Text -> Fetchable (NodeState 'SinglePullT) -> Widget n
 pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
   where
     SimpleUser {simpleUserLogin=(N openerUsername)} = issueUser

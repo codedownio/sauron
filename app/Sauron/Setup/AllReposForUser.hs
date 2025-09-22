@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 
 module Sauron.Setup.AllReposForUser (
   allReposForUser

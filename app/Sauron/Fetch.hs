@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -48,7 +49,7 @@ fetchRepo owner name repoVar = do
 fetchIssues :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> MainListElem' Variable PaginatedIssuesT -> m ()
-fetchIssues owner name (MainListElemItem {..}) = do
+fetchIssues owner name (PaginatedIssuesNode (EntityData {..})) = do
   extraTerms <- readTVarIO _search >>= \case
     SearchNone -> pure []
     SearchText t -> pure $ T.words t
@@ -64,12 +65,12 @@ fetchIssues owner name (MainListElemItem {..}) = do
       writeTVar _pageInfo newPageInfo
       writeTVar _state (Fetched sr)
       (writeTVar _children =<<) $ forM (V.toList results) $ \issue@(Issue {..}) ->
-        makeEmptyElem bc (SingleIssue issue) ("/issue/" <> show issueNumber) (_depth + 1)
+        SingleIssueNode <$> makeEmptyElem bc issue ("/issue/" <> show issueNumber) (_depth + 1)
 
 fetchPulls :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> MainListElem' Variable PaginatedPullsT -> m ()
-fetchPulls owner name (MainListElemItem {..}) = do
+fetchPulls owner name (PaginatedPullsNode (EntityData {..})) = do
   extraTerms <- readTVarIO _search >>= \case
     SearchNone -> pure []
     SearchText t -> pure $ T.words t
@@ -85,7 +86,7 @@ fetchPulls owner name (MainListElemItem {..}) = do
       writeTVar _pageInfo newPageInfo
       writeTVar _state (Fetched sr)
       (writeTVar _children =<<) $ forM (V.toList results) $ \issue@(Issue {..}) ->
-        makeEmptyElem bc (SinglePull issue) ("/pull/" <> show issueNumber) (_depth + 1)
+        SinglePullNode <$> makeEmptyElem bc issue ("/pull/" <> show issueNumber) (_depth + 1)
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -103,7 +104,7 @@ fetchIssue owner name issueNumber issueVar = do
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> MainListElem' Variable PaginatedWorkflowsT -> m ()
-fetchWorkflows owner name (MainListElemItem {..}) = do
+fetchWorkflows owner name (PaginatedWorkflowsNode (EntityData {..})) = do
   bc <- ask
   fetchPaginated'' (workflowRunsR owner name mempty) _pageInfo (writeTVar _state) $ \case
     Left err -> do
@@ -113,7 +114,7 @@ fetchWorkflows owner name (MainListElemItem {..}) = do
       writeTVar _pageInfo newPageInfo
       writeTVar _state (Fetched wtc)
       (writeTVar _children =<<) $ forM (V.toList results) $ \workflow@(WorkflowRun {}) ->
-        makeEmptyElem bc (SingleWorkflow workflow) "" (_depth + 1)
+        SingleWorkflowNode <$> makeEmptyElem bc workflow "" (_depth + 1)
 
 fetchIssueComments :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -143,7 +144,7 @@ fetchPullComments owner name issueNumber inner = do
 fetchWorkflowJobs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Id WorkflowRun -> MainListElem' Variable SingleWorkflowT -> m ()
-fetchWorkflowJobs owner name workflowRunId (MainListElemItem {..}) = do
+fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})) = do
   bc@(BaseContext {auth, manager}) <- ask
   bracketOnError_ (atomically $ writeTVar _state Fetching)
                   (atomically $ writeTVar _state (Errored "Workflow jobs fetch failed with exception.")) $
@@ -157,7 +158,7 @@ fetchWorkflowJobs owner name workflowRunId (MainListElemItem {..}) = do
       Right (responseBody -> wtc@(WithTotalCount results _totalCount)) -> atomically $ do
         writeTVar _state (Fetched wtc)
         (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) -> do
-          makeEmptyElem bc (SingleJob job) "" (_depth + 1)
+          SingleJobNode <$> makeEmptyElem bc job "" (_depth + 1)
           -- writeTVar (_state child) (PaginatedItemJob)
   -- TODO: do pagination for these jobs? The web UI doesn't seem to...
   -- bc <- ask
@@ -174,7 +175,7 @@ fetchWorkflowJobs owner name workflowRunId (MainListElemItem {..}) = do
 fetchJobLogs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Job -> MainListElem' Variable SingleJobT -> m ()
-fetchJobLogs owner name (Job {jobId}) (MainListElemItem {..}) = do
+fetchJobLogs owner name (Job {jobId}) (JobLogGroupNode (EntityData {..})) = do
   BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ writeTVar _state Fetching)
                   (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
@@ -193,12 +194,12 @@ fetchJobLogs owner name (Job {jobId}) (MainListElemItem {..}) = do
         children' <- liftIO $ atomically $ mapM (createJobLogGroupChildren bc (_depth + 1)) parsedLogs
 
         atomically $ do
-          writeTVar _state (Fetched parsedLogs)
+          writeTVar _state (Fetched ())
           writeTVar _children children'
 
 -- * Util
 
-makeEmptyElem :: BaseContext -> NodeType a -> Text -> Int -> STM (MainListElem' Variable a)
+makeEmptyElem :: BaseContext -> NodeStatic a -> Text -> Int -> STM (EntityData Variable a)
 makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
   stateVar <- newTVar NotFetched
   ident' <- getIdentifierSTM
@@ -207,8 +208,8 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
   searchVar <- newTVar $ SearchNone
   pageInfoVar <- newTVar emptyPageInfo
   healthCheckVar <- newTVar NotFetched
-  return $ MainListElemItem {
-    _typ = typ'
+  return $ EntityData {
+    _static = typ'
     , _state = stateVar
 
     , _urlSuffix = urlSuffix'
@@ -226,9 +227,8 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
     , _ident = ident'
 }
 
-createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (MainListElem' Variable JobLogGroupNodeT)
+createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (MainListElem' Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
-  let nodeType = JobLogGroupNode jobLogGroup
   stateVar <- newTVar (Fetched ())
   ident' <- getIdentifierSTM bc
   toggledVar <- newTVar False
@@ -242,8 +242,8 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
       newTVar childElems
 
   healthCheckVar2 <- newTVar NotFetched
-  return $ MainListElemItem {
-    _typ = nodeType
+  return $ JobLogGroupNode $ EntityData {
+    _static = jobLogGroup
     , _state = stateVar
     , _urlSuffix = ""
     , _toggled = toggledVar
