@@ -14,7 +14,6 @@ module Sauron.Types where
 import Brick.Forms
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
-import Data.String.Interpolate
 import Data.Text
 import Data.Time
 import Data.Typeable
@@ -23,7 +22,6 @@ import GitHub hiding (Status)
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
 import Relude
-import qualified Text.Show
 import UnliftIO.Async
 
 
@@ -155,8 +153,30 @@ emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 data SomeMainListElem f where
   SomeMainListElem :: (Typeable a) => { unSomeMainListElem :: MainListElem' f a } -> SomeMainListElem f
 
-getExistentialChildren :: MainListElem' f a -> [MainListElem' f a]
-getExistentialChildren _ = undefined
+instance Eq (SomeMainListElem f) where
+  (SomeMainListElem x) == (SomeMainListElem y) =
+    _ident (getEntityData x) == _ident (getEntityData y)
+
+getExistentialChildren :: MainListElem' Variable a -> IO [NodeChildType Variable a]
+getExistentialChildren node = readTVarIO (_children (getEntityData node))
+
+getExistentialChildrenWrapped :: MainListElem' Variable a -> STM [SomeMainListElem Variable]
+getExistentialChildrenWrapped node = case node of
+  -- These types have SomeMainListElem children
+  HeadingNode ed -> readTVar (_children ed)
+  RepoNode ed -> readTVar (_children ed)
+  
+  -- These types have specific GADT constructor children, so wrap them
+  PaginatedIssuesNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
+  PaginatedPullsNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
+  PaginatedWorkflowsNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
+  SingleWorkflowNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
+  SingleJobNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
+  JobLogGroupNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
+  
+  -- These are leaf nodes with no meaningful children
+  SingleIssueNode _ -> return []
+  SinglePullNode _ -> return []
 
 data EntityData f a = EntityData {
   _static :: NodeStatic a
@@ -192,7 +212,16 @@ data MainListElem' f (a :: NodeTyp) where
   RepoNode :: EntityData f 'RepoT -> MainListElem' f 'RepoT
 
 getEntityData :: MainListElem' f a -> EntityData f a
-getEntityData = undefined
+getEntityData (PaginatedIssuesNode ed) = ed
+getEntityData (PaginatedPullsNode ed) = ed
+getEntityData (PaginatedWorkflowsNode ed) = ed
+getEntityData (SingleIssueNode ed) = ed
+getEntityData (SinglePullNode ed) = ed
+getEntityData (SingleWorkflowNode ed) = ed
+getEntityData (SingleJobNode ed) = ed
+getEntityData (JobLogGroupNode ed) = ed
+getEntityData (HeadingNode ed) = ed
+getEntityData (RepoNode ed) = ed
 
 type MainListElem = SomeMainListElem Fixed
 type MainListElemVariable = SomeMainListElem Variable
@@ -214,4 +243,3 @@ data AppState = AppState {
   }
 
 makeLenses ''AppState
-makeLenses ''MainListElem'

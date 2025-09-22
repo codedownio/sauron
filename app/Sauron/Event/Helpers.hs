@@ -8,7 +8,6 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
-import Data.Typeable
 import GitHub
 import Lens.Micro
 import Relude hiding (Down, pred)

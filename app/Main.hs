@@ -68,7 +68,7 @@ main = do
   listElems :: V.Vector MainListElemVariable <- case cliConfigFile of
     Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
     Nothing -> isContainedInGitRepo >>= \case
-      Just (namespace, name) -> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
+      Just (namespace, name) -> (fmap SomeMainListElem) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
       Nothing -> (fmap SomeMainListElem) <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   -- Kick off initial fetches

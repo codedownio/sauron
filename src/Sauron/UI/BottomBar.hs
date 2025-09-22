@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 
 module Sauron.UI.BottomBar (
   bottomBar

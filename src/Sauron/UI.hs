@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 
 module Sauron.UI (
   drawUI
@@ -11,7 +12,6 @@ import qualified Brick.Widgets.List as L
 import Control.Monad
 import Data.Maybe
 import Data.String.Interpolate
-import Data.Typeable
 import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
 import Relude
@@ -79,7 +79,6 @@ listDrawElement appState ix isSelected (SomeMainListElem (PaginatedPullsNode ed@
     Fetching -> paginatedHeading ed appState "Pulls" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Pulls" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Pulls" (str [i|(error fetching: #{err})|])
-    _ -> str ""
   ]
 listDrawElement appState ix isSelected (SomeMainListElem (SinglePullNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
   Just $ pullLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state

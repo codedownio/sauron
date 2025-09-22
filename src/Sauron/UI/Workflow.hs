@@ -13,7 +13,7 @@ import Data.Time.Clock
 import qualified Data.Vector as V
 import GitHub
 import Relude
-import Sauron.Types hiding (toggled)
+import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Statuses (statusToIconAnimated, fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff
@@ -119,4 +119,3 @@ workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobs
             greenCheck  -- TODO: extract proper job status and use appropriate icon
             , padLeft (Pad 1) $ str $ show job  -- TODO: extract job name when field names are known
             ]
-      _ -> str "Jobs: (Unknown format)"

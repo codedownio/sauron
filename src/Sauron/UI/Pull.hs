@@ -13,7 +13,7 @@ import Data.Time
 import GitHub
 import GitHub.Data.Name
 import Relude
-import Sauron.Types hiding (toggled)
+import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
 import Sauron.UI.Markdown

@@ -1,24 +1,20 @@
 
 module Sauron.Fix (fixMainListElem) where
 
-import Control.Monad
-import Data.Function
 import Relude hiding (Down)
 import Sauron.Types
 
 
 fixMainListElem :: MainListElemVariable -> STM MainListElem
-fixMainListElem (SomeMainListElem (getEntityData -> (EntityData {..}))) = do
-  stateFixed <- readTVar _state
-
-  toggledFixed <- readTVar _toggled
-  -- childrenFixed <- readTVar _children >>= mapM fixMainListElem
-  childrenFixed <- undefined
-
-  searchFixed <- readTVar _search
-  pageInfoFixed <- readTVar _pageInfo
-
-  healthCheckFixed <- readTVar _healthCheck
+fixMainListElem (SomeMainListElem _item@(getEntityData -> (EntityData {..}))) = do
+  _stateFixed <- readTVar _state
+  _toggledFixed <- readTVar _toggled
+  -- TODO: Implement proper GADT-aware children fixing
+  -- This is complex due to the type-level constraints of GADTs
+  _childrenFixed <- undefined
+  _searchFixed <- readTVar _search
+  _pageInfoFixed <- readTVar _pageInfo
+  _healthCheckFixed <- readTVar _healthCheck
 
   undefined
 

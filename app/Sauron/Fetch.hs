@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -175,7 +176,7 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
 fetchJobLogs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Job -> MainListElem' Variable SingleJobT -> m ()
-fetchJobLogs owner name (Job {jobId}) (JobLogGroupNode (EntityData {..})) = do
+fetchJobLogs owner name (Job {jobId}) (SingleJobNode (EntityData {..})) = do
   BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ writeTVar _state Fetching)
                   (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
@@ -194,7 +195,7 @@ fetchJobLogs owner name (Job {jobId}) (JobLogGroupNode (EntityData {..})) = do
         children' <- liftIO $ atomically $ mapM (createJobLogGroupChildren bc (_depth + 1)) parsedLogs
 
         atomically $ do
-          writeTVar _state (Fetched ())
+          writeTVar _state (Fetched parsedLogs)
           writeTVar _children children'
 
 -- * Util

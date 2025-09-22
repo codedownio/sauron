@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -10,7 +11,6 @@ import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
 import Data.String.Interpolate
-import Data.Typeable
 import qualified Data.Vector as Vec
 import GitHub
 import qualified Graphics.Vty as V
@@ -32,13 +32,11 @@ appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
-    withFixedElemAndParents s $ \_fixedEl _variableEl parents -> case (viaNonEmpty head (toList parents), viaNonEmpty head [x | (SomeMainListElem x@(RepoNode {})) <- toList parents]) of
-      (Just el@(SomeMainListElem (getEntityData -> (EntityData {..}))), Just _repoEl) -> do
-        atomically $ do
-          writeTVar _search $ SearchText (formState form)
-          writeTVar _pageInfo $ PageInfo 1 Nothing Nothing Nothing Nothing
-        refresh (s ^. appBaseContext) el parents
-      _ -> modify (appForm .~ Nothing)
+    withFixedElemAndParents s $ \_fixedEl (SomeMainListElem el@(getEntityData -> (EntityData {..}))) parents -> do
+      atomically $ do
+        writeTVar _search $ SearchText (formState form)
+        writeTVar _pageInfo $ PageInfo 1 Nothing Nothing Nothing Nothing
+      refresh (s ^. appBaseContext) el parents
     modify (appForm .~ Nothing)
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
 
@@ -85,11 +83,9 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == openSelectedKey ->
     withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case (fixedEl, repoEl) of
-      (SomeMainListElem (RepoNode (EntityData {_state=(Fetched (Repo {repoHtmlUrl=(URL url)}))})), _) -> openBrowserToUrl (toString url)
       (SomeMainListElem el, RepoNode (EntityData {_state})) -> readTVarIO _state >>= \case
         Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (getNodeUrl (toString url) el)
         _ -> return ()
-      _ -> return ()
 
   -- Column 3
   V.EvKey c [] | c == nextPageKey -> tryNavigatePage s goNextPage
@@ -156,16 +152,16 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeMainListElem item
 
 getNodeUrl :: String -> MainListElem' Fixed a -> String
 getNodeUrl repoBaseUrl (PaginatedIssuesNode _) = repoBaseUrl <> "/issues"
--- getNodeUrl repoBaseUrl PaginatedPulls = repoBaseUrl <> "/pulls"
--- getNodeUrl repoBaseUrl PaginatedWorkflows = repoBaseUrl <> "/actions"
--- getNodeUrl repoBaseUrl (SingleIssue (Issue {..})) = case issueHtmlUrl of
---   Just url -> toString $ getUrl url
---   Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber}|]
--- getNodeUrl repoBaseUrl (SinglePull (Issue {..})) = case issueHtmlUrl of
---   Just url -> toString $ getUrl url
---   Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber}|]
--- getNodeUrl _repoBaseUrl (SingleWorkflow (WorkflowRun {..})) = toString $ getUrl workflowRunHtmlUrl
--- getNodeUrl _repoBaseUrl (SingleJob (Job {..})) = toString $ getUrl jobHtmlUrl
--- getNodeUrl _repoBaseUrl (JobLogGroupNode _) = ""
--- getNodeUrl repoBaseUrl (RepoNode _ _) = repoBaseUrl
--- getNodeUrl _repoBaseUrl (HeadingNode _) = ""
+getNodeUrl repoBaseUrl (PaginatedPullsNode _) = repoBaseUrl <> "/pulls"
+getNodeUrl repoBaseUrl (PaginatedWorkflowsNode _) = repoBaseUrl <> "/actions"
+getNodeUrl repoBaseUrl (SingleIssueNode (EntityData {_static=issue})) = case issueHtmlUrl issue of
+  Just url -> toString $ getUrl url
+  Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber issue}|]
+getNodeUrl repoBaseUrl (SinglePullNode (EntityData {_static=pull})) = case issueHtmlUrl pull of
+  Just url -> toString $ getUrl url
+  Nothing -> repoBaseUrl <> [i|/pulls/#{issueNumber pull}|]
+getNodeUrl _repoBaseUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) = toString $ getUrl $ workflowRunHtmlUrl workflowRun
+getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_static=job})) = toString $ getUrl $ jobHtmlUrl job
+getNodeUrl _repoBaseUrl (JobLogGroupNode _) = "" -- Job log groups don't have URLs
+getNodeUrl _repoBaseUrl (HeadingNode _) = "" -- Heading nodes don't have URLs
+getNodeUrl repoBaseUrl (RepoNode _) = repoBaseUrl
