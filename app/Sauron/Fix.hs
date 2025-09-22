@@ -8,18 +8,19 @@ import Sauron.Types
 
 
 fixMainListElem :: MainListElemVariable -> STM MainListElem
-fixMainListElem (MainListElemItem {..}) = do
+fixMainListElem (SomeMainListElem (MainListElemItem {..})) = do
   stateFixed <- readTVar _state
 
   toggledFixed <- readTVar _toggled
-  childrenFixed <- readTVar _children >>= mapM fixMainListElem
+  -- childrenFixed <- readTVar _children >>= mapM fixMainListElem
+  childrenFixed <- undefined
 
   searchFixed <- readTVar _search
   pageInfoFixed <- readTVar _pageInfo
-  
+
   healthCheckFixed <- readTVar _healthCheck
 
-  return $ MainListElemItem {
+  return $ SomeMainListElem $ MainListElemItem {
     _typ = _typ
     , _state = stateFixed
 
@@ -29,7 +30,7 @@ fixMainListElem (MainListElemItem {..}) = do
 
     , _search = searchFixed
     , _pageInfo = pageInfoFixed
-    
+
     , _healthCheck = healthCheckFixed
     , _healthCheckThread = _healthCheckThread
 

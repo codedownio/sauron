@@ -37,7 +37,7 @@ pullLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) animationCou
       , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
-pullInner :: UTCTime -> Issue -> Text -> Fetchable NodeState -> Widget n
+pullInner :: UTCTime -> Issue -> Text -> Fetchable (NodeState SinglePullT) -> Widget n
 pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
   where
     SimpleUser {simpleUserLogin=(N openerUsername)} = issueUser
@@ -50,8 +50,7 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
 
     comments :: [Widget n]
     comments = case inner of
-      Fetched (PaginatedItemPull cs) -> fmap renderComment (toList cs)
-      Fetched x -> [strWrap [i|Unexpected comments: #{x}|]]
+      Fetched cs -> fmap renderComment (toList cs)
       Fetching {} -> [strWrap [i|Fetching comments...|]]
       Errored err -> [strWrap [i|Failed to fetch comments: #{err}|]]
       NotFetched -> [strWrap [i|Comments not fetched.|]]

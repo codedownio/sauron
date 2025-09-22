@@ -56,21 +56,21 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           newRepoNode nsName repoVar healthCheckVar hcThread repoDepth (getIdentifier baseContext)
 
         case maybeHeadingNode of
-          Nothing -> tell repoNodes
+          Nothing -> tell (fmap SomeMainListElem repoNodes)
           Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l) -> do
-            childrenVar <- newTVarIO repoNodes
+            childrenVar <- newTVarIO (fmap SomeMainListElem repoNodes)
             headingHealthCheckVar <- newTVarIO NotFetched
             let headingNode = MainListElemItem {
-              _typ = HeadingNode l
-              , _state = statusVar
-              , _urlSuffix = ""
-              , _toggled = toggledVar
-              , _children = childrenVar
-              , _search = searchVar
-              , _pageInfo = pageInfoVar
-              , _healthCheck = headingHealthCheckVar
-              , _healthCheckThread = Nothing
-              , _depth = 0
-              , _ident = identifier
-              }
-            tell [headingNode]
+                  _typ = HeadingNode l
+                  , _state = statusVar
+                  , _urlSuffix = ""
+                  , _toggled = toggledVar
+                  , _children = childrenVar
+                  , _search = searchVar
+                  , _pageInfo = pageInfoVar
+                  , _healthCheck = headingHealthCheckVar
+                  , _healthCheckThread = Nothing
+                  , _depth = 0
+                  , _ident = identifier
+                  } :: MainListElem' Variable HeadingNodeT
+            tell [SomeMainListElem headingNode]

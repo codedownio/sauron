@@ -1,5 +1,7 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -101,34 +103,56 @@ data HealthCheckResult =
   | HealthCheckUnhealthy Text
   deriving (Show, Eq)
 
-data NodeType =
-  PaginatedIssues
-  | PaginatedPulls
-  | PaginatedWorkflows
+data PaginatedIssuesT
+data PaginatedPullsT
+data PaginatedWorkflowsT
+data SingleIssueT
+data SinglePullT
+data SingleWorkflowT
+data SingleJobT
+data JobLogGroupNodeT
+data HeadingNodeT
+data RepoNodeT
 
-  | SingleIssue Issue
-  | SinglePull Issue
-  | SingleWorkflow WorkflowRun
-  | SingleJob Job
-  | JobLogGroupNode JobLogGroup
-  | HeadingNode Text
-  | RepoNode (Name Owner) (Name Repo)
-  deriving (Show, Eq)
+data NodeType a where
+  PaginatedIssues :: NodeType PaginatedIssuesT
+  PaginatedPulls :: NodeType PaginatedPullsT
+  PaginatedWorkflows :: NodeType PaginatedWorkflowsT
 
-data NodeState =
-  PaginatedItemsIssues (SearchResult Issue)
-  | PaginatedItemsPulls (SearchResult Issue)
-  | PaginatedItemsWorkflows (WithTotalCount WorkflowRun)
-  | PaginatedItemsJobs (WithTotalCount Job)
+  SingleIssue :: Issue -> NodeType SingleIssueT
+  SinglePull :: Issue -> NodeType SinglePullT
+  SingleWorkflow :: WorkflowRun -> NodeType SingleWorkflowT
+  SingleJob :: Job -> NodeType SingleJobT
+  JobLogGroupNode :: JobLogGroup -> NodeType JobLogGroupNodeT
+  HeadingNode :: Text -> NodeType HeadingNodeT
+  RepoNode :: (Name Owner) -> (Name Repo) -> NodeType RepoNodeT
 
-  | PaginatedItemIssue (V.Vector IssueComment)
-  | PaginatedItemPull (V.Vector IssueComment)
-  | PaginatedItemWorkflow (WithTotalCount Job)
-  | PaginatedItemJob [JobLogGroup]
-  | JobLogGroupState
-  | HeadingState
-  | RepoState Repo
-  deriving (Show, Eq)
+deriving instance Show (NodeType a)
+deriving instance Eq (NodeType a)
+
+type family NodeState a where
+  NodeState PaginatedIssuesT = SearchResult Issue
+  NodeState PaginatedPullsT = SearchResult Issue
+  NodeState PaginatedWorkflowsT = WithTotalCount WorkflowRun
+  NodeState SingleIssueT = V.Vector IssueComment
+  NodeState SinglePullT = V.Vector IssueComment
+  NodeState SingleWorkflowT = WithTotalCount Job
+  NodeState SingleJobT = [JobLogGroup]
+  NodeState JobLogGroupNodeT = ()
+  NodeState HeadingNodeT = ()
+  NodeState RepoNodeT = Repo
+
+type family NodeChildType f a where
+  NodeChildType f PaginatedIssuesT = MainListElem' f SingleIssueT
+  NodeChildType f PaginatedPullsT = MainListElem' f SinglePullT
+  NodeChildType f PaginatedWorkflowsT = MainListElem' f SingleWorkflowT
+  NodeChildType f SingleIssueT = ()
+  NodeChildType f SinglePullT = ()
+  NodeChildType f SingleWorkflowT = MainListElem' f SingleJobT
+  NodeChildType f SingleJobT = MainListElem' f JobLogGroupNodeT
+  NodeChildType f JobLogGroupNodeT = MainListElem' f JobLogGroupNodeT
+  NodeChildType f HeadingNodeT = SomeMainListElem f
+  NodeChildType f RepoNodeT = SomeMainListElem f
 
 data Search = SearchText Text
             | SearchNone
@@ -145,41 +169,36 @@ data PageInfo = PageInfo {
 emptyPageInfo :: PageInfo
 emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
-data MainListElem' f =
+data SomeMainListElem f where
+  SomeMainListElem :: Typeable a => MainListElem' f a -> SomeMainListElem f
+
+data MainListElem' f a =
   MainListElemItem {
-      _typ :: NodeType
-      , _state :: Switchable f (Fetchable NodeState)
+    _typ :: NodeType a
+    , _state :: Switchable f (Fetchable (NodeState a))
 
-      , _urlSuffix :: Text
+    , _urlSuffix :: Text
 
-      , _toggled :: Switchable f Bool
-      , _children :: Switchable f [MainListElem' f]
+    , _toggled :: Switchable f Bool
+    , _children :: Switchable f [NodeChildType f a]
 
-      , _search :: Switchable f Search
-      , _pageInfo :: Switchable f PageInfo
+    , _search :: Switchable f Search
+    , _pageInfo :: Switchable f PageInfo
 
-      -- Health check fields (used for repos, unused for other node types)
-      , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
-      , _healthCheckThread :: Maybe (Async ())
+    -- Health check fields (currently used only for repos)
+    , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
+    , _healthCheckThread :: Maybe (Async ())
 
-      , _depth :: Int
-      , _ident :: Int
-      }
+    , _depth :: Int
+    , _ident :: Int
+    }
 
-type MainListElem = MainListElem' Fixed
-type MainListElemVariable = MainListElem' Variable
-
-deriving instance Eq MainListElem
+type MainListElem = SomeMainListElem Fixed
+type MainListElemVariable = SomeMainListElem Variable
 
 data AppEvent =
   ListUpdate (V.Vector MainListElem)
   | AnimationTick
-
-instance Show (MainListElem' Variable) where
-  show (MainListElemItem {..}) = [i|Item<#{_typ}>|]
-
-instance Show (MainListElem' Fixed) where
-  show (MainListElemItem {..}) = [i|Item<#{_typ}, #{_state}, #{_children}>|]
 
 data AppState = AppState {
   _appUser :: User

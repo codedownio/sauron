@@ -26,10 +26,10 @@ withFixedElemAndParents s cb = do
 
 withNthChildAndMaybeRepoParent :: (
   MonadIO m
-  ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe MainListElemVariable -> m ()) -> m ()
+  ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe (MainListElem' Variable RepoNodeT) -> m ()) -> m ()
 withNthChildAndMaybeRepoParent s cb =
   withFixedElemAndParents s $ \fixedEl _variableEl elems ->
-    cb fixedEl (last elems) (viaNonEmpty head [x | x@(MainListElemItem {_typ=(RepoNode {})}) <- toList elems])
+    cb fixedEl (last elems) (viaNonEmpty head [x | (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(RepoNode {})}))) <- toList elems])
 
 withNthChildAndMaybePaginationParent :: (
   MonadIO m
@@ -45,7 +45,7 @@ withRepoParent :: MonadIO m => AppState -> (Repo -> m ()) -> m ()
 withRepoParent s cb = do
   withNthChildAndMaybeRepoParent s $ \_ _ repoElem -> case repoElem of
     Just (MainListElemItem {_typ=(RepoNode {}), _state}) -> readTVarIO _state >>= \case
-      Fetched (RepoState r) -> cb r
+      Fetched r -> cb r
       _ -> return ()
     _ -> return ()
 

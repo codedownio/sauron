@@ -15,6 +15,7 @@ import Brick as B
 import Brick.Widgets.List
 import Control.Monad.IO.Class
 import Data.String.Interpolate
+import Data.Typeable
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
@@ -46,35 +47,35 @@ openBrowserToUrl url =
 withScroll :: AppState -> (forall s. ViewportScroll ClickableName -> EventM n s ()) -> EventM n AppState ()
 withScroll s action = do
   case listSelectedElement (s ^. appMainList) of
-    Just (_, el) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident el}|])
+    Just (_, el@(SomeMainListElem (MainListElemItem {..}))) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident}|])
     _ -> return ()
 
 refresh :: (MonadIO m) => BaseContext -> MainListElemVariable -> NonEmpty MainListElemVariable -> m ()
-refresh bc item@(MainListElemItem {_typ=(HeadingNode {}), _children}) _parents =
+refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(HeadingNode {}), _children} :: MainListElem' Variable HeadingNodeT))) _parents =
   readTVarIO _children >>= mapM_ (\child -> refresh bc child (item :| toList _parents))
-refresh bc repoNode@(MainListElemItem {_typ=(RepoNode {}), _children}) _parents =
-  liftIO $ readTVarIO _children >>= mapM_ (\child -> refresh bc child (repoNode :| toList _parents))
+refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(RepoNode {}), _children} :: MainListElem' Variable RepoNodeT))) _parents =
+  liftIO $ readTVarIO _children >>= mapM_ (\child -> refresh bc child (item :| toList _parents))
 
-refresh bc item@(MainListElemItem {_typ=PaginatedIssues}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name, _children})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
-refresh bc item@(MainListElemItem {_typ=PaginatedPulls}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name, _children})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchPulls owner name item) bc
-refresh bc item@(MainListElemItem {_typ=PaginatedWorkflows}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name, _children})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflows owner name item) bc
+refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedIssues} :: MainListElem' Variable PaginatedIssuesT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name x) bc
+refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedPulls} :: MainListElem' Variable PaginatedPullsT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchPulls owner name x) bc
+refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=PaginatedWorkflows} :: MainListElem' Variable PaginatedWorkflowsT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name), _children})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflows owner name x) bc
 
-refresh bc (MainListElemItem {_typ=(SingleIssue (Issue {..})), _state}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name})) =
+refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(SingleIssue (Issue {..})), _state} :: MainListElem' Variable SingleIssueT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name issueNumber _state) bc
-refresh bc (MainListElemItem {_typ=(SinglePull (Issue {..})), _state}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name})) =
+refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(SinglePull (Issue {..})), _state} :: MainListElem' Variable SinglePullT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name issueNumber _state) bc
-refresh bc item@(MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {workflowRunWorkflowRunId})), _state}) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId item) bc
-refresh bc item@(MainListElemItem {_typ=(SingleJob job@(Job {})), _state}) (findRepoParent -> Just (MainListElemItem {_typ = RepoNode owner name})) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job item) bc
+refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleWorkflow (WorkflowRun {workflowRunWorkflowRunId})), _state} :: MainListElem' Variable SingleWorkflowT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name workflowRunWorkflowRunId x) bc
+refresh bc item@(SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(SingleJob job@(Job {})), _state} :: MainListElem' Variable SingleJobT))) (findRepoParent -> Just (MainListElemItem {_typ=(RepoNode owner name)})) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job x) bc
 
 refresh _ _ _ = return ()
 
-findRepoParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariable
-findRepoParent elems = viaNonEmpty head [x | x@(MainListElemItem {_typ=(RepoNode {})}) <- toList elems]
+findRepoParent :: NonEmpty MainListElemVariable -> Maybe (MainListElem' Variable RepoNodeT)
+findRepoParent elems = viaNonEmpty head [x | SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(RepoNode {})} :: MainListElem' Variable RepoNodeT)) <- toList elems]
 
 -- findWorkflowsParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariable
 -- findWorkflowsParent elems = viaNonEmpty head [x | x@(MainListElemItem {_typ=PaginatedWorkflows}) <- toList elems]
@@ -94,11 +95,15 @@ refreshAll elems = do
       _ -> return () -- Should never happen since collectAllRepos only returns repos
 
   where
-    collectAllRepos :: [MainListElemVariable] -> IO [MainListElemVariable]
+    collectAllRepos :: [MainListElemVariable] -> IO [MainListElem' Variable RepoNodeT]
     collectAllRepos = fmap concat . mapM collectFromNode
       where
-        collectFromNode :: MainListElemVariable -> IO [MainListElemVariable]
-        collectFromNode repoNode@(MainListElemItem {_typ=(RepoNode _ _)}) = return [repoNode]
-        collectFromNode (MainListElemItem {_children}) = do
-          childNodes <- readTVarIO _children
-          collectAllRepos childNodes
+        collectFromNode :: MainListElemVariable -> IO [MainListElem' Variable RepoNodeT]
+        collectFromNode (SomeMainListElem (cast -> Just item@(MainListElemItem {_typ=(RepoNode _ _)} :: MainListElem' Variable RepoNodeT))) = return [item]
+        collectFromNode someMainListElem = do
+          undefined
+          -- childNodes <- readTVarIO _children
+          -- collectAllRepos childNodes
+
+getExistentialChildren :: SomeMainListElem f -> [SomeMainListElem f]
+getExistentialChildren _ = []

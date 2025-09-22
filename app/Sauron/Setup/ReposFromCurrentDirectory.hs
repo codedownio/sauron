@@ -90,9 +90,9 @@ reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
 
   atomically $ writeTVar (_toggled node) True
 
-  refresh baseContext node (node :| [])
+  refresh baseContext (SomeMainListElem node) ((SomeMainListElem node) :| [])
 
-  return $ V.fromList [node]
+  return $ V.fromList [SomeMainListElem node]
 
 
 -- | Traverse all parent directories starting from a given directory with a callback.

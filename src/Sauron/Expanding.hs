@@ -14,11 +14,12 @@ import Sauron.Types
 getExpandedList :: V.Vector MainListElem -> V.Vector MainListElem
 getExpandedList = V.fromList . concatMap expandNodes . V.toList
   where
-    expandNodes x@(MainListElemItem {..}) = execWriter $ do
+    expandNodes x@(SomeMainListElem (MainListElemItem {..})) = execWriter $ do
       tell [x]
       when _toggled $ do
-        forM_ _children $ \child -> do
-          tell (expandNodes child)
+        undefined
+        -- forM_ _children $ \child -> do
+        --   tell (expandNodes child)
 
 -- * Computing nth child in the presence of expanding
 
@@ -35,6 +36,6 @@ nthChildList n [] = pure $ Left n
 
 nthChild :: Int -> MainListElemVariable -> STM (Either Int (NonEmpty MainListElemVariable))
 nthChild 0 el = pure $ Right (el :| [])
-nthChild n el@(MainListElemItem {..}) = readTVar _toggled >>= \case
-  True -> (fmap ((el :|) . toList)) <$> (readTVar _children >>= nthChildList (n - 1))
+nthChild n el@(SomeMainListElem (MainListElemItem {..})) = readTVar _toggled >>= \case
+  True -> undefined -- (fmap ((el :|) . toList)) <$> (readTVar _children >>= nthChildList (n - 1))
   False -> pure $ Left (n - 1)
