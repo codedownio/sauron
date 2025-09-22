@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
@@ -21,29 +20,11 @@ import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude
+import Sauron.Actions.Util (findRepoParent, openBrowserToUrl)
 import Sauron.Fetch
 import Sauron.Types
 import UnliftIO.Async
-import UnliftIO.Process
 
-
-#ifdef mingw32_HOST_OS
-import System.Directory
-
-openBrowserToUrl :: MonadIO m => String -> m ()
-openBrowserToUrl url = do
-  findExecutable "explorer.exe" >>= \case
-    Just p -> void $ readCreateProcessWithExitCode (proc p [url]) ""
-    Nothing -> return ()
-#elif darwin_HOST_OS
-openBrowserToUrl :: MonadIO m => String -> m ()
-openBrowserToUrl url =
-  void $ readCreateProcessWithExitCode (proc "open" [url]) ""
-#else
-openBrowserToUrl :: MonadIO m => String -> m ()
-openBrowserToUrl url =
-  void $ readCreateProcessWithExitCode (proc "xdg-open" [url]) ""
-#endif
 
 withScroll :: AppState -> (forall s. ViewportScroll ClickableName -> EventM n s ()) -> EventM n AppState ()
 withScroll s action = do
@@ -71,9 +52,6 @@ refresh bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) (findRep
 refresh bc item@(SingleJobNode (EntityData {_static=job})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job item) bc
 refresh _ _ _ = return ()
-
-findRepoParent :: NonEmpty MainListElemVariable -> Maybe (MainListElem' Variable RepoT)
-findRepoParent elems = viaNonEmpty head [x | SomeMainListElem x@(RepoNode _) <- toList elems]
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m
