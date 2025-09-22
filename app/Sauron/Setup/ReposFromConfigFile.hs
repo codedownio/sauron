@@ -61,8 +61,8 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l) -> do
             childrenVar <- newTVarIO (fmap SomeMainListElem repoNodes)
             headingHealthCheckVar <- newTVarIO NotFetched
-            let headingNode = MainListElemItem {
-                  _typ = HeadingNode l
+            let headingNode = HeadingNode $ EntityData {
+                  _static = l
                   , _state = statusVar
                   , _urlSuffix = ""
                   , _toggled = toggledVar
@@ -73,5 +73,5 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
                   , _healthCheckThread = Nothing
                   , _depth = 0
                   , _ident = identifier
-                  } :: MainListElem' Variable HeadingNodeT
+                  }
             tell [SomeMainListElem headingNode]

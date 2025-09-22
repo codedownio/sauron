@@ -15,6 +15,7 @@ import Relude
 import Sauron.Actions.Util (withGithubApiSemaphore)
 import Sauron.Options
 import Sauron.Types
+import Sauron.UI.Statuses
 import UnliftIO.Async
 import UnliftIO.Concurrent
 

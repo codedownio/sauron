@@ -49,12 +49,12 @@ openBrowserToUrl url =
 withScroll :: AppState -> (forall s. ViewportScroll ClickableName -> EventM n s ()) -> EventM n AppState ()
 withScroll s action = do
   case listSelectedElement (s ^. appMainList) of
-    Just (_, el@(SomeMainListElem (MainListElemItem {..}))) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident}|])
+    Just (_, el@(SomeMainListElem (getEntityData -> EntityData {..}))) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident}|])
     _ -> return ()
 
 refresh :: (MonadIO m) => BaseContext -> MainListElem' Variable a -> NonEmpty MainListElemVariable -> m ()
-refresh bc item@(MainListElemItem {_key=HeadingNodeT, _typ=(HeadingNode {}), _children} :: MainListElem' Variable HeadingNodeT) _parents =
-  readTVarIO _children >>= mapM_ (\child -> refresh bc child ((SomeMainListElem item) :| toList _parents))
+refresh bc item@(HeadingNode (EntityData {_children})) _parents =
+  readTVarIO _children >>= mapM_ (\(SomeMainListElem child) -> refresh bc child ((SomeMainListElem item) :| toList _parents))
 -- refresh bc item@(SomeMainListElem (cast -> Just (MainListElemItem {_typ=(RepoNode {}), _children} :: MainListElem' Variable RepoNodeT))) _parents =
 --   liftIO $ readTVarIO _children >>= mapM_ (\child -> refresh bc child (item :| toList _parents))
 
@@ -76,8 +76,8 @@ refresh bc item@(MainListElemItem {_key=HeadingNodeT, _typ=(HeadingNode {}), _ch
 
 refresh _ _ _ = return ()
 
-findRepoParent :: NonEmpty MainListElemVariable -> Maybe (MainListElem' Variable RepoNodeT)
-findRepoParent elems = viaNonEmpty head [x | SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(RepoNode {})} :: MainListElem' Variable RepoNodeT)) <- toList elems]
+findRepoParent :: NonEmpty MainListElemVariable -> Maybe (MainListElem' Variable RepoT)
+findRepoParent elems = viaNonEmpty head [x | SomeMainListElem x@(RepoNode _) <- toList elems]
 
 -- findWorkflowsParent :: NonEmpty MainListElemVariable -> Maybe MainListElemVariable
 -- findWorkflowsParent elems = viaNonEmpty head [x | x@(MainListElemItem {_typ=PaginatedWorkflows}) <- toList elems]
@@ -91,18 +91,18 @@ refreshAll elems = do
 
   liftIO $ flip runReaderT baseContext $
     void $ async $ forConcurrently allRepos $ \case
-      MainListElemItem {_typ=(RepoNode owner name), _state} -> do
+      RepoNode (EntityData {_static=(owner, name), _state}) -> do
         fetchRepo owner name _state
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
       _ -> return () -- Should never happen since collectAllRepos only returns repos
 
   where
-    collectAllRepos :: [MainListElemVariable] -> IO [MainListElem' Variable RepoNodeT]
+    collectAllRepos :: [MainListElemVariable] -> IO [MainListElem' Variable RepoT]
     collectAllRepos = fmap concat . mapM collectFromNode
       where
-        collectFromNode :: MainListElemVariable -> IO [MainListElem' Variable RepoNodeT]
-        collectFromNode (SomeMainListElem (cast -> Just item@(MainListElemItem {_typ=(RepoNode _ _)} :: MainListElem' Variable RepoNodeT))) = return [item]
-        collectFromNode (SomeMainListElem (MainListElemItem {..})) = do
+        collectFromNode :: MainListElemVariable -> IO [MainListElem' Variable RepoT]
+        collectFromNode (SomeMainListElem item@(RepoNode {})) = return [item]
+        collectFromNode (SomeMainListElem _) = do
           undefined
           -- childNodes <- readTVarIO _children
           -- collectAllRepos (getExistentialChildren _typ childNodes)

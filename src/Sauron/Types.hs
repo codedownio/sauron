@@ -155,8 +155,8 @@ emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 data SomeMainListElem f where
   SomeMainListElem :: (Typeable a) => { unSomeMainListElem :: MainListElem' f a } -> SomeMainListElem f
 
-getExistentialChildren :: NodeState a -> [NodeChildType f a] -> [SomeMainListElem f]
-getExistentialChildren _ _ = []
+getExistentialChildren :: MainListElem' f a -> [MainListElem' f a]
+getExistentialChildren _ = undefined
 
 data EntityData f a = EntityData {
   _static :: NodeStatic a
@@ -190,6 +190,9 @@ data MainListElem' f (a :: NodeTyp) where
   JobLogGroupNode :: EntityData f 'JobLogGroupT -> MainListElem' f 'JobLogGroupT
   HeadingNode :: EntityData f 'HeadingT -> MainListElem' f 'HeadingT
   RepoNode :: EntityData f 'RepoT -> MainListElem' f 'RepoT
+
+getEntityData :: MainListElem' f a -> EntityData f a
+getEntityData = undefined
 
 type MainListElem = SomeMainListElem Fixed
 type MainListElemVariable = SomeMainListElem Variable

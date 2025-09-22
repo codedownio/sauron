@@ -21,7 +21,7 @@ import UnliftIO.Exception
 
 
 -- | Autodetect repos for user
-allReposForUser :: BaseContext -> PeriodSpec -> Name User -> IO (V.Vector (MainListElem' Variable RepoNodeT))
+allReposForUser :: BaseContext -> PeriodSpec -> Name User -> IO (V.Vector (MainListElem' Variable RepoT))
 allReposForUser baseContext defaultHealthCheckPeriodUs (N userLoginUnwrapped) = do
   let BaseContext {..} = baseContext
   -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll

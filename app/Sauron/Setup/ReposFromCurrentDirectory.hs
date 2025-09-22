@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -80,19 +81,19 @@ isContainedInGitRepo = runMaybeT $ do
 
 
 -- | Autodetect repos for user
-reposFromCurrentDirectory :: BaseContext -> PeriodSpec -> (Name Owner, Name Repo) -> IO (V.Vector MainListElemVariable)
+reposFromCurrentDirectory :: BaseContext -> PeriodSpec -> (Name Owner, Name Repo) -> IO (V.Vector (MainListElem' Variable RepoT))
 reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
   repoVar <- newTVarIO NotFetched
   healthCheckVar <- newTVarIO NotFetched
   let period = defaultHealthCheckPeriodUs
   hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar period
-  node <- newRepoNode nsName repoVar healthCheckVar (Just hcThread) 0 (getIdentifier baseContext)
+  node@(RepoNode (EntityData {..})) <- newRepoNode nsName repoVar healthCheckVar (Just hcThread) 0 (getIdentifier baseContext)
 
-  atomically $ writeTVar (_toggled node) True
+  atomically $ writeTVar _toggled True
 
-  refresh baseContext (SomeMainListElem node) ((SomeMainListElem node) :| [])
+  refresh baseContext node ((SomeMainListElem node) :| [])
 
-  return $ V.fromList [SomeMainListElem node]
+  return $ V.fromList [node]
 
 
 -- | Traverse all parent directories starting from a given directory with a callback.

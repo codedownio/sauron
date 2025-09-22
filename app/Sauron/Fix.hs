@@ -8,7 +8,7 @@ import Sauron.Types
 
 
 fixMainListElem :: MainListElemVariable -> STM MainListElem
-fixMainListElem (SomeMainListElem (MainListElemItem {..})) = do
+fixMainListElem (SomeMainListElem (getEntityData -> (EntityData {..}))) = do
   stateFixed <- readTVar _state
 
   toggledFixed <- readTVar _toggled
@@ -20,20 +20,22 @@ fixMainListElem (SomeMainListElem (MainListElemItem {..})) = do
 
   healthCheckFixed <- readTVar _healthCheck
 
-  return $ SomeMainListElem $ MainListElemItem {
-    _typ = _typ
-    , _state = stateFixed
+  undefined
 
-    , _urlSuffix = _urlSuffix
-    , _toggled = toggledFixed
-    , _children = childrenFixed
+  -- return $ SomeMainListElem $ MainListElemItem {
+  --   _typ = _typ
+  --   , _state = stateFixed
 
-    , _search = searchFixed
-    , _pageInfo = pageInfoFixed
+  --   , _urlSuffix = _urlSuffix
+  --   , _toggled = toggledFixed
+  --   , _children = childrenFixed
 
-    , _healthCheck = healthCheckFixed
-    , _healthCheckThread = _healthCheckThread
+  --   , _search = searchFixed
+  --   , _pageInfo = pageInfoFixed
 
-    , _depth = _depth
-    , _ident = _ident
-    }
+  --   , _healthCheck = healthCheckFixed
+  --   , _healthCheckThread = _healthCheckThread
+
+  --   , _depth = _depth
+  --   , _ident = _ident
+  --   }
