@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
 
 module Sauron.Types where
@@ -15,6 +17,7 @@ import Control.Concurrent.QSem
 import Data.String.Interpolate
 import Data.Text
 import Data.Time
+import Data.Typeable
 import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro.TH
@@ -170,7 +173,10 @@ emptyPageInfo :: PageInfo
 emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
 data SomeMainListElem f where
-  SomeMainListElem :: Typeable a => MainListElem' f a -> SomeMainListElem f
+  SomeMainListElem :: (Typeable a) => { unSomeMainListElem :: MainListElem' f a } -> SomeMainListElem f
+
+getExistentialChildren :: NodeState a -> [NodeChildType f a] -> [SomeMainListElem f]
+getExistentialChildren _ _ = []
 
 data MainListElem' f a =
   MainListElemItem {
@@ -195,6 +201,12 @@ data MainListElem' f a =
 
 type MainListElem = SomeMainListElem Fixed
 type MainListElemVariable = SomeMainListElem Variable
+
+deriving instance (Eq (NodeType a), Eq (NodeChildType Fixed a), Eq (NodeState a)) => Eq (MainListElem' Fixed a)
+instance Eq MainListElem where
+  (SomeMainListElem (x :: a)) == (SomeMainListElem y) = undefined -- case cast y of
+    -- Just (y' :: a) -> x == y'
+    -- Nothing -> False
 
 data AppEvent =
   ListUpdate (V.Vector MainListElem)

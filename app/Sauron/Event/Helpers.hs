@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
+{-# LANGUAGE GADTs #-}
 
 module Sauron.Event.Helpers where
 
@@ -6,6 +7,7 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
+import Data.Typeable
 import GitHub
 import Lens.Micro
 import Relude hiding (Down, pred)
@@ -29,14 +31,14 @@ withNthChildAndMaybeRepoParent :: (
   ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe (MainListElem' Variable RepoNodeT) -> m ()) -> m ()
 withNthChildAndMaybeRepoParent s cb =
   withFixedElemAndParents s $ \fixedEl _variableEl elems ->
-    cb fixedEl (last elems) (viaNonEmpty head [x | (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(RepoNode {})}))) <- toList elems])
+    cb fixedEl (last elems) (viaNonEmpty head [x | (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(RepoNode {})} :: MainListElem' Variable RepoNodeT))) <- toList elems])
 
 withNthChildAndMaybePaginationParent :: (
   MonadIO m
   ) => AppState -> (MainListElem -> MainListElemVariable -> Maybe MainListElemVariable -> m ()) -> m ()
 withNthChildAndMaybePaginationParent s cb =
   withFixedElemAndParents s $ \fixedEl _variableEl elems ->
-    cb fixedEl (last elems) (viaNonEmpty head [x | x@(MainListElemItem {}) <- toList elems])
+    cb fixedEl (last elems) (viaNonEmpty head [x | x <- toList elems])
 
 withNthChild :: MonadIO m => AppState -> (MainListElem -> MainListElemVariable -> m ()) -> m ()
 withNthChild s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el _ -> cb fixedEl el
@@ -49,7 +51,7 @@ withRepoParent s cb = do
       _ -> return ()
     _ -> return ()
 
-withNthChildAndRepoParent :: MonadIO m => AppState -> (MainListElem -> MainListElemVariable -> MainListElemVariable -> m ()) -> m ()
+withNthChildAndRepoParent :: MonadIO m => AppState -> (MainListElem -> MainListElemVariable -> MainListElem' Variable RepoNodeT -> m ()) -> m ()
 withNthChildAndRepoParent s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el -> \case
   Nothing -> return ()
   Just x -> cb fixedEl el x

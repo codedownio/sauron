@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -100,10 +101,7 @@ refreshAll elems = do
       where
         collectFromNode :: MainListElemVariable -> IO [MainListElem' Variable RepoNodeT]
         collectFromNode (SomeMainListElem (cast -> Just item@(MainListElemItem {_typ=(RepoNode _ _)} :: MainListElem' Variable RepoNodeT))) = return [item]
-        collectFromNode someMainListElem = do
+        collectFromNode (SomeMainListElem (MainListElemItem {..})) = do
           undefined
           -- childNodes <- readTVarIO _children
-          -- collectAllRepos childNodes
-
-getExistentialChildren :: SomeMainListElem f -> [SomeMainListElem f]
-getExistentialChildren _ = []
+          -- collectAllRepos (getExistentialChildren _typ childNodes)

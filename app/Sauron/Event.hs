@@ -10,6 +10,7 @@ import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
 import Data.String.Interpolate
+import Data.Typeable
 import qualified Data.Vector as Vec
 import GitHub
 import qualified Graphics.Vty as V
@@ -31,8 +32,9 @@ appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
-    withFixedElemAndParents s $ \_fixedEl _variableEl parents -> case (viaNonEmpty head [x | x@(MainListElemItem {}) <- toList parents], viaNonEmpty head [x | x@(MainListElemItem {_typ=(RepoNode {})}) <- toList parents]) of
-      (Just el@(MainListElemItem {..}), Just _repoEl) -> do
+    withFixedElemAndParents s $ \_fixedEl _variableEl parents -> case (viaNonEmpty head [x | x <- toList parents]
+                                                                      , viaNonEmpty head [x | (SomeMainListElem (cast -> Just x@(MainListElemItem {_typ=(RepoNode {})} :: MainListElem' Variable RepoNodeT))) <- toList parents]) of
+      (Just el@(SomeMainListElem (MainListElemItem {..})), Just _repoEl) -> do
         atomically $ do
           writeTVar _search $ SearchText (formState form)
           writeTVar _pageInfo $ PageInfo 1 Nothing Nothing Nothing Nothing
@@ -84,9 +86,9 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == openSelectedKey ->
     withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case (fixedEl, repoEl) of
-      (MainListElemItem {_typ=(RepoNode {}), _state = (Fetched (RepoState (Repo {repoHtmlUrl=(URL url)})))}, _) -> openBrowserToUrl (toString url)
-      (MainListElemItem {_urlSuffix, _typ}, MainListElemItem {_typ=(RepoNode {}), _state}) -> readTVarIO _state >>= \case
-        Fetched (RepoState (Repo {repoHtmlUrl=(URL url)})) -> openBrowserToUrl (getNodeUrl (toString url) _typ)
+      (SomeMainListElem (cast -> Just (MainListElemItem {_typ=(RepoNode {}), _state = (Fetched (Repo {repoHtmlUrl=(URL url)}))} :: MainListElem' Fixed RepoNodeT)), _) -> openBrowserToUrl (toString url)
+      (SomeMainListElem (MainListElemItem {_urlSuffix, _typ}), MainListElemItem {_typ=(RepoNode {}), _state}) -> readTVarIO _state >>= \case
+        Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (getNodeUrl (toString url) _typ)
         _ -> return ()
       _ -> return ()
 
@@ -98,7 +100,7 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == editSearchKey -> do
     withNthChildAndMaybePaginationParent s $ \_fixedEl _el paginationElem -> case paginationElem of
-      Just (MainListElemItem {_ident, _search}) -> do
+      Just (SomeMainListElem (MainListElemItem {_ident, _search})) -> do
         search' <- readTVarIO _search
         modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
       _ -> return ()
@@ -122,29 +124,31 @@ appEvent _s (MouseDown (ListRow n) V.BLeft _ _) = do
 appEvent _ _ = return ()
 
 handleLeftArrow :: AppState -> EventM ClickableName AppState ()
-handleLeftArrow s = withFixedElemAndParents s $ \_ mle parents -> do
+handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeMainListElem mle) parents -> do
   liftIO (atomically $ readTVar (_toggled mle)) >>= \case
     True -> liftIO $ atomically $ writeTVar (_toggled mle) False
     False -> case Relude.reverse (toList parents) of
-      _:parent:_ -> do
+      _:(SomeMainListElem parent):_ -> do
         expandedList <- gets (^. appMainList)
-        forM_ (Vec.findIndex ((_ident parent ==) . _ident) (listElements expandedList)) $
+        forM_ (Vec.findIndex (\(SomeMainListElem el) -> (_ident parent == _ident el)) (listElements expandedList)) $
           \index -> modify (appMainList %~ listMoveTo index)
       _ -> return ()
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
-modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do
+modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeMainListElem mle) parents -> do
   isOpen <- liftIO $ atomically $ do
     modifyTVar' (_toggled mle) cb
     readTVar (_toggled mle)
   when isOpen $
     unlessM (hasStartedInitialFetch fixedEl) $
-      refresh (s ^. appBaseContext) mle parents
+      refresh (s ^. appBaseContext) (SomeMainListElem mle) parents
   where
     hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
-    hasStartedInitialFetch (MainListElemItem {_typ=(RepoNode {}), _children}) = and <$> mapM hasStartedInitialFetch _children
-    hasStartedInitialFetch (MainListElemItem {_typ=(HeadingNode {})}) = return True
-    hasStartedInitialFetch (MainListElemItem {..}) = return (isFetchingOrFetched _state)
+    hasStartedInitialFetch (SomeMainListElem (cast -> Just (MainListElemItem {_typ=(RepoNode {}), _children} :: MainListElem' Variable RepoNodeT))) = do
+      wrappedChildren :: [MainListElem] <- undefined
+      and <$> mapM hasStartedInitialFetch wrappedChildren
+    hasStartedInitialFetch (SomeMainListElem (cast -> Just (MainListElemItem {_typ=(HeadingNode {})} :: MainListElem' Variable HeadingNodeT))) = return True
+    hasStartedInitialFetch (SomeMainListElem (MainListElemItem {..})) = return (isFetchingOrFetched _state)
 
     isFetchingOrFetched :: Fetchable a -> Bool
     isFetchingOrFetched (Fetched {}) = True
@@ -152,7 +156,7 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl mle parents -> do
     isFetchingOrFetched _ = False
 
 
-getNodeUrl :: String -> NodeType -> String
+getNodeUrl :: String -> NodeType a -> String
 getNodeUrl repoBaseUrl PaginatedIssues = repoBaseUrl <> "/issues"
 getNodeUrl repoBaseUrl PaginatedPulls = repoBaseUrl <> "/pulls"
 getNodeUrl repoBaseUrl PaginatedWorkflows = repoBaseUrl <> "/actions"
