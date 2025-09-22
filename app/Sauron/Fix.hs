@@ -1,37 +1,53 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Sauron.Fix (fixMainListElem) where
 
+import Data.Typeable
 import Relude hiding (Down)
 import Sauron.Types
 
 
 fixMainListElem :: MainListElemVariable -> STM MainListElem
-fixMainListElem (SomeMainListElem _item@(getEntityData -> (EntityData {..}))) = do
-  _stateFixed <- readTVar _state
-  _toggledFixed <- readTVar _toggled
-  -- TODO: Implement proper GADT-aware children fixing
-  -- This is complex due to the type-level constraints of GADTs
-  _childrenFixed <- undefined
-  _searchFixed <- readTVar _search
-  _pageInfoFixed <- readTVar _pageInfo
-  _healthCheckFixed <- readTVar _healthCheck
+fixMainListElem (SomeMainListElem item@(getEntityData -> ed)) = do
+  fixedEntityData <- fixEntityData ed
+  return $ SomeMainListElem $ setEntityData fixedEntityData item
 
-  undefined
+fixEntityData :: forall a. Typeable (NodeChildType Variable a) => EntityData Variable a -> STM (EntityData Fixed a)
+fixEntityData (EntityData {..}) = do
+  stateFixed <- readTVar _state
+  toggledFixed <- readTVar _toggled
+  searchFixed <- readTVar _search
+  pageInfoFixed <- readTVar _pageInfo
+  healthCheckFixed <- readTVar _healthCheck
 
-  -- return $ SomeMainListElem $ MainListElemItem {
-  --   _typ = _typ
-  --   , _state = stateFixed
+  childrenFixed <- readTVar _children >>= mapM (fixChild @a)
 
-  --   , _urlSuffix = _urlSuffix
-  --   , _toggled = toggledFixed
-  --   , _children = childrenFixed
+  return $ EntityData {
+    _static = _static
+    , _state = stateFixed
 
-  --   , _search = searchFixed
-  --   , _pageInfo = pageInfoFixed
+    , _urlSuffix = _urlSuffix
+    , _toggled = toggledFixed
+    , _children = childrenFixed
 
-  --   , _healthCheck = healthCheckFixed
-  --   , _healthCheckThread = _healthCheckThread
+    , _search = searchFixed
+    , _pageInfo = pageInfoFixed
 
-  --   , _depth = _depth
-  --   , _ident = _ident
-  --   }
+    , _healthCheck = healthCheckFixed
+    , _healthCheckThread = _healthCheckThread
+
+    , _depth = _depth
+    , _ident = _ident
+    }
+
+fixChild :: Typeable (NodeChildType Variable a) => NodeChildType Variable a -> STM (NodeChildType Fixed a)
+fixChild (cast -> Just (elem :: MainListElem' Variable SingleIssueT)) = do
+  -- SomeMainListElem el <- fixMainListElem (SomeMainListElem elem)
+  -- return el
+
+  let ed = getEntityData elem
+  ed' <- fixEntityData ed
+  -- return $ setEntityData ed' elem
+  return undefined

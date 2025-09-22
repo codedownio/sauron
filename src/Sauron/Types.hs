@@ -151,7 +151,7 @@ emptyPageInfo :: PageInfo
 emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
 data SomeMainListElem f where
-  SomeMainListElem :: (Typeable a) => { unSomeMainListElem :: MainListElem' f a } -> SomeMainListElem f
+  SomeMainListElem :: (Typeable a, Typeable (NodeChildType Variable a)) => { unSomeMainListElem :: MainListElem' f a } -> SomeMainListElem f
 
 instance Eq (SomeMainListElem f) where
   (SomeMainListElem x) == (SomeMainListElem y) =
@@ -165,7 +165,7 @@ getExistentialChildrenWrapped node = case node of
   -- These types have SomeMainListElem children
   HeadingNode ed -> readTVar (_children ed)
   RepoNode ed -> readTVar (_children ed)
-  
+
   -- These types have specific GADT constructor children, so wrap them
   PaginatedIssuesNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
   PaginatedPullsNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
@@ -173,7 +173,7 @@ getExistentialChildrenWrapped node = case node of
   SingleWorkflowNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
   SingleJobNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
   JobLogGroupNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
-  
+
   -- These are leaf nodes with no meaningful children
   SingleIssueNode _ -> return []
   SinglePullNode _ -> return []
@@ -222,6 +222,18 @@ getEntityData (SingleJobNode ed) = ed
 getEntityData (JobLogGroupNode ed) = ed
 getEntityData (HeadingNode ed) = ed
 getEntityData (RepoNode ed) = ed
+
+setEntityData :: EntityData f' a -> MainListElem' f a -> MainListElem' f' a
+setEntityData ed (PaginatedIssuesNode _) = PaginatedIssuesNode ed
+setEntityData ed (PaginatedPullsNode _) = PaginatedPullsNode ed
+setEntityData ed (PaginatedWorkflowsNode _) = PaginatedWorkflowsNode ed
+setEntityData ed (SingleIssueNode _) = SingleIssueNode ed
+setEntityData ed (SinglePullNode _) = SinglePullNode ed
+setEntityData ed (SingleWorkflowNode _) = SingleWorkflowNode ed
+setEntityData ed (SingleJobNode _) = SingleJobNode ed
+setEntityData ed (JobLogGroupNode _) = JobLogGroupNode ed
+setEntityData ed (HeadingNode _) = HeadingNode ed
+setEntityData ed (RepoNode _) = RepoNode ed
 
 type MainListElem = SomeMainListElem Fixed
 type MainListElemVariable = SomeMainListElem Variable
