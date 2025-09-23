@@ -58,6 +58,8 @@ nthChildList n [] = pure $ Left n
 
 nthChild :: Int -> SomeMainListElem Variable -> STM (Either Int (NonEmpty (SomeMainListElem Variable)))
 nthChild 0 el = pure $ Right (el :| [])
-nthChild n _el@(SomeMainListElem (getEntityData -> (EntityData {..}))) = readTVar _toggled >>= \case
-  True -> pure $ Left (n - 1) -- Simplified for now - expand later when needed
+nthChild n el@(SomeMainListElem item@(getEntityData -> (EntityData {..}))) = readTVar _toggled >>= \case
+  True -> do
+    wrappedChildren <- getExistentialChildrenWrapped item
+    (fmap ((el :|) . toList)) <$> (nthChildList (n - 1) wrappedChildren)
   False -> pure $ Left (n - 1)
