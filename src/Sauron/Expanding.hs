@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Sauron.Expanding (
@@ -15,11 +16,30 @@ import Sauron.Types
 getExpandedList :: V.Vector MainListElem -> V.Vector MainListElem
 getExpandedList = V.fromList . concatMap expandNodes . V.toList
   where
-    expandNodes x@(SomeMainListElem (getEntityData -> (EntityData {}))) = execWriter $ do
+    expandNodes :: MainListElem -> [MainListElem]
+    expandNodes x@(SomeMainListElem item) = execWriter $ do
       tell [x]
-      -- Note: We can't directly access _children here since it's wrapped in TVar for Variable types
-      -- This function appears to be designed for Fixed types, so we'll keep it simple for now
-      pure ()
+      when (_toggled (getEntityData item)) $
+        case item of
+          PaginatedIssuesNode (EntityData {..}) -> expandTyped _children
+          PaginatedPullsNode (EntityData {..}) -> expandTyped _children
+          PaginatedWorkflowsNode (EntityData {..}) -> expandTyped _children
+          SingleIssueNode (EntityData {..}) -> expandChildless _children
+          SinglePullNode (EntityData {..}) -> expandChildless _children
+          SingleWorkflowNode (EntityData {..}) -> expandTyped _children
+          SingleJobNode (EntityData {..}) -> expandTyped _children
+          JobLogGroupNode (EntityData {..}) -> expandTyped _children
+          HeadingNode (EntityData {..}) -> expandWrapped _children
+          RepoNode (EntityData {..}) -> forM_ _children $ \y -> tell (expandNodes y)
+
+    expandTyped :: (Foldable t, MonadWriter [MainListElem] m) => t (MainListElem' Fixed a) -> m ()
+    expandTyped xs = forM_ xs $ \y -> tell (expandNodes (SomeMainListElem y))
+
+    expandWrapped :: (Foldable t, MonadWriter [MainListElem] m) => t MainListElem -> m ()
+    expandWrapped xs = forM_ xs $ \y -> tell (expandNodes y)
+
+    expandChildless :: Monad m => [()] -> m ()
+    expandChildless _xs = return ()
 
 -- * Computing nth child in the presence of expanding
 

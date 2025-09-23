@@ -14,18 +14,22 @@ module Sauron.Types where
 import Brick.Forms
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
-import Data.Text
+import Data.String.Interpolate
+import Data.Text ()
 import Data.Time
-import Data.Typeable
 import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
 import Relude
+import qualified Text.Show
 import UnliftIO.Async
 
 
-data SortBy = SortByStars | SortByPushed | SortByUpdated
+data SortBy =
+  SortByStars
+  | SortByPushed
+  | SortByUpdated
   deriving (Eq)
 
 data JobLogGroup =
@@ -151,7 +155,9 @@ emptyPageInfo :: PageInfo
 emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
 data SomeMainListElem f where
-  SomeMainListElem :: (Typeable a, Typeable (NodeChildType Variable a)) => { unSomeMainListElem :: MainListElem' f a } -> SomeMainListElem f
+  SomeMainListElem :: (
+    Show (MainListElem' f a)
+    ) => { unSomeMainListElem :: MainListElem' f a } -> SomeMainListElem f
 
 instance Eq (SomeMainListElem f) where
   (SomeMainListElem x) == (SomeMainListElem y) =
@@ -237,6 +243,20 @@ setEntityData ed (RepoNode _) = RepoNode ed
 
 type MainListElem = SomeMainListElem Fixed
 type MainListElemVariable = SomeMainListElem Variable
+
+instance Show (MainListElem' f a) where
+  show (PaginatedIssuesNode (EntityData {..})) = [i|PaginatedIssuesNode<#{_ident}>|]
+  show (PaginatedPullsNode (EntityData {..})) = [i|PaginatedPullsNode<#{_ident}>|]
+  show (PaginatedWorkflowsNode (EntityData {..})) = [i|PaginatedWorkflowsNode<#{_ident}>|]
+  show (SingleIssueNode (EntityData {..})) = [i|SingleIssueNode<#{_ident}>|]
+  show (SinglePullNode (EntityData {..})) = [i|SinglePullNode<#{_ident}>|]
+  show (SingleWorkflowNode (EntityData {..})) = [i|SingleWorkflowNode<#{_ident}>|]
+  show (SingleJobNode (EntityData {..})) = [i|SingleJobNode<#{_ident}>|]
+  show (JobLogGroupNode (EntityData {..})) = [i|JobLogGroupNode<#{_ident}>|]
+  show (HeadingNode (EntityData {..})) = [i|HeadingNode<#{_ident}>|]
+  show (RepoNode (EntityData {..})) = [i|RepoNode<#{_ident}>|]
+
+deriving instance Show MainListElem
 
 data AppEvent =
   ListUpdate (V.Vector MainListElem)
