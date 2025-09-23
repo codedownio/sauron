@@ -5,6 +5,7 @@ module Sauron.UI.Statuses (
   , statusToIconAnimated
   , getQuarterCircleSpinner
   , fetchableQuarterCircleSpinner
+  , chooseWorkflowStatus
   ) where
 
 import Brick
@@ -73,3 +74,20 @@ redX = withAttr redXAttr (str "✗")
 ellipses = withAttr ellipsesAttr (str "⋯")
 neutral = withAttr neutralAttr (str "-")
 unknown = withAttr unknownAttr (str "?")
+
+chooseWorkflowStatus :: Text -> WorkflowStatus
+chooseWorkflowStatus "completed" = WorkflowSuccess
+chooseWorkflowStatus "action_required" = WorkflowPending
+chooseWorkflowStatus "cancelled" = WorkflowCancelled
+chooseWorkflowStatus "failure" = WorkflowFailed
+chooseWorkflowStatus "neutral" = WorkflowNeutral
+chooseWorkflowStatus "skipped" = WorkflowCancelled
+chooseWorkflowStatus "stale" = WorkflowNeutral
+chooseWorkflowStatus "success" = WorkflowSuccess
+chooseWorkflowStatus "timed_out" = WorkflowFailed
+chooseWorkflowStatus "in_progress" = WorkflowPending
+chooseWorkflowStatus "queued" = WorkflowPending
+chooseWorkflowStatus "requested" = WorkflowPending
+chooseWorkflowStatus "waiting" = WorkflowPending
+chooseWorkflowStatus "pending" = WorkflowPending
+chooseWorkflowStatus _ = WorkflowUnknown

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 
 module Sauron.Setup.AllReposForUser (
   allReposForUser
@@ -20,7 +21,7 @@ import UnliftIO.Exception
 
 
 -- | Autodetect repos for user
-allReposForUser :: BaseContext -> PeriodSpec -> Name User -> IO (V.Vector MainListElemVariable)
+allReposForUser :: BaseContext -> PeriodSpec -> Name User -> IO (V.Vector (MainListElem' Variable RepoT))
 allReposForUser baseContext defaultHealthCheckPeriodUs (N userLoginUnwrapped) = do
   let BaseContext {..} = baseContext
   -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
@@ -32,7 +33,7 @@ allReposForUser baseContext defaultHealthCheckPeriodUs (N userLoginUnwrapped) = 
 
   (V.fromList <$>) $ forM (V.toList repos) $ \r -> do
     let nsName = (simpleOwnerLogin $ repoOwner r, repoName r)
-    repoStateVar <- newTVarIO (Fetched (RepoState r))
+    repoStateVar <- newTVarIO (Fetched r)
     healthCheckVar <- newTVarIO NotFetched
     hcThread <- newHealthCheckThread baseContext nsName repoStateVar healthCheckVar defaultHealthCheckPeriodUs
     newRepoNode nsName repoStateVar healthCheckVar (Just hcThread) 0 getIdentifier

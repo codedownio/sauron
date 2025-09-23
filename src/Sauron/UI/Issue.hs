@@ -14,7 +14,7 @@ import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
 import Relude
-import Sauron.Types hiding (toggled)
+import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Markdown
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)

@@ -15,6 +15,7 @@ import Relude
 import Sauron.Actions.Util (withGithubApiSemaphore)
 import Sauron.Options
 import Sauron.Types
+import Sauron.UI.Statuses
 import UnliftIO.Async
 import UnliftIO.Concurrent
 
@@ -22,7 +23,7 @@ import UnliftIO.Concurrent
 newHealthCheckThread ::
   BaseContext
   -> (Name Owner, Name Repo)
-  -> TVar (Fetchable NodeState)
+  -> TVar (Fetchable Repo)
   -> TVar (Fetchable HealthCheckResult)
   -> PeriodSpec
   -> IO (Async ())
@@ -32,7 +33,7 @@ newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar heal
     -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?
     defaultBranch <- atomically $ do
       readTVar repoVar >>= \case
-        Fetched (RepoState (Repo {repoDefaultBranch=(Just branch)})) -> pure branch
+        Fetched (Repo {repoDefaultBranch=(Just branch)}) -> pure branch
         _ -> retry
 
     liftIO $ flip runReaderT baseContext $

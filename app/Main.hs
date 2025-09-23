@@ -65,16 +65,16 @@ main = do
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
 
-  listElems :: V.Vector MainListElemVariable <- case cliConfigFile of
+  listElems :: V.Vector (SomeMainListElem Variable) <- case cliConfigFile of
     Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
     Nothing -> isContainedInGitRepo >>= \case
-      Just (namespace, name) -> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
-      Nothing -> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+      Just (namespace, name) -> (fmap SomeMainListElem) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
+      Nothing -> (fmap SomeMainListElem) <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   -- Kick off initial fetches
   runReaderT (refreshAll listElems) baseContext
 
-  listElemsFixed :: V.Vector MainListElem <- atomically $ mapM fixMainListElem listElems
+  listElemsFixed :: V.Vector (SomeMainListElem Fixed) <- atomically $ mapM fixMainListElem listElems
 
   now <- getCurrentTime
 
