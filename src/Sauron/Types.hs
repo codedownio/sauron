@@ -145,6 +145,7 @@ instance Eq (SomeMainListElem Fixed) where
     _ -> False
 
 deriving instance Show (SomeMainListElem Fixed)
+deriving instance Show (SomeMainListElem Variable)
 
 -- * Packing and unpacking
 
