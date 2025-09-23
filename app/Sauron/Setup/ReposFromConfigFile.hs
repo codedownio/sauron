@@ -22,7 +22,7 @@ import UnliftIO.Exception
 
 
 -- | Autodetect repos for user
-reposFromConfigFile :: BaseContext -> PeriodSpec -> FilePath -> IO (V.Vector MainListElemVariable)
+reposFromConfigFile :: BaseContext -> PeriodSpec -> FilePath -> IO (V.Vector (SomeMainListElem Variable))
 reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
   Yaml.decodeFileEither configFile >>= \case
     Left err -> throwIO $ userError [i|Failed to decode config file '#{configFile}': #{err}|]

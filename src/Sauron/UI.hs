@@ -43,7 +43,7 @@ drawUI app = [vBox [
                  ]
              ]
 
-listDrawElement :: AppState -> Int -> Bool -> MainListElem -> Widget ClickableName
+listDrawElement :: AppState -> Int -> Bool -> SomeMainListElem Fixed -> Widget ClickableName
 
 -- * Repos
 

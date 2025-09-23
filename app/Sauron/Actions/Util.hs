@@ -46,5 +46,5 @@ withGithubApiSemaphore action = do
 withGithubApiSemaphore' :: (MonadIO m, MonadMask m) => QSem -> m a -> m a
 withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQSem sem)
 
-findRepoParent :: NonEmpty MainListElemVariable -> Maybe (MainListElem' Variable RepoT)
+findRepoParent :: NonEmpty (SomeMainListElem Variable) -> Maybe (MainListElem' Variable RepoT)
 findRepoParent elems = viaNonEmpty head [x | SomeMainListElem x@(RepoNode _) <- toList elems]

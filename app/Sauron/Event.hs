@@ -138,7 +138,7 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeMainListElem item
     unlessM (hasStartedInitialFetch fixedEl) $
       refresh (s ^. appBaseContext) item parents
   where
-    hasStartedInitialFetch :: (MonadIO m) => MainListElem -> m Bool
+    hasStartedInitialFetch :: (MonadIO m) => SomeMainListElem Fixed -> m Bool
     hasStartedInitialFetch (SomeMainListElem (RepoNode (EntityData {_children}))) = do
       and <$> mapM hasStartedInitialFetch _children
     hasStartedInitialFetch (SomeMainListElem (HeadingNode {})) = return True

@@ -32,7 +32,7 @@ withScroll s action = do
     Just (_, _el@(SomeMainListElem (getEntityData -> EntityData {..}))) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident}|])
     _ -> return ()
 
-refresh :: (MonadIO m) => BaseContext -> MainListElem' Variable a -> NonEmpty MainListElemVariable -> m ()
+refresh :: (MonadIO m) => BaseContext -> MainListElem' Variable a -> NonEmpty (SomeMainListElem Variable) -> m ()
 refresh bc item@(HeadingNode (EntityData {_children})) _parents =
   readTVarIO _children >>= mapM_ (\(SomeMainListElem child) -> refresh bc child ((SomeMainListElem item) :| toList _parents))
 refresh bc item@(RepoNode _) _parents =
@@ -55,7 +55,7 @@ refresh _ _ _ = return ()
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m
-  ) => V.Vector MainListElemVariable -> m ()
+  ) => V.Vector (SomeMainListElem Variable) -> m ()
 refreshAll elems = do
   baseContext <- ask
   allRepos <- liftIO $ collectAllRepos (V.toList elems)
@@ -67,10 +67,10 @@ refreshAll elems = do
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
 
   where
-    collectAllRepos :: [MainListElemVariable] -> IO [MainListElem' Variable RepoT]
+    collectAllRepos :: [SomeMainListElem Variable] -> IO [MainListElem' Variable RepoT]
     collectAllRepos = fmap concat . mapM collectFromNode
       where
-        collectFromNode :: MainListElemVariable -> IO [MainListElem' Variable RepoT]
+        collectFromNode :: SomeMainListElem Variable -> IO [MainListElem' Variable RepoT]
         collectFromNode (SomeMainListElem item@(RepoNode {})) = return [item]
         collectFromNode (SomeMainListElem item@(HeadingNode {})) = do
           children <- getExistentialChildren item

@@ -14,7 +14,7 @@ import Relude
 import Sauron.Types
 
 
-fixMainListElem :: MainListElemVariable -> STM MainListElem
+fixMainListElem :: SomeMainListElem Variable -> STM (SomeMainListElem Fixed)
 fixMainListElem (SomeMainListElem item) = SomeMainListElem <$> fixMainListElem' item
 
 fixMainListElem' :: MainListElem' Variable a -> STM (MainListElem' Fixed a)
@@ -41,8 +41,8 @@ fixChildlessNode :: (
 fixChildlessNode item ed = (`setEntityData` item) <$> (fixEntityData [] ed)
 
 fixWrappedNode :: (
-  NodeChildType Variable a ~ MainListElemVariable
-  , NodeChildType Fixed a ~ MainListElem
+  NodeChildType Variable a ~ SomeMainListElem Variable
+  , NodeChildType Fixed a ~ SomeMainListElem Fixed
   ) => MainListElem' f a -> EntityData Variable a -> STM (MainListElem' Fixed a)
 fixWrappedNode item ed = (`setEntityData` item) <$> (readTVar (_children ed) >>= mapM fixMainListElem >>= flip fixEntityData ed)
 
