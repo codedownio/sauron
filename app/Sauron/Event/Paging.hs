@@ -2,9 +2,11 @@
 
 module Sauron.Event.Paging where
 
+import Brick
+import Brick.Widgets.List
 import Control.Monad
-import Control.Monad.IO.Unlift
 import Data.Function
+import qualified Data.Vector as Vec
 import Lens.Micro
 import Relude hiding (Down, pi)
 import Sauron.Actions
@@ -13,12 +15,17 @@ import Sauron.Types
 import UnliftIO.STM (stateTVar)
 
 
-tryNavigatePage :: MonadIO m => AppState -> (PageInfo -> PageInfo) -> m ()
+tryNavigatePage :: AppState -> (PageInfo -> PageInfo) -> EventM ClickableName AppState ()
 tryNavigatePage s cb =
   withNthChildAndPaginationParent s $ \_fixedEl _el (SomeNode paginationEl, pageInfo) parents -> do
     didChange <- atomically $ stateTVar pageInfo $ \pi ->
       let pi' = cb pi in (pi' /= pi, pi')
-    when didChange $
+    when didChange $ do
+      -- Mark the pagination node selected
+      expandedList <- gets (^. appMainList)
+      forM_ (Vec.findIndex (\(SomeNode el) -> (_ident (getEntityData paginationEl) == _ident (getEntityData el))) (listElements expandedList)) $ \index ->
+        modify (appMainList %~ listMoveTo index)
+
       refresh (s ^. appBaseContext) paginationEl parents
 
 goNextPage :: PageInfo -> PageInfo
@@ -41,7 +48,6 @@ goNextPage pi@(PageInfo {..}) = pi {
         Just lastPage -> min lastPage (pageInfoCurrentPage + 1)
 
     didMove = currentPage' > pageInfoCurrentPage
-
 
 goPrevPage :: PageInfo -> PageInfo
 goPrevPage pi@(PageInfo {..}) = pi {

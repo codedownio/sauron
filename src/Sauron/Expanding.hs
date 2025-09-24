@@ -4,7 +4,6 @@
 
 module Sauron.Expanding (
   getExpandedList
-  , nthChildVector
   ) where
 
 import Control.Monad.Writer
@@ -43,24 +42,3 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
 
     expandChildless :: Monad m => [()] -> m ()
     expandChildless _xs = return ()
-
--- * Computing nth child in the presence of expanding
-
-nthChildVector :: Int -> V.Vector (SomeNode Variable) -> STM (Maybe (NonEmpty (SomeNode Variable)))
-nthChildVector n elems = nthChildList n (V.toList elems) >>= \case
-  Left _ -> pure Nothing
-  Right x -> pure (Just x)
-
-nthChildList :: Int -> [SomeNode Variable] -> STM (Either Int (NonEmpty (SomeNode Variable)))
-nthChildList n (x:xs) = nthChild n x >>= \case
-  Right els -> pure $ Right els
-  Left n' -> nthChildList n' xs
-nthChildList n [] = pure $ Left n
-
-nthChild :: Int -> SomeNode Variable -> STM (Either Int (NonEmpty (SomeNode Variable)))
-nthChild 0 el = pure $ Right (el :| [])
-nthChild n el@(SomeNode item@(getEntityData -> (EntityData {..}))) = readTVar _toggled >>= \case
-  True -> do
-    wrappedChildren <- getExistentialChildrenWrapped item
-    (fmap ((el :|) . toList)) <$> (nthChildList (n - 1) wrappedChildren)
-  False -> pure $ Left (n - 1)

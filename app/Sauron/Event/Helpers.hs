@@ -2,53 +2,61 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 
-module Sauron.Event.Helpers where
+module Sauron.Event.Helpers (
+  withFixedElemAndParents
+  , withNthChildAndPaginationParent
+  , withRepoParent
+  , withNthChildAndRepoParent
+  ) where
 
 import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
 import qualified Data.List as L
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude hiding (Down, pred)
-import Sauron.Expanding
 import Sauron.Types
 
 
 withFixedElemAndParents :: (
   MonadIO m
   ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> NonEmpty (SomeNode Variable) -> m ()) -> m ()
-withFixedElemAndParents s cb = do
+withFixedElemAndParents s cb =
   case listSelectedElement (s ^. appMainList) of
     Nothing -> return ()
     Just (n, fixedElem) ->
       atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
         Nothing -> return ()
-        Just elems -> cb fixedElem (last elems) elems
-
-withNthChildAndMaybeRepoParent :: (
-  MonadIO m
-  ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> Maybe (Node Variable 'RepoT) -> m ()) -> m ()
-withNthChildAndMaybeRepoParent s cb =
-  withFixedElemAndParents s $ \fixedEl _variableEl elems ->
-    cb fixedEl (last elems) (viaNonEmpty head [x | (SomeNode x@(RepoNode {})) <- toList elems])
-
-withNthChildAndMaybePaginationParent :: (
-  MonadIO m
-  ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> Maybe (SomeNode Variable) -> m ()) -> m ()
-withNthChildAndMaybePaginationParent s cb =
-  withFixedElemAndParents s $ \fixedEl _variableEl elems ->
-    cb fixedEl (last elems) (viaNonEmpty head [x | x <- toList elems, isJust (getPaginationInfo x)])
+        Just elems -> cb fixedElem (head elems) elems
 
 withNthChildAndPaginationParent :: (
   MonadIO m
   ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> (SomeNode Variable, TVar PageInfo) -> NonEmpty (SomeNode Variable) -> m ()) -> m ()
 withNthChildAndPaginationParent s cb =
-  withFixedElemAndParents s $ \fixedEl variableEl parents -> do
+  withFixedElemAndParents s $ \fixedEl variableEl parents ->
     case L.dropWhile (not . isPaginationNode) (toList parents) of
-      (el@(getPaginationInfo -> Just pageInfo):rest) -> cb fixedEl variableEl (el, pageInfo) (el :| rest)
+      (el@(getPaginationInfo -> Just pageInfo):rest) ->
+        cb fixedEl variableEl (el, pageInfo) (el :| rest)
       _ -> return ()
+
+withNthChildAndRepoParent :: MonadIO m => AppState -> (SomeNode Fixed -> SomeNode Variable -> Node Variable RepoT -> m ()) -> m ()
+withNthChildAndRepoParent s cb =
+  withFixedElemAndParents s $ \fixedEl _variableEl elems ->
+    case viaNonEmpty head [x | (SomeNode x@(RepoNode {})) <- toList elems] of
+      Nothing -> return ()
+      Just repoNode -> cb fixedEl (head elems) repoNode
+
+withRepoParent :: MonadIO m => AppState -> (Repo -> m ()) -> m ()
+withRepoParent s cb = do
+  withNthChildAndRepoParent s $ \_ _ (RepoNode (EntityData {_state})) -> readTVarIO _state >>= \case
+    Fetched r -> cb r
+    _ -> return ()
+
+-- * Util
 
 isPaginationNode :: SomeNode Variable -> Bool
 isPaginationNode = isJust . getPaginationInfo
@@ -60,39 +68,25 @@ getPaginationInfo (SomeNode (PaginatedWorkflowsNode (EntityData {..}))) = Just _
 getPaginationInfo (SomeNode (PaginatedReposNode (EntityData {..}))) = Just _pageInfo
 getPaginationInfo _ = Nothing
 
-withNthChild :: MonadIO m => AppState -> (SomeNode Fixed -> SomeNode Variable -> m ()) -> m ()
-withNthChild s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el _ -> cb fixedEl el
+-- * Computing nth child in the presence of expanding
 
-withRepoParent :: MonadIO m => AppState -> (Repo -> m ()) -> m ()
-withRepoParent s cb = do
-  withNthChildAndMaybeRepoParent s $ \_ _ repoElem -> case repoElem of
-    Just (RepoNode (EntityData {_state})) -> readTVarIO _state >>= \case
-      Fetched r -> cb r
-      _ -> return ()
-    _ -> return ()
+-- | Returns the node at the head of the list, and then its successive parents
+-- going up to a tree root.
+nthChildVector :: Int -> V.Vector (SomeNode Variable) -> STM (Maybe (NonEmpty (SomeNode Variable)))
+nthChildVector n elems = nthChildList n (V.toList elems) >>= \case
+  Left _ -> pure Nothing
+  Right x -> pure (Just (NE.reverse x))
 
-withNthChildAndRepoParent :: MonadIO m => AppState -> (SomeNode Fixed -> SomeNode Variable -> Node Variable RepoT -> m ()) -> m ()
-withNthChildAndRepoParent s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el -> \case
-  Nothing -> return ()
-  Just x -> cb fixedEl el x
+nthChildList :: Int -> [SomeNode Variable] -> STM (Either Int (NonEmpty (SomeNode Variable)))
+nthChildList n (x:xs) = nthChild n x >>= \case
+  Right els -> pure $ Right els
+  Left n' -> nthChildList n' xs
+nthChildList n [] = pure $ Left n
 
--- withElemByIdentifier :: MonadIO m => AppState -> Int -> (Maybe (SomeNode Variable) -> m ()) -> m ()
--- withElemByIdentifier s identifier cb =
---   atomically (findElemInList (\x -> _ident x == identifier) (V.toList (_appMainListVariable s))) >>= cb
-
--- findElem :: (SomeNode Variable -> Bool) -> SomeNode Variable -> STM (Maybe (SomeNode Variable))
--- findElem pred el | pred el = pure $ Just el
--- findElem pred (MainListElemPaginated {..}) = readTVar _children >>= findElemInList pred
--- findElem pred (MainListElemRepo {..}) = do
---   ic <- readTVar _issuesChild
---   pc <- readTVar _pullsChild
---   wc <- readTVar _workflowsChild
---   findElemInList pred [ic, pc, wc]
--- findElem _ _ = pure Nothing
-
--- findElemInList :: (SomeNode Variable -> Bool) -> [SomeNode Variable] -> STM (Maybe (SomeNode Variable))
--- findElemInList pred elems = flip fix elems $ \loop -> \case
---   (x:xs) -> findElem pred x >>= \case
---     Just x' -> pure (Just x')
---     Nothing -> loop xs
---   [] -> pure Nothing
+nthChild :: Int -> SomeNode Variable -> STM (Either Int (NonEmpty (SomeNode Variable)))
+nthChild 0 el = pure $ Right (el :| [])
+nthChild n el@(SomeNode item@(getEntityData -> (EntityData {..}))) = readTVar _toggled >>= \case
+  True -> do
+    wrappedChildren <- getExistentialChildrenWrapped item
+    (fmap ((el :|) . toList)) <$> (nthChildList (n - 1) wrappedChildren)
+  False -> pure $ Left (n - 1)

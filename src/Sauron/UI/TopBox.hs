@@ -122,12 +122,11 @@ keyIndicatorContextual app p key msg = case p app of
 
 -- * Predicates
 
--- someRepoSelected s = runIdentity $ withNthChildAndMaybeRepoParent s $ \_ _ maybeRepo ->
+-- someRepoSelected s = runIdentity $ withNthChildAndRepoParent s $ \_ _ repo ->
 --   pure $ isJust maybeRepo
 someRepoSelected s = case listSelectedElement (s ^. appMainList) of
   Nothing -> False
   Just _ -> True
-
 
 selectedRepoToggled = const False
 

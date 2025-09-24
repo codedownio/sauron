@@ -94,11 +94,9 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey c [] | c == lastPageKey -> tryNavigatePage s goLastPage
 
   V.EvKey c [] | c == editSearchKey -> do
-    withNthChildAndMaybePaginationParent s $ \_fixedEl _el paginationElem -> case paginationElem of
-      Just (SomeNode (getEntityData -> (EntityData {_ident, _search}))) -> do
-        search' <- readTVarIO _search
-        modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
-      _ -> return ()
+    withNthChildAndPaginationParent s $ \_fixedEl _el (SomeNode (getEntityData -> (EntityData {_ident, _search})), _) _parents -> do
+      search' <- readTVarIO _search
+      modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
@@ -125,8 +123,8 @@ handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
     False -> case Relude.reverse (toList parents) of
       _:(SomeNode parent):_ -> do
         expandedList <- gets (^. appMainList)
-        forM_ (Vec.findIndex (\(SomeNode el) -> (_ident (getEntityData parent) == _ident (getEntityData el))) (listElements expandedList)) $
-          \index -> modify (appMainList %~ listMoveTo index)
+        forM_ (Vec.findIndex (\(SomeNode el) -> (_ident (getEntityData parent) == _ident (getEntityData el))) (listElements expandedList)) $ \index ->
+          modify (appMainList %~ listMoveTo index)
       _ -> return ()
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
