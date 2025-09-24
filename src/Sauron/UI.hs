@@ -21,6 +21,7 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Border
 import Sauron.UI.BottomBar
 import Sauron.UI.Branch
+import Sauron.UI.Commit
 import Sauron.UI.Issue
 import Sauron.UI.Job
 import Sauron.UI.Pagination
@@ -48,6 +49,13 @@ listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget Clickable
 
 -- * Repos
 
+listDrawElement appState ix isSelected (SomeNode (PaginatedReposNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+  Just $ case _state of
+    Fetched repos -> paginatedHeading ed appState "Repositories" (str [i|(#{length repos})|])
+    Fetching -> paginatedHeading ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Repositories" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Repositories" (str [i|(error fetching: #{err})|])
+  ]
 listDrawElement appState ix isSelected (SomeNode (RepoNode x@(EntityData {_static=(owner, name), ..}))) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled (owner, name) _state _healthCheck (_appAnimationCounter appState)
   ]
@@ -101,15 +109,17 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedWorkflowsNode ed@(Ent
     NotFetched -> paginatedHeading ed appState "Actions" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Actions" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeNode (PaginatedReposNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
-  Just $ case _state of
-    Fetched repos -> paginatedHeading ed appState "Repositories" (str [i|(#{length repos})|])
-    Fetching -> paginatedHeading ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Repositories" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Repositories" (str [i|(error fetching: #{err})|])
+listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityData {_static=wf, ..}))) = wrapper ix isSelected ed [
+  Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state
+  , do
+      guard _toggled
+      guardFetched _state $ \_ ->
+        return $ padLeft (Pad 4) $
+          fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+            workflowInner wf _state
   ]
 
--- * Branches
+-- * Branches and commits
 
 listDrawElement appState ix isSelected (SomeNode (PaginatedBranchesNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
@@ -119,17 +129,12 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedBranchesNode ed@(Enti
     Errored err -> paginatedHeading ed appState "Branches" (str [i|(error fetching: #{err})|])
   ]
 
-listDrawElement _appState ix isSelected (SomeNode (SingleBranchNode ed@(EntityData {_static=branch, ..}))) = wrapper ix isSelected ed [
-  Just $ branchLine _toggled branch
+listDrawElement appState ix isSelected (SomeNode (SingleBranchNode ed@(EntityData {_static=branch, _state, ..}))) = wrapper ix isSelected ed [
+  Just $ branchLine _toggled branch appState _state
   ]
-listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityData {_static=wf, ..}))) = wrapper ix isSelected ed [
-  Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state
-  , do
-      guard _toggled
-      guardFetched _state $ \_ ->
-        return $ padLeft (Pad 4) $
-          fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-            workflowInner wf _state
+
+listDrawElement _appState ix isSelected (SomeNode (SingleCommitNode ed@(EntityData {_static=commit, ..}))) = wrapper ix isSelected ed [
+  Just $ commitLine _toggled commit
   ]
 
 -- * Jobs

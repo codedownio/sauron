@@ -163,6 +163,7 @@ getNodeUrl repoBaseUrl (SinglePullNode (EntityData {_static=pull})) = case issue
 getNodeUrl _repoBaseUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) = toString $ getUrl $ workflowRunHtmlUrl workflowRun
 getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_static=job})) = toString $ getUrl $ jobHtmlUrl job
 getNodeUrl repoBaseUrl (SingleBranchNode (EntityData {_static=branch})) = repoBaseUrl <> "/tree/" <> toString (branchName branch)
+getNodeUrl repoBaseUrl (SingleCommitNode (EntityData {_static=commit})) = repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit))
 getNodeUrl _repoBaseUrl (JobLogGroupNode _) = "" -- Job log groups don't have URLs
 getNodeUrl _repoBaseUrl (HeadingNode _) = "" -- Heading nodes don't have URLs
 getNodeUrl repoBaseUrl (RepoNode _) = repoBaseUrl

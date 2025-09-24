@@ -41,6 +41,7 @@ data Node f (a :: NodeTyp) where
   SingleWorkflowNode :: EntityData f 'SingleWorkflowT -> Node f 'SingleWorkflowT
   SingleJobNode :: EntityData f 'SingleJobT -> Node f 'SingleJobT
   SingleBranchNode :: EntityData f 'SingleBranchT -> Node f 'SingleBranchT
+  SingleCommitNode :: EntityData f 'SingleCommitT -> Node f 'SingleCommitT
   JobLogGroupNode :: EntityData f 'JobLogGroupT -> Node f 'JobLogGroupT
   HeadingNode :: EntityData f 'HeadingT -> Node f 'HeadingT
   RepoNode :: EntityData f 'RepoT -> Node f 'RepoT
@@ -56,6 +57,7 @@ data NodeTyp =
   | SingleWorkflowT
   | SingleJobT
   | SingleBranchT
+  | SingleCommitT
   | JobLogGroupT
   | HeadingT
   | RepoT
@@ -73,6 +75,7 @@ instance Show (Node f a) where
   show (SingleWorkflowNode (EntityData {..})) = [i|SingleWorkflowNode<#{_ident}>|]
   show (SingleJobNode (EntityData {..})) = [i|SingleJobNode<#{_ident}>|]
   show (SingleBranchNode (EntityData {..})) = [i|SingleBranchNode<#{_ident}>|]
+  show (SingleCommitNode (EntityData {..})) = [i|SingleCommitNode<#{_ident}>|]
   show (JobLogGroupNode (EntityData {..})) = [i|JobLogGroupNode<#{_ident}>|]
   show (HeadingNode (EntityData {..})) = [i|HeadingNode<#{_ident}>|]
   show (RepoNode (EntityData {..})) = [i|RepoNode<#{_ident}>|]
@@ -114,6 +117,7 @@ type family NodeStatic a where
   NodeStatic SingleWorkflowT = WorkflowRun
   NodeStatic SingleJobT = Job
   NodeStatic SingleBranchT = Branch
+  NodeStatic SingleCommitT = Commit
   NodeStatic JobLogGroupT = JobLogGroup
   NodeStatic HeadingT = Text
   NodeStatic RepoT = (Name Owner, Name Repo)
@@ -128,7 +132,8 @@ type family NodeState a where
   NodeState SinglePullT = V.Vector IssueComment
   NodeState SingleWorkflowT = WithTotalCount Job
   NodeState SingleJobT = [JobLogGroup]
-  NodeState SingleBranchT = ()
+  NodeState SingleBranchT = V.Vector Commit
+  NodeState SingleCommitT = ()
   NodeState JobLogGroupT = ()
   NodeState HeadingT = ()
   NodeState RepoT = Repo
@@ -143,7 +148,8 @@ type family NodeChildType f a where
   NodeChildType f SinglePullT = ()
   NodeChildType f SingleWorkflowT = Node f SingleJobT
   NodeChildType f SingleJobT = Node f JobLogGroupT
-  NodeChildType f SingleBranchT = ()
+  NodeChildType f SingleBranchT = Node f SingleCommitT
+  NodeChildType f SingleCommitT = ()
   NodeChildType f JobLogGroupT = Node f JobLogGroupT
   NodeChildType f HeadingT = SomeNode f
   NodeChildType f RepoT = SomeNode f
@@ -184,12 +190,13 @@ getExistentialChildrenWrapped node = case node of
   PaginatedBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleWorkflowNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleJobNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  SingleBranchNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   JobLogGroupNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
 
   -- These are leaf nodes with no meaningful children
   SingleIssueNode _ -> return []
   SinglePullNode _ -> return []
-  SingleBranchNode _ -> return []
+  SingleCommitNode _ -> return []
 
 getEntityData :: Node f a -> EntityData f a
 getEntityData (PaginatedIssuesNode ed) = ed
@@ -202,6 +209,7 @@ getEntityData (SinglePullNode ed) = ed
 getEntityData (SingleWorkflowNode ed) = ed
 getEntityData (SingleJobNode ed) = ed
 getEntityData (SingleBranchNode ed) = ed
+getEntityData (SingleCommitNode ed) = ed
 getEntityData (JobLogGroupNode ed) = ed
 getEntityData (HeadingNode ed) = ed
 getEntityData (RepoNode ed) = ed
@@ -217,6 +225,7 @@ setEntityData ed (SinglePullNode _) = SinglePullNode ed
 setEntityData ed (SingleWorkflowNode _) = SingleWorkflowNode ed
 setEntityData ed (SingleJobNode _) = SingleJobNode ed
 setEntityData ed (SingleBranchNode _) = SingleBranchNode ed
+setEntityData ed (SingleCommitNode _) = SingleCommitNode ed
 setEntityData ed (JobLogGroupNode _) = JobLogGroupNode ed
 setEntityData ed (HeadingNode _) = HeadingNode ed
 setEntityData ed (RepoNode _) = RepoNode ed

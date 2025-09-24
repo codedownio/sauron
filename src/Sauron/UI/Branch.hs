@@ -3,18 +3,25 @@ module Sauron.UI.Branch (
   ) where
 
 import Brick
+import Data.String.Interpolate
+import qualified Data.Vector as V
 import GitHub
 import Relude
+import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 
 
-branchLine :: Bool -> Branch -> Widget n
-branchLine toggled (Branch {branchName, branchCommit}) = vBox [line1, line2]
+branchLine :: Bool -> Branch -> AppState -> Fetchable (V.Vector Commit) -> Widget n
+branchLine toggled (Branch {branchName, branchCommit}) appState fetchableState = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr branchAttr $ str $ toString branchName
-      , padLeft Max $ withAttr normalAttr $ str "branch"
+      , fetchableQuarterCircleSpinner (_appAnimationCounter appState) fetchableState
+      , padLeft Max $ case fetchableState of
+          Fetched commits -> str [i|(#{V.length commits} commits)|]
+          _ -> withAttr normalAttr $ str "branch"
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox [

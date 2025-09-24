@@ -34,6 +34,7 @@ library
       Sauron.UI.Border
       Sauron.UI.BottomBar
       Sauron.UI.Branch
+      Sauron.UI.Commit
       Sauron.UI.Issue
       Sauron.UI.Job
       Sauron.UI.Keys

@@ -18,6 +18,7 @@ module Sauron.Fetch (
   , fetchIssueComments
 
   , fetchBranches
+  , fetchBranchCommits
 
   , fetchWorkflowJobs
   , fetchJobLogs
@@ -125,6 +126,23 @@ fetchBranches owner name (PaginatedBranchesNode (EntityData {..})) = do
       writeTVar _state (Fetched branches)
       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
         SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+
+fetchBranchCommits :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Node Variable SingleBranchT -> m ()
+fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..})) = do
+  bc@(BaseContext {auth, manager}) <- ask
+  let branchSha = branchCommitSha $ branchCommit branch
+  bracketOnError_ (atomically $ writeTVar _state Fetching)
+                  (atomically $ writeTVar _state (Errored "Branch commits fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commitsWithOptionsForR owner name (FetchAtLeast 10) [CommitQuerySha branchSha])) >>= \case
+      Left err -> atomically $ do
+        writeTVar _state (Errored (show err))
+        writeTVar _children []
+      Right (responseBody -> commits) -> atomically $ do
+        writeTVar _state (Fetched commits)
+        (writeTVar _children =<<) $ forM (V.toList commits) $ \commit@(Commit {..}) ->
+          SingleCommitNode <$> makeEmptyElem bc commit ("/commit/" <> T.pack (toString (untagName commitSha))) (_depth + 1)
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m

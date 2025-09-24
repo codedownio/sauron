@@ -29,7 +29,8 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
           SinglePullNode (EntityData {..}) -> expandChildless _children
           SingleWorkflowNode (EntityData {..}) -> expandTyped _children
           SingleJobNode (EntityData {..}) -> expandTyped _children
-          SingleBranchNode (EntityData {..}) -> expandChildless _children
+          SingleBranchNode (EntityData {..}) -> expandTyped _children
+          SingleCommitNode (EntityData {..}) -> expandChildless _children
           JobLogGroupNode (EntityData {..}) -> expandTyped _children
           HeadingNode (EntityData {..}) -> expandWrapped _children
           RepoNode (EntityData {..}) -> forM_ _children $ \y -> tell (expandNodes y)

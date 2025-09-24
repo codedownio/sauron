@@ -55,6 +55,8 @@ refresh bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) (findRep
   liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item) bc
 refresh bc item@(SingleJobNode (EntityData {_static=job})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchJobLogs owner name job item) bc
+refresh bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc
 refresh _ _ _ = return ()
 
 refreshAll :: (
