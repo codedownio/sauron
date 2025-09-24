@@ -24,6 +24,7 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
           PaginatedIssuesNode (EntityData {..}) -> expandTyped _children
           PaginatedPullsNode (EntityData {..}) -> expandTyped _children
           PaginatedWorkflowsNode (EntityData {..}) -> expandTyped _children
+          PaginatedReposNode (EntityData {..}) -> expandTyped _children
           SingleIssueNode (EntityData {..}) -> expandChildless _children
           SinglePullNode (EntityData {..}) -> expandChildless _children
           SingleWorkflowNode (EntityData {..}) -> expandTyped _children

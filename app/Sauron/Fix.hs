@@ -20,6 +20,7 @@ fixNode :: Node Variable a -> STM (Node Fixed a)
 fixNode item@(PaginatedIssuesNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedPullsNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedWorkflowsNode ed) = fixTypedNode item ed
+fixNode item@(PaginatedReposNode ed) = fixTypedNode item ed
 fixNode item@(SingleIssueNode ed) = fixChildlessNode item ed
 fixNode item@(SinglePullNode ed) = fixChildlessNode item ed
 fixNode item@(SingleWorkflowNode ed) = fixTypedNode item ed

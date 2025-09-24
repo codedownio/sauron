@@ -69,7 +69,7 @@ main = do
     Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
     Nothing -> isContainedInGitRepo >>= \case
       Just (namespace, name) -> (fmap SomeNode) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
-      Nothing -> (fmap SomeNode) <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+      Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   -- Kick off initial fetches
   runReaderT (refreshAll listElems) baseContext

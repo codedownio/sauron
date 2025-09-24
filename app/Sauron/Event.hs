@@ -154,6 +154,7 @@ getNodeUrl :: String -> Node Fixed a -> String
 getNodeUrl repoBaseUrl (PaginatedIssuesNode _) = repoBaseUrl <> "/issues"
 getNodeUrl repoBaseUrl (PaginatedPullsNode _) = repoBaseUrl <> "/pulls"
 getNodeUrl repoBaseUrl (PaginatedWorkflowsNode _) = repoBaseUrl <> "/actions"
+getNodeUrl repoBaseUrl (PaginatedReposNode _) = ""
 getNodeUrl repoBaseUrl (SingleIssueNode (EntityData {_static=issue})) = case issueHtmlUrl issue of
   Just url -> toString $ getUrl url
   Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber issue}|]

@@ -33,6 +33,7 @@ data Node f (a :: NodeTyp) where
   PaginatedIssuesNode :: EntityData f 'PaginatedIssuesT -> Node f 'PaginatedIssuesT
   PaginatedPullsNode :: EntityData f 'PaginatedPullsT -> Node f 'PaginatedPullsT
   PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> Node f 'PaginatedWorkflowsT
+  PaginatedReposNode :: EntityData f 'PaginatedReposT -> Node f 'PaginatedReposT
 
   SingleIssueNode :: EntityData f 'SingleIssueT -> Node f 'SingleIssueT
   SinglePullNode :: EntityData f 'SinglePullT -> Node f 'SinglePullT
@@ -46,6 +47,7 @@ data NodeTyp =
   PaginatedIssuesT
   | PaginatedPullsT
   | PaginatedWorkflowsT
+  | PaginatedReposT
   | SingleIssueT
   | SinglePullT
   | SingleWorkflowT
@@ -60,6 +62,7 @@ instance Show (Node f a) where
   show (PaginatedIssuesNode (EntityData {..})) = [i|PaginatedIssuesNode<#{_ident}>|]
   show (PaginatedPullsNode (EntityData {..})) = [i|PaginatedPullsNode<#{_ident}>|]
   show (PaginatedWorkflowsNode (EntityData {..})) = [i|PaginatedWorkflowsNode<#{_ident}>|]
+  show (PaginatedReposNode (EntityData {..})) = [i|PaginatedReposNode<#{_ident}>|]
   show (SingleIssueNode (EntityData {..})) = [i|SingleIssueNode<#{_ident}>|]
   show (SinglePullNode (EntityData {..})) = [i|SinglePullNode<#{_ident}>|]
   show (SingleWorkflowNode (EntityData {..})) = [i|SingleWorkflowNode<#{_ident}>|]
@@ -98,6 +101,7 @@ type family NodeStatic a where
   NodeStatic PaginatedIssuesT = ()
   NodeStatic PaginatedPullsT = ()
   NodeStatic PaginatedWorkflowsT = ()
+  NodeStatic PaginatedReposT = ()
   NodeStatic SingleIssueT = Issue
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun
@@ -110,6 +114,7 @@ type family NodeState a where
   NodeState PaginatedIssuesT = SearchResult Issue
   NodeState PaginatedPullsT = SearchResult Issue
   NodeState PaginatedWorkflowsT = WithTotalCount WorkflowRun
+  NodeState PaginatedReposT = V.Vector Repo
   NodeState SingleIssueT = V.Vector IssueComment
   NodeState SinglePullT = V.Vector IssueComment
   NodeState SingleWorkflowT = WithTotalCount Job
@@ -122,6 +127,7 @@ type family NodeChildType f a where
   NodeChildType f PaginatedIssuesT = Node f SingleIssueT
   NodeChildType f PaginatedPullsT = Node f SinglePullT
   NodeChildType f PaginatedWorkflowsT = Node f SingleWorkflowT
+  NodeChildType f PaginatedReposT = Node f RepoT
   NodeChildType f SingleIssueT = ()
   NodeChildType f SinglePullT = ()
   NodeChildType f SingleWorkflowT = Node f SingleJobT
@@ -162,6 +168,7 @@ getExistentialChildrenWrapped node = case node of
   PaginatedIssuesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedPullsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedWorkflowsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedReposNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleWorkflowNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleJobNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   JobLogGroupNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
@@ -174,6 +181,7 @@ getEntityData :: Node f a -> EntityData f a
 getEntityData (PaginatedIssuesNode ed) = ed
 getEntityData (PaginatedPullsNode ed) = ed
 getEntityData (PaginatedWorkflowsNode ed) = ed
+getEntityData (PaginatedReposNode ed) = ed
 getEntityData (SingleIssueNode ed) = ed
 getEntityData (SinglePullNode ed) = ed
 getEntityData (SingleWorkflowNode ed) = ed
@@ -186,6 +194,7 @@ setEntityData :: EntityData f' a -> Node f a -> Node f' a
 setEntityData ed (PaginatedIssuesNode _) = PaginatedIssuesNode ed
 setEntityData ed (PaginatedPullsNode _) = PaginatedPullsNode ed
 setEntityData ed (PaginatedWorkflowsNode _) = PaginatedWorkflowsNode ed
+setEntityData ed (PaginatedReposNode _) = PaginatedReposNode ed
 setEntityData ed (SingleIssueNode _) = SingleIssueNode ed
 setEntityData ed (SinglePullNode _) = SinglePullNode ed
 setEntityData ed (SingleWorkflowNode _) = SingleWorkflowNode ed

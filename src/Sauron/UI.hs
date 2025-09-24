@@ -100,6 +100,13 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedWorkflowsNode ed@(Ent
     NotFetched -> paginatedHeading ed appState "Actions" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Actions" (str [i|(error fetching: #{err})|])
   ]
+listDrawElement appState ix isSelected (SomeNode (PaginatedReposNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+  Just $ case _state of
+    Fetched repos -> paginatedHeading ed appState "Repositories" (str [i|(#{length repos})|])
+    Fetching -> paginatedHeading ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Repositories" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Repositories" (str [i|(error fetching: #{err})|])
+  ]
 listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityData {_static=wf, ..}))) = wrapper ix isSelected ed [
   Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state
   , do
