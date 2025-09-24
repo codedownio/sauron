@@ -24,7 +24,8 @@ extra-deps:
   # - fixes for search query escaping
   # - fix Job type to make some fields optional
   # - fix JobStep type to make some fields optional
-  commit: 982f19a11732b8d043911fbc3f95181a4d3a70de
+  # - Repo: add subscribers_count
+  commit: 584fc29c2d4c6a39cf3a39a0afe74dd158a42c1c
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
