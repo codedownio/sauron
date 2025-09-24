@@ -20,6 +20,7 @@ import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
 import Sauron.UI.Border
 import Sauron.UI.BottomBar
+import Sauron.UI.Branch
 import Sauron.UI.Issue
 import Sauron.UI.Job
 import Sauron.UI.Pagination
@@ -106,6 +107,20 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedReposNode ed@(EntityD
     Fetching -> paginatedHeading ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Repositories" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Repositories" (str [i|(error fetching: #{err})|])
+  ]
+
+-- * Branches
+
+listDrawElement appState ix isSelected (SomeNode (PaginatedBranchesNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+  Just $ case _state of
+    Fetched branches -> paginatedHeading ed appState "Branches" (str [i|(#{length branches})|])
+    Fetching -> paginatedHeading ed appState "Branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Branches" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Branches" (str [i|(error fetching: #{err})|])
+  ]
+
+listDrawElement _appState ix isSelected (SomeNode (SingleBranchNode ed@(EntityData {_static=branch, ..}))) = wrapper ix isSelected ed [
+  Just $ branchLine _toggled branch
   ]
 listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityData {_static=wf, ..}))) = wrapper ix isSelected ed [
   Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state

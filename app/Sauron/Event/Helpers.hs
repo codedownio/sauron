@@ -66,6 +66,7 @@ getPaginationInfo (SomeNode (PaginatedIssuesNode (EntityData {..}))) = Just _pag
 getPaginationInfo (SomeNode (PaginatedPullsNode (EntityData {..}))) = Just _pageInfo
 getPaginationInfo (SomeNode (PaginatedWorkflowsNode (EntityData {..}))) = Just _pageInfo
 getPaginationInfo (SomeNode (PaginatedReposNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo (SomeNode (PaginatedBranchesNode (EntityData {..}))) = Just _pageInfo
 getPaginationInfo _ = Nothing
 
 -- * Computing nth child in the presence of expanding

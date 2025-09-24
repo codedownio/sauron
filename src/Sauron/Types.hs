@@ -34,11 +34,13 @@ data Node f (a :: NodeTyp) where
   PaginatedPullsNode :: EntityData f 'PaginatedPullsT -> Node f 'PaginatedPullsT
   PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> Node f 'PaginatedWorkflowsT
   PaginatedReposNode :: EntityData f 'PaginatedReposT -> Node f 'PaginatedReposT
+  PaginatedBranchesNode :: EntityData f 'PaginatedBranchesT -> Node f 'PaginatedBranchesT
 
   SingleIssueNode :: EntityData f 'SingleIssueT -> Node f 'SingleIssueT
   SinglePullNode :: EntityData f 'SinglePullT -> Node f 'SinglePullT
   SingleWorkflowNode :: EntityData f 'SingleWorkflowT -> Node f 'SingleWorkflowT
   SingleJobNode :: EntityData f 'SingleJobT -> Node f 'SingleJobT
+  SingleBranchNode :: EntityData f 'SingleBranchT -> Node f 'SingleBranchT
   JobLogGroupNode :: EntityData f 'JobLogGroupT -> Node f 'JobLogGroupT
   HeadingNode :: EntityData f 'HeadingT -> Node f 'HeadingT
   RepoNode :: EntityData f 'RepoT -> Node f 'RepoT
@@ -48,10 +50,12 @@ data NodeTyp =
   | PaginatedPullsT
   | PaginatedWorkflowsT
   | PaginatedReposT
+  | PaginatedBranchesT
   | SingleIssueT
   | SinglePullT
   | SingleWorkflowT
   | SingleJobT
+  | SingleBranchT
   | JobLogGroupT
   | HeadingT
   | RepoT
@@ -63,10 +67,12 @@ instance Show (Node f a) where
   show (PaginatedPullsNode (EntityData {..})) = [i|PaginatedPullsNode<#{_ident}>|]
   show (PaginatedWorkflowsNode (EntityData {..})) = [i|PaginatedWorkflowsNode<#{_ident}>|]
   show (PaginatedReposNode (EntityData {..})) = [i|PaginatedReposNode<#{_ident}>|]
+  show (PaginatedBranchesNode (EntityData {..})) = [i|PaginatedBranchesNode<#{_ident}>|]
   show (SingleIssueNode (EntityData {..})) = [i|SingleIssueNode<#{_ident}>|]
   show (SinglePullNode (EntityData {..})) = [i|SinglePullNode<#{_ident}>|]
   show (SingleWorkflowNode (EntityData {..})) = [i|SingleWorkflowNode<#{_ident}>|]
   show (SingleJobNode (EntityData {..})) = [i|SingleJobNode<#{_ident}>|]
+  show (SingleBranchNode (EntityData {..})) = [i|SingleBranchNode<#{_ident}>|]
   show (JobLogGroupNode (EntityData {..})) = [i|JobLogGroupNode<#{_ident}>|]
   show (HeadingNode (EntityData {..})) = [i|HeadingNode<#{_ident}>|]
   show (RepoNode (EntityData {..})) = [i|RepoNode<#{_ident}>|]
@@ -102,10 +108,12 @@ type family NodeStatic a where
   NodeStatic PaginatedPullsT = ()
   NodeStatic PaginatedWorkflowsT = ()
   NodeStatic PaginatedReposT = Name User
+  NodeStatic PaginatedBranchesT = ()
   NodeStatic SingleIssueT = Issue
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun
   NodeStatic SingleJobT = Job
+  NodeStatic SingleBranchT = Branch
   NodeStatic JobLogGroupT = JobLogGroup
   NodeStatic HeadingT = Text
   NodeStatic RepoT = (Name Owner, Name Repo)
@@ -115,10 +123,12 @@ type family NodeState a where
   NodeState PaginatedPullsT = SearchResult Issue
   NodeState PaginatedWorkflowsT = WithTotalCount WorkflowRun
   NodeState PaginatedReposT = V.Vector Repo
+  NodeState PaginatedBranchesT = V.Vector Branch
   NodeState SingleIssueT = V.Vector IssueComment
   NodeState SinglePullT = V.Vector IssueComment
   NodeState SingleWorkflowT = WithTotalCount Job
   NodeState SingleJobT = [JobLogGroup]
+  NodeState SingleBranchT = ()
   NodeState JobLogGroupT = ()
   NodeState HeadingT = ()
   NodeState RepoT = Repo
@@ -128,10 +138,12 @@ type family NodeChildType f a where
   NodeChildType f PaginatedPullsT = Node f SinglePullT
   NodeChildType f PaginatedWorkflowsT = Node f SingleWorkflowT
   NodeChildType f PaginatedReposT = Node f RepoT
+  NodeChildType f PaginatedBranchesT = Node f SingleBranchT
   NodeChildType f SingleIssueT = ()
   NodeChildType f SinglePullT = ()
   NodeChildType f SingleWorkflowT = Node f SingleJobT
   NodeChildType f SingleJobT = Node f JobLogGroupT
+  NodeChildType f SingleBranchT = ()
   NodeChildType f JobLogGroupT = Node f JobLogGroupT
   NodeChildType f HeadingT = SomeNode f
   NodeChildType f RepoT = SomeNode f
@@ -169,6 +181,7 @@ getExistentialChildrenWrapped node = case node of
   PaginatedPullsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedWorkflowsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedReposNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleWorkflowNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleJobNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   JobLogGroupNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
@@ -176,16 +189,19 @@ getExistentialChildrenWrapped node = case node of
   -- These are leaf nodes with no meaningful children
   SingleIssueNode _ -> return []
   SinglePullNode _ -> return []
+  SingleBranchNode _ -> return []
 
 getEntityData :: Node f a -> EntityData f a
 getEntityData (PaginatedIssuesNode ed) = ed
 getEntityData (PaginatedPullsNode ed) = ed
 getEntityData (PaginatedWorkflowsNode ed) = ed
 getEntityData (PaginatedReposNode ed) = ed
+getEntityData (PaginatedBranchesNode ed) = ed
 getEntityData (SingleIssueNode ed) = ed
 getEntityData (SinglePullNode ed) = ed
 getEntityData (SingleWorkflowNode ed) = ed
 getEntityData (SingleJobNode ed) = ed
+getEntityData (SingleBranchNode ed) = ed
 getEntityData (JobLogGroupNode ed) = ed
 getEntityData (HeadingNode ed) = ed
 getEntityData (RepoNode ed) = ed
@@ -195,10 +211,12 @@ setEntityData ed (PaginatedIssuesNode _) = PaginatedIssuesNode ed
 setEntityData ed (PaginatedPullsNode _) = PaginatedPullsNode ed
 setEntityData ed (PaginatedWorkflowsNode _) = PaginatedWorkflowsNode ed
 setEntityData ed (PaginatedReposNode _) = PaginatedReposNode ed
+setEntityData ed (PaginatedBranchesNode _) = PaginatedBranchesNode ed
 setEntityData ed (SingleIssueNode _) = SingleIssueNode ed
 setEntityData ed (SinglePullNode _) = SinglePullNode ed
 setEntityData ed (SingleWorkflowNode _) = SingleWorkflowNode ed
 setEntityData ed (SingleJobNode _) = SingleJobNode ed
+setEntityData ed (SingleBranchNode _) = SingleBranchNode ed
 setEntityData ed (JobLogGroupNode _) = JobLogGroupNode ed
 setEntityData ed (HeadingNode _) = HeadingNode ed
 setEntityData ed (RepoNode _) = RepoNode ed

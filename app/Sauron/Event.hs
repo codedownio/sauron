@@ -153,6 +153,7 @@ getNodeUrl repoBaseUrl (PaginatedIssuesNode _) = repoBaseUrl <> "/issues"
 getNodeUrl repoBaseUrl (PaginatedPullsNode _) = repoBaseUrl <> "/pulls"
 getNodeUrl repoBaseUrl (PaginatedWorkflowsNode _) = repoBaseUrl <> "/actions"
 getNodeUrl _repoBaseUrl (PaginatedReposNode _) = ""
+getNodeUrl repoBaseUrl (PaginatedBranchesNode _) = repoBaseUrl <> "/branches"
 getNodeUrl repoBaseUrl (SingleIssueNode (EntityData {_static=issue})) = case issueHtmlUrl issue of
   Just url -> toString $ getUrl url
   Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber issue}|]
@@ -161,6 +162,7 @@ getNodeUrl repoBaseUrl (SinglePullNode (EntityData {_static=pull})) = case issue
   Nothing -> repoBaseUrl <> [i|/pulls/#{issueNumber pull}|]
 getNodeUrl _repoBaseUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) = toString $ getUrl $ workflowRunHtmlUrl workflowRun
 getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_static=job})) = toString $ getUrl $ jobHtmlUrl job
+getNodeUrl repoBaseUrl (SingleBranchNode (EntityData {_static=branch})) = repoBaseUrl <> "/tree/" <> toString (branchName branch)
 getNodeUrl _repoBaseUrl (JobLogGroupNode _) = "" -- Job log groups don't have URLs
 getNodeUrl _repoBaseUrl (HeadingNode _) = "" -- Heading nodes don't have URLs
 getNodeUrl repoBaseUrl (RepoNode _) = repoBaseUrl

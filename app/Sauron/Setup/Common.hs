@@ -88,8 +88,29 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _ident = workflowsIdentifier
         } :: Node Variable PaginatedWorkflowsT
 
+  branchesVar <- newTVarIO NotFetched
+  branchesToggledVar <- newTVarIO False
+  branchesChildrenVar <- newTVarIO []
+  branchesSearchVar <- newTVarIO SearchNone
+  branchesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  branchesHealthCheckVar <- newTVarIO NotFetched
+  branchesIdentifier <- liftIO getIdentifier
+  let branchesChild = PaginatedBranchesNode $ EntityData {
+        _static = ()
+        , _state = branchesVar
+        , _urlSuffix = "branches"
+        , _toggled = branchesToggledVar
+        , _children = branchesChildrenVar
+        , _search = branchesSearchVar
+        , _pageInfo = branchesPageInfoVar
+        , _healthCheck = branchesHealthCheckVar
+        , _healthCheckThread = Nothing
+        , _depth = repoDepth + 1
+        , _ident = branchesIdentifier
+        } :: Node Variable PaginatedBranchesT
+
   repoIdentifier <- liftIO getIdentifier
-  childrenVar <- newTVarIO [SomeNode issuesChild, SomeNode pullsChild, SomeNode workflowsChild]
+  childrenVar <- newTVarIO [SomeNode issuesChild, SomeNode pullsChild, SomeNode workflowsChild, SomeNode branchesChild]
   searchVar <- newTVarIO SearchNone
   pageInfoVar <- newTVarIO emptyPageInfo
   return $ RepoNode $ EntityData {

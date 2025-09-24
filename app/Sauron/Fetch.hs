@@ -17,6 +17,8 @@ module Sauron.Fetch (
   , fetchIssue
   , fetchIssueComments
 
+  , fetchBranches
+
   , fetchWorkflowJobs
   , fetchJobLogs
   ) where
@@ -108,6 +110,21 @@ fetchPulls owner name (PaginatedPullsNode (EntityData {..})) = do
       writeTVar _state (Fetched sr)
       (writeTVar _children =<<) $ forM (V.toList results) $ \issue@(Issue {..}) ->
         SinglePullNode <$> makeEmptyElem bc issue ("/pull/" <> show issueNumber) (_depth + 1)
+
+fetchBranches :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Node Variable PaginatedBranchesT -> m ()
+fetchBranches owner name (PaginatedBranchesNode (EntityData {..})) = do
+  bc <- ask
+  fetchPaginated'' (branchesForR owner name) _pageInfo (writeTVar _state) $ \case
+    Left err -> do
+      writeTVar _state (Errored (show err))
+      writeTVar _children []
+    Right (branches, newPageInfo) -> do
+      writeTVar _pageInfo newPageInfo
+      writeTVar _state (Fetched branches)
+      (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
+        SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
