@@ -6,6 +6,7 @@
 
 module Sauron.Fetch (
   fetchRepo
+  , fetchRepos
 
   , fetchWorkflows
 
@@ -27,6 +28,7 @@ import Data.String.Interpolate
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub
+import GitHub.Data.Name
 import Network.HTTP.Conduit
 import qualified Network.URI as URI
 import Relude
@@ -46,6 +48,24 @@ fetchRepo owner name repoVar = do
     withGithubApiSemaphore (liftIO $ github auth (repositoryR owner name)) >>= \case
       Left err -> atomically $ writeTVar repoVar (Errored (show err))
       Right x -> atomically $ writeTVar repoVar (Fetched x)
+
+fetchRepos :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name User -> Node Variable PaginatedReposT -> m ()
+fetchRepos userLogin (PaginatedReposNode (EntityData {..})) = do
+  bc <- ask
+  fetchPaginated'' (\fetchCount -> userReposR (N $ untagName userLogin) RepoPublicityAll fetchCount) _pageInfo (writeTVar _state) $ \case
+    Left err -> do
+      writeTVar _state (Errored (show err))
+      writeTVar _children []
+    Right (repos, newPageInfo) -> do
+      writeTVar _pageInfo newPageInfo
+      writeTVar _state (Fetched repos)
+      (writeTVar _children =<<) $ forM (V.toList repos) $ \r -> do
+        let nsName = (simpleOwnerLogin $ repoOwner r, repoName r)
+        entityData@(EntityData {_state=innerState}) <- makeEmptyElem bc nsName "" (_depth + 1)
+        writeTVar innerState (Fetched r)
+        return $ RepoNode entityData
 
 fetchIssues :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m

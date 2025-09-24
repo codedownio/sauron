@@ -8,6 +8,7 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
+import qualified Data.List as L
 import GitHub
 import Lens.Micro
 import Relude hiding (Down, pred)
@@ -38,7 +39,26 @@ withNthChildAndMaybePaginationParent :: (
   ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> Maybe (SomeNode Variable) -> m ()) -> m ()
 withNthChildAndMaybePaginationParent s cb =
   withFixedElemAndParents s $ \fixedEl _variableEl elems ->
-    cb fixedEl (last elems) (viaNonEmpty head [x | x <- toList elems])
+    cb fixedEl (last elems) (viaNonEmpty head [x | x <- toList elems, isJust (getPaginationInfo x)])
+
+withNthChildAndPaginationParent :: (
+  MonadIO m
+  ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> (SomeNode Variable, TVar PageInfo) -> NonEmpty (SomeNode Variable) -> m ()) -> m ()
+withNthChildAndPaginationParent s cb =
+  withFixedElemAndParents s $ \fixedEl variableEl parents -> do
+    case L.dropWhile (not . isPaginationNode) (toList parents) of
+      (el@(getPaginationInfo -> Just pageInfo):rest) -> cb fixedEl variableEl (el, pageInfo) (el :| rest)
+      _ -> return ()
+
+isPaginationNode :: SomeNode Variable -> Bool
+isPaginationNode = isJust . getPaginationInfo
+
+getPaginationInfo :: SomeNode Variable -> Maybe (TVar PageInfo)
+getPaginationInfo (SomeNode (PaginatedIssuesNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo (SomeNode (PaginatedPullsNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo (SomeNode (PaginatedWorkflowsNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo (SomeNode (PaginatedReposNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo _ = Nothing
 
 withNthChild :: MonadIO m => AppState -> (SomeNode Fixed -> SomeNode Variable -> m ()) -> m ()
 withNthChild s cb = withNthChildAndMaybeRepoParent s $ \fixedEl el _ -> cb fixedEl el

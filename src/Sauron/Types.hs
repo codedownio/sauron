@@ -101,7 +101,7 @@ type family NodeStatic a where
   NodeStatic PaginatedIssuesT = ()
   NodeStatic PaginatedPullsT = ()
   NodeStatic PaginatedWorkflowsT = ()
-  NodeStatic PaginatedReposT = ()
+  NodeStatic PaginatedReposT = Name User
   NodeStatic SingleIssueT = Issue
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun

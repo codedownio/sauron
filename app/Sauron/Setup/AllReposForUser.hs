@@ -6,49 +6,25 @@ module Sauron.Setup.AllReposForUser (
 
 import Control.Monad
 import Data.Function
-import Data.String.Interpolate
-import qualified Data.Vector as V
 import GitHub
-import GitHub.Data.Name
 import Relude hiding (Down)
-import Sauron.Actions.Util (withGithubApiSemaphore')
-import Sauron.HealthCheck
 import Sauron.Options
-import Sauron.Setup.Common (newRepoNode)
 import Sauron.Types
-import System.IO.Error (userError)
-import UnliftIO.Exception
 
 
--- | Autodetect repos for user
 allReposForUser :: BaseContext -> PeriodSpec -> Name User -> IO (Node Variable PaginatedReposT)
-allReposForUser baseContext defaultHealthCheckPeriodUs (N userLoginUnwrapped) = do
+allReposForUser baseContext _defaultHealthCheckPeriodUs userLogin = do
   let BaseContext {..} = baseContext
-  -- repos <- github' $ organizationReposR "codedownio" RepoPublicityAll FetchAll
-  -- putStrLn [i|repos: #{second (fmap repoName) repos}|]
-
-  repos <- withGithubApiSemaphore' requestSemaphore (github auth (userReposR (N userLoginUnwrapped) RepoPublicityAll FetchAll)) >>= \case
-    Left err -> throwIO $ userError [i|Failed to fetch repos for '#{userLoginUnwrapped}': #{err}|]
-    Right x -> return x
-
-  repoNodes <- (V.fromList <$>) $ forM (V.toList repos) $ \r -> do
-    let nsName = (simpleOwnerLogin $ repoOwner r, repoName r)
-    repoStateVar <- newTVarIO (Fetched r)
-    healthCheckVar <- newTVarIO NotFetched
-    hcThread <- newHealthCheckThread baseContext nsName repoStateVar healthCheckVar defaultHealthCheckPeriodUs
-    newRepoNode nsName repoStateVar healthCheckVar (Just hcThread) 1 getIdentifier
-
-  -- Create PaginatedReposNode
-  reposStateVar <- newTVarIO (Fetched repos)
+  reposStateVar <- newTVarIO NotFetched
   toggledVar <- newTVarIO False
-  childrenVar <- newTVarIO (V.toList repoNodes)
+  childrenVar <- newTVarIO mempty
   searchVar <- newTVarIO SearchNone
   pageInfoVar <- newTVarIO emptyPageInfo
   healthCheckVar <- newTVarIO NotFetched
   identifier <- getIdentifier
 
   return $ PaginatedReposNode $ EntityData {
-    _static = ()
+    _static = userLogin
     , _state = reposStateVar
     , _urlSuffix = ""
     , _toggled = toggledVar

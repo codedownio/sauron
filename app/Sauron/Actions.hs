@@ -43,6 +43,8 @@ refresh bc item@(PaginatedPullsNode _) (findRepoParent -> Just (RepoNode (Entity
   liftIO $ void $ async $ liftIO $ runReaderT (fetchPulls owner name item) bc
 refresh bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflows owner name item) bc
+refresh bc item@(PaginatedReposNode (EntityData {_static=userLogin})) _parents =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchRepos userLogin item) bc
 refresh bc (SingleIssueNode (EntityData {_static=issue, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name (issueNumber issue) _state) bc
 refresh bc (SinglePullNode (EntityData {_static=pull, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
