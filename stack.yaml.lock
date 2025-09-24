@@ -53,7 +53,7 @@ packages:
     git: https://github.com/thomasjm/vty-crossplatform.git
 snapshots:
 - completed:
-    sha256: e9b93acfb8aaf8ae4869050506553a963a8adba95748cd60356f9ffe64f03345
-    size: 712232
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/5/28.yaml
-  original: nightly-2025-05-28
+    sha256: ff8bf94902277a37e41b5e037ac3cb49add646e70ec613c550af4321370c059c
+    size: 696385
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/9/22.yaml
+  original: nightly-2025-09-22

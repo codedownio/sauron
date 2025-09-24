@@ -80,6 +80,9 @@
                 pcre
                 pkg-config
                 zlib
+
+                pkgs.haskell.compiler.ghc9122
+                (pkgs.haskell-language-server.override { supportedGhcVersions = ["9122"]; })
               ];
             };
           };

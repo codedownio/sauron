@@ -1,17 +1,14 @@
 
-resolver: nightly-2025-05-28
+resolver: nightly-2025-09-22
 
 packages:
 - .
 # - /home/tom/tools/github
 
 nix:
-  pure: false
-  packages:
-  - pcre
-  - zlib
-  path:
-  - "nixpkgs=/home/tom/tools/nixpkgs"
+  enable: false
+
+system-ghc: true
 
 extra-deps:
 - vty-windows-0.2.0.3
