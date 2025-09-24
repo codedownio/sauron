@@ -59,6 +59,8 @@ renderBlock maybePrefix width (B.Para inlines) =
           inlinesToRender = if showHeaderSymbols then inlines else rest
       in withAttr headerAttr $ fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlinesToRender
     _ -> fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
+  where
+    showHeaderSymbols = False
 renderBlock maybePrefix width (B.Plain inlines) = fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
 renderBlock maybePrefix width (B.Header level _ inlines) =
   withAttr (getHeaderAttr level) $ fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
@@ -103,10 +105,6 @@ renderBlock maybePrefix _ b =
     Nothing -> strWrap [i|UNHANDLED BLOCK: #{b}|]
     Just prefix -> hBox [prefix, strWrap [i|UNHANDLED BLOCK: #{b}|]]
 
-
-showHeaderSymbols :: Bool
-showHeaderSymbols = False
-
 getHeaderAttr :: Int -> AttrName
 getHeaderAttr level = case level of
   1 -> boldUnderlineText
@@ -116,17 +114,11 @@ getHeaderAttr level = case level of
   _ -> boldText
 
 renderHighlightedCodeBlock :: Int -> [Text] -> Text -> Widget n
-renderHighlightedCodeBlock _width classes codeContent =
-  case tryRender of
-    Nothing -> withAttr codeBlockText $ strWrap (toString codeContent)
-    Just rendered -> rendered
-
-  where
-    tryRender = do
-      lang <- case classes of
-        [] -> Nothing
-        (x:_) -> Just x
-      syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap
-      case SkyCore.tokenize (SkyCore.TokenizerConfig Sky.defaultSyntaxMap False) syntax codeContent of
-        Left _ -> Nothing
-        Right xs -> Just $ renderRawSource txt xs
+renderHighlightedCodeBlock _width classes codeContent = fromMaybe (withAttr codeBlockText $ txtWrap codeContent) $ do
+  lang <- case classes of
+    [] -> Nothing
+    (x:_) -> Just x
+  syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap
+  case SkyCore.tokenize (SkyCore.TokenizerConfig Sky.defaultSyntaxMap False) syntax codeContent of
+    Left _ -> Nothing
+    Right xs -> Just $ renderRawSource txt xs
