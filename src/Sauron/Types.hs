@@ -29,18 +29,18 @@ import UnliftIO.Async
 
 -- * Main list elem
 
-data MainListElem' f (a :: NodeTyp) where
-  PaginatedIssuesNode :: EntityData f 'PaginatedIssuesT -> MainListElem' f 'PaginatedIssuesT
-  PaginatedPullsNode :: EntityData f 'PaginatedPullsT -> MainListElem' f 'PaginatedPullsT
-  PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> MainListElem' f 'PaginatedWorkflowsT
+data Node f (a :: NodeTyp) where
+  PaginatedIssuesNode :: EntityData f 'PaginatedIssuesT -> Node f 'PaginatedIssuesT
+  PaginatedPullsNode :: EntityData f 'PaginatedPullsT -> Node f 'PaginatedPullsT
+  PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> Node f 'PaginatedWorkflowsT
 
-  SingleIssueNode :: EntityData f 'SingleIssueT -> MainListElem' f 'SingleIssueT
-  SinglePullNode :: EntityData f 'SinglePullT -> MainListElem' f 'SinglePullT
-  SingleWorkflowNode :: EntityData f 'SingleWorkflowT -> MainListElem' f 'SingleWorkflowT
-  SingleJobNode :: EntityData f 'SingleJobT -> MainListElem' f 'SingleJobT
-  JobLogGroupNode :: EntityData f 'JobLogGroupT -> MainListElem' f 'JobLogGroupT
-  HeadingNode :: EntityData f 'HeadingT -> MainListElem' f 'HeadingT
-  RepoNode :: EntityData f 'RepoT -> MainListElem' f 'RepoT
+  SingleIssueNode :: EntityData f 'SingleIssueT -> Node f 'SingleIssueT
+  SinglePullNode :: EntityData f 'SinglePullT -> Node f 'SinglePullT
+  SingleWorkflowNode :: EntityData f 'SingleWorkflowT -> Node f 'SingleWorkflowT
+  SingleJobNode :: EntityData f 'SingleJobT -> Node f 'SingleJobT
+  JobLogGroupNode :: EntityData f 'JobLogGroupT -> Node f 'JobLogGroupT
+  HeadingNode :: EntityData f 'HeadingT -> Node f 'HeadingT
+  RepoNode :: EntityData f 'RepoT -> Node f 'RepoT
 
 data NodeTyp =
   PaginatedIssuesT
@@ -54,9 +54,9 @@ data NodeTyp =
   | HeadingT
   | RepoT
 
-deriving instance Eq (EntityData Fixed a) => Eq (MainListElem' Fixed a)
+deriving instance Eq (EntityData Fixed a) => Eq (Node Fixed a)
 
-instance Show (MainListElem' f a) where
+instance Show (Node f a) where
   show (PaginatedIssuesNode (EntityData {..})) = [i|PaginatedIssuesNode<#{_ident}>|]
   show (PaginatedPullsNode (EntityData {..})) = [i|PaginatedPullsNode<#{_ident}>|]
   show (PaginatedWorkflowsNode (EntityData {..})) = [i|PaginatedWorkflowsNode<#{_ident}>|]
@@ -119,58 +119,58 @@ type family NodeState a where
   NodeState RepoT = Repo
 
 type family NodeChildType f a where
-  NodeChildType f PaginatedIssuesT = MainListElem' f SingleIssueT
-  NodeChildType f PaginatedPullsT = MainListElem' f SinglePullT
-  NodeChildType f PaginatedWorkflowsT = MainListElem' f SingleWorkflowT
+  NodeChildType f PaginatedIssuesT = Node f SingleIssueT
+  NodeChildType f PaginatedPullsT = Node f SinglePullT
+  NodeChildType f PaginatedWorkflowsT = Node f SingleWorkflowT
   NodeChildType f SingleIssueT = ()
   NodeChildType f SinglePullT = ()
-  NodeChildType f SingleWorkflowT = MainListElem' f SingleJobT
-  NodeChildType f SingleJobT = MainListElem' f JobLogGroupT
-  NodeChildType f JobLogGroupT = MainListElem' f JobLogGroupT
-  NodeChildType f HeadingT = SomeMainListElem f
-  NodeChildType f RepoT = SomeMainListElem f
+  NodeChildType f SingleWorkflowT = Node f SingleJobT
+  NodeChildType f SingleJobT = Node f JobLogGroupT
+  NodeChildType f JobLogGroupT = Node f JobLogGroupT
+  NodeChildType f HeadingT = SomeNode f
+  NodeChildType f RepoT = SomeNode f
 
 -- * Existential wrapper
 
-data SomeMainListElem f where
-  SomeMainListElem :: (
-    Show (MainListElem' f a)
-    , Eq (MainListElem' Fixed a)
+data SomeNode f where
+  SomeNode :: (
+    Show (Node f a)
+    , Eq (Node Fixed a)
     , Typeable a
-    ) => { unSomeMainListElem :: MainListElem' f a } -> SomeMainListElem f
+    ) => { unSomeNode :: Node f a } -> SomeNode f
 
-instance Eq (SomeMainListElem Fixed) where
-  (SomeMainListElem (x :: a)) == (SomeMainListElem y) = case cast y of
+instance Eq (SomeNode Fixed) where
+  (SomeNode (x :: a)) == (SomeNode y) = case cast y of
     Just (y' :: a) -> x == y'
     _ -> False
 
-deriving instance Show (SomeMainListElem Fixed)
-deriving instance Show (SomeMainListElem Variable)
+deriving instance Show (SomeNode Fixed)
+deriving instance Show (SomeNode Variable)
 
 -- * Packing and unpacking
 
-getExistentialChildren :: MainListElem' Variable a -> IO [NodeChildType Variable a]
+getExistentialChildren :: Node Variable a -> IO [NodeChildType Variable a]
 getExistentialChildren node = readTVarIO (_children (getEntityData node))
 
-getExistentialChildrenWrapped :: MainListElem' Variable a -> STM [SomeMainListElem Variable]
+getExistentialChildrenWrapped :: Node Variable a -> STM [SomeNode Variable]
 getExistentialChildrenWrapped node = case node of
-  -- These types have SomeMainListElem children
+  -- These types have SomeNode children
   HeadingNode ed -> readTVar (_children ed)
   RepoNode ed -> readTVar (_children ed)
 
   -- These types have specific GADT constructor children, so wrap them
-  PaginatedIssuesNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
-  PaginatedPullsNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
-  PaginatedWorkflowsNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
-  SingleWorkflowNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
-  SingleJobNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
-  JobLogGroupNode ed -> fmap (fmap SomeMainListElem) (readTVar (_children ed))
+  PaginatedIssuesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedPullsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedWorkflowsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  SingleWorkflowNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  SingleJobNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  JobLogGroupNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
 
   -- These are leaf nodes with no meaningful children
   SingleIssueNode _ -> return []
   SinglePullNode _ -> return []
 
-getEntityData :: MainListElem' f a -> EntityData f a
+getEntityData :: Node f a -> EntityData f a
 getEntityData (PaginatedIssuesNode ed) = ed
 getEntityData (PaginatedPullsNode ed) = ed
 getEntityData (PaginatedWorkflowsNode ed) = ed
@@ -182,7 +182,7 @@ getEntityData (JobLogGroupNode ed) = ed
 getEntityData (HeadingNode ed) = ed
 getEntityData (RepoNode ed) = ed
 
-setEntityData :: EntityData f' a -> MainListElem' f a -> MainListElem' f' a
+setEntityData :: EntityData f' a -> Node f a -> Node f' a
 setEntityData ed (PaginatedIssuesNode _) = PaginatedIssuesNode ed
 setEntityData ed (PaginatedPullsNode _) = PaginatedPullsNode ed
 setEntityData ed (PaginatedWorkflowsNode _) = PaginatedWorkflowsNode ed
@@ -279,14 +279,14 @@ emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 -- * Overall app state
 
 data AppEvent =
-  ListUpdate (V.Vector (SomeMainListElem Fixed))
+  ListUpdate (V.Vector (SomeNode Fixed))
   | AnimationTick
 
 data AppState = AppState {
   _appUser :: User
   , _appBaseContext :: BaseContext
-  , _appMainListVariable :: V.Vector (SomeMainListElem Variable)
-  , _appMainList :: L.List ClickableName (SomeMainListElem Fixed)
+  , _appMainListVariable :: V.Vector (SomeNode Variable)
+  , _appMainList :: L.List ClickableName (SomeNode Fixed)
   , _appSortBy :: SortBy
   , _appNow :: UTCTime
 

@@ -32,7 +32,7 @@ appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
-    withFixedElemAndParents s $ \_fixedEl (SomeMainListElem el@(getEntityData -> (EntityData {..}))) parents -> do
+    withFixedElemAndParents s $ \_fixedEl (SomeNode el@(getEntityData -> (EntityData {..}))) parents -> do
       atomically $ do
         writeTVar _search $ SearchText (formState form)
         writeTVar _pageInfo $ PageInfo 1 Nothing Nothing Nothing Nothing
@@ -76,14 +76,14 @@ appEvent s (VtyEvent e) = case e of
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
-    withFixedElemAndParents s $ \_fixedEl (SomeMainListElem el) parents ->
+    withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents ->
       refresh (s ^. appBaseContext) el parents
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 
   V.EvKey c [] | c == openSelectedKey ->
     withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case (fixedEl, repoEl) of
-      (SomeMainListElem el, RepoNode (EntityData {_state})) -> readTVarIO _state >>= \case
+      (SomeNode el, RepoNode (EntityData {_state})) -> readTVarIO _state >>= \case
         Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (getNodeUrl (toString url) el)
         _ -> return ()
 
@@ -95,7 +95,7 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == editSearchKey -> do
     withNthChildAndMaybePaginationParent s $ \_fixedEl _el paginationElem -> case paginationElem of
-      Just (SomeMainListElem (getEntityData -> (EntityData {_ident, _search}))) -> do
+      Just (SomeNode (getEntityData -> (EntityData {_ident, _search}))) -> do
         search' <- readTVarIO _search
         modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
       _ -> return ()
@@ -119,18 +119,18 @@ appEvent _s (MouseDown (ListRow n) V.BLeft _ _) = do
 appEvent _ _ = return ()
 
 handleLeftArrow :: AppState -> EventM ClickableName AppState ()
-handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeMainListElem mle) parents -> do
+handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
   liftIO (atomically $ readTVar (_toggled (getEntityData mle))) >>= \case
     True -> liftIO $ atomically $ writeTVar (_toggled (getEntityData mle)) False
     False -> case Relude.reverse (toList parents) of
-      _:(SomeMainListElem parent):_ -> do
+      _:(SomeNode parent):_ -> do
         expandedList <- gets (^. appMainList)
-        forM_ (Vec.findIndex (\(SomeMainListElem el) -> (_ident (getEntityData parent) == _ident (getEntityData el))) (listElements expandedList)) $
+        forM_ (Vec.findIndex (\(SomeNode el) -> (_ident (getEntityData parent) == _ident (getEntityData el))) (listElements expandedList)) $
           \index -> modify (appMainList %~ listMoveTo index)
       _ -> return ()
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
-modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeMainListElem item@(getEntityData -> mle)) parents -> do
+modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeNode item@(getEntityData -> mle)) parents -> do
   isOpen <- liftIO $ atomically $ do
     modifyTVar' (_toggled mle) cb
     readTVar (_toggled mle)
@@ -138,11 +138,11 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeMainListElem item
     unlessM (hasStartedInitialFetch fixedEl) $
       refresh (s ^. appBaseContext) item parents
   where
-    hasStartedInitialFetch :: (MonadIO m) => SomeMainListElem Fixed -> m Bool
-    hasStartedInitialFetch (SomeMainListElem (RepoNode (EntityData {_children}))) = do
+    hasStartedInitialFetch :: (MonadIO m) => SomeNode Fixed -> m Bool
+    hasStartedInitialFetch (SomeNode (RepoNode (EntityData {_children}))) = do
       and <$> mapM hasStartedInitialFetch _children
-    hasStartedInitialFetch (SomeMainListElem (HeadingNode {})) = return True
-    hasStartedInitialFetch (SomeMainListElem (getEntityData -> (EntityData {..}))) = return (isFetchingOrFetched _state)
+    hasStartedInitialFetch (SomeNode (HeadingNode {})) = return True
+    hasStartedInitialFetch (SomeNode (getEntityData -> (EntityData {..}))) = return (isFetchingOrFetched _state)
 
     isFetchingOrFetched :: Fetchable a -> Bool
     isFetchingOrFetched (Fetched {}) = True
@@ -150,7 +150,7 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeMainListElem item
     isFetchingOrFetched _ = False
 
 
-getNodeUrl :: String -> MainListElem' Fixed a -> String
+getNodeUrl :: String -> Node Fixed a -> String
 getNodeUrl repoBaseUrl (PaginatedIssuesNode _) = repoBaseUrl <> "/issues"
 getNodeUrl repoBaseUrl (PaginatedPullsNode _) = repoBaseUrl <> "/pulls"
 getNodeUrl repoBaseUrl (PaginatedWorkflowsNode _) = repoBaseUrl <> "/actions"

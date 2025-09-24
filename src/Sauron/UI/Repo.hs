@@ -48,9 +48,9 @@ statsBox :: Repo -> Widget n
 statsBox (Repo {..}) = if L.null cells then str " " else hBox cells
   where
     cells = catMaybes [
-      guarding (repoSubscribersCount > 0) $ padLeft (Pad 1) (
+      guardJust repoSubscribersCount $ \subscribersCount -> guarding (subscribersCount > 0) $ padLeft (Pad 1) (
           padRight (Pad 1) (withAttr iconAttr (str "◊"))
-          <+> str (show repoSubscribersCount)
+          <+> str (show subscribersCount)
           )
 
       , guarding (repoForksCount > 0) $ padLeft (Pad 1) (

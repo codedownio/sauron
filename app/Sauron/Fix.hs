@@ -5,46 +5,45 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Sauron.Fix (fixMainListElem) where
+module Sauron.Fix (fixSomeNode) where
 
 import Relude
 import Sauron.Types
 
 
-fixMainListElem :: SomeMainListElem Variable -> STM (SomeMainListElem Fixed)
-fixMainListElem (SomeMainListElem item) = SomeMainListElem <$> fixMainListElem' item
+fixSomeNode :: SomeNode Variable -> STM (SomeNode Fixed)
+fixSomeNode (SomeNode item) = SomeNode <$> fixNode item
 
-fixMainListElem' :: MainListElem' Variable a -> STM (MainListElem' Fixed a)
-fixMainListElem' item@(PaginatedIssuesNode ed) = fixTypedNode item ed
-fixMainListElem' item@(PaginatedPullsNode ed) = fixTypedNode item ed
-fixMainListElem' item@(PaginatedWorkflowsNode ed) = fixTypedNode item ed
-fixMainListElem' item@(SingleIssueNode ed) = fixChildlessNode item ed
-fixMainListElem' item@(SinglePullNode ed) = fixChildlessNode item ed
-fixMainListElem' item@(SingleWorkflowNode ed) = fixTypedNode item ed
-fixMainListElem' item@(SingleJobNode ed) = fixTypedNode item ed
-fixMainListElem' item@(JobLogGroupNode ed) = fixTypedNode item ed
-fixMainListElem' item@(HeadingNode ed) = fixWrappedNode item ed
-fixMainListElem' item@(RepoNode ed) = fixWrappedNode item ed
+fixNode :: Node Variable a -> STM (Node Fixed a)
+fixNode item@(PaginatedIssuesNode ed) = fixTypedNode item ed
+fixNode item@(PaginatedPullsNode ed) = fixTypedNode item ed
+fixNode item@(PaginatedWorkflowsNode ed) = fixTypedNode item ed
+fixNode item@(SingleIssueNode ed) = fixChildlessNode item ed
+fixNode item@(SinglePullNode ed) = fixChildlessNode item ed
+fixNode item@(SingleWorkflowNode ed) = fixTypedNode item ed
+fixNode item@(SingleJobNode ed) = fixTypedNode item ed
+fixNode item@(JobLogGroupNode ed) = fixTypedNode item ed
+fixNode item@(HeadingNode ed) = fixWrappedNode item ed
+fixNode item@(RepoNode ed) = fixWrappedNode item ed
 
 fixTypedNode :: (
-  NodeChildType Variable a1 ~ MainListElem' Variable a2
-  , NodeChildType Fixed a1 ~ MainListElem' Fixed a2
-  ) => MainListElem' f a1 -> EntityData Variable a1 -> STM (MainListElem' Fixed a1)
-fixTypedNode item ed = (`setEntityData` item) <$> (readTVar (_children ed) >>= mapM fixMainListElem' >>= flip fixEntityData ed)
+  NodeChildType Variable a1 ~ Node Variable a2
+  , NodeChildType Fixed a1 ~ Node Fixed a2
+  ) => Node f a1 -> EntityData Variable a1 -> STM (Node Fixed a1)
+fixTypedNode item ed = (`setEntityData` item) <$> (readTVar (_children ed) >>= mapM fixNode >>= flip fixEntityData ed)
 
 fixChildlessNode :: (
   NodeChildType Variable a ~ (), NodeChildType Fixed a ~ ()
-  ) => MainListElem' f a -> EntityData Variable a -> STM (MainListElem' Fixed a)
+  ) => Node f a -> EntityData Variable a -> STM (Node Fixed a)
 fixChildlessNode item ed = (`setEntityData` item) <$> (fixEntityData [] ed)
 
 fixWrappedNode :: (
-  NodeChildType Variable a ~ SomeMainListElem Variable
-  , NodeChildType Fixed a ~ SomeMainListElem Fixed
-  ) => MainListElem' f a -> EntityData Variable a -> STM (MainListElem' Fixed a)
-fixWrappedNode item ed = (`setEntityData` item) <$> (readTVar (_children ed) >>= mapM fixMainListElem >>= flip fixEntityData ed)
+  NodeChildType Variable a ~ SomeNode Variable
+  , NodeChildType Fixed a ~ SomeNode Fixed
+  ) => Node f a -> EntityData Variable a -> STM (Node Fixed a)
+fixWrappedNode item ed = (`setEntityData` item) <$> (readTVar (_children ed) >>= mapM fixSomeNode >>= flip fixEntityData ed)
 
 fixEntityData :: [NodeChildType Fixed a] -> EntityData Variable a -> STM (EntityData Fixed a)
 fixEntityData childrenFixed (EntityData {..}) = do

@@ -82,7 +82,7 @@ isContainedInGitRepo = runMaybeT $ do
 
 
 -- | Autodetect repos for user
-reposFromCurrentDirectory :: BaseContext -> PeriodSpec -> (Name Owner, Name Repo) -> IO (V.Vector (MainListElem' Variable RepoT))
+reposFromCurrentDirectory :: BaseContext -> PeriodSpec -> (Name Owner, Name Repo) -> IO (V.Vector (Node Variable RepoT))
 reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
   repoVar <- newTVarIO NotFetched
   healthCheckVar <- newTVarIO NotFetched
@@ -92,7 +92,7 @@ reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
 
   atomically $ writeTVar _toggled True
 
-  refresh baseContext node ((SomeMainListElem node) :| [])
+  refresh baseContext node ((SomeNode node) :| [])
 
   return $ V.fromList [node]
 

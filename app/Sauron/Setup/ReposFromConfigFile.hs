@@ -22,7 +22,7 @@ import UnliftIO.Exception
 
 
 -- | Autodetect repos for user
-reposFromConfigFile :: BaseContext -> PeriodSpec -> FilePath -> IO (V.Vector (SomeMainListElem Variable))
+reposFromConfigFile :: BaseContext -> PeriodSpec -> FilePath -> IO (V.Vector (SomeNode Variable))
 reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
   Yaml.decodeFileEither configFile >>= \case
     Left err -> throwIO $ userError [i|Failed to decode config file '#{configFile}': #{err}|]
@@ -57,9 +57,9 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           newRepoNode nsName repoVar healthCheckVar hcThread repoDepth (getIdentifier baseContext)
 
         case maybeHeadingNode of
-          Nothing -> tell (fmap SomeMainListElem repoNodes)
+          Nothing -> tell (fmap SomeNode repoNodes)
           Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l) -> do
-            childrenVar <- newTVarIO (fmap SomeMainListElem repoNodes)
+            childrenVar <- newTVarIO (fmap SomeNode repoNodes)
             headingHealthCheckVar <- newTVarIO NotFetched
             let headingNode = HeadingNode $ EntityData {
                   _static = l
@@ -74,4 +74,4 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
                   , _depth = 0
                   , _ident = identifier
                   }
-            tell [SomeMainListElem headingNode]
+            tell [SomeNode headingNode]

@@ -49,7 +49,7 @@ fetchRepo owner name repoVar = do
 
 fetchIssues :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> MainListElem' Variable PaginatedIssuesT -> m ()
+  ) => Name Owner -> Name Repo -> Node Variable PaginatedIssuesT -> m ()
 fetchIssues owner name (PaginatedIssuesNode (EntityData {..})) = do
   extraTerms <- readTVarIO _search >>= \case
     SearchNone -> pure []
@@ -70,7 +70,7 @@ fetchIssues owner name (PaginatedIssuesNode (EntityData {..})) = do
 
 fetchPulls :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> MainListElem' Variable PaginatedPullsT -> m ()
+  ) => Name Owner -> Name Repo -> Node Variable PaginatedPullsT -> m ()
 fetchPulls owner name (PaginatedPullsNode (EntityData {..})) = do
   extraTerms <- readTVarIO _search >>= \case
     SearchNone -> pure []
@@ -104,7 +104,7 @@ fetchIssue owner name issueNumber issueVar = do
 
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> MainListElem' Variable PaginatedWorkflowsT -> m ()
+  ) => Name Owner -> Name Repo -> Node Variable PaginatedWorkflowsT -> m ()
 fetchWorkflows owner name (PaginatedWorkflowsNode (EntityData {..})) = do
   bc <- ask
   fetchPaginated'' (workflowRunsR owner name mempty) _pageInfo (writeTVar _state) $ \case
@@ -144,7 +144,7 @@ fetchPullComments owner name issueNumber inner = do
 
 fetchWorkflowJobs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Id WorkflowRun -> MainListElem' Variable SingleWorkflowT -> m ()
+  ) => Name Owner -> Name Repo -> Id WorkflowRun -> Node Variable SingleWorkflowT -> m ()
 fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})) = do
   bc@(BaseContext {auth, manager}) <- ask
   bracketOnError_ (atomically $ writeTVar _state Fetching)
@@ -175,7 +175,7 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
 
 fetchJobLogs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Job -> MainListElem' Variable SingleJobT -> m ()
+  ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
 fetchJobLogs owner name (Job {jobId}) (SingleJobNode (EntityData {..})) = do
   BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ writeTVar _state Fetching)
@@ -228,7 +228,7 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
     , _ident = ident'
 }
 
-createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (MainListElem' Variable 'JobLogGroupT)
+createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
   stateVar <- newTVar (Fetched ())
   ident' <- getIdentifierSTM bc

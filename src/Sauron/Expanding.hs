@@ -13,11 +13,11 @@ import Relude
 import Sauron.Types
 
 
-getExpandedList :: V.Vector (SomeMainListElem Fixed) -> V.Vector (SomeMainListElem Fixed)
+getExpandedList :: V.Vector (SomeNode Fixed) -> V.Vector (SomeNode Fixed)
 getExpandedList = V.fromList . concatMap expandNodes . V.toList
   where
-    expandNodes :: (SomeMainListElem Fixed) -> [(SomeMainListElem Fixed)]
-    expandNodes x@(SomeMainListElem item) = execWriter $ do
+    expandNodes :: (SomeNode Fixed) -> [(SomeNode Fixed)]
+    expandNodes x@(SomeNode item) = execWriter $ do
       tell [x]
       when (_toggled (getEntityData item)) $
         case item of
@@ -33,11 +33,11 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
           RepoNode (EntityData {..}) -> forM_ _children $ \y -> tell (expandNodes y)
 
     expandTyped :: (
-      Foldable t, MonadWriter [SomeMainListElem Fixed] m, Eq (MainListElem' Fixed a), Typeable a
-      ) => t (MainListElem' Fixed a) -> m ()
-    expandTyped xs = forM_ xs $ \y -> tell (expandNodes (SomeMainListElem y))
+      Foldable t, MonadWriter [SomeNode Fixed] m, Eq (Node Fixed a), Typeable a
+      ) => t (Node Fixed a) -> m ()
+    expandTyped xs = forM_ xs $ \y -> tell (expandNodes (SomeNode y))
 
-    expandWrapped :: (Foldable t, MonadWriter [SomeMainListElem Fixed] m) => t (SomeMainListElem Fixed) -> m ()
+    expandWrapped :: (Foldable t, MonadWriter [SomeNode Fixed] m) => t (SomeNode Fixed) -> m ()
     expandWrapped xs = forM_ xs $ \y -> tell (expandNodes y)
 
     expandChildless :: Monad m => [()] -> m ()
@@ -45,20 +45,20 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
 
 -- * Computing nth child in the presence of expanding
 
-nthChildVector :: Int -> V.Vector (SomeMainListElem Variable) -> STM (Maybe (NonEmpty (SomeMainListElem Variable)))
+nthChildVector :: Int -> V.Vector (SomeNode Variable) -> STM (Maybe (NonEmpty (SomeNode Variable)))
 nthChildVector n elems = nthChildList n (V.toList elems) >>= \case
   Left _ -> pure Nothing
   Right x -> pure (Just x)
 
-nthChildList :: Int -> [SomeMainListElem Variable] -> STM (Either Int (NonEmpty (SomeMainListElem Variable)))
+nthChildList :: Int -> [SomeNode Variable] -> STM (Either Int (NonEmpty (SomeNode Variable)))
 nthChildList n (x:xs) = nthChild n x >>= \case
   Right els -> pure $ Right els
   Left n' -> nthChildList n' xs
 nthChildList n [] = pure $ Left n
 
-nthChild :: Int -> SomeMainListElem Variable -> STM (Either Int (NonEmpty (SomeMainListElem Variable)))
+nthChild :: Int -> SomeNode Variable -> STM (Either Int (NonEmpty (SomeNode Variable)))
 nthChild 0 el = pure $ Right (el :| [])
-nthChild n el@(SomeMainListElem item@(getEntityData -> (EntityData {..}))) = readTVar _toggled >>= \case
+nthChild n el@(SomeNode item@(getEntityData -> (EntityData {..}))) = readTVar _toggled >>= \case
   True -> do
     wrappedChildren <- getExistentialChildrenWrapped item
     (fmap ((el :|) . toList)) <$> (nthChildList (n - 1) wrappedChildren)

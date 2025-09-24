@@ -21,7 +21,7 @@ newRepoNode ::
   -> Maybe (Async ())
   -> Int
   -> IO Int
-  -> m (MainListElem' Variable 'RepoT)
+  -> m (Node Variable 'RepoT)
 newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   toggledVar <- newTVarIO False
 
@@ -44,7 +44,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _healthCheckThread = Nothing
         , _depth = repoDepth + 1
         , _ident = issuesIdentifier
-        } :: MainListElem' Variable PaginatedIssuesT
+        } :: Node Variable PaginatedIssuesT
 
   pullsVar <- newTVarIO NotFetched
   pullsToggledVar <- newTVarIO False
@@ -65,7 +65,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _healthCheckThread = Nothing
         , _depth = repoDepth + 1
         , _ident = pullsIdentifier
-        } :: MainListElem' Variable PaginatedPullsT
+        } :: Node Variable PaginatedPullsT
 
   workflowsVar <- newTVarIO NotFetched
   workflowsToggledVar <- newTVarIO False
@@ -86,10 +86,10 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _healthCheckThread = Nothing
         , _depth = repoDepth + 1
         , _ident = workflowsIdentifier
-        } :: MainListElem' Variable PaginatedWorkflowsT
+        } :: Node Variable PaginatedWorkflowsT
 
   repoIdentifier <- liftIO getIdentifier
-  childrenVar <- newTVarIO [SomeMainListElem issuesChild, SomeMainListElem pullsChild, SomeMainListElem workflowsChild]
+  childrenVar <- newTVarIO [SomeNode issuesChild, SomeNode pullsChild, SomeNode workflowsChild]
   searchVar <- newTVarIO SearchNone
   pageInfoVar <- newTVarIO emptyPageInfo
   return $ RepoNode $ EntityData {

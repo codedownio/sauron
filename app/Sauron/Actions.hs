@@ -29,14 +29,14 @@ import UnliftIO.Async
 withScroll :: AppState -> (forall s. ViewportScroll ClickableName -> EventM n s ()) -> EventM n AppState ()
 withScroll s action = do
   case listSelectedElement (s ^. appMainList) of
-    Just (_, _el@(SomeMainListElem (getEntityData -> EntityData {..}))) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident}|])
+    Just (_, _el@(SomeNode (getEntityData -> EntityData {..}))) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident}|])
     _ -> return ()
 
-refresh :: (MonadIO m) => BaseContext -> MainListElem' Variable a -> NonEmpty (SomeMainListElem Variable) -> m ()
+refresh :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
 refresh bc item@(HeadingNode (EntityData {_children})) _parents =
-  readTVarIO _children >>= mapM_ (\(SomeMainListElem child) -> refresh bc child ((SomeMainListElem item) :| toList _parents))
+  readTVarIO _children >>= mapM_ (\(SomeNode child) -> refresh bc child ((SomeNode item) :| toList _parents))
 refresh bc item@(RepoNode _) _parents =
-  liftIO $ atomically (getExistentialChildrenWrapped item) >>= mapM_ (\(SomeMainListElem childItem) -> refresh bc childItem ((SomeMainListElem item) :| toList _parents))
+  liftIO $ atomically (getExistentialChildrenWrapped item) >>= mapM_ (\(SomeNode childItem) -> refresh bc childItem ((SomeNode item) :| toList _parents))
 refresh bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
 refresh bc item@(PaginatedPullsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
@@ -55,7 +55,7 @@ refresh _ _ _ = return ()
 
 refreshAll :: (
   MonadReader BaseContext m, MonadIO m
-  ) => V.Vector (SomeMainListElem Variable) -> m ()
+  ) => V.Vector (SomeNode Variable) -> m ()
 refreshAll elems = do
   baseContext <- ask
   allRepos <- liftIO $ collectAllRepos (V.toList elems)
@@ -67,14 +67,14 @@ refreshAll elems = do
         -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
 
   where
-    collectAllRepos :: [SomeMainListElem Variable] -> IO [MainListElem' Variable RepoT]
+    collectAllRepos :: [SomeNode Variable] -> IO [Node Variable RepoT]
     collectAllRepos = fmap concat . mapM collectFromNode
       where
-        collectFromNode :: SomeMainListElem Variable -> IO [MainListElem' Variable RepoT]
-        collectFromNode (SomeMainListElem item@(RepoNode {})) = return [item]
-        collectFromNode (SomeMainListElem item@(HeadingNode {})) = do
+        collectFromNode :: SomeNode Variable -> IO [Node Variable RepoT]
+        collectFromNode (SomeNode item@(RepoNode {})) = return [item]
+        collectFromNode (SomeNode item@(HeadingNode {})) = do
           children <- getExistentialChildren item
           collectAllRepos children
-        collectFromNode (SomeMainListElem _item) =
+        collectFromNode (SomeNode _item) =
           -- Other node types don't contain repos as children
           pure []

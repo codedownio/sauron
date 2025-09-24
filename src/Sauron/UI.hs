@@ -43,24 +43,24 @@ drawUI app = [vBox [
                  ]
              ]
 
-listDrawElement :: AppState -> Int -> Bool -> SomeMainListElem Fixed -> Widget ClickableName
+listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget ClickableName
 
 -- * Repos
 
-listDrawElement appState ix isSelected (SomeMainListElem (RepoNode x@(EntityData {_static=(owner, name), ..}))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeNode (RepoNode x@(EntityData {_static=(owner, name), ..}))) = wrapper ix isSelected x [
   Just $ renderRepoLine _toggled (owner, name) _state _healthCheck (_appAnimationCounter appState)
   ]
 
 -- * Issues
 
-listDrawElement appState ix isSelected (SomeMainListElem (PaginatedIssuesNode x@(EntityData {_state}))) = wrapper ix isSelected x [
+listDrawElement appState ix isSelected (SomeNode (PaginatedIssuesNode x@(EntityData {_state}))) = wrapper ix isSelected x [
   Just $ case _state of
     Fetched (SearchResult totalCount _xs) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount})|])
     Fetching -> paginatedHeading x appState "Issues" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading x appState "Issues" (str [i|(not fetched)|])
     Errored err -> paginatedHeading x appState "Issues" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeMainListElem (SingleIssueNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
+listDrawElement appState ix isSelected (SomeNode (SingleIssueNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
   Just $ issueLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
@@ -73,14 +73,14 @@ listDrawElement appState ix isSelected (SomeMainListElem (SingleIssueNode ed@(En
 
 -- * Pulls
 
-listDrawElement appState ix isSelected (SomeMainListElem (PaginatedPullsNode ed@(EntityData {_state}))) = wrapper ix isSelected ed [
+listDrawElement appState ix isSelected (SomeNode (PaginatedPullsNode ed@(EntityData {_state}))) = wrapper ix isSelected ed [
   Just $ case _state of
     Fetched (SearchResult totalCount _xs) -> paginatedHeading ed appState "Pulls" (str [i|(#{totalCount})|])
     Fetching -> paginatedHeading ed appState "Pulls" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Pulls" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Pulls" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeMainListElem (SinglePullNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
+listDrawElement appState ix isSelected (SomeNode (SinglePullNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
   Just $ pullLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
@@ -93,14 +93,14 @@ listDrawElement appState ix isSelected (SomeMainListElem (SinglePullNode ed@(Ent
 
 -- * Workflows
 
-listDrawElement appState ix isSelected (SomeMainListElem (PaginatedWorkflowsNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+listDrawElement appState ix isSelected (SomeNode (PaginatedWorkflowsNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
     Fetched (WithTotalCount _xs totalCount) -> paginatedHeading ed appState "Actions" (str [i|(#{totalCount})|])
     Fetching -> paginatedHeading ed appState "Actions" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Actions" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Actions" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeMainListElem (SingleWorkflowNode ed@(EntityData {_static=wf, ..}))) = wrapper ix isSelected ed [
+listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityData {_static=wf, ..}))) = wrapper ix isSelected ed [
   Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state
   , do
       guard _toggled
@@ -112,7 +112,7 @@ listDrawElement appState ix isSelected (SomeMainListElem (SingleWorkflowNode ed@
 
 -- * Jobs
 
-listDrawElement appState ix isSelected (SomeMainListElem (SingleJobNode ed@(EntityData {_static=job, ..}))) = wrapper ix isSelected ed [
+listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {_static=job, ..}))) = wrapper ix isSelected ed [
   Just $ jobLine (_appAnimationCounter appState) _toggled job _state
   , do
       guard _toggled
@@ -127,13 +127,13 @@ listDrawElement appState ix isSelected (SomeMainListElem (SingleJobNode ed@(Enti
 
 -- * Job Log Groups
 
-listDrawElement _appState ix isSelected (SomeMainListElem (JobLogGroupNode ed@(EntityData {_static=jobLogGroup, ..}))) = wrapper ix isSelected ed [
+listDrawElement _appState ix isSelected (SomeNode (JobLogGroupNode ed@(EntityData {_static=jobLogGroup, ..}))) = wrapper ix isSelected ed [
   Just $ jobLogGroupLine _toggled jobLogGroup
   ]
 
 -- * Headings
 
-listDrawElement _appState ix isSelected (SomeMainListElem (HeadingNode ed@(EntityData {_static=label, ..}))) = wrapper ix isSelected ed [
+listDrawElement _appState ix isSelected (SomeNode (HeadingNode ed@(EntityData {_static=label, ..}))) = wrapper ix isSelected ed [
   Just $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
     , Just (hBox [str (toString label)])

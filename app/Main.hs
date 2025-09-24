@@ -65,16 +65,16 @@ main = do
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
 
-  listElems :: V.Vector (SomeMainListElem Variable) <- case cliConfigFile of
+  listElems :: V.Vector (SomeNode Variable) <- case cliConfigFile of
     Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
     Nothing -> isContainedInGitRepo >>= \case
-      Just (namespace, name) -> (fmap SomeMainListElem) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
-      Nothing -> (fmap SomeMainListElem) <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+      Just (namespace, name) -> (fmap SomeNode) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
+      Nothing -> (fmap SomeNode) <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   -- Kick off initial fetches
   runReaderT (refreshAll listElems) baseContext
 
-  listElemsFixed :: V.Vector (SomeMainListElem Fixed) <- atomically $ mapM fixMainListElem listElems
+  listElemsFixed :: V.Vector (SomeNode Fixed) <- atomically $ mapM fixSomeNode listElems
 
   now <- getCurrentTime
 
@@ -107,7 +107,7 @@ main = do
       handleAny (\e -> putStrLn [i|Got exception in event async: #{e}|] >> threadDelay refreshPeriod) $ do
         newFixed <- atomically $ do
           currentFixed <- readTVar listElemsVar
-          newFixed <- mapM fixMainListElem listElems
+          newFixed <- mapM fixSomeNode listElems
           when (newFixed == currentFixed) retry
 
           writeTVar listElemsVar newFixed
