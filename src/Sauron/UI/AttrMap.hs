@@ -62,7 +62,7 @@ mainAttrMap = attrMap V.defAttr ([
   , (disabledHotkeyAttr, fg midGray)
   , (hotkeyMessageAttr, fg brightWhite)
   , (disabledHotkeyMessageAttr, fg brightGray)
-  
+
   -- Spinner
   , (circleSpinnerAttr, fg brightGray)
 
@@ -72,7 +72,7 @@ mainAttrMap = attrMap V.defAttr ([
   , (hashNumberAttr, fg solarizedViolet)
   , (usernameAttr, fg solarizedBlue)
 
-  -- Text
+  -- Markdown
   , (italicText, style V.italic)
   , (underlineText, style V.underline)
   , (boldText, style V.bold)

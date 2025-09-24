@@ -4,7 +4,7 @@ module Sauron.UI.Markdown (
   ) where
 
 import Brick
-import Brick.Widgets.Skylighting (highlight)
+import Brick.Widgets.Skylighting (renderRawSource)
 import Commonmark hiding (str)
 import Commonmark.Extensions
 import Commonmark.Pandoc
@@ -21,22 +21,22 @@ import qualified Text.Pandoc.Builder as B
 
 
 markdownToWidgetsWithWidth :: Int -> Text -> Widget n
-markdownToWidgetsWithWidth width t =
+markdownToWidgetsWithWidth width (T.replace "\r\n" "\n" -> t) = -- TODO: do this T.replace on the initial fetch for perf
   case parseCommonmarkWith (defaultSyntaxSpec <> gfmExtensions) (tokenize "source" t) :: Maybe (Either ParseError (Cm () B.Blocks)) of
     Nothing -> strWrap [i|Parse error.|]
     Just (Left err) -> strWrap [i|Parse error: '#{err}'.|]
-    Just (Right (Cm (B.Many bs))) ->
-      let (renderedBlocks, footnoteBlocks) = runWriter $ traverse (renderBlockM Nothing width) (toList bs)
-          contentWidgets = case renderedBlocks of
-                            (x:xs) -> x : fmap (padTop (Pad 1)) xs
-                            x -> x
-          footnoteWidget = if null footnoteBlocks
-                          then emptyWidget
-                          else vBox [
-                            padTop (Pad 1) $ withAttr horizontalRuleAttr $ str (replicate width '─'),
-                            padTop (Pad 1) $ vBox $ zipWith (renderFootnoteRef width) [1..] footnoteBlocks
-                          ]
-      in vBox $ contentWidgets ++ [footnoteWidget]
+    Just (Right (Cm (B.Many bs))) -> vBox $ contentWidgets ++ [footnoteWidget]
+      where
+        (renderedBlocks, footnoteBlocks) = runWriter $ traverse (renderBlockM Nothing width) (toList bs)
+        contentWidgets = case renderedBlocks of
+                           (x:xs) -> x : fmap (padTop (Pad 1)) xs
+                           x -> x
+        footnoteWidget = if null footnoteBlocks
+                         then emptyWidget
+                         else vBox [
+                           padTop (Pad 1) $ withAttr horizontalRuleAttr $ str (replicate width '─'),
+                           padTop (Pad 1) $ vBox $ zipWith (renderFootnoteRef width) [1..] footnoteBlocks
+                         ]
 
 renderBlockM :: Maybe (Widget n) -> Int -> B.Block -> FootnoteM (Widget n)
 renderBlockM maybePrefix width block = case block of
@@ -62,13 +62,8 @@ renderBlock maybePrefix width (B.Para inlines) =
 renderBlock maybePrefix width (B.Plain inlines) = fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
 renderBlock maybePrefix width (B.Header level _ inlines) =
   withAttr (getHeaderAttr level) $ fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
-renderBlock maybePrefix width (B.CodeBlock (_, classes, _) codeContent) =
-  case maybePrefix of
-    Nothing -> renderHighlightedCodeBlock width classes codeContent
-    Just prefix ->
-      let codeLines = T.lines codeContent
-          renderLine line = hBox [prefix, withAttr codeBlockText $ txt line]
-      in vBox $ map renderLine codeLines
+renderBlock _maybePrefix width (B.CodeBlock (_, classes, _) codeContent) =
+  renderHighlightedCodeBlock width classes codeContent
 renderBlock maybePrefix width (B.OrderedList _ items) =
   vBox $ zipWith (\n blocks -> go n blocks) [1..] items
   where
@@ -120,23 +115,18 @@ getHeaderAttr level = case level of
   4 -> italicText
   _ -> boldText
 
-
--- Render code block with syntax highlighting
 renderHighlightedCodeBlock :: Int -> [Text] -> Text -> Widget n
 renderHighlightedCodeBlock _width classes codeContent =
-  case getLanguage classes of
-    Nothing -> withAttr codeBlockText $ strWrap (toString codeContent)  -- Use the ORIGINAL working approach
-    Just lang ->
-      case Sky.lookupSyntax lang Sky.defaultSyntaxMap of
-        Nothing -> withAttr codeBlockText $ strWrap (toString codeContent)  -- Use the ORIGINAL working approach
-        Just syntax ->
-          case SkyCore.tokenize (SkyCore.TokenizerConfig Sky.defaultSyntaxMap False) syntax codeContent of
-            Left _ -> withAttr codeBlockText $ strWrap (toString codeContent)  -- Use the ORIGINAL working approach
-            Right _ ->
-              -- Use the actual highlight function from brick-skylighting but constrain it properly
-              hLimit 80 $ vBox [highlight syntax codeContent]
+  case tryRender of
+    Nothing -> withAttr codeBlockText $ strWrap (toString codeContent)
+    Just rendered -> rendered
+
   where
-    -- Extract language from classes (first class is typically the language)
-    getLanguage :: [Text] -> Maybe Text
-    getLanguage [] = Nothing
-    getLanguage (x:_) = Just x
+    tryRender = do
+      lang <- case classes of
+        [] -> Nothing
+        (x:_) -> Just x
+      syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap
+      case SkyCore.tokenize (SkyCore.TokenizerConfig Sky.defaultSyntaxMap False) syntax codeContent of
+        Left _ -> Nothing
+        Right xs -> Just $ renderRawSource txt xs
