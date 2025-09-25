@@ -20,6 +20,7 @@ import Data.Time
 import Data.Typeable
 import qualified Data.Vector as V
 import GitHub hiding (Status)
+import Lens.Micro
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
 import Relude
@@ -30,6 +31,9 @@ import UnliftIO.Async
 -- * Main list elem
 
 data Node f (a :: NodeTyp) where
+  HeadingNode :: EntityData f 'HeadingT -> Node f 'HeadingT
+  RepoNode :: EntityData f 'RepoT -> Node f 'RepoT
+
   PaginatedIssuesNode :: EntityData f 'PaginatedIssuesT -> Node f 'PaginatedIssuesT
   PaginatedPullsNode :: EntityData f 'PaginatedPullsT -> Node f 'PaginatedPullsT
   PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> Node f 'PaginatedWorkflowsT
@@ -43,15 +47,17 @@ data Node f (a :: NodeTyp) where
   SingleBranchNode :: EntityData f 'SingleBranchT -> Node f 'SingleBranchT
   SingleCommitNode :: EntityData f 'SingleCommitT -> Node f 'SingleCommitT
   JobLogGroupNode :: EntityData f 'JobLogGroupT -> Node f 'JobLogGroupT
-  HeadingNode :: EntityData f 'HeadingT -> Node f 'HeadingT
-  RepoNode :: EntityData f 'RepoT -> Node f 'RepoT
 
 data NodeTyp =
-  PaginatedIssuesT
+  HeadingT
+  | RepoT
+
+  | PaginatedIssuesT
   | PaginatedPullsT
   | PaginatedWorkflowsT
   | PaginatedReposT
   | PaginatedBranchesT
+
   | SingleIssueT
   | SinglePullT
   | SingleWorkflowT
@@ -59,17 +65,19 @@ data NodeTyp =
   | SingleBranchT
   | SingleCommitT
   | JobLogGroupT
-  | HeadingT
-  | RepoT
 
 deriving instance Eq (EntityData Fixed a) => Eq (Node Fixed a)
 
 instance Show (Node f a) where
+  show (RepoNode (EntityData {..})) = [i|RepoNode<#{_ident}>|]
+  show (HeadingNode (EntityData {..})) = [i|HeadingNode<#{_ident}>|]
+
   show (PaginatedIssuesNode (EntityData {..})) = [i|PaginatedIssuesNode<#{_ident}>|]
   show (PaginatedPullsNode (EntityData {..})) = [i|PaginatedPullsNode<#{_ident}>|]
   show (PaginatedWorkflowsNode (EntityData {..})) = [i|PaginatedWorkflowsNode<#{_ident}>|]
   show (PaginatedReposNode (EntityData {..})) = [i|PaginatedReposNode<#{_ident}>|]
   show (PaginatedBranchesNode (EntityData {..})) = [i|PaginatedBranchesNode<#{_ident}>|]
+
   show (SingleIssueNode (EntityData {..})) = [i|SingleIssueNode<#{_ident}>|]
   show (SinglePullNode (EntityData {..})) = [i|SinglePullNode<#{_ident}>|]
   show (SingleWorkflowNode (EntityData {..})) = [i|SingleWorkflowNode<#{_ident}>|]
@@ -77,8 +85,6 @@ instance Show (Node f a) where
   show (SingleBranchNode (EntityData {..})) = [i|SingleBranchNode<#{_ident}>|]
   show (SingleCommitNode (EntityData {..})) = [i|SingleCommitNode<#{_ident}>|]
   show (JobLogGroupNode (EntityData {..})) = [i|JobLogGroupNode<#{_ident}>|]
-  show (HeadingNode (EntityData {..})) = [i|HeadingNode<#{_ident}>|]
-  show (RepoNode (EntityData {..})) = [i|RepoNode<#{_ident}>|]
 
 -- * Entity data
 
@@ -199,36 +205,26 @@ getExistentialChildrenWrapped node = case node of
   SingleCommitNode _ -> return []
 
 getEntityData :: Node f a -> EntityData f a
-getEntityData (PaginatedIssuesNode ed) = ed
-getEntityData (PaginatedPullsNode ed) = ed
-getEntityData (PaginatedWorkflowsNode ed) = ed
-getEntityData (PaginatedReposNode ed) = ed
-getEntityData (PaginatedBranchesNode ed) = ed
-getEntityData (SingleIssueNode ed) = ed
-getEntityData (SinglePullNode ed) = ed
-getEntityData (SingleWorkflowNode ed) = ed
-getEntityData (SingleJobNode ed) = ed
-getEntityData (SingleBranchNode ed) = ed
-getEntityData (SingleCommitNode ed) = ed
-getEntityData (JobLogGroupNode ed) = ed
-getEntityData (HeadingNode ed) = ed
-getEntityData (RepoNode ed) = ed
+getEntityData node = node ^. entityDataL
 
 setEntityData :: EntityData f' a -> Node f a -> Node f' a
-setEntityData ed (PaginatedIssuesNode _) = PaginatedIssuesNode ed
-setEntityData ed (PaginatedPullsNode _) = PaginatedPullsNode ed
-setEntityData ed (PaginatedWorkflowsNode _) = PaginatedWorkflowsNode ed
-setEntityData ed (PaginatedReposNode _) = PaginatedReposNode ed
-setEntityData ed (PaginatedBranchesNode _) = PaginatedBranchesNode ed
-setEntityData ed (SingleIssueNode _) = SingleIssueNode ed
-setEntityData ed (SinglePullNode _) = SinglePullNode ed
-setEntityData ed (SingleWorkflowNode _) = SingleWorkflowNode ed
-setEntityData ed (SingleJobNode _) = SingleJobNode ed
-setEntityData ed (SingleBranchNode _) = SingleBranchNode ed
-setEntityData ed (SingleCommitNode _) = SingleCommitNode ed
-setEntityData ed (JobLogGroupNode _) = JobLogGroupNode ed
-setEntityData ed (HeadingNode _) = HeadingNode ed
-setEntityData ed (RepoNode _) = RepoNode ed
+setEntityData ed node = node & entityDataL .~ ed
+
+entityDataL :: Lens (Node f a) (Node f' a) (EntityData f a) (EntityData f' a)
+entityDataL f (PaginatedIssuesNode ed) = PaginatedIssuesNode <$> f ed
+entityDataL f (PaginatedPullsNode ed) = PaginatedPullsNode <$> f ed
+entityDataL f (PaginatedWorkflowsNode ed) = PaginatedWorkflowsNode <$> f ed
+entityDataL f (PaginatedReposNode ed) = PaginatedReposNode <$> f ed
+entityDataL f (PaginatedBranchesNode ed) = PaginatedBranchesNode <$> f ed
+entityDataL f (SingleIssueNode ed) = SingleIssueNode <$> f ed
+entityDataL f (SinglePullNode ed) = SinglePullNode <$> f ed
+entityDataL f (SingleWorkflowNode ed) = SingleWorkflowNode <$> f ed
+entityDataL f (SingleJobNode ed) = SingleJobNode <$> f ed
+entityDataL f (SingleBranchNode ed) = SingleBranchNode <$> f ed
+entityDataL f (SingleCommitNode ed) = SingleCommitNode <$> f ed
+entityDataL f (JobLogGroupNode ed) = JobLogGroupNode <$> f ed
+entityDataL f (HeadingNode ed) = HeadingNode <$> f ed
+entityDataL f (RepoNode ed) = RepoNode <$> f ed
 
 -- * Misc
 
