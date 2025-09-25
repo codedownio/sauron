@@ -1,0 +1,156 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+
+module Sauron.OAuth (
+  authenticateWithGitHub
+  ) where
+
+import Control.Concurrent (threadDelay)
+import Control.Exception
+import Control.Monad
+import Data.Aeson
+import Data.String.Interpolate
+import Data.Text as T
+import qualified Data.Text.Encoding as TE
+import GitHub.Auth
+import Network.HTTP.Client
+import Network.HTTP.Conduit (tlsManagerSettings)
+import Network.HTTP.Types.Header
+import Network.HTTP.Types.Status
+import Relude hiding (ByteString)
+import qualified System.IO as SIO
+import System.IO.Error (userError)
+
+-- Client ID used by "gh auth login"
+-- TODO: get our own client ID
+githubCliClientId :: Text
+githubCliClientId = "178c6fc778ccc68e1d6a"
+
+data DeviceCodeResponse = DeviceCodeResponse {
+  device_code :: Text
+  , user_code :: Text
+  , verification_uri :: Text
+  , expires_in :: Int
+  , interval :: Int
+  } deriving (Show, Generic)
+
+instance FromJSON DeviceCodeResponse where
+  parseJSON = withObject "DeviceCodeResponse" $ \o -> DeviceCodeResponse
+    <$> o .: "device_code"
+    <*> o .: "user_code"
+    <*> o .: "verification_uri"
+    <*> o .: "expires_in"
+    <*> o .: "interval"
+
+data TokenResponse = TokenResponse {
+  access_token :: Text
+  , token_type :: Text
+  , scope :: Text
+  } deriving (Show, Generic)
+
+instance FromJSON TokenResponse where
+  parseJSON = withObject "TokenResponse" $ \o -> TokenResponse
+    <$> o .: "access_token"
+    <*> o .: "token_type"
+    <*> o .: "scope"
+
+data TokenError = TokenError {
+  error :: Text
+  , error_description :: Maybe Text
+  } deriving (Show, Generic)
+
+instance FromJSON TokenError where
+  parseJSON = withObject "TokenError" $ \o -> TokenError
+    <$> o .: "error"
+    <*> o .:? "error_description"
+
+authenticateWithGitHub :: IO Auth
+authenticateWithGitHub = do
+  putStrLn "Authenticating with GitHub..."
+
+  manager <- newManager tlsManagerSettings
+
+  -- Step 1: Request device code
+  deviceResp <- requestDeviceCode manager
+
+  -- Step 2: Show user the code and URL
+  putStrLn [i|Please visit: #{verification_uri deviceResp}|]
+  putStrLn [i|Enter code: #{user_code deviceResp}|]
+  putStr "Waiting for authentication"
+  SIO.hFlush stdout
+
+  -- Step 3: Poll for access token
+  token <- pollForToken manager deviceResp
+
+  putStrLn " ✓"
+  putStrLn "Successfully authenticated with GitHub!"
+
+  return $ OAuth (TE.encodeUtf8 token)
+
+requestDeviceCode :: Manager -> IO DeviceCodeResponse
+requestDeviceCode manager = do
+  initReq <- parseRequest "POST https://github.com/login/device/code"
+  let req = initReq {
+        requestHeaders = [
+            (hAccept, "application/json")
+            , (hUserAgent, "sauron")
+            ]
+        , requestBody = RequestBodyLBS $ encode $ object [
+            "client_id" .= githubCliClientId
+            , "scope" .= ("repo user" :: Text)
+            ]
+        }
+
+  response <- httpLbs req manager
+
+  case responseStatus response of
+    status | status == status200 -> do
+      case eitherDecode (responseBody response) of
+        Left err -> throwIO $ userError [i|Failed to parse device code response: #{err}|]
+        Right deviceResp -> return deviceResp
+    _ -> throwIO $ userError [i|Failed to request device code: #{responseStatus response}|]
+
+pollForToken :: Manager -> DeviceCodeResponse -> IO Text
+pollForToken manager deviceResp = do
+  let pollInterval = interval deviceResp * 1_000_000
+
+  let loop = do
+        threadDelay pollInterval
+        putStr "."
+        SIO.hFlush stdout
+
+        initReq <- parseRequest "POST https://github.com/login/oauth/access_token"
+        let req = initReq {
+              requestHeaders = [
+                  (hAccept, "application/json")
+                  , (hUserAgent, "sauron")
+                  ]
+              , requestBody = RequestBodyLBS $ encode $ object [
+                  "client_id" .= githubCliClientId
+                  , "device_code" .= device_code deviceResp
+                  , "grant_type" .= ("urn:ietf:params:oauth:grant-type:device_code" :: Text)
+                  ]
+              }
+
+        response <- httpLbs req manager
+
+        case responseStatus response of
+          status | status == status200 -> do
+            case eitherDecode (responseBody response) of
+              Left err -> throwIO $ userError [i|Failed to parse token response: #{err}|]
+              Right (tokenResp :: TokenResponse) -> return $ access_token tokenResp
+          _ -> do
+            -- Check if it's an expected error (authorization_pending, slow_down)
+            case eitherDecode (responseBody response) of
+              Right (TokenError errorCode _) ->
+                case errorCode of
+                  "authorization_pending" -> loop -- Keep polling
+                  "slow_down" -> do
+                    threadDelay (pollInterval * 2) -- Slow down
+                    loop
+                  "access_denied" -> throwIO $ userError "GitHub authentication was denied"
+                  "expired_token" -> throwIO $ userError "GitHub device code expired, please try again"
+                  other -> throwIO $ userError [i|GitHub authentication error: #{other}|]
+              Left _ -> throwIO $ userError $ [i|Failed to get access token #{responseStatus response}|]
+
+  loop

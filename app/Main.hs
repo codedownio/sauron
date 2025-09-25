@@ -22,6 +22,7 @@ import Relude hiding (Down)
 import Sauron.Actions
 import Sauron.Actions.Util
 import Sauron.Auth
+import Sauron.OAuth
 import Sauron.Event
 import Sauron.Expanding
 import Sauron.Fix
@@ -139,7 +140,7 @@ buildBaseContext = do
     Nothing -> tryDiscoverAuth
 
   auth <- case maybeAuth of
-    Nothing -> throwIO $ userError [i|Couldn't figure out authentication.|]
+    Nothing -> authenticateWithGitHub
     Just x -> pure x
 
   putStrLn [i|Got auth: #{auth}|]
