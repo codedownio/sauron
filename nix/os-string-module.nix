@@ -4,4 +4,6 @@
   packages.filepath.components.library.configureFlags = [''-f os-string''];
   packages.directory.components.library.configureFlags = [''-f os-string''];
   packages.unix.components.library.configureFlags = [''-f os-string''];
+
+  packages.Win32.components.library.configureFlags = [''-f os-string''];
 }

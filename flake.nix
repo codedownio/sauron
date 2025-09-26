@@ -67,6 +67,7 @@
           compiler-nix-name = compilerNixName;
           projectFileName = "stack.yaml";
           modules = [
+            (import ./nix/os-string-module.nix)
             {
               packages.bitvec.components.library.configureFlags = [
                 "-f -simd"
