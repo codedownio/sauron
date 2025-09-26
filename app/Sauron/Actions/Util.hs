@@ -21,7 +21,7 @@ import Sauron.Types
 import UnliftIO.Process
 
 #ifdef mingw32_HOST_OS
-import System.Directory
+import UnliftIO.Directory
 
 openBrowserToUrl :: MonadIO m => String -> m ()
 openBrowserToUrl url = do
