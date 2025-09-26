@@ -21,7 +21,7 @@
 
         src = gitignore.lib.gitignoreSource ./.;
 
-        compilerNixName = "ghc966";
+        compilerNixName = "ghc9122";
 
         flake = (pkgs.haskell-nix.hix.project {
           inherit src;
@@ -30,6 +30,7 @@
           projectFileName = "stack.yaml";
           modules = [
             (import ./nix/fix-ghc-pkgs-module.nix)
+            (import ./nix/os-string-module.nix)
             {
               packages.sauron.components.exes.sauron.configureFlags = [
                 ''--ghc-options="-pgml g++"''
@@ -47,6 +48,7 @@
           projectFileName = "stack.yaml";
           modules = [
             (import ./nix/fix-ghc-pkgs-module.nix)
+            (import ./nix/os-string-module.nix)
             {
               packages.sauron.components.exes.sauron.configureFlags = [
                 ''--ghc-options="-pgml g++"''
