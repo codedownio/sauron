@@ -120,7 +120,7 @@ handleLeftArrow :: AppState -> EventM ClickableName AppState ()
 handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
   liftIO (atomically $ readTVar (_toggled (getEntityData mle))) >>= \case
     True -> liftIO $ atomically $ writeTVar (_toggled (getEntityData mle)) False
-    False -> case Relude.reverse (toList parents) of
+    False -> case toList parents of
       _:(SomeNode parent):_ -> do
         expandedList <- gets (^. appMainList)
         forM_ (Vec.findIndex (\(SomeNode el) -> (_ident (getEntityData parent) == _ident (getEntityData el))) (listElements expandedList)) $ \index ->
