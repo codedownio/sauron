@@ -37,6 +37,16 @@
               ];
               packages.sauron.components.exes.sauron.build-tools = [pkgs.gcc];
               packages.sauron.components.exes.sauron.dontStrip = false;
+              packages.sauron.components.exes.sauron.postInstall = pkgs.lib.optionalString (pkgs.stdenv.hostPlatform.isDarwin) ''
+                # Haskell.nix seems to automatically strip on Linux, but we need this on macOS
+                strip "$out/bin/sauron"
+
+                # For debugging
+                otool -L $out/bin/sauron
+
+                # Recursively gather and fix all dylib dependencies
+                ${./nix/gather-dylibs.sh} $out/bin/sauron $out/bin "@executable_path/"
+              '';
             }
           ];
         }).flake {};
