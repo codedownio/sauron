@@ -78,26 +78,21 @@
               ];
 
               packages.sauron.components.exes.sauron.postInstall = ''
-                # Strip the binary
                 strip "$out/bin/sauron"
 
-                # Verify linking - should show system libraries only, no nix store dylibs
-                echo "=== Checking final binary dependencies ==="
-                otool -L "$out/bin/sauron"
+                # Fix a few more dylibs
+                source "${./nix/fix-dylib.sh}"
+                fix_dylib "$out/bin/sauron" "libstdc++.6.dylib" "/usr/lib/libstdc++.dylib"
+                fix_dylib "$out/bin/sauron" "libc++.1.0.dylib" "/usr/lib/libc++.dylib"
+                fix_dylib "$out/bin/sauron" "libc++abi.1.0.dylib" "/usr/lib/libc++abi.dylib"
+                fix_dylib "$out/bin/sauron" "libz.dylib" "/usr/lib/libz.dylib"
+                fix_dylib "$out/bin/sauron" "libiconv.2.dylib" "/usr/lib/libiconv.2.dylib"
 
-                # Count nix store references - should be minimal (ideally just system libs)
-                nix_refs=$(otool -L "$out/bin/sauron" | grep -c "/nix/store/" || echo "0")
-                echo "Nix store references found: $nix_refs"
-
-                # This is acceptable as long as there are no dylib files being shipped
-                # The goal is to not need separate dylib files
-                if [ -d "$out/bin" ] && find "$out/bin" -name "*.dylib" | grep -q .; then
-                  echo "ERROR: Dylib files found in output!"
-                  find "$out/bin" -name "*.dylib"
+                if otool -L "$out/bin/sauron" | tail -n +2 | grep -q "/nix/store"; then
+                  echo "ERROR: Found nix store references in binary:"
+                  otool -L "$out/bin/sauron" | tail -n +2 | grep "/nix/store"
                   exit 1
                 fi
-
-                echo "SUCCESS: No separate dylib files needed"
               '';
             }
           ];
