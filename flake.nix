@@ -142,6 +142,17 @@
           ];
         }).flake {};
 
+        version = flake.packages."sauron:exe:sauron".version;
+
+        mkGithubArtifacts = binary: system: exeSuffix:
+          with pkgs; runCommand "github-artifacts-${system}-${version}" {} ''
+          mkdir $out
+          BINARY="sauron${exeSuffix}"
+          cp "${binary}/bin/$BINARY" "$out/$BINARY"
+          tar -czvf "$out/sauron-${system}-${version}.tar.gz" -C "$out" "$BINARY"
+          rm "$out/$BINARY"
+        '';
+
       in
         {
           devShells = {
@@ -169,8 +180,6 @@
             darwin-static = flakeDarwinStatic.packages."sauron:exe:sauron";
             windows = flakeWindows.packages."sauron:exe:sauron";
 
-            inherit (normal) version;
-
             githubArtifacts = let
               binary = if pkgs.stdenv.hostPlatform.isDarwin then darwin-static
                        else if pkgs.stdenv.hostPlatform.isWindows then windows
@@ -178,18 +187,15 @@
                        else throw "Unrecognized platform: ${pkgs.stdenv.hostPlatform.system}";
               exeSuffix = if pkgs.stdenv.hostPlatform.isWindows then ".exe" else "";
             in
-              with pkgs; runCommand "github-artifacts-${pkgs.stdenv.hostPlatform.system}" {} ''
-                mkdir $out
-                BINARY="sauron${exeSuffix}"
-                cp "${binary}/bin/$BINARY" "$out/$BINARY"
-                tar -czvf "$out/$BINARY-${pkgs.stdenv.hostPlatform.system}-${version}.tar.gz" -C "$out" "$BINARY"
-                rm "$out/$BINARY"
-              '';
+              mkGithubArtifacts binary pkgs.stdenv.hostPlatform.system exeSuffix;
+
+            windowsGithubArtifacts = mkGithubArtifacts windows "x86_64-windows" ".exe";
 
             grandCombinedGithubArtifacts = pkgs.symlinkJoin {
               name = "sauron-grand-combined-artifacts";
               paths = [
                 self.packages.x86_64-linux.githubArtifacts
+                self.packages.x86_64-linux.windowsGithubArtifacts
                 self.packages.x86_64-darwin.githubArtifacts
                 self.packages.aarch64-darwin.githubArtifacts
               ];
