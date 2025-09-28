@@ -61,11 +61,11 @@
             (import ./nix/os-string-module.nix)
             {
               packages.sauron.components.exes.sauron.configureFlags = [
-                ''--ghc-options="-pgml g++ -optl-L${pkgs.pkgsStatic.gmp}/lib -optl-L${pkgs.pkgsStatic.ncurses}/lib -optl-L${pkgs.pkgsStatic.pcre}/lib -optl-L${pkgs.pkgsStatic.libffi}/lib -optl-L${pkgs.pkgsStatic.gettext}/lib"''
+                ''--ghc-options="-pgml clang++ -optl-L${pkgs.pkgsStatic.gmp}/lib -optl-L${pkgs.pkgsStatic.ncurses}/lib -optl-L${pkgs.pkgsStatic.pcre}/lib -optl-L${pkgs.pkgsStatic.libffi}/lib -optl-L${pkgs.pkgsStatic.gettext}/lib"''
                 ''--ghc-options="-optl-lgmp -optl-lncursesw -optl-lpcre -optl-lffi -optl-lintl"''
                 "--disable-shared"
               ];
-              packages.sauron.components.exes.sauron.build-tools = [pkgs.gcc];
+              packages.sauron.components.exes.sauron.build-tools = [pkgs.clang];
               packages.sauron.components.exes.sauron.dontStrip = false;
 
               # Override C library dependencies to use static versions
@@ -79,6 +79,9 @@
 
               packages.sauron.components.exes.sauron.postInstall = ''
                 strip "$out/bin/sauron"
+
+                echo "Dynamic library dependencies before patching:"
+                otool -L "$out/bin/sauron"
 
                 # Fix a few more dylibs
                 source "${./nix/fix-dylib.sh}"
@@ -177,7 +180,7 @@
                 mkdir $out
                 BINARY="sauron${exeSuffix}"
                 cp "${binary}/bin/$BINARY" "$out/$BINARY"
-                tar -czvf "$out/$BINARY.tar.gz" -C "$out" "$BINARY"
+                tar -czvf "$out/$BINARY-${pkgs.stdenv.hostPlatform.system}-${version}.tar.gz" -C "$out" "$BINARY"
                 rm "$out/$BINARY"
               '';
 
@@ -185,7 +188,7 @@
               name = "sauron-grand-combined-artifacts";
               paths = [
                 self.packages.x86_64-linux.githubArtifacts
-                # self.packages.x86_64-darwin.githubArtifacts
+                self.packages.x86_64-darwin.githubArtifacts
                 self.packages.aarch64-darwin.githubArtifacts
               ];
             };
