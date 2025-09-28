@@ -166,6 +166,30 @@
             darwin-static = flakeDarwinStatic.packages."sauron:exe:sauron";
             windows = flakeWindows.packages."sauron:exe:sauron";
 
+            githubArtifacts = let
+              binary = if pkgs.stdenv.hostPlatform.isDarwin then darwin-static
+                       else if pkgs.stdenv.hostPlatform.isWindows then windows
+                       else if pkgs.stdenv.hostPlatform.isLinux then static
+                       else throw "Unrecognized platform: ${pkgs.stdenv.hostPlatform.system}";
+              exeSuffix = if pkgs.stdenv.hostPlatform.isWindows then ".exe" else "";
+            in
+              with pkgs; runCommand "github-artifacts-${pkgs.stdenv.hostPlatform.system}" {} ''
+                mkdir $out
+                BINARY="sauron${exeSuffix}"
+                cp "${binary}/bin/$BINARY" "$out/$BINARY"
+                tar -czvf "$out/$BINARY.tar.gz" -C "$out" "$BINARY"
+                rm "$out/$BINARY"
+              '';
+
+            grandCombinedGithubArtifacts = pkgs.symlinkJoin {
+              name = "sauron-grand-combined-artifacts";
+              paths = [
+                self.packages.x86_64-linux.githubArtifacts
+                # self.packages.x86_64-darwin.githubArtifacts
+                self.packages.aarch64-darwin.githubArtifacts
+              ];
+            };
+
             print-nixpkgs = pkgs.writeShellScriptBin "print-nixpkgs.sh" "echo ${pkgs.path}";
           };
         }
