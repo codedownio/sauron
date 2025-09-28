@@ -166,6 +166,8 @@
             darwin-static = flakeDarwinStatic.packages."sauron:exe:sauron";
             windows = flakeWindows.packages."sauron:exe:sauron";
 
+            inherit (normal) version;
+
             print-nixpkgs = pkgs.writeShellScriptBin "print-nixpkgs.sh" "echo ${pkgs.path}";
           };
         }
