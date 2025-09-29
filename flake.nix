@@ -31,73 +31,7 @@
           modules = [
             (import ./nix/fix-ghc-pkgs-module.nix)
             (import ./nix/os-string-module.nix)
-            {
-              packages.sauron.components.exes.sauron.configureFlags = [
-                ''--ghc-options="-pgml g++"''
-              ];
-              packages.sauron.components.exes.sauron.build-tools = [pkgs.gcc];
-              packages.sauron.components.exes.sauron.dontStrip = false;
-              packages.sauron.components.exes.sauron.postInstall = pkgs.lib.optionalString (pkgs.stdenv.hostPlatform.isDarwin) ''
-                # Haskell.nix seems to automatically strip on Linux, but we need this on macOS
-                strip "$out/bin/sauron"
-
-                # For debugging
-                otool -L $out/bin/sauron
-
-                # Recursively gather and fix all dylib dependencies
-                ${./nix/gather-dylibs.sh} $out/bin/sauron $out/bin "@executable_path/"
-              '';
-            }
-          ];
-        }).flake {};
-
-        flakeDarwinStatic = (pkgs.haskell-nix.hix.project {
-          inherit src;
-          evalSystem = "x86_64-linux";
-          compiler-nix-name = compilerNixName;
-          projectFileName = "stack.yaml";
-          modules = [
-            (import ./nix/fix-ghc-pkgs-module.nix)
-            (import ./nix/os-string-module.nix)
-            {
-              packages.sauron.components.exes.sauron.configureFlags = [
-                ''--ghc-options="-pgml clang++ -optl-L${pkgs.pkgsStatic.gmp}/lib -optl-L${pkgs.pkgsStatic.ncurses}/lib -optl-L${pkgs.pkgsStatic.pcre}/lib -optl-L${pkgs.pkgsStatic.libffi}/lib -optl-L${pkgs.pkgsStatic.gettext}/lib"''
-                ''--ghc-options="-optl-lgmp -optl-lncursesw -optl-lpcre -optl-lffi -optl-lintl"''
-                "--disable-shared"
-              ];
-              packages.sauron.components.exes.sauron.build-tools = [pkgs.clang];
-              packages.sauron.components.exes.sauron.dontStrip = false;
-
-              # Override C library dependencies to use static versions
-              packages.sauron.components.exes.sauron.libs = with pkgs; [
-                pkgsStatic.gmp
-                pkgsStatic.ncurses
-                pkgsStatic.pcre
-                pkgsStatic.libffi
-                pkgsStatic.gettext
-              ];
-
-              packages.sauron.components.exes.sauron.postInstall = ''
-                strip "$out/bin/sauron"
-
-                echo "Dynamic library dependencies before patching:"
-                otool -L "$out/bin/sauron"
-
-                # Fix a few more dylibs
-                source "${./nix/fix-dylib.sh}"
-                fix_dylib "$out/bin/sauron" "libstdc++.6.dylib" "/usr/lib/libstdc++.dylib"
-                fix_dylib "$out/bin/sauron" "libc++.1.0.dylib" "/usr/lib/libc++.dylib"
-                fix_dylib "$out/bin/sauron" "libc++abi.1.0.dylib" "/usr/lib/libc++abi.dylib"
-                fix_dylib "$out/bin/sauron" "libz.dylib" "/usr/lib/libz.dylib"
-                fix_dylib "$out/bin/sauron" "libiconv.2.dylib" "/usr/lib/libiconv.2.dylib"
-
-                if otool -L "$out/bin/sauron" | tail -n +2 | grep -q "/nix/store"; then
-                  echo "ERROR: Found nix store references in binary:"
-                  otool -L "$out/bin/sauron" | tail -n +2 | grep "/nix/store"
-                  exit 1
-                fi
-              '';
-            }
+            (pkgs.callPackage ./nix/module-normal.nix {})
           ];
         }).flake {};
 
@@ -109,16 +43,19 @@
           modules = [
             (import ./nix/fix-ghc-pkgs-module.nix)
             (import ./nix/os-string-module.nix)
-            {
-              packages.sauron.components.exes.sauron.configureFlags = [
-                ''--ghc-options="-pgml g++"''
-              ];
-              packages.sauron.components.exes.sauron.dontStrip = false;
+            (pkgs.callPackage ./nix/module-static.nix {})
+          ];
+        }).flake {};
 
-              packages.sauron.components.exes.sauron.enableShared = false;
-              packages.sauron.components.exes.sauron.libs = [];
-              packages.sauron.components.exes.sauron.build-tools = [pkgs.pkgsCross.musl64.gcc];
-            }
+        flakeDarwinStatic = (pkgs.haskell-nix.hix.project {
+          inherit src;
+          evalSystem = "x86_64-linux";
+          compiler-nix-name = compilerNixName;
+          projectFileName = "stack.yaml";
+          modules = [
+            (import ./nix/fix-ghc-pkgs-module.nix)
+            (import ./nix/os-string-module.nix)
+            (pkgs.callPackage ./nix/module-darwin-static.nix {})
           ];
         }).flake {};
 
@@ -128,17 +65,7 @@
           projectFileName = "stack.yaml";
           modules = [
             (import ./nix/os-string-module.nix)
-            {
-              packages.bitvec.components.library.configureFlags = [
-                "-f -simd"
-              ];
-              packages.basement.components.library.configureFlags = [
-                "--gcc-option=-Wno-int-conversion" # Fix for newer GCC
-              ];
-              packages.sauron.components.exes.sauron.configureFlags = [
-                "--ld-option=-Wl,--allow-multiple-definition"
-              ];
-            }
+            (pkgs.callPackage ./nix/module-windows.nix {})
           ];
         }).flake {};
 
@@ -171,9 +98,7 @@
           };
 
           packages = rec {
-            inherit pkgs flake flakeStatic flakeDarwinStatic;
-
-            inherit (pkgs) cabal2nix;
+            inherit flake flakeStatic flakeDarwinStatic flakeWindows;
 
             normal = flake.packages."sauron:exe:sauron";
             static = flakeStatic.packages."sauron:exe:sauron";
@@ -200,8 +125,6 @@
                 self.packages.aarch64-darwin.githubArtifacts
               ];
             };
-
-            print-nixpkgs = pkgs.writeShellScriptBin "print-nixpkgs.sh" "echo ${pkgs.path}";
           };
         }
     );
