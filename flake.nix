@@ -31,7 +31,7 @@
           modules = [
             (import ./nix/fix-ghc-pkgs-module.nix)
             (import ./nix/os-string-module.nix)
-            (pkgs.callPackage ./nix/module-normal.nix {})
+            (import ./nix/module-normal.nix { inherit (pkgs) gcc lib stdenv; })
           ];
         }).flake {};
 
@@ -43,7 +43,7 @@
           modules = [
             (import ./nix/fix-ghc-pkgs-module.nix)
             (import ./nix/os-string-module.nix)
-            (pkgs.callPackage ./nix/module-static.nix {})
+            (import ./nix/module-static.nix { inherit (pkgs) pkgsCross; })
           ];
         }).flake {};
 
@@ -55,7 +55,7 @@
           modules = [
             (import ./nix/fix-ghc-pkgs-module.nix)
             (import ./nix/os-string-module.nix)
-            (pkgs.callPackage ./nix/module-darwin-static.nix {})
+            (import ./nix/module-darwin-static.nix { inherit (pkgs) clang pkgsStatic; })
           ];
         }).flake {};
 
@@ -65,7 +65,7 @@
           projectFileName = "stack.yaml";
           modules = [
             (import ./nix/os-string-module.nix)
-            (pkgs.callPackage ./nix/module-windows.nix {})
+            (import ./nix/module-windows.nix {})
           ];
         }).flake {};
 
@@ -98,8 +98,6 @@
           };
 
           packages = rec {
-            inherit flake flakeStatic flakeDarwinStatic flakeWindows;
-
             normal = flake.packages."sauron:exe:sauron";
             static = flakeStatic.packages."sauron:exe:sauron";
             darwin-static = flakeDarwinStatic.packages."sauron:exe:sauron";
