@@ -264,6 +264,7 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
   searchVar <- newTVar $ SearchNone
   pageInfoVar <- newTVar emptyPageInfo
   healthCheckVar <- newTVar NotFetched
+  healthCheckThreadVar <- newTVar Nothing
   return $ EntityData {
     _static = typ'
     , _state = stateVar
@@ -277,7 +278,7 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
     , _pageInfo = pageInfoVar
 
     , _healthCheck = healthCheckVar
-    , _healthCheckThread = Nothing
+    , _healthCheckThread = healthCheckThreadVar
 
     , _depth = depth'
     , _ident = ident'
@@ -298,6 +299,7 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
       newTVar childElems
 
   healthCheckVar2 <- newTVar NotFetched
+  healthCheckThreadVar2 <- newTVar Nothing
   return $ JobLogGroupNode $ EntityData {
     _static = jobLogGroup
     , _state = stateVar
@@ -307,7 +309,7 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
     , _search = searchVar
     , _pageInfo = pageInfoVar
     , _healthCheck = healthCheckVar2
-    , _healthCheckThread = Nothing
+    , _healthCheckThread = healthCheckThreadVar2
     , _depth = depth'
     , _ident = ident'
   }

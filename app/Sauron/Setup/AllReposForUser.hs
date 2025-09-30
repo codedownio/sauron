@@ -21,6 +21,7 @@ allReposForUser baseContext _defaultHealthCheckPeriodUs userLogin = do
   searchVar <- newTVarIO SearchNone
   pageInfoVar <- newTVarIO emptyPageInfo
   healthCheckVar <- newTVarIO NotFetched
+  healthCheckThreadVar <- newTVarIO Nothing
   identifier <- getIdentifier
 
   return $ PaginatedReposNode $ EntityData {
@@ -32,7 +33,7 @@ allReposForUser baseContext _defaultHealthCheckPeriodUs userLogin = do
     , _search = searchVar
     , _pageInfo = pageInfoVar
     , _healthCheck = healthCheckVar
-    , _healthCheckThread = Nothing
+    , _healthCheckThread = healthCheckThreadVar
     , _depth = 0
     , _ident = identifier
     }

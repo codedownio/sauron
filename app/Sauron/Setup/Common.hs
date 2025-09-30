@@ -31,6 +31,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   issuesSearchVar <- newTVarIO $ SearchText "is:issue is:open"
   issuesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   issuesHealthCheckVar <- newTVarIO NotFetched
+  issuesHealthCheckThreadVar <- newTVarIO Nothing
   issuesIdentifier <- liftIO getIdentifier
   let issuesChild = PaginatedIssuesNode $ EntityData {
         _static = ()
@@ -41,7 +42,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _search = issuesSearchVar
         , _pageInfo = issuesPageInfoVar
         , _healthCheck = issuesHealthCheckVar
-        , _healthCheckThread = Nothing
+        , _healthCheckThread = issuesHealthCheckThreadVar
         , _depth = repoDepth + 1
         , _ident = issuesIdentifier
         } :: Node Variable PaginatedIssuesT
@@ -52,6 +53,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   pullsSearchVar <- newTVarIO $ SearchText "is:pr is:open"
   pullsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   pullsHealthCheckVar <- newTVarIO NotFetched
+  pullsHealthCheckThreadVar <- newTVarIO Nothing
   pullsIdentifier <- liftIO getIdentifier
   let pullsChild = PaginatedPullsNode $ EntityData {
         _static = ()
@@ -62,7 +64,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _search = pullsSearchVar
         , _pageInfo = pullsPageInfoVar
         , _healthCheck = pullsHealthCheckVar
-        , _healthCheckThread = Nothing
+        , _healthCheckThread = pullsHealthCheckThreadVar
         , _depth = repoDepth + 1
         , _ident = pullsIdentifier
         } :: Node Variable PaginatedPullsT
@@ -73,6 +75,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   workflowsSearchVar <- newTVarIO SearchNone
   workflowsPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   workflowsHealthCheckVar <- newTVarIO NotFetched
+  workflowsHealthCheckThreadVar <- newTVarIO Nothing
   workflowsIdentifier <- liftIO getIdentifier
   let workflowsChild = PaginatedWorkflowsNode $ EntityData {
         _static = ()
@@ -83,7 +86,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _search = workflowsSearchVar
         , _pageInfo = workflowsPageInfoVar
         , _healthCheck = workflowsHealthCheckVar
-        , _healthCheckThread = Nothing
+        , _healthCheckThread = workflowsHealthCheckThreadVar
         , _depth = repoDepth + 1
         , _ident = workflowsIdentifier
         } :: Node Variable PaginatedWorkflowsT
@@ -94,6 +97,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   branchesSearchVar <- newTVarIO SearchNone
   branchesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
   branchesHealthCheckVar <- newTVarIO NotFetched
+  branchesHealthCheckThreadVar <- newTVarIO Nothing
   branchesIdentifier <- liftIO getIdentifier
   let branchesChild = PaginatedBranchesNode $ EntityData {
         _static = ()
@@ -104,7 +108,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _search = branchesSearchVar
         , _pageInfo = branchesPageInfoVar
         , _healthCheck = branchesHealthCheckVar
-        , _healthCheckThread = Nothing
+        , _healthCheckThread = branchesHealthCheckThreadVar
         , _depth = repoDepth + 1
         , _ident = branchesIdentifier
         } :: Node Variable PaginatedBranchesT
@@ -113,6 +117,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   childrenVar <- newTVarIO [SomeNode issuesChild, SomeNode pullsChild, SomeNode workflowsChild, SomeNode branchesChild]
   searchVar <- newTVarIO SearchNone
   pageInfoVar <- newTVarIO emptyPageInfo
+  repoHealthCheckThreadVar <- newTVarIO hcThread
   return $ RepoNode $ EntityData {
     _static = (fst nsName, snd nsName)
     , _state = repoVar
@@ -122,7 +127,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
     , _search = searchVar
     , _pageInfo = pageInfoVar
     , _healthCheck = healthCheckVar
-    , _healthCheckThread = hcThread
+    , _healthCheckThread = repoHealthCheckThreadVar
     , _depth = repoDepth
     , _ident = repoIdentifier
     }

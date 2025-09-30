@@ -117,7 +117,9 @@ executable sauron
       Sauron.Fetch.ParseJobLogs
       Sauron.Fix
       Sauron.HealthCheck
-      Sauron.HealthCheck.NodeHealthCheck
+      Sauron.HealthCheck.Common
+      Sauron.HealthCheck.Job
+      Sauron.HealthCheck.Workflow
       Sauron.OAuth
       Sauron.Options
       Sauron.Setup.AllReposForUser

@@ -61,6 +61,7 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l) -> do
             childrenVar <- newTVarIO (fmap SomeNode repoNodes)
             headingHealthCheckVar <- newTVarIO NotFetched
+            headingHealthCheckThreadVar <- newTVarIO Nothing
             let headingNode = HeadingNode $ EntityData {
                   _static = l
                   , _state = statusVar
@@ -70,7 +71,7 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
                   , _search = searchVar
                   , _pageInfo = pageInfoVar
                   , _healthCheck = headingHealthCheckVar
-                  , _healthCheckThread = Nothing
+                  , _healthCheckThread = headingHealthCheckThreadVar
                   , _depth = 0
                   , _ident = identifier
                   }
