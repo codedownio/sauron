@@ -68,7 +68,7 @@ unknown = withAttr unknownAttr (str "?")
 
 
 workflowInner :: WorkflowRun -> Fetchable (NodeState SingleWorkflowT) -> Widget n
-workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobsSection]
+workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails
   where
     runTime = diffUTCTime workflowRunUpdatedAt workflowRunStartedAt
 
@@ -104,18 +104,3 @@ workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails ++ [jobs
           , withAttr branchAttr $ str $ toString workflowRunHeadBranch
         ]
       ]
-
-    jobsSection = padTop (Pad 1) $ case jobsFetchable of
-      NotFetched -> str "Jobs: (Not fetched)"
-      Fetching -> str "Jobs: (Fetching...)"
-      Errored err -> str [i|Jobs error: #{err}|]
-      Fetched (WithTotalCount jobs totalCount) ->
-        vBox [
-          str [i|Jobs (#{totalCount}):|]
-          , padLeft (Pad 2) $ vBox $ map renderJobSimple (V.toList jobs)
-        ]
-        where
-          renderJobSimple job = hBox [
-            greenCheck  -- TODO: extract proper job status and use appropriate icon
-            , padLeft (Pad 1) $ str $ show job  -- TODO: extract job name when field names are known
-            ]
