@@ -60,4 +60,4 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
             return ()
 
     hasRunningWorkflow :: WorkflowRun -> Bool
-    hasRunningWorkflow wr = not $ isWorkflowCompleted (fromMaybe (workflowRunStatus wr) (workflowRunConclusion wr))
+    hasRunningWorkflow wr = not $ isWorkflowCompleted $ fromMaybe (workflowRunStatus wr) (workflowRunConclusion wr)
