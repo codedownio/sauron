@@ -22,10 +22,11 @@ import Relude hiding (Down)
 import Sauron.Actions
 import Sauron.Actions.Util
 import Sauron.Auth
-import Sauron.OAuth
 import Sauron.Event
 import Sauron.Expanding
+import Sauron.Fetch (makeEmptyElem)
 import Sauron.Fix
+import Sauron.OAuth
 import Sauron.Options
 import Sauron.Setup.AllReposForUser
 import Sauron.Setup.ReposFromConfigFile
@@ -66,11 +67,14 @@ main = do
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
 
-  listElems :: V.Vector (SomeNode Variable) <- case cliConfigFile of
+  listElems' :: V.Vector (SomeNode Variable) <- case cliConfigFile of
     Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
     Nothing -> isContainedInGitRepo >>= \case
       Just (namespace, name) -> (fmap SomeNode) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
       Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+
+  -- Prepend a PaginatedNotificationsNode
+  listElems <- flip V.cons listElems' <$> atomically (SomeNode . PaginatedNotificationsNode <$> makeEmptyElem baseContext () "" 0)
 
   -- Kick off initial fetches
   runReaderT (refreshAll listElems) baseContext

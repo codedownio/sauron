@@ -24,6 +24,8 @@ module Sauron.Fetch (
 
   , fetchWorkflowJobs
   , fetchJobLogs
+
+  , makeEmptyElem
   ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -134,7 +136,7 @@ fetchNotifications :: (
   ) => Node Variable PaginatedNotificationsT -> m ()
 fetchNotifications (PaginatedNotificationsNode (EntityData {..})) = do
   bc <- ask
-  fetchPaginated'' (getNotificationsR) _pageInfo _state $ \case
+  fetchPaginated'' getNotificationsR _pageInfo _state $ \case
     Left err -> do
       writeTVar _state (Errored (show err))
       writeTVar _children []
