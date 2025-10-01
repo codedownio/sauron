@@ -73,23 +73,14 @@ refreshAll :: (
   ) => V.Vector (SomeNode Variable) -> m ()
 refreshAll elems = do
   baseContext <- ask
-  allRepos <- liftIO $ collectAllRepos (V.toList elems)
-
-  liftIO $ flip runReaderT baseContext $
-    void $ async $ forConcurrently allRepos $ \case
-      RepoNode (EntityData {_static=(owner, name), _state}) -> do
-        fetchRepo owner name _state
-        -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
+  liftIO $ refreshVisibleNodes baseContext [] (V.toList elems)
 
   where
-    collectAllRepos :: [SomeNode Variable] -> IO [Node Variable RepoT]
-    collectAllRepos = fmap concat . mapM collectFromNode
-      where
-        collectFromNode :: SomeNode Variable -> IO [Node Variable RepoT]
-        collectFromNode (SomeNode item@(RepoNode {})) = return [item]
-        collectFromNode (SomeNode item@(HeadingNode {})) = do
-          children <- getExistentialChildren item
-          collectAllRepos children
-        collectFromNode (SomeNode _item) =
-          -- Other node types don't contain repos as children
-          pure []
+    refreshVisibleNodes :: BaseContext -> [SomeNode Variable] -> [SomeNode Variable] -> IO ()
+    refreshVisibleNodes baseContext parents nodes = do
+      forM_ nodes $ \someNode@(SomeNode node) -> do
+        refresh baseContext node (someNode :| parents)
+
+        whenM (readTVarIO (_toggled (getEntityData node))) $
+          atomically (getExistentialChildrenWrapped node)
+            >>= refreshVisibleNodes baseContext (someNode : parents)
