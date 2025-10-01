@@ -30,7 +30,7 @@ getQuarterCircleSpinner counter =
 fetchableQuarterCircleSpinner :: Int -> Fetchable a -> Widget n
 fetchableQuarterCircleSpinner animationCounter fetchableState =
   case fetchableState of
-    Fetching -> padLeft (Pad 1) $ getQuarterCircleSpinner animationCounter
+    Fetching _ -> padLeft (Pad 1) $ getQuarterCircleSpinner animationCounter
     _ -> str ""
 
 getSpinningIcon :: Int -> Widget n

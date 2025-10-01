@@ -52,7 +52,9 @@ listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget Clickable
 listDrawElement appState ix isSelected (SomeNode (PaginatedReposNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
     Fetched repos -> paginatedHeading ed appState "Repositories" (str [i|(#{length repos})|])
-    Fetching -> paginatedHeading ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    Fetching maybeRepos -> case maybeRepos of
+      Just repos -> paginatedHeading ed appState "Repositories" (str [i|(#{length repos}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Repositories" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Repositories" (str [i|(error fetching: #{err})|])
   ]
@@ -65,7 +67,9 @@ listDrawElement appState ix isSelected (SomeNode (RepoNode x@(EntityData {_stati
 listDrawElement appState ix isSelected (SomeNode (PaginatedIssuesNode x@(EntityData {_state}))) = wrapper ix isSelected x [
   Just $ case _state of
     Fetched (SearchResult totalCount _xs) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount})|])
-    Fetching -> paginatedHeading x appState "Issues" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    Fetching maybeIssues -> case maybeIssues of
+      Just (SearchResult totalCount _xs) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading x appState "Issues" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading x appState "Issues" (str [i|(not fetched)|])
     Errored err -> paginatedHeading x appState "Issues" (str [i|(error fetching: #{err})|])
   ]
@@ -73,7 +77,7 @@ listDrawElement appState ix isSelected (SomeNode (SingleIssueNode ed@(EntityData
   Just $ issueLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
-      guardFetched _state $ \comments ->
+      guardFetchedOrHasPrevious _state $ \comments ->
         guardJust (issueBody issue) $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
@@ -85,7 +89,9 @@ listDrawElement appState ix isSelected (SomeNode (SingleIssueNode ed@(EntityData
 listDrawElement appState ix isSelected (SomeNode (PaginatedPullsNode ed@(EntityData {_state}))) = wrapper ix isSelected ed [
   Just $ case _state of
     Fetched (SearchResult totalCount _xs) -> paginatedHeading ed appState "Pulls" (str [i|(#{totalCount})|])
-    Fetching -> paginatedHeading ed appState "Pulls" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    Fetching maybePulls -> case maybePulls of
+      Just (SearchResult totalCount _xs) -> paginatedHeading ed appState "Pulls" (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "Pulls" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Pulls" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Pulls" (str [i|(error fetching: #{err})|])
   ]
@@ -93,7 +99,7 @@ listDrawElement appState ix isSelected (SomeNode (SinglePullNode ed@(EntityData 
   Just $ pullLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
-      guardFetched _state $ \comments ->
+      guardFetchedOrHasPrevious _state $ \comments ->
         guardJust (issueBody issue) $ \body ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
@@ -105,7 +111,9 @@ listDrawElement appState ix isSelected (SomeNode (SinglePullNode ed@(EntityData 
 listDrawElement appState ix isSelected (SomeNode (PaginatedWorkflowsNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
     Fetched (WithTotalCount _xs totalCount) -> paginatedHeading ed appState "Actions" (str [i|(#{totalCount})|])
-    Fetching -> paginatedHeading ed appState "Actions" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    Fetching maybeWorkflows -> case maybeWorkflows of
+      Just (WithTotalCount _xs totalCount) -> paginatedHeading ed appState "Actions" (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "Actions" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Actions" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Actions" (str [i|(error fetching: #{err})|])
   ]
@@ -113,7 +121,7 @@ listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityD
   Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state
   , do
       guard _toggled
-      guardFetched _state $ \_ ->
+      guardFetchedOrHasPrevious _state $ \_ ->
         return $ padLeft (Pad 4) $
           fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
             workflowInner wf _state
@@ -124,7 +132,9 @@ listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityD
 listDrawElement appState ix isSelected (SomeNode (PaginatedBranchesNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
     Fetched branches -> paginatedHeading ed appState "Branches" (str [i|(#{length branches})|])
-    Fetching -> paginatedHeading ed appState "Branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    Fetching maybeBranches -> case maybeBranches of
+      Just branches -> paginatedHeading ed appState "Branches" (str [i|(#{length branches}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "Branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Branches" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Branches" (str [i|(error fetching: #{err})|])
   ]

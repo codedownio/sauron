@@ -10,7 +10,6 @@ module Sauron.UI.Workflow (
 import Brick
 import Data.String.Interpolate
 import Data.Time.Clock
-import qualified Data.Vector as V
 import GitHub
 import Relude
 import Sauron.Types
@@ -68,7 +67,7 @@ unknown = withAttr unknownAttr (str "?")
 
 
 workflowInner :: WorkflowRun -> Fetchable (NodeState SingleWorkflowT) -> Widget n
-workflowInner (WorkflowRun {..}) jobsFetchable = vBox $ workflowDetails
+workflowInner (WorkflowRun {..}) _jobsFetchable = vBox $ workflowDetails
   where
     runTime = diffUTCTime workflowRunUpdatedAt workflowRunStartedAt
 

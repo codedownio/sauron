@@ -267,14 +267,22 @@ type family Switchable (f :: Type -> Type) x where
 
 data Fetchable a =
   NotFetched
-  | Fetching
+  | Fetching (Maybe a)
   | Errored Text
   | Fetched a
   deriving (Show, Eq)
 
+fetchableCurrent :: Fetchable a -> Maybe a
+fetchableCurrent (Fetched x) = Just x
+fetchableCurrent (Fetching x) = x
+fetchableCurrent _ = Nothing
+
+readFetchableCurrentSTM :: MonadIO m => TVar (Fetchable a) -> m (Maybe a)
+readFetchableCurrentSTM var = fetchableCurrent <$> readTVarIO var
+
 instance Functor Fetchable where
   fmap _ NotFetched = NotFetched
-  fmap _ Fetching = Fetching
+  fmap f (Fetching ma) = Fetching (f <$> ma)
   fmap _ (Errored e) = Errored e
   fmap f (Fetched a) = Fetched (f a)
 

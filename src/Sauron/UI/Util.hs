@@ -52,6 +52,16 @@ guardFetched fetchable fn = do
     Fetched x -> fn x
     _ -> error "impossible"
 
+guardFetchedOrHasPrevious :: (Monad m, Alternative m) => Fetchable a -> (a -> m b) -> m b
+guardFetchedOrHasPrevious fetchable fn = do
+  guard (isFetchedOrHasPrevious fetchable)
+  case fetchableCurrent fetchable of
+    Just x -> fn x
+    _ -> error "impossible"
+
 isFetched :: Fetchable a -> Bool
 isFetched (Fetched _) = True
 isFetched _ = False
+
+isFetchedOrHasPrevious :: Fetchable a -> Bool
+isFetchedOrHasPrevious = isJust . fetchableCurrent

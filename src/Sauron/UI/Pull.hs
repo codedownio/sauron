@@ -52,7 +52,9 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
     comments :: [Widget n]
     comments = case inner of
       Fetched cs -> fmap renderComment (toList cs)
-      Fetching {} -> [strWrap [i|Fetching comments...|]]
+      Fetching maybeCs -> case maybeCs of
+        Just cs -> fmap renderComment (toList cs) ++ [strWrap [i|Refreshing comments...|]]
+        Nothing -> [strWrap [i|Fetching comments...|]]
       Errored err -> [strWrap [i|Failed to fetch comments: #{err}|]]
       NotFetched -> [strWrap [i|Comments not fetched.|]]
 

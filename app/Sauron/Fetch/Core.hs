@@ -23,16 +23,19 @@ fetchPaginated'' :: (
   )
   => (FetchCount -> Request k res)
   -> TVar PageInfo
-  -> (Fetchable a -> STM ())
+  -> TVar (Fetchable a)
   -> (Either Text (res, PageInfo) -> STM ())
   -> m ()
-fetchPaginated'' mkReq pageInfoVar writeFetchable cb = do
+fetchPaginated'' mkReq pageInfoVar stateVar cb = do
   BaseContext {auth, manager} <- ask
 
   PageInfo {pageInfoCurrentPage} <- readTVarIO pageInfoVar
 
-  bracketOnError_ (atomically $ writeFetchable Fetching)
-                  (atomically $ writeFetchable (Errored "Fetch failed with exception.")) $
+  bracketOnError_ (atomically $ do
+                      previous <- fetchableCurrent <$> readTVar stateVar
+                      writeTVar stateVar (Fetching previous)
+                  )
+                  (atomically $ writeTVar stateVar (Errored "Fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just pageInfoCurrentPage))))) >>= \case
       Left err -> atomically $ do
         cb $ Left (show err)

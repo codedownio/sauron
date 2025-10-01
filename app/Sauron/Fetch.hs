@@ -46,7 +46,10 @@ fetchRepo :: (
   ) => Name Owner -> Name Repo -> TVar (Fetchable Repo) -> m ()
 fetchRepo owner name repoVar = do
   BaseContext {auth} <- ask
-  bracketOnError_ (atomically $ writeTVar repoVar Fetching)
+  bracketOnError_ (atomically $ do
+                      previous <- fetchableCurrent <$> readTVar repoVar
+                      writeTVar repoVar (Fetching previous)
+                  )
                   (atomically $ writeTVar repoVar (Errored "Repo fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ github auth (repositoryR owner name)) >>= \case
       Left err -> atomically $ writeTVar repoVar (Errored (show err))
@@ -57,7 +60,7 @@ fetchRepos :: (
   ) => Name User -> Node Variable PaginatedReposT -> m ()
 fetchRepos userLogin (PaginatedReposNode (EntityData {..})) = do
   bc <- ask
-  fetchPaginated'' (\fetchCount -> userReposR (N $ untagName userLogin) RepoPublicityAll fetchCount) _pageInfo (writeTVar _state) $ \case
+  fetchPaginated'' (\fetchCount -> userReposR (N $ untagName userLogin) RepoPublicityAll fetchCount) _pageInfo _state $ \case
     Left err -> do
       writeTVar _state (Errored (show err))
       writeTVar _children []
@@ -81,7 +84,7 @@ fetchIssues owner name (PaginatedIssuesNode (EntityData {..})) = do
 
   bc <- ask
 
-  fetchPaginated'' (searchIssuesR fullQuery) _pageInfo (writeTVar _state) $ \case
+  fetchPaginated'' (searchIssuesR fullQuery) _pageInfo _state $ \case
     Left err -> do
       writeTVar _state (Errored (show err))
       writeTVar _children []
@@ -102,7 +105,7 @@ fetchPulls owner name (PaginatedPullsNode (EntityData {..})) = do
 
   bc <- ask
 
-  fetchPaginated'' (searchIssuesR fullQuery) _pageInfo (writeTVar _state) $ \case
+  fetchPaginated'' (searchIssuesR fullQuery) _pageInfo _state $ \case
     Left err -> do
       writeTVar _state (Errored (show err))
       writeTVar _children []
@@ -117,7 +120,7 @@ fetchBranches :: (
   ) => Name Owner -> Name Repo -> Node Variable PaginatedBranchesT -> m ()
 fetchBranches owner name (PaginatedBranchesNode (EntityData {..})) = do
   bc <- ask
-  fetchPaginated'' (branchesForR owner name) _pageInfo (writeTVar _state) $ \case
+  fetchPaginated'' (branchesForR owner name) _pageInfo _state $ \case
     Left err -> do
       writeTVar _state (Errored (show err))
       writeTVar _children []
@@ -133,7 +136,10 @@ fetchBranchCommits :: (
 fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..})) = do
   bc@(BaseContext {auth, manager}) <- ask
   let branchSha = branchCommitSha $ branchCommit branch
-  bracketOnError_ (atomically $ writeTVar _state Fetching)
+  bracketOnError_ (atomically $ do
+                      previous <- fetchableCurrent <$> readTVar _state
+                      writeTVar _state (Fetching previous)
+                  )
                   (atomically $ writeTVar _state (Errored "Branch commits fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commitsWithOptionsForR owner name (FetchAtLeast 10) [CommitQuerySha branchSha])) >>= \case
       Left err -> atomically $ do
@@ -149,8 +155,11 @@ fetchIssue :: (
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable Issue) -> m ()
 fetchIssue owner name issueNumber issueVar = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar issueVar Fetching)
-                  (atomically $ writeTVar issueVar (Errored "Workflows fetch failed with exception.")) $
+  bracketOnError_ (atomically $ do
+                      previous <- fetchableCurrent <$> readTVar issueVar
+                      writeTVar issueVar (Fetching previous)
+                  )
+                  (atomically $ writeTVar issueVar (Errored "Issue fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
       Left err -> atomically $ do
         writeTVar issueVar (Errored (show err))
@@ -162,7 +171,7 @@ fetchWorkflows :: (
   ) => Name Owner -> Name Repo -> Node Variable PaginatedWorkflowsT -> m ()
 fetchWorkflows owner name (PaginatedWorkflowsNode (EntityData {..})) = do
   bc <- ask
-  fetchPaginated'' (workflowRunsR owner name mempty) _pageInfo (writeTVar _state) $ \case
+  fetchPaginated'' (workflowRunsR owner name mempty) _pageInfo _state $ \case
     Left err -> do
       writeTVar _state (Errored (show err))
       writeTVar _children []
@@ -177,7 +186,10 @@ fetchIssueComments :: (
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector IssueComment)) -> m ()
 fetchIssueComments owner name issueNumber inner = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar inner Fetching)
+  bracketOnError_ (atomically $ do
+                      previous <- fetchableCurrent <$> readTVar inner
+                      writeTVar inner (Fetching previous)
+                  )
                   (atomically $ writeTVar inner (Errored "Issue comments fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
@@ -188,7 +200,10 @@ fetchPullComments :: (
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector IssueComment)) -> m ()
 fetchPullComments owner name issueNumber inner = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar inner Fetching)
+  bracketOnError_ (atomically $ do
+                      previous <- fetchableCurrent <$> readTVar inner
+                      writeTVar inner (Fetching previous)
+                  )
                   (atomically $ writeTVar inner (Errored "Pull comments fetch failed with exception.")) $
     -- pullRequestCommentsR returns comments on the "unified diff"
     -- there are also "commit comments" and "issue comments".
@@ -202,7 +217,10 @@ fetchWorkflowJobs :: (
   ) => Name Owner -> Name Repo -> Id WorkflowRun -> Node Variable SingleWorkflowT -> m ()
 fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})) = do
   bc@(BaseContext {auth, manager}) <- ask
-  bracketOnError_ (atomically $ writeTVar _state Fetching)
+  bracketOnError_ (atomically $ do
+                      previous <- fetchableCurrent <$> readTVar _state
+                      writeTVar _state (Fetching previous)
+                  )
                   (atomically $ writeTVar _state (Errored "Workflow jobs fetch failed with exception.")) $
     -- pullRequestCommentsR returns comments on the "unified diff"
     -- there are also "commit comments" and "issue comments".
@@ -233,7 +251,10 @@ fetchJobLogs :: (
   ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
 fetchJobLogs owner name (Job {jobId}) (SingleJobNode (EntityData {..})) = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ writeTVar _state Fetching)
+  bracketOnError_ (atomically $ do
+                      previous <- fetchableCurrent <$> readTVar _state
+                      writeTVar _state (Fetching previous)
+                  )
                   (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
     -- First, get the download URI
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case

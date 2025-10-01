@@ -36,7 +36,7 @@ healthIndicator _ = Nothing
 
 repoAttr :: Fetchable Repo -> AttrName
 repoAttr NotFetched = notFetchedAttr
-repoAttr Fetching = fetchingAttr
+repoAttr (Fetching {}) = fetchingAttr
 repoAttr (Errored {}) = erroredAttr
 repoAttr (Fetched {}) = normalAttr
 
