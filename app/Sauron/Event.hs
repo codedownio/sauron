@@ -154,6 +154,7 @@ getNodeUrl repoBaseUrl (PaginatedPullsNode _) = repoBaseUrl <> "/pulls"
 getNodeUrl repoBaseUrl (PaginatedWorkflowsNode _) = repoBaseUrl <> "/actions"
 getNodeUrl _repoBaseUrl (PaginatedReposNode _) = ""
 getNodeUrl repoBaseUrl (PaginatedBranchesNode _) = repoBaseUrl <> "/branches"
+getNodeUrl _repoBaseUrl (PaginatedNotificationsNode _) = "https://github.com/notifications"
 getNodeUrl repoBaseUrl (SingleIssueNode (EntityData {_static=issue})) = case issueHtmlUrl issue of
   Just url -> toString $ getUrl url
   Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber issue}|]
@@ -164,6 +165,7 @@ getNodeUrl _repoBaseUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) 
 getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_static=job})) = toString $ getUrl $ jobHtmlUrl job
 getNodeUrl repoBaseUrl (SingleBranchNode (EntityData {_static=branch})) = repoBaseUrl <> "/tree/" <> toString (branchName branch)
 getNodeUrl repoBaseUrl (SingleCommitNode (EntityData {_static=commit})) = repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit))
+getNodeUrl _repoBaseUrl (SingleNotificationNode _) = "https://github.com/notifications" -- Notifications don't have individual URLs
 getNodeUrl _repoBaseUrl (JobLogGroupNode _) = "" -- Job log groups don't have URLs
 getNodeUrl _repoBaseUrl (HeadingNode _) = "" -- Heading nodes don't have URLs
 getNodeUrl repoBaseUrl (RepoNode _) = repoBaseUrl

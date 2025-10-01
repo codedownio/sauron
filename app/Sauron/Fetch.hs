@@ -20,6 +20,8 @@ module Sauron.Fetch (
   , fetchBranches
   , fetchBranchCommits
 
+  , fetchNotifications
+
   , fetchWorkflowJobs
   , fetchJobLogs
   ) where
@@ -126,6 +128,21 @@ fetchBranches owner name (PaginatedBranchesNode (EntityData {..})) = do
       writeTVar _state (Fetched branches)
       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
         SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+
+fetchNotifications :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Node Variable PaginatedNotificationsT -> m ()
+fetchNotifications (PaginatedNotificationsNode (EntityData {..})) = do
+  bc <- ask
+  fetchPaginated'' (getNotificationsR) _pageInfo _state $ \case
+    Left err -> do
+      writeTVar _state (Errored (show err))
+      writeTVar _children []
+    Right (notifications, newPageInfo) -> do
+      writeTVar _pageInfo newPageInfo
+      writeTVar _state (Fetched notifications)
+      (writeTVar _children =<<) $ forM (V.toList notifications) $ \notification ->
+        SingleNotificationNode <$> makeEmptyElem bc notification "" (_depth + 1)
 
 fetchBranchCommits :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m

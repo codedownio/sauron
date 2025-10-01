@@ -24,6 +24,7 @@ import Sauron.UI.Branch
 import Sauron.UI.Commit
 import Sauron.UI.Issue
 import Sauron.UI.Job
+import Sauron.UI.Notification
 import Sauron.UI.Pagination
 import Sauron.UI.Pull
 import Sauron.UI.Repo
@@ -161,6 +162,27 @@ listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {
     maybeJobLogs = case _state of
       Fetched logs -> Just logs
       _ -> Nothing
+
+-- * Notifications
+
+listDrawElement appState ix isSelected (SomeNode (PaginatedNotificationsNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+  Just $ case _state of
+    Fetched notifications -> paginatedHeading ed appState "Notifications" (str [i|(#{length notifications})|])
+    Fetching maybeNotifications -> case maybeNotifications of
+      Just notifications -> paginatedHeading ed appState "Notifications" (str [i|(#{length notifications}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "Notifications" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Notifications" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Notifications" (str [i|(error fetching: #{err})|])
+  ]
+
+listDrawElement appState ix isSelected (SomeNode (SingleNotificationNode ed@(EntityData {_static=notification, ..}))) = wrapper ix isSelected ed [
+  Just $ notificationLine _toggled notification (_appAnimationCounter appState) _state
+  , do
+      guard _toggled
+      return $ padLeft (Pad 4) $
+        fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+          notificationInner notification
+  ]
 
 -- * Job Log Groups
 

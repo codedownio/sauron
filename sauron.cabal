@@ -42,6 +42,7 @@ library
       Sauron.UI.Markdown.Footnotes
       Sauron.UI.Markdown.Table
       Sauron.UI.Markdown.Wrapping
+      Sauron.UI.Notification
       Sauron.UI.Pagination
       Sauron.UI.Pull
       Sauron.UI.Repo

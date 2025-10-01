@@ -47,6 +47,8 @@ refresh bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (En
   liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflows owner name item) bc
 refresh bc item@(PaginatedBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranches owner name item) bc
+refresh bc item@(PaginatedNotificationsNode _) _parents =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchNotifications item) bc
 refresh bc item@(PaginatedReposNode (EntityData {_static=userLogin})) _parents =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchRepos userLogin item) bc
 refresh bc (SingleIssueNode (EntityData {_static=issue, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
@@ -63,6 +65,7 @@ refresh bc item@(SingleJobNode (EntityData {_static=job})) parents@(findRepoPare
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 refresh bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc
+refresh _ (SingleNotificationNode _) _ = return ()
 refresh _ _ _ = return ()
 
 refreshAll :: (

@@ -39,6 +39,7 @@ data Node f (a :: NodeTyp) where
   PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> Node f 'PaginatedWorkflowsT
   PaginatedReposNode :: EntityData f 'PaginatedReposT -> Node f 'PaginatedReposT
   PaginatedBranchesNode :: EntityData f 'PaginatedBranchesT -> Node f 'PaginatedBranchesT
+  PaginatedNotificationsNode :: EntityData f 'PaginatedNotificationsT -> Node f 'PaginatedNotificationsT
 
   SingleIssueNode :: EntityData f 'SingleIssueT -> Node f 'SingleIssueT
   SinglePullNode :: EntityData f 'SinglePullT -> Node f 'SinglePullT
@@ -46,6 +47,7 @@ data Node f (a :: NodeTyp) where
   SingleJobNode :: EntityData f 'SingleJobT -> Node f 'SingleJobT
   SingleBranchNode :: EntityData f 'SingleBranchT -> Node f 'SingleBranchT
   SingleCommitNode :: EntityData f 'SingleCommitT -> Node f 'SingleCommitT
+  SingleNotificationNode :: EntityData f 'SingleNotificationT -> Node f 'SingleNotificationT
   JobLogGroupNode :: EntityData f 'JobLogGroupT -> Node f 'JobLogGroupT
 
 data NodeTyp =
@@ -57,6 +59,7 @@ data NodeTyp =
   | PaginatedWorkflowsT
   | PaginatedReposT
   | PaginatedBranchesT
+  | PaginatedNotificationsT
 
   | SingleIssueT
   | SinglePullT
@@ -64,6 +67,7 @@ data NodeTyp =
   | SingleJobT
   | SingleBranchT
   | SingleCommitT
+  | SingleNotificationT
   | JobLogGroupT
 
 deriving instance Eq (EntityData Fixed a) => Eq (Node Fixed a)
@@ -77,6 +81,7 @@ instance Show (Node f a) where
   show (PaginatedWorkflowsNode (EntityData {..})) = [i|PaginatedWorkflowsNode<#{_ident}>|]
   show (PaginatedReposNode (EntityData {..})) = [i|PaginatedReposNode<#{_ident}>|]
   show (PaginatedBranchesNode (EntityData {..})) = [i|PaginatedBranchesNode<#{_ident}>|]
+  show (PaginatedNotificationsNode (EntityData {..})) = [i|PaginatedNotificationsNode<#{_ident}>|]
 
   show (SingleIssueNode (EntityData {..})) = [i|SingleIssueNode<#{_ident}>|]
   show (SinglePullNode (EntityData {..})) = [i|SinglePullNode<#{_ident}>|]
@@ -84,6 +89,7 @@ instance Show (Node f a) where
   show (SingleJobNode (EntityData {..})) = [i|SingleJobNode<#{_ident}>|]
   show (SingleBranchNode (EntityData {..})) = [i|SingleBranchNode<#{_ident}>|]
   show (SingleCommitNode (EntityData {..})) = [i|SingleCommitNode<#{_ident}>|]
+  show (SingleNotificationNode (EntityData {..})) = [i|SingleNotificationNode<#{_ident}>|]
   show (JobLogGroupNode (EntityData {..})) = [i|JobLogGroupNode<#{_ident}>|]
 
 -- * Entity data
@@ -118,12 +124,14 @@ type family NodeStatic a where
   NodeStatic PaginatedWorkflowsT = ()
   NodeStatic PaginatedReposT = Name User
   NodeStatic PaginatedBranchesT = ()
+  NodeStatic PaginatedNotificationsT = ()
   NodeStatic SingleIssueT = Issue
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun
   NodeStatic SingleJobT = Job
   NodeStatic SingleBranchT = Branch
   NodeStatic SingleCommitT = Commit
+  NodeStatic SingleNotificationT = Notification
   NodeStatic JobLogGroupT = JobLogGroup
   NodeStatic HeadingT = Text
   NodeStatic RepoT = (Name Owner, Name Repo)
@@ -134,12 +142,14 @@ type family NodeState a where
   NodeState PaginatedWorkflowsT = WithTotalCount WorkflowRun
   NodeState PaginatedReposT = V.Vector Repo
   NodeState PaginatedBranchesT = V.Vector Branch
+  NodeState PaginatedNotificationsT = V.Vector Notification
   NodeState SingleIssueT = V.Vector IssueComment
   NodeState SinglePullT = V.Vector IssueComment
   NodeState SingleWorkflowT = WithTotalCount Job
   NodeState SingleJobT = [JobLogGroup]
   NodeState SingleBranchT = V.Vector Commit
   NodeState SingleCommitT = ()
+  NodeState SingleNotificationT = ()
   NodeState JobLogGroupT = ()
   NodeState HeadingT = ()
   NodeState RepoT = Repo
@@ -150,12 +160,14 @@ type family NodeChildType f a where
   NodeChildType f PaginatedWorkflowsT = Node f SingleWorkflowT
   NodeChildType f PaginatedReposT = Node f RepoT
   NodeChildType f PaginatedBranchesT = Node f SingleBranchT
+  NodeChildType f PaginatedNotificationsT = Node f SingleNotificationT
   NodeChildType f SingleIssueT = ()
   NodeChildType f SinglePullT = ()
   NodeChildType f SingleWorkflowT = Node f SingleJobT
   NodeChildType f SingleJobT = Node f JobLogGroupT
   NodeChildType f SingleBranchT = Node f SingleCommitT
   NodeChildType f SingleCommitT = ()
+  NodeChildType f SingleNotificationT = ()
   NodeChildType f JobLogGroupT = Node f JobLogGroupT
   NodeChildType f HeadingT = SomeNode f
   NodeChildType f RepoT = SomeNode f
@@ -194,6 +206,7 @@ getExistentialChildrenWrapped node = case node of
   PaginatedWorkflowsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedReposNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedNotificationsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleWorkflowNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleJobNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleBranchNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
@@ -203,6 +216,7 @@ getExistentialChildrenWrapped node = case node of
   SingleIssueNode _ -> return []
   SinglePullNode _ -> return []
   SingleCommitNode _ -> return []
+  SingleNotificationNode _ -> return []
 
 getEntityData :: Node f a -> EntityData f a
 getEntityData node = node ^. entityDataL
@@ -216,12 +230,14 @@ entityDataL f (PaginatedPullsNode ed) = PaginatedPullsNode <$> f ed
 entityDataL f (PaginatedWorkflowsNode ed) = PaginatedWorkflowsNode <$> f ed
 entityDataL f (PaginatedReposNode ed) = PaginatedReposNode <$> f ed
 entityDataL f (PaginatedBranchesNode ed) = PaginatedBranchesNode <$> f ed
+entityDataL f (PaginatedNotificationsNode ed) = PaginatedNotificationsNode <$> f ed
 entityDataL f (SingleIssueNode ed) = SingleIssueNode <$> f ed
 entityDataL f (SinglePullNode ed) = SinglePullNode <$> f ed
 entityDataL f (SingleWorkflowNode ed) = SingleWorkflowNode <$> f ed
 entityDataL f (SingleJobNode ed) = SingleJobNode <$> f ed
 entityDataL f (SingleBranchNode ed) = SingleBranchNode <$> f ed
 entityDataL f (SingleCommitNode ed) = SingleCommitNode <$> f ed
+entityDataL f (SingleNotificationNode ed) = SingleNotificationNode <$> f ed
 entityDataL f (JobLogGroupNode ed) = JobLogGroupNode <$> f ed
 entityDataL f (HeadingNode ed) = HeadingNode <$> f ed
 entityDataL f (RepoNode ed) = RepoNode <$> f ed
