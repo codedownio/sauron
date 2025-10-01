@@ -1,8 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Sauron.UI.Statuses (
-  statusToIcon
-  , statusToIconAnimated
+  statusToIconAnimated
   , getQuarterCircleSpinner
   , fetchableQuarterCircleSpinner
   , chooseWorkflowStatus
@@ -41,29 +40,14 @@ getSpinningIcon counter =
         [] -> "⣾"  -- fallback
   in withAttr queuedAttr (str icon)
 
-statusToIcon :: Text -> Widget n
-statusToIcon = workflowStatusToIcon . chooseWorkflowStatus
-
-statusToIconAnimated :: Int -> Text -> Widget n
-statusToIconAnimated counter status'
-  | status' == "queued" = queuedIcon
-  | status' == "in_progress" = getSpinningIcon counter
-  | status' == "running" = getSpinningIcon counter
-  | otherwise = case chooseWorkflowStatus status' of
-      WorkflowSuccess -> greenCheck
-      WorkflowPending -> getSpinningIcon counter
-      WorkflowFailed -> redX
-      WorkflowCancelled -> cancelled
-      WorkflowNeutral -> neutral
-      WorkflowUnknown -> queuedIcon
-
-workflowStatusToIcon :: WorkflowStatus -> Widget n
-workflowStatusToIcon WorkflowSuccess = greenCheck
-workflowStatusToIcon WorkflowPending = ellipses
-workflowStatusToIcon WorkflowFailed = redX
-workflowStatusToIcon WorkflowCancelled = cancelled
-workflowStatusToIcon WorkflowNeutral = neutral
-workflowStatusToIcon WorkflowUnknown = unknown
+statusToIconAnimated :: Int -> WorkflowStatus -> Widget n
+statusToIconAnimated _ WorkflowSuccess = greenCheck
+statusToIconAnimated _ WorkflowPending = queuedIcon
+statusToIconAnimated counter WorkflowRunning = getSpinningIcon counter
+statusToIconAnimated _ WorkflowFailed = redX
+statusToIconAnimated _ WorkflowCancelled = cancelled
+statusToIconAnimated _ WorkflowNeutral = neutral
+statusToIconAnimated _ WorkflowUnknown = unknown
 
 queuedIcon :: Widget n
 queuedIcon = withAttr queuedAttr (str "●")
@@ -71,7 +55,6 @@ queuedIcon = withAttr queuedAttr (str "●")
 cancelled = withAttr cancelledAttr (str "⊘")
 greenCheck = withAttr greenCheckAttr (str "✓")
 redX = withAttr redXAttr (str "✗")
-ellipses = withAttr ellipsesAttr (str "⋯")
 neutral = withAttr neutralAttr (str "-")
 unknown = withAttr unknownAttr (str "?")
 
@@ -85,7 +68,8 @@ chooseWorkflowStatus "skipped" = WorkflowCancelled
 chooseWorkflowStatus "stale" = WorkflowNeutral
 chooseWorkflowStatus "success" = WorkflowSuccess
 chooseWorkflowStatus "timed_out" = WorkflowFailed
-chooseWorkflowStatus "in_progress" = WorkflowPending
+chooseWorkflowStatus "in_progress" = WorkflowRunning
+chooseWorkflowStatus "running" = WorkflowRunning
 chooseWorkflowStatus "queued" = WorkflowPending
 chooseWorkflowStatus "requested" = WorkflowPending
 chooseWorkflowStatus "waiting" = WorkflowPending

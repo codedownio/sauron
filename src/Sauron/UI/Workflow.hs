@@ -3,7 +3,6 @@
 
 module Sauron.UI.Workflow (
   workflowLine
-  , workflowStatusToIcon
   , workflowInner
   ) where
 
@@ -14,7 +13,7 @@ import GitHub
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Statuses (statusToIconAnimated, fetchableQuarterCircleSpinner)
+import Sauron.UI.Statuses
 import Sauron.UI.Util.TimeDiff
 
 
@@ -28,7 +27,7 @@ workflowLine animationCounter toggled (WorkflowRun {..}) fetchableState = vBox [
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString workflowRunDisplayTitle
-      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe workflowRunStatus workflowRunConclusion
+      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe workflowRunStatus workflowRunConclusion
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ hBox [
           withAttr branchAttr $ str (toString workflowRunHeadBranch)
@@ -47,24 +46,6 @@ workflowLine animationCounter toggled (WorkflowRun {..}) fetchableState = vBox [
       , str " pushed by "
       , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
       ]
-
-
-
-workflowStatusToIcon :: WorkflowStatus -> Widget n
-workflowStatusToIcon WorkflowSuccess = greenCheck
-workflowStatusToIcon WorkflowPending = ellipses
-workflowStatusToIcon WorkflowFailed = redX
-workflowStatusToIcon WorkflowCancelled = cancelled
-workflowStatusToIcon WorkflowNeutral = neutral
-workflowStatusToIcon WorkflowUnknown = unknown
-
-cancelled = withAttr cancelledAttr (str "⊘")
-greenCheck = withAttr greenCheckAttr (str "✓")
-redX = withAttr redXAttr (str "✗")
-ellipses = withAttr ellipsesAttr (str "⋯")
-neutral = withAttr neutralAttr (str "-")
-unknown = withAttr unknownAttr (str "?")
-
 
 workflowInner :: WorkflowRun -> Fetchable (NodeState SingleWorkflowT) -> Widget n
 workflowInner (WorkflowRun {..}) _jobsFetchable = vBox $ workflowDetails

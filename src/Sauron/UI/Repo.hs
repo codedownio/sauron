@@ -10,9 +10,8 @@ import GitHub hiding (Status)
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
+import Sauron.UI.Statuses
 import Sauron.UI.Util
-import Sauron.UI.Workflow (workflowStatusToIcon)
 
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> Fetchable Repo -> Fetchable HealthCheckResult -> Int -> Widget n
@@ -24,15 +23,15 @@ renderRepoLine isToggled (owner, name) fetchableRepo fetchableHealthCheck animat
       , withAttr attr (str (toString (untagName name)))
       ]
   , Just $ fetchableQuarterCircleSpinner animationCounter fetchableRepo
-  , healthIndicator fetchableHealthCheck
+  , healthIndicator fetchableHealthCheck animationCounter
   , Just (padLeft Max (fetchableStatsBox fetchableRepo))
   ]
   where
     attr = repoAttr fetchableRepo
 
-healthIndicator :: Fetchable HealthCheckResult -> Maybe (Widget n)
-healthIndicator (Fetched (HealthCheckWorkflowResult ws)) = Just (padLeft (Pad 1) (workflowStatusToIcon ws))
-healthIndicator _ = Nothing
+healthIndicator :: Fetchable HealthCheckResult -> Int -> Maybe (Widget n)
+healthIndicator (Fetched (HealthCheckWorkflowResult ws)) animationCounter = Just (padLeft (Pad 1) (statusToIconAnimated animationCounter ws))
+healthIndicator _ _ = Nothing
 
 repoAttr :: Fetchable Repo -> AttrName
 repoAttr NotFetched = notFetchedAttr

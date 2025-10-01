@@ -12,7 +12,7 @@ import GitHub
 import Relude
 import Sauron.Types (JobLogGroup(..), Fetchable(..))
 import Sauron.UI.AttrMap
-import Sauron.UI.Statuses (statusToIconAnimated, fetchableQuarterCircleSpinner)
+import Sauron.UI.Statuses
 import Sauron.UI.Util.TimeDiff
 
 jobLine :: Int -> Bool -> Job -> Fetchable a -> Widget n
@@ -21,7 +21,7 @@ jobLine animationCounter toggled (Job {..}) fetchableState = vBox [line1, line2]
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString $ untagName jobName
-      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStatus jobConclusion
+      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe jobStatus jobConclusion
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ str $ calculateDuration jobStartedAt jobCompletedAt
       ]
@@ -54,7 +54,7 @@ jobInner animationCounter (Job {..}) _maybeJobLogs' = vBox [
     renderJobStep :: JobStep -> Widget n
     renderJobStep (JobStep {..}) = hBox [
       withAttr normalAttr $ str $ toString $ untagName jobStepName
-      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ fromMaybe jobStepStatus jobStepConclusion
+      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe jobStepStatus jobStepConclusion
       ]
 
     -- renderJobLogGroup :: JobLogGroup -> Widget n

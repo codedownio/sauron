@@ -310,6 +310,7 @@ instance Functor Fetchable where
 data WorkflowStatus =
   WorkflowSuccess
   | WorkflowPending
+  | WorkflowRunning
   | WorkflowFailed
   | WorkflowCancelled
   | WorkflowNeutral
