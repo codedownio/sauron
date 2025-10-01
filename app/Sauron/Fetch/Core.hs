@@ -31,10 +31,7 @@ fetchPaginated'' mkReq pageInfoVar stateVar cb = do
 
   PageInfo {pageInfoCurrentPage} <- readTVarIO pageInfoVar
 
-  bracketOnError_ (atomically $ do
-                      previous <- fetchableCurrent <$> readTVar stateVar
-                      writeTVar stateVar (Fetching previous)
-                  )
+  bracketOnError_ (atomically $ markFetching stateVar)
                   (atomically $ writeTVar stateVar (Errored "Fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just pageInfoCurrentPage))))) >>= \case
       Left err -> atomically $ do

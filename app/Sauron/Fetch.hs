@@ -46,10 +46,7 @@ fetchRepo :: (
   ) => Name Owner -> Name Repo -> TVar (Fetchable Repo) -> m ()
 fetchRepo owner name repoVar = do
   BaseContext {auth} <- ask
-  bracketOnError_ (atomically $ do
-                      previous <- fetchableCurrent <$> readTVar repoVar
-                      writeTVar repoVar (Fetching previous)
-                  )
+  bracketOnError_ (atomically $ markFetching repoVar)
                   (atomically $ writeTVar repoVar (Errored "Repo fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ github auth (repositoryR owner name)) >>= \case
       Left err -> atomically $ writeTVar repoVar (Errored (show err))
@@ -136,10 +133,7 @@ fetchBranchCommits :: (
 fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..})) = do
   bc@(BaseContext {auth, manager}) <- ask
   let branchSha = branchCommitSha $ branchCommit branch
-  bracketOnError_ (atomically $ do
-                      previous <- fetchableCurrent <$> readTVar _state
-                      writeTVar _state (Fetching previous)
-                  )
+  bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Branch commits fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commitsWithOptionsForR owner name (FetchAtLeast 10) [CommitQuerySha branchSha])) >>= \case
       Left err -> atomically $ do
@@ -155,10 +149,7 @@ fetchIssue :: (
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable Issue) -> m ()
 fetchIssue owner name issueNumber issueVar = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ do
-                      previous <- fetchableCurrent <$> readTVar issueVar
-                      writeTVar issueVar (Fetching previous)
-                  )
+  bracketOnError_ (atomically $ markFetching issueVar)
                   (atomically $ writeTVar issueVar (Errored "Issue fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
       Left err -> atomically $ do
@@ -186,10 +177,7 @@ fetchIssueComments :: (
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector IssueComment)) -> m ()
 fetchIssueComments owner name issueNumber inner = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ do
-                      previous <- fetchableCurrent <$> readTVar inner
-                      writeTVar inner (Fetching previous)
-                  )
+  bracketOnError_ (atomically $ markFetching inner)
                   (atomically $ writeTVar inner (Errored "Issue comments fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
@@ -200,10 +188,7 @@ fetchPullComments :: (
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector IssueComment)) -> m ()
 fetchPullComments owner name issueNumber inner = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ do
-                      previous <- fetchableCurrent <$> readTVar inner
-                      writeTVar inner (Fetching previous)
-                  )
+  bracketOnError_ (atomically $ markFetching inner)
                   (atomically $ writeTVar inner (Errored "Pull comments fetch failed with exception.")) $
     -- pullRequestCommentsR returns comments on the "unified diff"
     -- there are also "commit comments" and "issue comments".
@@ -217,10 +202,7 @@ fetchWorkflowJobs :: (
   ) => Name Owner -> Name Repo -> Id WorkflowRun -> Node Variable SingleWorkflowT -> m ()
 fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})) = do
   bc@(BaseContext {auth, manager}) <- ask
-  bracketOnError_ (atomically $ do
-                      previous <- fetchableCurrent <$> readTVar _state
-                      writeTVar _state (Fetching previous)
-                  )
+  bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Workflow jobs fetch failed with exception.")) $
     -- pullRequestCommentsR returns comments on the "unified diff"
     -- there are also "commit comments" and "issue comments".
@@ -251,10 +233,7 @@ fetchJobLogs :: (
   ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
 fetchJobLogs owner name (Job {jobId}) (SingleJobNode (EntityData {..})) = do
   BaseContext {auth, manager} <- ask
-  bracketOnError_ (atomically $ do
-                      previous <- fetchableCurrent <$> readTVar _state
-                      writeTVar _state (Fetching previous)
-                  )
+  bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
     -- First, get the download URI
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case

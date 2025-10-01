@@ -280,6 +280,11 @@ fetchableCurrent _ = Nothing
 readFetchableCurrentSTM :: MonadIO m => TVar (Fetchable a) -> m (Maybe a)
 readFetchableCurrentSTM var = fetchableCurrent <$> readTVarIO var
 
+markFetching :: TVar (Fetchable a) -> STM ()
+markFetching var = do
+  previous <- fetchableCurrent <$> readTVar var
+  writeTVar var (Fetching previous)
+
 instance Functor Fetchable where
   fmap _ NotFetched = NotFetched
   fmap f (Fetching ma) = Fetching (f <$> ma)
