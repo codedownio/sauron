@@ -35,10 +35,12 @@ withScroll s action = do
     _ -> return ()
 
 refresh :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
-refresh bc item@(HeadingNode (EntityData {_children})) _parents =
-  readTVarIO _children >>= mapM_ (\(SomeNode child) -> refresh bc child ((SomeNode item) :| toList _parents))
-refresh bc item@(RepoNode _) _parents =
-  liftIO $ atomically (getExistentialChildrenWrapped item) >>= mapM_ (\(SomeNode childItem) -> refresh bc childItem ((SomeNode item) :| toList _parents))
+refresh _bc _item@(HeadingNode (EntityData {_children})) _parents = do
+  return ()
+  -- readTVarIO _children >>= mapM_ (\(SomeNode child) -> refresh bc child ((SomeNode item) :| toList _parents))
+refresh bc item@(RepoNode (EntityData {_static=(owner, name), _state})) _parents = do
+  liftIO $ void $ async $ flip runReaderT bc $ fetchRepo owner name _state
+  liftIO $ atomically (getExistentialChildrenWrapped item) >>= mapM_ (\(SomeNode childItem) -> refresh bc childItem (SomeNode item :| toList _parents))
 refresh bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
 refresh bc item@(PaginatedPullsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
