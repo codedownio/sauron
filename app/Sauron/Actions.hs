@@ -35,10 +35,12 @@ withScroll s action = do
     _ -> return ()
 
 refresh :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
-refresh bc item@(HeadingNode (EntityData {_children})) _parents =
-  readTVarIO _children >>= mapM_ (\(SomeNode child) -> refresh bc child ((SomeNode item) :| toList _parents))
-refresh bc item@(RepoNode _) _parents =
-  liftIO $ atomically (getExistentialChildrenWrapped item) >>= mapM_ (\(SomeNode childItem) -> refresh bc childItem ((SomeNode item) :| toList _parents))
+refresh _bc _item@(HeadingNode (EntityData {_children})) _parents = do
+  return ()
+  -- readTVarIO _children >>= mapM_ (\(SomeNode child) -> refresh bc child ((SomeNode item) :| toList _parents))
+refresh bc item@(RepoNode (EntityData {_static=(owner, name), _state})) _parents = do
+  liftIO $ void $ async $ flip runReaderT bc $ fetchRepo owner name _state
+  liftIO $ atomically (getExistentialChildrenWrapped item) >>= mapM_ (\(SomeNode childItem) -> refresh bc childItem (SomeNode item :| toList _parents))
 refresh bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
 refresh bc item@(PaginatedPullsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
@@ -73,23 +75,14 @@ refreshAll :: (
   ) => V.Vector (SomeNode Variable) -> m ()
 refreshAll elems = do
   baseContext <- ask
-  allRepos <- liftIO $ collectAllRepos (V.toList elems)
-
-  liftIO $ flip runReaderT baseContext $
-    void $ async $ forConcurrently allRepos $ \case
-      RepoNode (EntityData {_static=(owner, name), _state}) -> do
-        fetchRepo owner name _state
-        -- TODO: clear issues, workflows, etc. and re-fetch for open repos?
+  liftIO $ refreshVisibleNodes baseContext [] (V.toList elems)
 
   where
-    collectAllRepos :: [SomeNode Variable] -> IO [Node Variable RepoT]
-    collectAllRepos = fmap concat . mapM collectFromNode
-      where
-        collectFromNode :: SomeNode Variable -> IO [Node Variable RepoT]
-        collectFromNode (SomeNode item@(RepoNode {})) = return [item]
-        collectFromNode (SomeNode item@(HeadingNode {})) = do
-          children <- getExistentialChildren item
-          collectAllRepos children
-        collectFromNode (SomeNode _item) =
-          -- Other node types don't contain repos as children
-          pure []
+    refreshVisibleNodes :: BaseContext -> [SomeNode Variable] -> [SomeNode Variable] -> IO ()
+    refreshVisibleNodes baseContext parents nodes = do
+      forM_ nodes $ \someNode@(SomeNode node) -> do
+        refresh baseContext node (someNode :| parents)
+
+        whenM (readTVarIO (_toggled (getEntityData node))) $
+          atomically (getExistentialChildrenWrapped node)
+            >>= refreshVisibleNodes baseContext (someNode : parents)

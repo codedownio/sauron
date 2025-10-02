@@ -139,13 +139,16 @@ buildBaseContext = do
 
   githubApiSemaphore <- newQSem cliConcurrentGithubApiLimit
 
-  maybeAuth <- case cliOAuthToken of
-    Just t -> pure $ Just $ OAuth (encodeUtf8 t)
-    Nothing -> tryDiscoverAuth
+  auth <- case cliForceAuth of
+    True -> authenticateWithGitHub
+    False -> do
+      maybeAuth <- case cliOAuthToken of
+        Just t -> pure $ Just $ OAuth (encodeUtf8 t)
+        Nothing -> tryDiscoverAuth
 
-  auth <- case maybeAuth of
-    Nothing -> authenticateWithGitHub
-    Just x -> pure x
+      case maybeAuth of
+        Nothing -> authenticateWithGitHub
+        Just x -> pure x
 
   putStrLn [i|Got auth: #{auth}|]
 
