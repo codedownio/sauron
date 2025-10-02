@@ -21,10 +21,9 @@ import Relude hiding (ByteString)
 import qualified System.IO as SIO
 import System.IO.Error (userError)
 
--- Client ID used by "gh auth login"
--- TODO: get our own client ID
+
 githubCliClientId :: Text
-githubCliClientId = "178c6fc778ccc68e1d6a"
+githubCliClientId = "Ov23ctc5CLqumglgHaeZ"
 
 data DeviceCodeResponse = DeviceCodeResponse {
   device_code :: Text
@@ -93,6 +92,7 @@ requestDeviceCode manager = do
   let req = initReq {
         requestHeaders = [
             (hAccept, "application/json")
+            , (hContentType, "application/json")
             , (hUserAgent, "sauron")
             ]
         , requestBody = RequestBodyLBS $ encode $ object [
@@ -123,6 +123,7 @@ pollForToken manager deviceResp = do
         let req = initReq {
               requestHeaders = [
                   (hAccept, "application/json")
+                  , (hContentType, "application/json")
                   , (hUserAgent, "sauron")
                   ]
               , requestBody = RequestBodyLBS $ encode $ object [
@@ -136,11 +137,24 @@ pollForToken manager deviceResp = do
 
         case responseStatus response of
           status | status == status200 -> do
+            -- Try parsing as error first (GitHub returns 200 for authorization_pending, etc.)
             case eitherDecode (responseBody response) of
-              Left err -> throwIO $ userError [i|Failed to parse token response: #{err}|]
-              Right (tokenResp :: TokenResponse) -> return $ access_token tokenResp
+              Right (TokenError errorCode _) ->
+                case errorCode of
+                  "authorization_pending" -> loop -- Keep polling
+                  "slow_down" -> do
+                    threadDelay (pollInterval * 2) -- Slow down
+                    loop
+                  "access_denied" -> throwIO $ userError "GitHub authentication was denied"
+                  "expired_token" -> throwIO $ userError "GitHub device code expired, please try again"
+                  other -> throwIO $ userError [i|GitHub authentication error: #{other}|]
+              Left _ -> do
+                -- If not an error, try parsing as success token response
+                case eitherDecode (responseBody response) of
+                  Left err -> throwIO $ userError [i|Failed to parse token response: #{err}|]
+                  Right (tokenResp :: TokenResponse) -> return $ access_token tokenResp
           _ -> do
-            -- Check if it's an expected error (authorization_pending, slow_down)
+            -- Non-200 status - check if it's an expected error
             case eitherDecode (responseBody response) of
               Right (TokenError errorCode _) ->
                 case errorCode of
