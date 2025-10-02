@@ -22,7 +22,8 @@ extra-deps:
   # - fix Job type to make some fields optional
   # - fix JobStep type to make some fields optional
   # - Repo: add subscribers_count
-  commit: 584fc29c2d4c6a39cf3a39a0afe74dd158a42c1c
+  # - Fix getNotificationsR
+  commit: 614148cbe9f7047e9d776d98cc536b63adda51f1
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf

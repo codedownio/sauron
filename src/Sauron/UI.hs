@@ -176,12 +176,12 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedNotificationsNode ed@
   ]
 
 listDrawElement appState ix isSelected (SomeNode (SingleNotificationNode ed@(EntityData {_static=notification, ..}))) = wrapper ix isSelected ed [
-  Just $ notificationLine _toggled notification (_appAnimationCounter appState) _state
+  Just $ notificationLine (_appNow appState) _toggled notification (_appAnimationCounter appState) _state
   , do
       guard _toggled
       return $ padLeft (Pad 4) $
         fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-          notificationInner notification
+          notificationInner (_appNow appState) notification
   ]
 
 -- * Job Log Groups
