@@ -3,6 +3,8 @@
 
 module Sauron.OAuth (
   authenticateWithGitHub
+  , saveToken
+  , loadSavedToken
   ) where
 
 import Control.Concurrent (threadDelay)
@@ -12,14 +14,18 @@ import Data.Aeson
 import Data.String.Interpolate
 import Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified Data.Text.IO as T
 import GitHub.Auth
 import Network.HTTP.Client
 import Network.HTTP.Conduit (tlsManagerSettings)
 import Network.HTTP.Types.Header
 import Network.HTTP.Types.Status
-import Relude hiding (ByteString)
+import Relude hiding (ByteString, lookupEnv)
+import System.FilePath ((</>))
 import qualified System.IO as SIO
 import System.IO.Error (userError)
+import UnliftIO.Directory (createDirectoryIfMissing, doesFileExist, getHomeDirectory)
+import UnliftIO.Environment (lookupEnv)
 
 
 githubCliClientId :: Text
@@ -65,7 +71,7 @@ instance FromJSON TokenError where
 
 authenticateWithGitHub :: IO Auth
 authenticateWithGitHub = do
-  putStrLn "Authenticating with GitHub..."
+  putStrLn "\nAuthenticating with GitHub...\n"
 
   manager <- newManager tlsManagerSettings
 
@@ -74,8 +80,14 @@ authenticateWithGitHub = do
 
   -- Step 2: Show user the code and URL
   putStrLn [i|Please visit: #{verification_uri deviceResp}|]
-  putStrLn [i|Enter code: #{user_code deviceResp}|]
-  putStr "Waiting for authentication"
+  putStrLn [i|Enter code: #{user_code deviceResp}\n|]
+
+  configDir <- getConfigDir
+  putStrLn [__i|This will ask for full access to GitHub.
+                Don't worry, it just generates an OAuth token that will be stored locally in #{configDir}.
+                (This is also how tools like "gh auth" work.)\n|]
+
+  putStr "Waiting for authentication..."
   SIO.hFlush stdout
 
   -- Step 3: Poll for access token
@@ -83,6 +95,8 @@ authenticateWithGitHub = do
 
   putStrLn " ✓"
   putStrLn "Successfully authenticated with GitHub!"
+
+  saveToken token
 
   return $ OAuth (TE.encodeUtf8 token)
 
@@ -116,8 +130,6 @@ pollForToken manager deviceResp = do
 
   let loop = do
         threadDelay pollInterval
-        putStr "."
-        SIO.hFlush stdout
 
         initReq <- parseRequest "POST https://github.com/login/oauth/access_token"
         let req = initReq {
@@ -168,3 +180,30 @@ pollForToken manager deviceResp = do
               Left _ -> throwIO $ userError $ [i|Failed to get access token #{responseStatus response}|]
 
   loop
+
+getConfigDir :: MonadIO m => m FilePath
+getConfigDir = lookupEnv "XDG_CONFIG_HOME" >>= \case
+  Just xdgConfig -> return $ xdgConfig </> "sauron"
+  Nothing -> do
+    homeDir <- getHomeDirectory
+    return $ homeDir </> ".config" </> "sauron"
+
+getTokenPath :: MonadIO m => m FilePath
+getTokenPath = (</> "token") <$> getConfigDir
+
+saveToken :: MonadIO m => Text -> m ()
+saveToken token = do
+  tokenPath <- getTokenPath
+  configDir <- getConfigDir
+  createDirectoryIfMissing True configDir
+  liftIO $ T.writeFile tokenPath token
+  putStrLn [i|Token saved to #{tokenPath}|]
+
+loadSavedToken :: MonadIO m => m (Maybe Auth)
+loadSavedToken = do
+  tokenPath <- getTokenPath
+  doesFileExist tokenPath >>= \case
+    False -> return Nothing
+    True -> do
+      tokenText <- liftIO $ T.readFile tokenPath
+      return $ Just $ OAuth (encodeUtf8 $ T.strip tokenText)

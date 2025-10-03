@@ -26,7 +26,7 @@ import Sauron.Event
 import Sauron.Expanding
 import Sauron.Fetch (makeEmptyElem)
 import Sauron.Fix
-import Sauron.OAuth
+import Sauron.OAuth (authenticateWithGitHub, loadSavedToken)
 import Sauron.Options
 import Sauron.Setup.AllReposForUser
 import Sauron.Setup.ReposFromConfigFile
@@ -133,9 +133,7 @@ main = do
 
 buildBaseContext :: IO BaseContext
 buildBaseContext = do
-  args@(CliArgs {..}) <- parseCliArgs
-
-  putStrLn [i|Got args: #{args}|]
+  CliArgs {..} <- parseCliArgs
 
   githubApiSemaphore <- newQSem cliConcurrentGithubApiLimit
 
@@ -144,11 +142,12 @@ buildBaseContext = do
     False -> do
       maybeAuth <- case cliOAuthToken of
         Just t -> pure $ Just $ OAuth (encodeUtf8 t)
-        Nothing -> tryDiscoverAuth
+        Nothing ->
+          loadSavedToken >>= \case
+            Just auth -> pure $ Just auth
+            Nothing -> tryDiscoverAuth
 
-      case maybeAuth of
-        Nothing -> authenticateWithGitHub
-        Just x -> pure x
+      maybe authenticateWithGitHub pure maybeAuth
 
   putStrLn [i|Got auth: #{auth}|]
 

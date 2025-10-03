@@ -20,5 +20,7 @@ usingGhToken :: MonadIO m => m (Maybe Auth)
 usingGhToken = runMaybeT $ do
   gh <- MaybeT $ findExecutable "gh"
   liftIO (readCreateProcessWithExitCode (proc gh ["auth", "token"]) "") >>= \case
-    (ExitSuccess, sout, _) -> pure $ OAuth $ encodeUtf8 $ T.strip (fromString sout)
+    (ExitSuccess, sout, _) -> do
+      putStrLn "Obtained auth token automatically by calling 'gh auth token'"
+      pure $ OAuth $ encodeUtf8 $ T.strip (fromString sout)
     _ -> MaybeT $ return Nothing
