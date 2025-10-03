@@ -16,7 +16,7 @@ allReposForUser :: BaseContext -> PeriodSpec -> Name User -> IO (Node Variable P
 allReposForUser baseContext _defaultHealthCheckPeriodUs userLogin = do
   let BaseContext {..} = baseContext
   reposStateVar <- newTVarIO NotFetched
-  toggledVar <- newTVarIO False
+  toggledVar <- newTVarIO True
   childrenVar <- newTVarIO mempty
   searchVar <- newTVarIO SearchNone
   pageInfoVar <- newTVarIO emptyPageInfo
