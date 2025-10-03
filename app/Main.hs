@@ -59,7 +59,7 @@ app = App {
 
 main :: IO ()
 main = do
-  CliArgs {cliConfigFile} <- parseCliArgs
+  CliArgs {cliConfigFile, cliShowAllRepos} <- parseCliArgs
 
   baseContext@(BaseContext {..}) <- buildBaseContext
 
@@ -67,11 +67,13 @@ main = do
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
 
-  listElems' :: V.Vector (SomeNode Variable) <- case cliConfigFile of
-    Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
-    Nothing -> isContainedInGitRepo >>= \case
-      Just (namespace, name) -> (fmap SomeNode) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
-      Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+  listElems' :: V.Vector (SomeNode Variable) <- case cliShowAllRepos of
+    True -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+    False -> case cliConfigFile of
+      Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
+      Nothing -> isContainedInGitRepo >>= \case
+        Just (namespace, name) -> (fmap SomeNode) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
+        Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   -- Prepend a PaginatedNotificationsNode
   listElems <- flip V.cons listElems' <$> atomically (SomeNode . PaginatedNotificationsNode <$> makeEmptyElem baseContext () "" 0)
