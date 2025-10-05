@@ -150,18 +150,19 @@ listDrawElement _appState ix isSelected (SomeNode (SingleCommitNode ed@(EntityDa
 
 -- * Jobs
 
-listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {_static=job, ..}))) = wrapper ix isSelected ed [
-  Just $ jobLine (_appAnimationCounter appState) _toggled job _state
+listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+  Just $ case _state of
+    Fetched (job, _) -> jobLine (_appAnimationCounter appState) _toggled job _state
+    Fetching (Just (job, _)) -> jobLine (_appAnimationCounter appState) _toggled job _state
+    _ -> str "Loading job..."
   , do
       guard _toggled
-      return $ padLeft (Pad 4) $
-        fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-          jobInner (_appAnimationCounter appState) job maybeJobLogs
+      case _state of
+        Fetched (job, logs) -> return $ padLeft (Pad 4) $
+          fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+            jobInner (_appAnimationCounter appState) job (Just logs)
+        _ -> return $ str "No job data"
   ]
-  where
-    maybeJobLogs = case _state of
-      Fetched logs -> Just logs
-      _ -> Nothing
 
 -- * Notifications
 

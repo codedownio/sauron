@@ -162,7 +162,9 @@ getNodeUrl repoBaseUrl (SinglePullNode (EntityData {_static=pull})) = case issue
   Just url -> toString $ getUrl url
   Nothing -> repoBaseUrl <> [i|/pulls/#{issueNumber pull}|]
 getNodeUrl _repoBaseUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) = toString $ getUrl $ workflowRunHtmlUrl workflowRun
-getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_static=job})) = toString $ getUrl $ jobHtmlUrl job
+getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_state})) = case fetchableCurrent _state of
+  Just (job, _) -> toString $ getUrl $ jobHtmlUrl job
+  Nothing -> ""
 getNodeUrl repoBaseUrl (SingleBranchNode (EntityData {_static=branch})) = repoBaseUrl <> "/tree/" <> toString (branchName branch)
 getNodeUrl repoBaseUrl (SingleCommitNode (EntityData {_static=commit})) = repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit))
 getNodeUrl _repoBaseUrl (SingleNotificationNode _) = "https://github.com/notifications" -- Notifications don't have individual URLs

@@ -23,7 +23,7 @@ import Relude
 import Sauron.Actions.Util (findRepoParent, openBrowserToUrl)
 import Sauron.Fetch
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
--- import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
+import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
 import Sauron.Types
 import UnliftIO.Async
 
@@ -57,13 +57,17 @@ refresh bc (SingleIssueNode (EntityData {_static=issue, _state})) (findRepoParen
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name (issueNumber issue) _state) bc
 refresh bc (SinglePullNode (EntityData {_static=pull, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name (issueNumber pull) _state) bc
-refresh bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) _parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
+refresh bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
     fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item
-    -- liftIO $ void $ startWorkflowHealthCheckIfNeeded bc item parents
-refresh bc item@(SingleJobNode (EntityData {_static=job})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
+    liftIO $ void $ startWorkflowHealthCheckIfNeeded bc item parents
+refresh bc item@(SingleJobNode (EntityData {_state})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
-    fetchJobLogs owner name job item
+    currentState <- readTVarIO _state
+    case currentState of
+      Fetched (job, _) -> fetchJobLogs owner name job item
+      Fetching (Just (job, _)) -> fetchJobLogs owner name job item
+      _ -> return ()
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 refresh bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc
