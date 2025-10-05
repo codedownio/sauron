@@ -37,7 +37,6 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
-import GitHub.Endpoints.Actions.WorkflowJobs (jobR)
 import Network.HTTP.Conduit
 import qualified Network.URI as URI
 import Relude
