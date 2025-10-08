@@ -81,11 +81,14 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
 
-  V.EvKey c [] | c == openSelectedKey ->
-    withNthChildAndRepoParent s $ \fixedEl _el repoEl -> case (fixedEl, repoEl) of
-      (SomeNode el, RepoNode (EntityData {_state})) -> readTVarIO _state >>= \case
-        Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (getNodeUrl (toString url) el)
-        _ -> return ()
+  V.EvKey c [] | c == openSelectedKey -> do
+    withFixedElemAndParents s $ \(SomeNode el) _variableEl elems -> do
+      case viaNonEmpty head [x | (SomeNode x@(RepoNode {})) <- toList elems] of
+        Just (RepoNode (EntityData {_state})) ->
+          readTVarIO _state >>= \case
+            Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (getNodeUrl (toString url) el)
+            _ -> return ()
+        Nothing -> openBrowserToUrl (getNodeUrl "" el)
 
   -- Column 3
   V.EvKey c [] | c == nextPageKey -> tryNavigatePage s goNextPage
@@ -162,10 +165,17 @@ getNodeUrl repoBaseUrl (SinglePullNode (EntityData {_static=pull})) = case issue
   Just url -> toString $ getUrl url
   Nothing -> repoBaseUrl <> [i|/pulls/#{issueNumber pull}|]
 getNodeUrl _repoBaseUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) = toString $ getUrl $ workflowRunHtmlUrl workflowRun
-getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_static=job})) = toString $ getUrl $ jobHtmlUrl job
+getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_state})) = case fetchableCurrent _state of
+  Just (job, _) -> toString $ getUrl $ jobHtmlUrl job
+  Nothing -> ""
 getNodeUrl repoBaseUrl (SingleBranchNode (EntityData {_static=branch})) = repoBaseUrl <> "/tree/" <> toString (branchName branch)
 getNodeUrl repoBaseUrl (SingleCommitNode (EntityData {_static=commit})) = repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit))
-getNodeUrl _repoBaseUrl (SingleNotificationNode _) = "https://github.com/notifications" -- Notifications don't have individual URLs
+getNodeUrl _repoBaseUrl (SingleNotificationNode (EntityData {_static=notification})) =
+  case subjectLatestCommentURL (notificationSubject notification) of
+    Just latestCommentUrl -> toString $ getUrl latestCommentUrl
+    Nothing -> case subjectURL (notificationSubject notification) of
+      Just subjectUrl -> toString $ getUrl subjectUrl
+      Nothing -> toString $ getUrl $ notificationUrl notification
 getNodeUrl _repoBaseUrl (JobLogGroupNode _) = "" -- Job log groups don't have URLs
 getNodeUrl _repoBaseUrl (HeadingNode _) = "" -- Heading nodes don't have URLs
 getNodeUrl repoBaseUrl (RepoNode _) = repoBaseUrl

@@ -128,7 +128,7 @@ type family NodeStatic a where
   NodeStatic SingleIssueT = Issue
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun
-  NodeStatic SingleJobT = Job
+  NodeStatic SingleJobT = ()
   NodeStatic SingleBranchT = Branch
   NodeStatic SingleCommitT = Commit
   NodeStatic SingleNotificationT = Notification
@@ -146,7 +146,7 @@ type family NodeState a where
   NodeState SingleIssueT = V.Vector IssueComment
   NodeState SinglePullT = V.Vector IssueComment
   NodeState SingleWorkflowT = WithTotalCount Job
-  NodeState SingleJobT = [JobLogGroup]
+  NodeState SingleJobT = (Job, [JobLogGroup])
   NodeState SingleBranchT = V.Vector Commit
   NodeState SingleCommitT = ()
   NodeState SingleNotificationT = ()

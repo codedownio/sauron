@@ -24,6 +24,7 @@ module Sauron.Fetch (
 
   , fetchWorkflowJobs
   , fetchJobLogs
+  , fetchJob
 
   , makeEmptyElem
   ) where
@@ -237,7 +238,10 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
       Right (responseBody -> wtc@(WithTotalCount results _totalCount)) -> atomically $ do
         writeTVar _state (Fetched wtc)
         (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) -> do
-          SingleJobNode <$> makeEmptyElem bc job "" (_depth + 1)
+          entityData <- makeEmptyElem bc () "" (_depth + 1)
+          let EntityData {_state = jobState} = entityData
+          writeTVar jobState (Fetched (job, []))
+          return $ SingleJobNode entityData
           -- writeTVar (_state child) (PaginatedItemJob)
   -- TODO: do pagination for these jobs? The web UI doesn't seem to...
   -- bc <- ask
@@ -273,8 +277,28 @@ fetchJobLogs owner name (Job {jobId}) (SingleJobNode (EntityData {..})) = do
         children' <- liftIO $ atomically $ mapM (createJobLogGroupChildren bc (_depth + 1)) parsedLogs
 
         atomically $ do
-          writeTVar _state (Fetched parsedLogs)
+          currentState <- readTVar _state
+          case currentState of
+            Fetched (job, _) -> writeTVar _state (Fetched (job, parsedLogs))
+            Fetching (Just (job, _)) -> writeTVar _state (Fetched (job, parsedLogs))
+            Fetching Nothing -> writeTVar _state (Errored "No job data available")
+            _ -> writeTVar _state (Errored "Invalid job state")
           writeTVar _children children'
+
+fetchJob :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Id Job -> Node Variable SingleJobT -> m ()
+fetchJob owner name jobId (SingleJobNode (EntityData {_state})) = do
+  BaseContext {auth, manager} <- ask
+  withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (jobR owner name jobId)) >>= \case
+    Left _err -> return () -- Silently fail for health checks
+    Right (responseBody -> updatedJob) -> liftIO $ atomically $ do
+      currentState <- readTVar _state
+      case currentState of
+        Fetched (_, logGroups) -> writeTVar _state (Fetched (updatedJob, logGroups))
+        Fetching (Just (_, logGroups)) -> writeTVar _state (Fetching (Just (updatedJob, logGroups)))
+        Fetching Nothing -> writeTVar _state (Fetching (Just (updatedJob, [])))
+        _ -> writeTVar _state (Fetched (updatedJob, []))
 
 -- * Util
 
