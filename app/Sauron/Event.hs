@@ -15,13 +15,18 @@ import qualified Data.Vector as Vec
 import GitHub
 import qualified Graphics.Vty as V
 import Lens.Micro
+import Network.HTTP.Conduit (Manager, responseBody, httpLbs, parseUrlThrow)
+import Network.HTTP.Simple (setRequestHeaders, setRequestManager)
+import Data.Aeson (eitherDecode)
 import Relude hiding (Down, pi)
 import Sauron.Actions
+import Sauron.Actions.Util (withGithubApiSemaphore, executeRequestWithMgrAndRes)
 import Sauron.Event.Helpers
 import Sauron.Event.Paging
 import Sauron.Types
 import Sauron.UI.Keys
-import System.FilePath
+import qualified System.FilePath as FP
+import Text.Read (readMaybe)
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
@@ -69,11 +74,11 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey c [] | c == browserToHomeKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url)
   V.EvKey c [] | c == browserToIssuesKey ->
-    withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "issues")
+    withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url <> "/issues")
   V.EvKey c [] | c == browserToPullsKey ->
-    withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "pulls")
+    withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url <> "/pulls")
   V.EvKey c [] | c == browserToActionsKey ->
-    withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url </> "actions")
+    withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url <> "/actions")
 
   V.EvKey c [] | c == refreshSelectedKey -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents ->
@@ -86,9 +91,15 @@ appEvent s (VtyEvent e) = case e of
       case viaNonEmpty head [x | (SomeNode x@(RepoNode {})) <- toList elems] of
         Just (RepoNode (EntityData {_state})) ->
           readTVarIO _state >>= \case
-            Fetched (Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (getNodeUrl (toString url) el)
+            Fetched (Repo {repoHtmlUrl=(URL url)}) -> case el of
+              SingleNotificationNode (EntityData {_static=notification}) ->
+                liftIO $ fetchNotificationHtmlUrl (s ^. appBaseContext) notification
+              _ -> openBrowserToUrl (getNodeUrl (toString url) el)
             _ -> return ()
-        Nothing -> openBrowserToUrl (getNodeUrl "" el)
+        Nothing -> case el of
+          SingleNotificationNode (EntityData {_static=notification}) ->
+            liftIO $ fetchNotificationHtmlUrl (s ^. appBaseContext) notification
+          _ -> openBrowserToUrl (getNodeUrl "" el)
 
   -- Column 3
   V.EvKey c [] | c == nextPageKey -> tryNavigatePage s goNextPage
@@ -171,11 +182,16 @@ getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_state})) = case fetchableCu
 getNodeUrl repoBaseUrl (SingleBranchNode (EntityData {_static=branch})) = repoBaseUrl <> "/tree/" <> toString (branchName branch)
 getNodeUrl repoBaseUrl (SingleCommitNode (EntityData {_static=commit})) = repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit))
 getNodeUrl _repoBaseUrl (SingleNotificationNode (EntityData {_static=notification})) =
-  case subjectLatestCommentURL (notificationSubject notification) of
-    Just latestCommentUrl -> toString $ getUrl latestCommentUrl
-    Nothing -> case subjectURL (notificationSubject notification) of
-      Just subjectUrl -> toString $ getUrl subjectUrl
-      Nothing -> toString $ getUrl $ notificationUrl notification
+  -- We need to make API calls to get proper html_url fields, but getNodeUrl is pure
+  -- This should be handled asynchronously when the notification is opened
+  "placeholder://notification-url"
 getNodeUrl _repoBaseUrl (JobLogGroupNode _) = "" -- Job log groups don't have URLs
 getNodeUrl _repoBaseUrl (HeadingNode _) = "" -- Heading nodes don't have URLs
 getNodeUrl repoBaseUrl (RepoNode _) = repoBaseUrl
+
+-- | Open notification using GitHub's notification URL
+fetchNotificationHtmlUrl :: BaseContext -> Notification -> IO ()
+fetchNotificationHtmlUrl _baseContext notification = do
+  -- Simply use GitHub's notification URL - this is what GitHub web UI does
+  -- and it will redirect to the appropriate issue/PR/comment automatically
+  openBrowserToUrl (toString $ getUrl $ notificationUrl notification)
