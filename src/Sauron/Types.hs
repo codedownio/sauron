@@ -140,7 +140,7 @@ type family NodeState a where
   NodeState PaginatedIssuesT = SearchResult Issue
   NodeState PaginatedPullsT = SearchResult Issue
   NodeState PaginatedWorkflowsT = WithTotalCount WorkflowRun
-  NodeState PaginatedReposT = V.Vector Repo
+  NodeState PaginatedReposT = SearchResult Repo
   NodeState PaginatedBranchesT = V.Vector Branch
   NodeState PaginatedNotificationsT = V.Vector Notification
   NodeState SingleIssueT = V.Vector IssueComment

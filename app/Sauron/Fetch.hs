@@ -35,7 +35,6 @@ import Data.String.Interpolate
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub
-import GitHub.Data.Name
 import Network.HTTP.Conduit
 import qualified Network.URI as URI
 import Relude
@@ -58,17 +57,22 @@ fetchRepo owner name repoVar = do
 
 fetchRepos :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name User -> Node Variable PaginatedReposT -> m ()
-fetchRepos userLogin (PaginatedReposNode (EntityData {..})) = do
+  ) => Node Variable PaginatedReposT -> m ()
+fetchRepos (PaginatedReposNode (EntityData {..})) = do
+  terms <- readTVarIO _search >>= \case
+    SearchNone -> pure []
+    SearchText t -> pure $ T.words t
+  let fullQuery = T.intercalate "+" terms
+
   bc <- ask
-  fetchPaginated'' (\fetchCount -> userReposR (N $ untagName userLogin) RepoPublicityAll fetchCount) _pageInfo _state $ \case
+  fetchPaginated'' (searchReposR fullQuery) _pageInfo _state $ \case
     Left err -> do
       writeTVar _state (Errored (show err))
       writeTVar _children []
-    Right (repos, newPageInfo) -> do
+    Right (sr@(SearchResult _totalCount results), newPageInfo) -> do
       writeTVar _pageInfo newPageInfo
-      writeTVar _state (Fetched repos)
-      (writeTVar _children =<<) $ forM (V.toList repos) $ \r -> do
+      writeTVar _state (Fetched sr)
+      (writeTVar _children =<<) $ forM (V.toList results) $ \r -> do
         let nsName = (simpleOwnerLogin $ repoOwner r, repoName r)
         entityData@(EntityData {_state=innerState}) <- makeEmptyElem bc nsName "" (_depth + 1)
         writeTVar innerState (Fetched r)

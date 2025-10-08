@@ -18,7 +18,7 @@ allReposForUser baseContext _defaultHealthCheckPeriodUs userLogin = do
   reposStateVar <- newTVarIO NotFetched
   toggledVar <- newTVarIO True
   childrenVar <- newTVarIO mempty
-  searchVar <- newTVarIO SearchNone
+  searchVar <- newTVarIO (SearchText ("user:" <> untagName userLogin))
   pageInfoVar <- newTVarIO emptyPageInfo
   healthCheckVar <- newTVarIO NotFetched
   healthCheckThreadVar <- newTVarIO Nothing

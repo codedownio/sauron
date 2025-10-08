@@ -12,6 +12,7 @@ import qualified Brick.Widgets.List as L
 import Control.Monad
 import Data.Maybe
 import Data.String.Interpolate
+import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
 import Relude
@@ -52,9 +53,9 @@ listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget Clickable
 
 listDrawElement appState ix isSelected (SomeNode (PaginatedReposNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
-    Fetched repos -> paginatedHeading ed appState "Repositories" (str [i|(#{length repos})|])
+    Fetched (SearchResult totalCount repos) -> paginatedHeading ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount}|])
     Fetching maybeRepos -> case maybeRepos of
-      Just repos -> paginatedHeading ed appState "Repositories" (str [i|(#{length repos}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Just (SearchResult totalCount repos) -> paginatedHeading ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount} |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
       Nothing -> paginatedHeading ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Repositories" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Repositories" (str [i|(error fetching: #{err})|])
