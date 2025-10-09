@@ -33,7 +33,7 @@ import Sauron.Setup.ReposFromConfigFile
 import Sauron.Setup.ReposFromCurrentDirectory
 import Sauron.Types
 import Sauron.UI
-import Sauron.UI.AttrMap
+import Sauron.UI.AttrMap (buildAdaptiveAttrMap)
 import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
@@ -47,13 +47,13 @@ refreshPeriod = 100000
 defaultHealthCheckPeriodUs :: PeriodSpec
 defaultHealthCheckPeriodUs = PeriodSpec (1_000_000 * 60 * 10)
 
-app :: App AppState AppEvent ClickableName
-app = App {
+mkApp :: V.Vty -> App AppState AppEvent ClickableName
+mkApp vty = App {
   appDraw = drawUI
   , appChooseCursor = showFirstCursor
   , appHandleEvent = \event -> get >>= \s -> appEvent s event
   , appStartEvent = return ()
-  , appAttrMap = const mainAttrMap
+  , appAttrMap = const (buildAdaptiveAttrMap vty)
   }
 
 
@@ -123,14 +123,17 @@ main = do
         threadDelay refreshPeriod
 
   let buildVty = do
-        v <- V.mkVty V.defaultConfig
+        config <- V.userConfig
+        let configWithFullColor = config { V.configPreferredColorMode = Just V.FullColor }
+        v <- V.mkVty configWithFullColor
         let output = V.outputIface v
         when (V.supportsMode output V.Mouse) $
           V.setMode output V.Mouse True
         return v
   initialVty <- buildVty
+  let adaptiveApp = mkApp initialVty
   flip onException (cancel eventAsync) $
-    void $ customMain initialVty buildVty (Just eventChan) app initialState
+    void $ customMain initialVty buildVty (Just eventChan) adaptiveApp initialState
 
 
 buildBaseContext :: IO BaseContext

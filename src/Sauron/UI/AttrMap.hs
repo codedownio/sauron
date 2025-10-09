@@ -16,61 +16,55 @@ import qualified Skylighting.Styles as Sky
 mkAttrName :: String -> AttrName
 mkAttrName = attrName
 
-mainAttrMap :: AttrMap
-mainAttrMap = attrMap V.defAttr ([
-  -- (listAttr, V.white `on` V.blue)
-  -- (listSelectedAttr, V.blue `on` V.white)
-  -- (listSelectedAttr, bg (V.Color240 $ V.rgbColorToColor240 0 1 0))
-  -- (selectedAttr, bg (V.Color240 $ V.rgbColorToColor240 0 1 0))
-
+buildAdaptiveAttrMap :: V.Vty -> AttrMap
+buildAdaptiveAttrMap vty = attrMap V.defAttr ([
   -- Statuses
   (iconAttr, fg V.white)
   , (normalAttr, fg V.white)
-  , (notFetchedAttr, fg midGray)
+  , (notFetchedAttr, fg (select midGray))
   , (fetchingAttr, fg V.blue)
   , (erroredAttr, fg V.red)
 
   -- Pagination
-
-  , (searchAttr, fg midGray)
-  , (selectedPageAttr, fg solarizedGreen & flip V.withStyle V.bold)
-  , (notSelectedPageAttr, fg midGray & flip V.withStyle V.dim)
-  , (pageEllipsesAttr, fg midGray)
+  , (searchAttr, fg (select midGray))
+  , (selectedPageAttr, fg (select solarizedGreen) & flip V.withStyle V.bold)
+  , (notSelectedPageAttr, fg (select midGray) & flip V.withStyle V.dim)
+  , (pageEllipsesAttr, fg (select midGray))
 
   -- Stats box
   , (starsAttr, fg V.yellow)
 
   -- Workflow icons
-  , (cancelledAttr, fg midGray)
+  , (cancelledAttr, fg (select midGray))
   , (greenCheckAttr, fg V.green)
   , (redXAttr, fg V.red)
-  , (ellipsesAttr, fg midGray)
-  , (neutralAttr, fg midGray)
+  , (ellipsesAttr, fg (select midGray))
+  , (neutralAttr, fg (select midGray))
   , (unknownAttr, fg V.white)
-  , (queuedAttr, fg githubOrange)
+  , (queuedAttr, fg (select githubOrange))
 
   -- Progress bar
-  , (progressCompleteAttr, bg (V.Color240 235))
-  , (progressIncompleteAttr, bg (V.Color240 225))
+  , (progressCompleteAttr, bg (select (V.Color240 235, V.Color240 235, V.brightBlack, V.black, V.black)))
+  , (progressIncompleteAttr, bg (select (V.Color240 225, V.Color240 225, V.black, V.black, V.black)))
 
   -- Main list
-  , (toggleMarkerAttr, fg midGray)
-  , (openMarkerAttr, fg midGray)
+  , (toggleMarkerAttr, fg (select midGray))
+  , (openMarkerAttr, fg (select midGray))
 
   -- Hotkey stuff
   , (hotkeyAttr, fg V.blue)
-  , (disabledHotkeyAttr, fg midGray)
-  , (hotkeyMessageAttr, fg brightWhite)
-  , (disabledHotkeyMessageAttr, fg brightGray)
+  , (disabledHotkeyAttr, fg (select midGray))
+  , (hotkeyMessageAttr, fg (select brightWhite))
+  , (disabledHotkeyMessageAttr, fg (select brightGray))
 
   -- Spinner
-  , (circleSpinnerAttr, fg brightGray)
+  , (circleSpinnerAttr, fg (select brightGray))
 
   -- General UI
-  , (branchAttr, fg solarizedBlue)
-  , (hashAttr, fg midGray)
-  , (hashNumberAttr, fg solarizedViolet)
-  , (usernameAttr, fg solarizedBlue)
+  , (branchAttr, fg (select solarizedBlue))
+  , (hashAttr, fg (select midGray))
+  , (hashNumberAttr, fg (select solarizedViolet))
+  , (usernameAttr, fg (select solarizedBlue))
 
   -- Markdown
   , (italicText, style V.italic)
@@ -78,13 +72,16 @@ mainAttrMap = attrMap V.defAttr ([
   , (boldText, style V.bold)
   , (boldUnderlineText, V.defAttr `V.withStyle` V.bold `V.withStyle` V.underline)
   , (strikeoutText, style V.strikethrough)
-  , (codeText, brightWhite `on` dimGray)
-  , (codeBlockText, fg midGray)
-  , (horizontalRuleAttr, fg midGray)
+  , (codeText, select brightWhite `on` select dimGray)
+  , (codeBlockText, fg (select midGray))
+  , (horizontalRuleAttr, fg (select midGray))
 
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
   ] <> attrMappingsForStyle Sky.breezeDark)
+  where
+    colorMode = V.outputColorMode (V.outputIface vty)
+    select = selectColor colorMode
 
 iconAttr = mkAttrName "icon"
 normalAttr = mkAttrName "normal"
@@ -141,32 +138,87 @@ codeText = mkAttrName "code-text"
 codeBlockText = mkAttrName "code-block-text"
 horizontalRuleAttr = mkAttrName "horizontal-rule"
 
--- * Colors
+-- * Color Fallback System
 
-solarizedBase03 = V.rgbColor 0x00 0x2b 0x36
-solarizedBase02 = V.rgbColor 0x07 0x36 0x42
-solarizedBase01 = V.rgbColor 0x58 0x6e 0x75
-solarizedbase00 = V.rgbColor 0x65 0x7b 0x83
-solarizedBase0 = V.rgbColor 0x83 0x94 0x96
-solarizedBase1 = V.rgbColor 0x93 0xa1 0xa1
-solarizedBase2 = V.rgbColor 0xee 0xe8 0xd5
-solarizedBase3 = V.rgbColor 0xfd 0xf6 0xe3
-solarizedYellow = V.rgbColor 0xb5 0x89 0x00
-solarizedOrange = V.rgbColor 0xcb 0x4b 0x16
-solarizedRed = V.rgbColor 0xdc 0x32 0x2f
-solarizedMagenta = V.rgbColor 0xd3 0x36 0x82
-solarizedViolet = V.rgbColor 0x6c 0x71 0xc4
-solarizedBlue = V.rgbColor 0x26 0x8b 0xd2
-solarizedCyan = V.rgbColor 0x2a 0xa1 0x98
-solarizedGreen = V.rgbColor 0x85 0x99 0x00
+-- Type alias for color fallbacks: (FullColor, ColorMode240, ColorMode16, ColorMode8, NoColor)
+type ColorFallback = (V.Color, V.Color, V.Color, V.Color, V.Color)
 
-githubOrange = V.rgbColor 0xd2 0x99 0x22
+-- Color selection function based on detected terminal capabilities
+selectColor :: V.ColorMode -> ColorFallback -> V.Color
+selectColor colorMode (fullColor, color240, color16, color8, noColor) = case colorMode of
+  V.FullColor      -> fullColor
+  V.ColorMode240 _ -> color240
+  V.ColorMode16    -> color16
+  V.ColorMode8     -> color8
+  V.NoColor        -> noColor
 
-dimGray = grayAt 25
-midGray = grayAt 50
-brightGray = grayAt 80
-midWhite = grayAt 140
-brightWhite = grayAt 200
+-- * Color Definitions with Fallbacks
 
-grayAt level = V.rgbColor level level level
--- grayAt level = V.Color240 $ V.rgbColorToColor240 level level level
+solarizedBase03 :: ColorFallback
+solarizedBase03 = (V.rgbColor 0x00 0x2b 0x36, V.Color240 234, V.black, V.black, V.black)
+
+solarizedBase02 :: ColorFallback
+solarizedBase02 = (V.rgbColor 0x07 0x36 0x42, V.Color240 235, V.black, V.black, V.black)
+
+solarizedBase01 :: ColorFallback
+solarizedBase01 = (V.rgbColor 0x58 0x6e 0x75, V.Color240 240, V.brightBlack, V.black, V.black)
+
+solarizedbase00 :: ColorFallback
+solarizedbase00 = (V.rgbColor 0x65 0x7b 0x83, V.Color240 241, V.brightBlack, V.black, V.black)
+
+solarizedBase0 :: ColorFallback
+solarizedBase0 = (V.rgbColor 0x83 0x94 0x96, V.Color240 244, V.brightBlack, V.white, V.white)
+
+solarizedBase1 :: ColorFallback
+solarizedBase1 = (V.rgbColor 0x93 0xa1 0xa1, V.Color240 245, V.brightWhite, V.white, V.white)
+
+solarizedBase2 :: ColorFallback
+solarizedBase2 = (V.rgbColor 0xee 0xe8 0xd5, V.Color240 254, V.brightWhite, V.white, V.white)
+
+solarizedBase3 :: ColorFallback
+solarizedBase3 = (V.rgbColor 0xfd 0xf6 0xe3, V.Color240 230, V.brightWhite, V.white, V.white)
+
+solarizedYellow :: ColorFallback
+solarizedYellow = (V.rgbColor 0xb5 0x89 0x00, V.Color240 136, V.brightYellow, V.yellow, V.white)
+
+solarizedOrange :: ColorFallback
+solarizedOrange = (V.rgbColor 0xcb 0x4b 0x16, V.Color240 166, V.brightRed, V.red, V.white)
+
+solarizedRed :: ColorFallback
+solarizedRed = (V.rgbColor 0xdc 0x32 0x2f, V.Color240 160, V.brightRed, V.red, V.white)
+
+solarizedMagenta :: ColorFallback
+solarizedMagenta = (V.rgbColor 0xd3 0x36 0x82, V.Color240 125, V.brightMagenta, V.magenta, V.white)
+
+solarizedViolet :: ColorFallback
+solarizedViolet = (V.rgbColor 0x6c 0x71 0xc4, V.Color240 61, V.brightBlue, V.blue, V.white)
+
+solarizedBlue :: ColorFallback
+solarizedBlue = (V.rgbColor 0x26 0x8b 0xd2, V.Color240 33, V.brightBlue, V.blue, V.white)
+
+solarizedCyan :: ColorFallback
+solarizedCyan = (V.rgbColor 0x2a 0xa1 0x98, V.Color240 37, V.brightCyan, V.cyan, V.white)
+
+solarizedGreen :: ColorFallback
+solarizedGreen = (V.rgbColor 0x85 0x99 0x00, V.Color240 106, V.brightGreen, V.green, V.white)
+
+githubOrange :: ColorFallback
+githubOrange = (V.rgbColor 0xd2 0x99 0x22, V.Color240 178, V.brightYellow, V.yellow, V.white)
+
+dimGray :: ColorFallback
+dimGray = (grayAtRGB 25, V.Color240 236, V.black, V.black, V.black)
+
+midGray :: ColorFallback
+midGray = (grayAtRGB 50, V.Color240 238, V.brightBlack, V.black, V.black)
+
+brightGray :: ColorFallback
+brightGray = (grayAtRGB 80, V.Color240 244, V.brightBlack, V.white, V.white)
+
+midWhite :: ColorFallback
+midWhite = (grayAtRGB 140, V.Color240 249, V.brightWhite, V.white, V.white)
+
+brightWhite :: ColorFallback
+brightWhite = (grayAtRGB 200, V.Color240 253, V.brightWhite, V.white, V.white)
+
+grayAtRGB :: Word8 -> V.Color
+grayAtRGB level = V.rgbColor level level level
