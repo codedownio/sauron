@@ -15,18 +15,12 @@ import qualified Data.Vector as Vec
 import GitHub
 import qualified Graphics.Vty as V
 import Lens.Micro
-import Network.HTTP.Conduit (Manager, responseBody, httpLbs, parseUrlThrow)
-import Network.HTTP.Simple (setRequestHeaders, setRequestManager)
-import Data.Aeson (eitherDecode)
 import Relude hiding (Down, pi)
 import Sauron.Actions
-import Sauron.Actions.Util (withGithubApiSemaphore, executeRequestWithMgrAndRes)
 import Sauron.Event.Helpers
 import Sauron.Event.Paging
 import Sauron.Types
 import Sauron.UI.Keys
-import qualified System.FilePath as FP
-import Text.Read (readMaybe)
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
