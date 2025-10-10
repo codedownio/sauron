@@ -33,7 +33,7 @@ import Sauron.Setup.ReposFromConfigFile
 import Sauron.Setup.ReposFromCurrentDirectory
 import Sauron.Types
 import Sauron.UI
-import Sauron.UI.AttrMap
+import Sauron.UI.AttrMap (buildAdaptiveAttrMap)
 import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
@@ -47,19 +47,19 @@ refreshPeriod = 100000
 defaultHealthCheckPeriodUs :: PeriodSpec
 defaultHealthCheckPeriodUs = PeriodSpec (1_000_000 * 60 * 10)
 
-app :: App AppState AppEvent ClickableName
-app = App {
+mkApp :: V.ColorMode -> App AppState AppEvent ClickableName
+mkApp colorMode = App {
   appDraw = drawUI
   , appChooseCursor = showFirstCursor
   , appHandleEvent = \event -> get >>= \s -> appEvent s event
   , appStartEvent = return ()
-  , appAttrMap = const mainAttrMap
+  , appAttrMap = const (buildAdaptiveAttrMap colorMode)
   }
 
 
 main :: IO ()
 main = do
-  CliArgs {cliConfigFile, cliShowAllRepos} <- parseCliArgs
+  CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode} <- parseCliArgs
 
   baseContext@(BaseContext {..}) <- buildBaseContext
 
@@ -97,6 +97,8 @@ main = do
 
           , _appForm = Nothing
           , _appAnimationCounter = 0
+
+          , _appColorMode = V.FullColor
         }
 
 
@@ -123,14 +125,14 @@ main = do
         threadDelay refreshPeriod
 
   let buildVty = do
-        v <- V.mkVty V.defaultConfig
-        let output = V.outputIface v
-        when (V.supportsMode output V.Mouse) $
-          V.setMode output V.Mouse True
+        v <- V.userConfig >>= V.mkVty
+        when (V.supportsMode (V.outputIface v) V.Mouse) $
+          V.setMode (V.outputIface v) V.Mouse True
         return v
   initialVty <- buildVty
+  let colorMode = fromMaybe (V.outputColorMode (V.outputIface initialVty)) cliColorMode
   flip onException (cancel eventAsync) $
-    void $ customMain initialVty buildVty (Just eventChan) app initialState
+    void $ customMain initialVty buildVty (Just eventChan) (mkApp colorMode) (initialState { _appColorMode = colorMode })
 
 
 buildBaseContext :: IO BaseContext

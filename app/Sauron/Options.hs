@@ -22,6 +22,7 @@ import Data.Aeson as A
 import Data.Aeson.TH
 import Data.String.Interpolate
 import Data.Text as T
+import qualified Graphics.Vty as V
 import Options.Applicative
 import Relude
 import Sauron.Aeson
@@ -36,6 +37,7 @@ data CliArgs = CliArgs {
   , cliDebugFile :: Maybe FilePath
   , cliForceAuth :: Bool
   , cliShowAllRepos :: Bool
+  , cliColorMode :: Maybe V.ColorMode
   } deriving (Show)
 
 cliArgsParser :: Parser CliArgs
@@ -46,6 +48,7 @@ cliArgsParser = CliArgs
   <*> optional (strOption (long "debug-file" <> help "Debug file path (for optional logging)" <> metavar "STRING"))
   <*> switch (long "auth" <> help "Force OAuth authentication flow")
   <*> switch (long "all" <> help "Show all repositories for the authenticated user")
+  <*> optional (option (maybeReader parseColorMode) (long "color-mode" <> help "Force a specific color mode (full, 240, 16, 8, none)" <> metavar "MODE"))
 
 parseCliArgs :: IO CliArgs
 parseCliArgs = execParser opts
@@ -55,6 +58,16 @@ parseCliArgs = execParser opts
       <> progDesc "A dark lord's-eye view of your GitHub repos"
       <> header "hello - a test for optparse-applicative"
       )
+
+-- * Color mode
+
+parseColorMode :: String -> Maybe V.ColorMode
+parseColorMode "full" = Just V.FullColor
+parseColorMode "240" = Just (V.ColorMode240 240)
+parseColorMode "16" = Just V.ColorMode16
+parseColorMode "8" = Just V.ColorMode8
+parseColorMode "none" = Just V.NoColor
+parseColorMode _ = Nothing
 
 -- * Config file
 

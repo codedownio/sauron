@@ -20,6 +20,7 @@ import Data.Time
 import Data.Typeable
 import qualified Data.Vector as V
 import GitHub hiding (Status)
+import qualified Graphics.Vty as V
 import Lens.Micro
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
@@ -354,6 +355,8 @@ data AppState = AppState {
 
   , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
   , _appAnimationCounter :: Int
+
+  , _appColorMode :: V.ColorMode
   }
 
 makeLenses ''AppState
