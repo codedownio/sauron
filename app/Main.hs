@@ -59,7 +59,7 @@ mkApp colorMode = App {
 
 main :: IO ()
 main = do
-  CliArgs {cliConfigFile, cliShowAllRepos} <- parseCliArgs
+  CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode} <- parseCliArgs
 
   baseContext@(BaseContext {..}) <- buildBaseContext
 
@@ -130,7 +130,7 @@ main = do
           V.setMode (V.outputIface v) V.Mouse True
         return v
   initialVty <- buildVty
-  let colorMode = V.outputColorMode (V.outputIface initialVty)
+  let colorMode = fromMaybe (V.outputColorMode (V.outputIface initialVty)) cliColorMode
   flip onException (cancel eventAsync) $
     void $ customMain initialVty buildVty (Just eventChan) (mkApp colorMode) (initialState { _appColorMode = colorMode })
 
