@@ -16,8 +16,8 @@ import qualified Skylighting.Styles as Sky
 mkAttrName :: String -> AttrName
 mkAttrName = attrName
 
-buildAdaptiveAttrMap :: V.Vty -> AttrMap
-buildAdaptiveAttrMap vty = attrMap V.defAttr ([
+buildAdaptiveAttrMap :: V.ColorMode -> AttrMap
+buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   -- Statuses
   (iconAttr, fg V.white)
   , (normalAttr, fg V.white)
@@ -80,7 +80,6 @@ buildAdaptiveAttrMap vty = attrMap V.defAttr ([
   , (E.editFocusedAttr, V.black `on` V.yellow)
   ] <> attrMappingsForStyle Sky.breezeDark)
   where
-    colorMode = V.outputColorMode (V.outputIface vty)
     select = selectColor colorMode
 
 iconAttr = mkAttrName "icon"

@@ -175,7 +175,7 @@ getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_state})) = case fetchableCu
   Nothing -> ""
 getNodeUrl repoBaseUrl (SingleBranchNode (EntityData {_static=branch})) = repoBaseUrl <> "/tree/" <> toString (branchName branch)
 getNodeUrl repoBaseUrl (SingleCommitNode (EntityData {_static=commit})) = repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit))
-getNodeUrl _repoBaseUrl (SingleNotificationNode (EntityData {_static=notification})) =
+getNodeUrl _repoBaseUrl (SingleNotificationNode (EntityData {_static=_notification})) =
   -- We need to make API calls to get proper html_url fields, but getNodeUrl is pure
   -- This should be handled asynchronously when the notification is opened
   "placeholder://notification-url"

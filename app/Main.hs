@@ -47,13 +47,13 @@ refreshPeriod = 100000
 defaultHealthCheckPeriodUs :: PeriodSpec
 defaultHealthCheckPeriodUs = PeriodSpec (1_000_000 * 60 * 10)
 
-mkApp :: V.Vty -> App AppState AppEvent ClickableName
-mkApp vty = App {
+mkApp :: V.ColorMode -> App AppState AppEvent ClickableName
+mkApp colorMode = App {
   appDraw = drawUI
   , appChooseCursor = showFirstCursor
   , appHandleEvent = \event -> get >>= \s -> appEvent s event
   , appStartEvent = return ()
-  , appAttrMap = const (buildAdaptiveAttrMap vty)
+  , appAttrMap = const (buildAdaptiveAttrMap colorMode)
   }
 
 
@@ -97,6 +97,8 @@ main = do
 
           , _appForm = Nothing
           , _appAnimationCounter = 0
+
+          , _appColorMode = V.FullColor
         }
 
 
@@ -123,17 +125,14 @@ main = do
         threadDelay refreshPeriod
 
   let buildVty = do
-        config <- V.userConfig
-        let configWithFullColor = config { V.configPreferredColorMode = Just V.FullColor }
-        v <- V.mkVty configWithFullColor
-        let output = V.outputIface v
-        when (V.supportsMode output V.Mouse) $
-          V.setMode output V.Mouse True
+        v <- V.userConfig >>= V.mkVty
+        when (V.supportsMode (V.outputIface v) V.Mouse) $
+          V.setMode (V.outputIface v) V.Mouse True
         return v
   initialVty <- buildVty
-  let adaptiveApp = mkApp initialVty
+  let colorMode = V.outputColorMode (V.outputIface initialVty)
   flip onException (cancel eventAsync) $
-    void $ customMain initialVty buildVty (Just eventChan) adaptiveApp initialState
+    void $ customMain initialVty buildVty (Just eventChan) (mkApp colorMode) (initialState { _appColorMode = colorMode })
 
 
 buildBaseContext :: IO BaseContext
