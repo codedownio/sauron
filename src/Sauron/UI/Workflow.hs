@@ -30,57 +30,29 @@ workflowLine animationCounter toggled (WorkflowRun {..}) fetchableState = vBox [
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe workflowRunStatus workflowRunConclusion
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ hBox [
-          withAttr branchAttr $ str (toString workflowRunHeadBranch)
-          , str " "
-          , str [i|#{timeDiff runTime}|]
+          str [i|#{timeDiff runTime}|]
         ]
       ]
 
-    line2 = padRight Max $ padLeft (Pad 4) $ hBox [
+    line2 = padRight Max $ padLeft (Pad 4) $ hBox $ [
       withAttr boldText $ str $ toString $ untagName workflowRunName
       , str " "
       , withAttr hashAttr $ str "#"
       , withAttr hashNumberAttr $ str $ show workflowRunRunNumber
       , str ": Commit "
       , withAttr hashAttr $ str $ take 7 $ toString workflowRunHeadSha
-      , str " pushed by "
+      , str " on "
+      , withAttr branchAttr $ str $ toString workflowRunHeadBranch
+      , str " • Pushed by "
       , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
-      ]
+      ] <> (if workflowRunAttempt > 1 then [str [i| • Attempt #{workflowRunAttempt}|]] else [])
 
 workflowInner :: WorkflowRun -> Fetchable (NodeState SingleWorkflowT) -> Widget n
 workflowInner (WorkflowRun {..}) _jobsFetchable = vBox $ workflowDetails
   where
-    runTime = diffUTCTime workflowRunUpdatedAt workflowRunStartedAt
-
     workflowDetails = [
-      withAttr normalAttr $ strWrap $ toString workflowRunDisplayTitle
-
-      , padTop (Pad 1) $ hBox [
+      hBox [
           str "File: "
           , withAttr hashAttr $ str $ toString workflowRunPath
-          , str " • Event: "
-          , withAttr branchAttr $ str $ toString workflowRunEvent
-        ]
-
-      , hBox [
-          str "Triggered by "
-          , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
-          , str [i| on #{workflowRunCreatedAt}|]
-        ]
-
-      , hBox [
-          str "Run #"
-          , withAttr hashNumberAttr $ str $ show workflowRunRunNumber
-          , str " • Attempt "
-          , str $ show workflowRunAttempt
-          , str " • Duration: "
-          , str [i|#{timeDiff runTime}|]
-        ]
-
-      , hBox [
-          str "Commit: "
-          , withAttr hashAttr $ str $ take 7 $ toString workflowRunHeadSha
-          , str " on "
-          , withAttr branchAttr $ str $ toString workflowRunHeadBranch
         ]
       ]
