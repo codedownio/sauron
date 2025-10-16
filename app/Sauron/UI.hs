@@ -17,6 +17,7 @@ import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
 import Relude
+import Sauron.Fetch.Core
 import Sauron.Types
 import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
@@ -134,9 +135,9 @@ listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityD
 
 listDrawElement appState ix isSelected (SomeNode (PaginatedBranchesNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
-    Fetched branches -> paginatedHeading ed appState "Branches" (str [i|(#{length branches})|])
+    Fetched branches -> paginatedHeading ed appState "Branches" (countWidget _pageInfo branches)
     Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "Branches" (str [i|(#{length branches}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Just branches -> paginatedHeading ed appState "Branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
       Nothing -> paginatedHeading ed appState "Branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Branches" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Branches" (str [i|(error fetching: #{err})|])
@@ -170,9 +171,9 @@ listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {
 
 listDrawElement appState ix isSelected (SomeNode (PaginatedNotificationsNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
   Just $ case _state of
-    Fetched notifications -> paginatedHeading ed appState "Notifications" (str [i|(#{length notifications})|])
+    Fetched notifications -> paginatedHeading ed appState "Notifications" (countWidget _pageInfo notifications)
     Fetching maybeNotifications -> case maybeNotifications of
-      Just notifications -> paginatedHeading ed appState "Notifications" (str [i|(#{length notifications}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Just notifications -> paginatedHeading ed appState "Notifications" (countWidget _pageInfo notifications <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
       Nothing -> paginatedHeading ed appState "Notifications" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Notifications" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Notifications" (str [i|(error fetching: #{err})|])
@@ -256,6 +257,11 @@ paginatedHeading (EntityData {..}) appState l countInParens = hBox $ catMaybes [
   , Just $ countInParens
   , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
   ]
+
+countWidget :: PageInfo -> V.Vector a -> Widget n
+countWidget pageInfo items = case pageInfoLastPage pageInfo of
+  Just lastPage -> str [i|(~#{lastPage * pageSize})|]
+  Nothing -> str [i|(#{V.length items})|]
 
 wrapper :: Int -> Bool -> EntityData a f -> [Maybe (Widget ClickableName)] -> Widget ClickableName
 wrapper ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes

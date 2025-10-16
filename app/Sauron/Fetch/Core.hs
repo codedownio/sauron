@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Sauron.Fetch.Core (
-  fetchPaginated''
+  fetchPaginated'',
+  pageSize
 ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -18,6 +19,10 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Types
 
+-- | Default page size for GitHub API requests
+pageSize :: Int
+pageSize = 10
+
 fetchPaginated'' :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m, FromJSON res
   )
@@ -33,7 +38,7 @@ fetchPaginated'' mkReq pageInfoVar stateVar cb = do
 
   bracketOnError_ (atomically $ markFetching stateVar)
                   (atomically $ writeTVar stateVar (Errored "Fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just 10) (Just pageInfoCurrentPage))))) >>= \case
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just pageSize) (Just pageInfoCurrentPage))))) >>= \case
       Left err -> atomically $ do
         cb $ Left (show err)
 

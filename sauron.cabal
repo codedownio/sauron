@@ -23,10 +23,32 @@ source-repository head
   type: git
   location: https://github.com/codedownio/sauron
 
-library
-  exposed-modules:
+executable sauron
+  main-is: Main.hs
+  other-modules:
+      Sauron.Actions
+      Sauron.Actions.Util
+      Sauron.Aeson
+      Sauron.Auth
+      Sauron.Event
+      Sauron.Event.Helpers
+      Sauron.Event.Paging
       Sauron.Expanding
+      Sauron.Fetch
+      Sauron.Fetch.Core
+      Sauron.Fetch.ParseJobLogs
       Sauron.Filter
+      Sauron.Fix
+      Sauron.HealthCheck
+      Sauron.HealthCheck.Common
+      Sauron.HealthCheck.Job
+      Sauron.HealthCheck.Workflow
+      Sauron.OAuth
+      Sauron.Options
+      Sauron.Setup.AllReposForUser
+      Sauron.Setup.Common
+      Sauron.Setup.ReposFromConfigFile
+      Sauron.Setup.ReposFromCurrentDirectory
       Sauron.Types
       Sauron.UI
       Sauron.UI.AnsiUtil
@@ -53,80 +75,6 @@ library
       Sauron.UI.Util.TimeDiff
       Sauron.UI.Workflow
       Sauron.Util
-  other-modules:
-      Paths_sauron
-  hs-source-dirs:
-      src
-  default-extensions:
-      FlexibleContexts
-      FlexibleInstances
-      LambdaCase
-      MultiWayIf
-      NamedFieldPuns
-      NoImplicitPrelude
-      NumericUnderscores
-      OverloadedStrings
-      QuasiQuotes
-      RecordWildCards
-      ScopedTypeVariables
-      ViewPatterns
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
-  build-depends:
-      ansi-terminal
-    , base >=4.7 && <5
-    , brick
-    , brick-skylighting
-    , commonmark
-    , commonmark-extensions
-    , commonmark-pandoc
-    , containers
-    , github
-    , http-client
-    , http-conduit
-    , http-types
-    , microlens
-    , microlens-th
-    , mtl
-    , network-uri
-    , pandoc-types
-    , process
-    , relude
-    , skylighting
-    , stm
-    , string-interpolate
-    , text
-    , time
-    , unliftio
-    , unliftio-core
-    , vector
-    , vty
-    , vty-crossplatform
-  default-language: Haskell2010
-
-executable sauron
-  main-is: Main.hs
-  other-modules:
-      Sauron.Actions
-      Sauron.Actions.Util
-      Sauron.Aeson
-      Sauron.Auth
-      Sauron.Event
-      Sauron.Event.Helpers
-      Sauron.Event.Paging
-      Sauron.Fetch
-      Sauron.Fetch.Core
-      Sauron.Fetch.ParseJobLogs
-      Sauron.Fix
-      Sauron.HealthCheck
-      Sauron.HealthCheck.Common
-      Sauron.HealthCheck.Job
-      Sauron.HealthCheck.Workflow
-      Sauron.OAuth
-      Sauron.Options
-      Sauron.Setup.AllReposForUser
-      Sauron.Setup.Common
-      Sauron.Setup.ReposFromConfigFile
-      Sauron.Setup.ReposFromCurrentDirectory
       Paths_sauron
   hs-source-dirs:
       app
@@ -164,6 +112,7 @@ executable sauron
     , lens
     , lens-regex-pcre
     , microlens
+    , microlens-th
     , mtl
     , network-uri
     , optparse-applicative
@@ -171,7 +120,6 @@ executable sauron
     , process
     , relude
     , safe-exceptions
-    , sauron
     , skylighting
     , stm
     , string-interpolate

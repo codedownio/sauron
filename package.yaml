@@ -74,13 +74,6 @@ ghc-options:
 - -Wpartial-fields
 - -Wredundant-constraints
 
-library:
-  source-dirs: src
-  dependencies:
-  - microlens-th
-  - time
-  - vector
-
 executables:
   sauron:
     main: Main.hs
@@ -99,9 +92,9 @@ executables:
     - git-config
     - lens
     - lens-regex-pcre
+    - microlens-th
     - optparse-applicative
     - safe-exceptions
-    - sauron
     - yaml
 
 tests:
