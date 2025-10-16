@@ -231,17 +231,16 @@ jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
     renderLogGroup (JobLogLines _timestamp contents) = vBox $ map renderLogLine contents
     renderLogGroup (JobLogGroup _timestamp title _status children) = vBox [
       withAttr normalAttr $ str $ toString title,
-      padLeft (Pad 2) $ vBox $ map renderLogGroup children
+      vBox $ map renderLogGroup children
       ]
 
-    renderLogLine content = hBox $
-      if "[command]" `T.isPrefixOf` content
-        then renderCommandLine content
-        else str "  " : parseAnsiText content
+    renderLogLine content
+      | "[command]" `T.isPrefixOf` content = hBox $ renderCommandLine content
+      | otherwise = hBox $ parseAnsiText content
 
     renderCommandLine content =
       let commandText = T.drop 9 content  -- Remove "[command]"
-      in [ str "  ▶ "  -- Unicode right-pointing triangle
+      in [ str "▶ "
          , withAttr commandAttr $ str $ toString commandText
          ]
 
