@@ -190,6 +190,14 @@ listDrawElement appState ix isSelected (SomeNode (SingleNotificationNode ed@(Ent
 
 listDrawElement appState ix isSelected (SomeNode (JobLogGroupNode ed@(EntityData {_static=jobLogGroup, ..}))) = wrapper ix isSelected ed [
   Just $ jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
+  , do
+      guard _toggled
+      case jobLogGroup of
+        JobLogGroup _timestamp _title (Just _status) children -> 
+          return $ padLeft (Pad 4) $
+            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+              jobLogGroupInner children
+        _ -> Nothing
   ]
 
 -- * Headings
@@ -215,6 +223,17 @@ jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status _
     statusWidget = case status of
       Just s -> Just $ padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus s
       Nothing -> Nothing
+
+jobLogGroupInner :: [JobLogGroup] -> Widget n
+jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
+  where
+    renderLogGroup (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox $
+      str "  " : parseAnsiText content
+      ) contents
+    renderLogGroup (JobLogGroup _timestamp title _status children) = vBox [
+      withAttr normalAttr $ str $ toString title,
+      padLeft (Pad 2) $ vBox $ map renderLogGroup children
+      ]
 
 paginatedHeading ::
   EntityData Fixed a

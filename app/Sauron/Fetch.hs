@@ -370,7 +370,8 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
 
   childrenVar <- case jobLogGroup of
     JobLogLines _ _ -> newTVar []
-    JobLogGroup _ _ _ children' -> do
+    JobLogGroup _ _ (Just _status) _children' -> newTVar []  -- Top-level job groups don't have children in the tree
+    JobLogGroup _ _ Nothing children' -> do  -- Only nested log groups have children
       childElems <- mapM (createJobLogGroupChildren bc (depth' + 1)) children'
       newTVar childElems
 
