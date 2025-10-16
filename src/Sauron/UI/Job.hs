@@ -7,7 +7,6 @@ module Sauron.UI.Job (
 
 import Brick
 import Data.Time.Clock
-import qualified Data.Vector as V
 import GitHub
 import Relude
 import Sauron.Types (JobLogGroup(..), Fetchable(..))
@@ -44,22 +43,4 @@ jobLine animationCounter toggled (Job {..}) fetchableState = vBox [line1, line2]
     runnerNameWidget Nothing = Nothing
 
 jobInner :: Int -> Job -> Maybe [JobLogGroup] -> Widget n
-jobInner animationCounter (Job {..}) _maybeJobLogs' = vBox [
-  vBox $ map renderJobStep (V.toList jobSteps)
-  -- , case maybeJobLogs of
-  --     Nothing -> str "No logs"
-  --     Just xs -> vBox (map renderJobLogGroup xs)
-  ]
-  where
-    renderJobStep :: JobStep -> Widget n
-    renderJobStep (JobStep {..}) = hBox [
-      withAttr normalAttr $ str $ toString $ untagName jobStepName
-      , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe jobStepStatus jobStepConclusion
-      ]
-
-    -- renderJobLogGroup :: JobLogGroup -> Widget n
-    -- renderJobLogGroup (JobLogLines _timestamp contents) = vBox $ map (str . toString) contents
-    -- renderJobLogGroup (JobLogGroup _timestamp title children) = vBox [
-    --   withAttr normalAttr $ str $ "Group: " <> toString title,
-    --   padLeft (Pad 2) $ vBox (map renderJobLogGroup children)
-    --   ]
+jobInner _animationCounter (Job {}) _maybeJobLogs' = vBox []
