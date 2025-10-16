@@ -96,6 +96,7 @@ main = do
           , _appNow = now
 
           , _appForm = Nothing
+          , _appModal = Nothing
           , _appAnimationCounter = 0
 
           , _appColorMode = V.FullColor

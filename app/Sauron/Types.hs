@@ -273,6 +273,8 @@ data ClickableName =
   | InnerViewport Text
   | InfoBar
   | TextForm
+  | CommentModal
+  | CommentEditor
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -345,6 +347,13 @@ data AppEvent =
   ListUpdate (V.Vector (SomeNode Fixed))
   | AnimationTick
 
+data ModalState =
+  CommentModalState {
+    _commentText :: Text
+    , _commentIssueNumber :: Int
+    , _issueIsPR :: Bool  -- True for PR, False for Issue
+  }
+
 data AppState = AppState {
   _appUser :: User
   , _appBaseContext :: BaseContext
@@ -354,9 +363,11 @@ data AppState = AppState {
   , _appNow :: UTCTime
 
   , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
+  , _appModal :: Maybe ModalState
   , _appAnimationCounter :: Int
 
   , _appColorMode :: V.ColorMode
   }
 
+makeLenses ''ModalState
 makeLenses ''AppState

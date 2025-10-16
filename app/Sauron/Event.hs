@@ -11,6 +11,7 @@ import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
 import Data.String.Interpolate
+import qualified Data.Text as T
 import qualified Data.Vector as Vec
 import GitHub
 import qualified Graphics.Vty as V
@@ -27,6 +28,39 @@ appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableNam
 appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (listSelected $ s ^. appMainList))
 
 appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
+
+-- Handle modal events
+appEvent (_appModal -> Just modalState) e = case e of
+  VtyEvent (V.EvKey V.KEsc []) -> modify (appModal .~ Nothing)
+  VtyEvent (V.EvKey V.KEnter [V.MCtrl]) -> do
+    -- TODO: Submit comment
+    modify (appModal .~ Nothing)
+  VtyEvent ev -> case modalState of
+    CommentModalState text issueNumber isPR -> do
+      -- let editor = commentEditor text
+      -- let tempState = AppState {
+      --       _appUser = s ^. appUser
+      --       , _appBaseContext = s ^. appBaseContext
+      --       , _appMainListVariable = s ^. appMainListVariable
+      --       , _appMainList = s ^. appMainList
+      --       , _appSortBy = s ^. appSortBy
+      --       , _appNow = s ^. appNow
+      --       , _appForm = Nothing
+      --       , _appModal = Nothing
+      --       , _appAnimationCounter = s ^. appAnimationCounter
+      --       , _appColorMode = s ^. appColorMode
+      --       }
+
+      -- For now, just capture text changes with simple key events
+      case ev of
+        V.EvKey (V.KChar c) [] ->
+          modify (appModal .~ Just (CommentModalState (text <> T.singleton c) issueNumber isPR))
+        V.EvKey V.KBS [] ->
+          modify (appModal .~ Just (CommentModalState (T.dropEnd 1 text) issueNumber isPR))
+        V.EvKey V.KEnter [] ->
+          modify (appModal .~ Just (CommentModalState (text <> "\n") issueNumber isPR))
+        _ -> return ()
+  _ -> return ()
 
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
@@ -105,6 +139,15 @@ appEvent s (VtyEvent e) = case e of
     withNthChildAndPaginationParent s $ \_fixedEl _el (SomeNode (getEntityData -> (EntityData {_ident, _search})), _) _parents -> do
       search' <- readTVarIO _search
       modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
+
+  V.EvKey c [] | c == commentKey -> do
+    withFixedElemAndParents s $ \(SomeNode el) _variableEl _parents -> do
+      case el of
+        SingleIssueNode (EntityData {_static=Issue{issueNumber=(IssueNumber number)}}) -> do
+          modify (appModal .~ Just (CommentModalState "" number False))
+        SinglePullNode (EntityData {_static=Issue{issueNumber=(IssueNumber number)}}) -> do
+          modify (appModal .~ Just (CommentModalState "" number True))
+        _ -> return ()
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups

@@ -30,6 +30,7 @@ firstPageKey = V.KChar 'F'
 lastPageKey = V.KChar 'L'
 
 editSearchKey = V.KChar 's'
+commentKey = V.KChar 'c'
 
 exitKey = V.KChar 'q'
 
