@@ -34,6 +34,8 @@ import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import Data.String.Interpolate
 import qualified Data.Text as T
+import Data.Time.Calendar (fromGregorian)
+import Data.Time.Clock (UTCTime(..))
 import qualified Data.Vector as V
 import GitHub
 import Network.HTTP.Conduit
@@ -258,7 +260,7 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
 fetchJobLogs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
-fetchJobLogs owner name (Job {jobId}) (SingleJobNode (EntityData {..})) = do
+fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})) = do
   BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
@@ -274,7 +276,8 @@ fetchJobLogs owner name (Job {jobId}) (SingleJobNode (EntityData {..})) = do
         -- traceM [i|parsedLogs: #{parsedLogs}|]
 
         bc <- ask
-        children' <- liftIO $ atomically $ mapM (createJobLogGroupChildren bc (_depth + 1)) parsedLogs
+        children' <- liftIO $ atomically $ do
+          mapM (createJobStepNode bc (_depth + 1) parsedLogs) (V.toList jobSteps)
 
         atomically $ do
           currentState <- readTVar _state
@@ -330,6 +333,31 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
     , _depth = depth'
     , _ident = ident'
 }
+
+createJobStepNode :: BaseContext -> Int -> [JobLogGroup] -> JobStep -> STM (Node Variable 'JobLogGroupT)
+createJobStepNode bc depth' allLogs jobStep = do
+  let stepTitle = untagName (jobStepName jobStep)
+  let stepTimestamp = fromMaybe (UTCTime (fromGregorian 1970 1 1) 0) (jobStepStartedAt jobStep)
+  createJobLogGroupChildren bc depth' (JobLogGroup stepTimestamp stepTitle logsForStep)
+  where
+    logsForStep :: [JobLogGroup]
+    logsForStep =
+      let startTime = jobStepStartedAt jobStep
+          endTime = jobStepCompletedAt jobStep
+      in filter (logInTimeRange startTime endTime) allLogs
+
+    logInTimeRange :: Maybe UTCTime -> Maybe UTCTime -> JobLogGroup -> Bool
+    logInTimeRange startTime endTime logGroup =
+      let logTime = getLogTimestamp logGroup
+      in case (startTime, endTime) of
+           (Just start, Just end) -> logTime >= start && logTime <= end
+           (Just start, Nothing) -> logTime >= start
+           (Nothing, Just end) -> logTime <= end
+           (Nothing, Nothing) -> True
+
+    getLogTimestamp :: JobLogGroup -> UTCTime
+    getLogTimestamp (JobLogLines timestamp _) = timestamp
+    getLogTimestamp (JobLogGroup timestamp _ _) = timestamp
 
 createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
