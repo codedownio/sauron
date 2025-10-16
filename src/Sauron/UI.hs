@@ -30,7 +30,7 @@ import Sauron.UI.Pagination
 import Sauron.UI.Pull
 import Sauron.UI.Repo
 import Sauron.UI.Search
-import Sauron.UI.Statuses (getQuarterCircleSpinner)
+import Sauron.UI.Statuses (getQuarterCircleSpinner, statusToIconAnimated, chooseWorkflowStatus)
 import Sauron.UI.TopBox
 import Sauron.UI.Util
 import Sauron.UI.Workflow
@@ -188,8 +188,8 @@ listDrawElement appState ix isSelected (SomeNode (SingleNotificationNode ed@(Ent
 
 -- * Job Log Groups
 
-listDrawElement _appState ix isSelected (SomeNode (JobLogGroupNode ed@(EntityData {_static=jobLogGroup, ..}))) = wrapper ix isSelected ed [
-  Just $ jobLogGroupLine _toggled jobLogGroup
+listDrawElement appState ix isSelected (SomeNode (JobLogGroupNode ed@(EntityData {_static=jobLogGroup, ..}))) = wrapper ix isSelected ed [
+  Just $ jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
   ]
 
 -- * Headings
@@ -202,14 +202,19 @@ listDrawElement _appState ix isSelected (SomeNode (HeadingNode ed@(EntityData {_
     ]
   ]
 
-jobLogGroupLine :: Bool -> JobLogGroup -> Widget n
-jobLogGroupLine _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox $
+jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
+jobLogGroupLine _animationCounter _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox $
   str "  " : parseAnsiText content
   ) contents
-jobLogGroupLine toggled' (JobLogGroup _timestamp title _children) = hBox [
-  withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
-  withAttr normalAttr $ str $ toString title
+jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status _children) = hBox $ catMaybes [
+  Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
+  Just $ withAttr normalAttr $ str $ toString title,
+  statusWidget
   ]
+  where
+    statusWidget = case status of
+      Just s -> Just $ padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus s
+      Nothing -> Nothing
 
 paginatedHeading ::
   EntityData Fixed a

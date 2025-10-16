@@ -338,7 +338,8 @@ createJobStepNode :: BaseContext -> Int -> [JobLogGroup] -> JobStep -> STM (Node
 createJobStepNode bc depth' allLogs jobStep = do
   let stepTitle = untagName (jobStepName jobStep)
   let stepTimestamp = fromMaybe (UTCTime (fromGregorian 1970 1 1) 0) (jobStepStartedAt jobStep)
-  createJobLogGroupChildren bc depth' (JobLogGroup stepTimestamp stepTitle logsForStep)
+  let stepStatus = Just $ fromMaybe (jobStepStatus jobStep) (jobStepConclusion jobStep)
+  createJobLogGroupChildren bc depth' (JobLogGroup stepTimestamp stepTitle stepStatus logsForStep)
   where
     logsForStep :: [JobLogGroup]
     logsForStep =
@@ -357,7 +358,7 @@ createJobStepNode bc depth' allLogs jobStep = do
 
     getLogTimestamp :: JobLogGroup -> UTCTime
     getLogTimestamp (JobLogLines timestamp _) = timestamp
-    getLogTimestamp (JobLogGroup timestamp _ _) = timestamp
+    getLogTimestamp (JobLogGroup timestamp _ _ _) = timestamp
 
 createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
@@ -369,7 +370,7 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
 
   childrenVar <- case jobLogGroup of
     JobLogLines _ _ -> newTVar []
-    JobLogGroup _ _ children' -> do
+    JobLogGroup _ _ _ children' -> do
       childElems <- mapM (createJobLogGroupChildren bc (depth' + 1)) children'
       newTVar childElems
 

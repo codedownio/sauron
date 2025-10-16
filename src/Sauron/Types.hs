@@ -253,7 +253,7 @@ data SortBy =
 
 data JobLogGroup =
   JobLogLines UTCTime [Text]
-  | JobLogGroup UTCTime Text [JobLogGroup]
+  | JobLogGroup UTCTime Text (Maybe Text) [JobLogGroup]
   deriving (Show, Eq)
 
 type Var = TVar

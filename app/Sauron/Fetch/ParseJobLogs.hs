@@ -51,9 +51,9 @@ parseWithAccumulation (line:rest) groupStack accumulatedLines
                    else [createJobLogLines accumulatedLines]
           (children, remainingLines) = parseWithAccumulation rest ((timestamp, groupTitle) : groupStack) []
       in case remainingLines of
-           [] -> (result <> [JobLogGroup timestamp groupTitle children], [])
+           [] -> (result <> [JobLogGroup timestamp groupTitle Nothing children], [])
            _ -> let (siblings, finalLines) = parseWithAccumulation remainingLines groupStack []
-                in (result <> [JobLogGroup timestamp groupTitle children] <> siblings, finalLines)
+                in (result <> [JobLogGroup timestamp groupTitle Nothing children] <> siblings, finalLines)
   
   | isGroupEnd line = 
       let result = if null accumulatedLines 
@@ -94,4 +94,4 @@ parseTimestampAndContent line =
 
 closeAllGroups :: [(UTCTime, Text)] -> [JobLogGroup]
 closeAllGroups [] = []
-closeAllGroups ((timestamp, title):rest) = [JobLogGroup timestamp title (closeAllGroups rest)]
+closeAllGroups ((timestamp, title):rest) = [JobLogGroup timestamp title Nothing (closeAllGroups rest)]
