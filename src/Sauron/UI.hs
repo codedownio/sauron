@@ -12,6 +12,7 @@ import qualified Brick.Widgets.List as L
 import Control.Monad
 import Data.Maybe
 import Data.String.Interpolate
+import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub hiding (Status)
 import Lens.Micro hiding (ix)
@@ -193,7 +194,7 @@ listDrawElement appState ix isSelected (SomeNode (JobLogGroupNode ed@(EntityData
   , do
       guard _toggled
       case jobLogGroup of
-        JobLogGroup _timestamp _title (Just _status) children -> 
+        JobLogGroup _timestamp _title (Just _status) children ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
               jobLogGroupInner children
@@ -227,13 +228,22 @@ jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status _
 jobLogGroupInner :: [JobLogGroup] -> Widget n
 jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
   where
-    renderLogGroup (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox $
-      str "  " : parseAnsiText content
-      ) contents
+    renderLogGroup (JobLogLines _timestamp contents) = vBox $ map renderLogLine contents
     renderLogGroup (JobLogGroup _timestamp title _status children) = vBox [
       withAttr normalAttr $ str $ toString title,
       padLeft (Pad 2) $ vBox $ map renderLogGroup children
       ]
+
+    renderLogLine content = hBox $
+      if "[command]" `T.isPrefixOf` content
+        then renderCommandLine content
+        else str "  " : parseAnsiText content
+
+    renderCommandLine content =
+      let commandText = T.drop 9 content  -- Remove "[command]"
+      in [ str "  ▶ "  -- Unicode right-pointing triangle
+         , withAttr commandAttr $ str $ toString commandText
+         ]
 
 paginatedHeading ::
   EntityData Fixed a

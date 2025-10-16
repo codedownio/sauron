@@ -76,6 +76,9 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   , (codeBlockText, fg (select midGray))
   , (horizontalRuleAttr, fg (select midGray))
 
+  -- Command lines inside job logs
+  , (commandAttr, fg (select solarizedBlue) & flip V.withStyle V.bold)
+
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
   ] <> attrMappingsForStyle Sky.breezeDark)
@@ -136,6 +139,7 @@ strikeoutText = mkAttrName "strikeout-text"
 codeText = mkAttrName "code-text"
 codeBlockText = mkAttrName "code-block-text"
 horizontalRuleAttr = mkAttrName "horizontal-rule"
+commandAttr = mkAttrName "command"
 
 -- * Color Fallback System
 
