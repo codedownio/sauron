@@ -24,6 +24,7 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Border
 import Sauron.UI.BottomBar
 import Sauron.UI.Branch
+import Sauron.UI.CommentModal (renderModal)
 import Sauron.UI.Commit
 import Sauron.UI.Issue
 import Sauron.UI.Job
@@ -39,7 +40,8 @@ import Sauron.UI.Workflow
 
 
 drawUI :: AppState -> [Widget ClickableName]
-drawUI app = [vBox [
+drawUI app =
+  let mainUI = vBox [
                  topBox app
                  , borderWithCounts app
                  -- , fixedHeightOrViewportPercent (InnerViewport [i|viewport_debugging|]) 50 $
@@ -47,7 +49,9 @@ drawUI app = [vBox [
                  , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
                  , clickable InfoBar $ bottomBar app
                  ]
-             ]
+  in case _appModal app of
+       Nothing -> [mainUI]
+       Just modalState -> [renderModal app modalState, mainUI]
 
 listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget ClickableName
 
