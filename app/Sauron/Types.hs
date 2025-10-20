@@ -12,6 +12,7 @@
 module Sauron.Types where
 
 import Brick.Forms
+import Brick.Widgets.Edit (Editor)
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Data.String.Interpolate
@@ -349,7 +350,7 @@ data AppEvent =
 
 data ModalState =
   CommentModalState {
-    _commentText :: Text
+    _commentEditor :: Editor Text ClickableName
     , _commentIssueNumber :: Int
     , _issueIsPR :: Bool  -- True for PR, False for Issue
   }
