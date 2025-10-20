@@ -209,13 +209,13 @@ githubOrange :: ColorFallback
 githubOrange = (V.rgbColor 0xd2 0x99 0x22, V.Color240 178, V.brightYellow, V.yellow, V.white)
 
 dimGray :: ColorFallback
-dimGray = (grayAtRGB 25, V.Color240 236, V.black, V.black, V.black)
+dimGray = (grayAtRGB 25, V.Color240 236, V.brightWhite, V.white, V.white)
 
 midGray :: ColorFallback
-midGray = (grayAtRGB 50, V.Color240 238, V.brightBlack, V.black, V.black)
+midGray = (grayAtRGB 50, V.Color240 238, V.brightWhite, V.white, V.white)
 
 brightGray :: ColorFallback
-brightGray = (grayAtRGB 80, V.Color240 244, V.brightBlack, V.white, V.white)
+brightGray = (grayAtRGB 80, V.Color240 244, V.brightWhite, V.white, V.white)
 
 midWhite :: ColorFallback
 midWhite = (grayAtRGB 140, V.Color240 249, V.brightWhite, V.white, V.white)
