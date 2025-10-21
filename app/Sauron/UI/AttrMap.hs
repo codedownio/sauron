@@ -43,6 +43,10 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   , (unknownAttr, fg V.white)
   , (queuedAttr, fg (select githubOrange))
 
+  -- Notification styles
+  , (unreadNotificationAttr, bg (select unreadNotificationBg))
+  , (blueDotAttr, fg V.blue)
+
   -- Progress bar
   , (progressCompleteAttr, bg (select (V.Color240 235, V.Color240 235, V.brightBlack, V.black, V.black)))
   , (progressIncompleteAttr, bg (select (V.Color240 225, V.Color240 225, V.black, V.black, V.black)))
@@ -128,6 +132,11 @@ branchAttr = mkAttrName "branch"
 hashAttr = mkAttrName "hash"
 hashNumberAttr = mkAttrName "hashNumber"
 usernameAttr = mkAttrName "username"
+
+-- * Notification styles
+
+unreadNotificationAttr = mkAttrName "unreadNotification"
+blueDotAttr = mkAttrName "blueDot"
 
 -- * Text
 
@@ -222,6 +231,9 @@ midWhite = (grayAtRGB 140, V.Color240 249, V.brightWhite, V.white, V.white)
 
 brightWhite :: ColorFallback
 brightWhite = (grayAtRGB 200, V.Color240 253, V.brightWhite, V.white, V.white)
+
+unreadNotificationBg :: ColorFallback
+unreadNotificationBg = (V.rgbColor 0x1a 0x2f 0x3a, V.Color240 236, V.brightBlack, V.black, V.black)
 
 grayAtRGB :: Word8 -> V.Color
 grayAtRGB level = V.rgbColor level level level

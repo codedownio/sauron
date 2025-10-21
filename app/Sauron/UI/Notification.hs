@@ -14,24 +14,27 @@ import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
 
 notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable a -> Widget n
-notificationLine now toggled notification animationCounter fetchableState = vBox [line1, line2]
+notificationLine now toggled (Notification {..}) animationCounter fetchableState =
+  if notificationUnread
+    -- then withAttr unreadNotificationAttr $ vBox [line1, line2]
+    then vBox [line1, line2]
+    else vBox [line1, line2]
   where
-    Notification {..} = notification
     Subject {..} = notificationSubject
-    RepoRef {..} = notificationRepo
-    SimpleOwner {..} = repoRefOwner
+    RepoRef {repoRefOwner=(SimpleOwner {..}), ..} = notificationRepo
 
-    line1 = hBox [
-      withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
-      , withAttr normalAttr $ str $ toString subjectTitle
-      , fetchableQuarterCircleSpinner animationCounter fetchableState
-      , padLeft Max $ hBox [
-          if notificationUnread
-            then withAttr erroredAttr $ str "🔴 "
-            else withAttr greenCheckAttr $ str "✓ "
-          , str (toString subjectType)
+    line1 = hBox (catMaybes [
+      Just $ withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
+      , Just $ withAttr normalAttr $ str $ toString subjectTitle
+      , if notificationUnread then Just (withAttr blueDotAttr $ str " ●") else Nothing
+      , Just $ fetchableQuarterCircleSpinner animationCounter fetchableState
+      , Just $ padLeft Max $ hBox [
+          case subjectType of
+            "PullRequest" -> str "🔄"
+            "Issue" -> str "◉"
+            _ -> str (toString subjectType)
         ]
-      ]
+      ])
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox [
       withAttr hashAttr $ str (toString $ untagName simpleOwnerLogin)
