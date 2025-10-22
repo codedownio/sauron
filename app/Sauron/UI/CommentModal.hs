@@ -20,7 +20,9 @@ renderCommentModal _appState editor issueNumber isPR =
   sideBySideEditor editor issueNumber isPR
   & border
   & withAttr normalAttr
-  & commentCenterLayer
+  & hLimit 130
+  & vLimit 25
+  & centerLayer
 
 sideBySideEditor :: Editor Text ClickableName -> Int -> Bool -> Widget ClickableName
 sideBySideEditor editor issueNumber isPR = hBox [
@@ -53,12 +55,5 @@ sideBySideEditor editor issueNumber isPR = hBox [
     modalTitle = if isPR
                  then "Comment on Pull Request #" <> show issueNumber
                  else "Comment on Issue #" <> show issueNumber
-    
-    text = T.unlines $ getEditContents editor
 
-commentCenterLayer :: Widget ClickableName -> Widget ClickableName
-commentCenterLayer widget =
-  center $
-  hLimit 130 $
-  vLimit 25 $
-  widget
+    text = T.unlines $ getEditContents editor

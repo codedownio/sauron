@@ -40,18 +40,18 @@ import Sauron.UI.Workflow
 
 
 drawUI :: AppState -> [Widget ClickableName]
-drawUI app =
-  let mainUI = vBox [
-                 topBox app
-                 , borderWithCounts app
-                 -- , fixedHeightOrViewportPercent (InnerViewport [i|viewport_debugging|]) 50 $
-                 --     vBox [border $ strWrap (show item <> "\n") | item <- toList (app ^. appMainList)]
-                 , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
-                 , clickable InfoBar $ bottomBar app
-                 ]
-  in case _appModal app of
-       Nothing -> [mainUI]
-       Just modalState -> [renderModal app modalState, mainUI]
+drawUI app = case _appModal app of
+  Nothing -> [mainUI]
+  Just modalState -> [renderModal app modalState, mainUI]
+  where
+    mainUI = vBox [
+      topBox app
+      , borderWithCounts app
+      -- , fixedHeightOrViewportPercent (InnerViewport [i|viewport_debugging|]) 50 $
+      --     vBox [border $ strWrap (show item <> "\n") | item <- toList (app ^. appMainList)]
+      , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
+      , clickable InfoBar $ bottomBar app
+      ]
 
 listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget ClickableName
 
