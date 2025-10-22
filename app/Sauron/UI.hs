@@ -86,10 +86,9 @@ listDrawElement appState ix isSelected (SomeNode (SingleIssueNode ed@(EntityData
   , do
       guard _toggled
       guardFetchedOrHasPrevious _state $ \comments ->
-        guardJust (issueBody issue) $ \body ->
-          return $ padLeft (Pad 4) $
-            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              issueInner (_appNow appState) issue body (Fetched comments)
+        return $ padLeft (Pad 4) $
+          fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+            issueInner (_appNow appState) issue comments
   ]
 
 -- * Pulls
@@ -108,10 +107,9 @@ listDrawElement appState ix isSelected (SomeNode (SinglePullNode ed@(EntityData 
   , do
       guard _toggled
       guardFetchedOrHasPrevious _state $ \comments ->
-        guardJust (issueBody issue) $ \body ->
-          return $ padLeft (Pad 4) $
-            fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              issueInner (_appNow appState) issue body (Fetched comments)
+        return $ padLeft (Pad 4) $
+          fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+            issueInner (_appNow appState) issue comments
   ]
 
 -- * Workflows

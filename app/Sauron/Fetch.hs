@@ -178,10 +178,8 @@ fetchIssue owner name issueNumber issueVar = do
   bracketOnError_ (atomically $ markFetching issueVar)
                   (atomically $ writeTVar issueVar (Errored "Issue fetch failed with exception.")) $
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
-      Left err -> atomically $ do
-        writeTVar issueVar (Errored (show err))
-      Right x -> atomically $ do
-        writeTVar issueVar (Fetched (responseBody x))
+      Left err -> atomically $ writeTVar issueVar (Errored (show err))
+      Right x -> atomically $ writeTVar issueVar (Fetched (responseBody x))
 
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
