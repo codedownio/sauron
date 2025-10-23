@@ -37,6 +37,9 @@ appEvent (_appModal -> Just modalState) e = case e of
       (V.EvKey V.KEnter [V.MCtrl]) -> do
         -- TODO: Submit comment
         modify (appModal .~ Nothing)
+      (V.EvKey V.KEnter [V.MCtrl, V.MShift]) -> do
+        -- TODO: Close issue/PR with comment
+        modify (appModal .~ Nothing)
       _ -> zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
   _ -> return ()
 
