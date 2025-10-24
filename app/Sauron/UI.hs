@@ -221,10 +221,10 @@ listDrawElement _appState ix isSelected (SomeNode (HeadingNode ed@(EntityData {_
   ]
 
 jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
-jobLogGroupLine _animationCounter _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> hBox $
+jobLogGroupLine _animationCounter _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> padRight Max $ hBox $
   str "  " : parseAnsiText content
   ) contents
-jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status _children) = hBox $ catMaybes [
+jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status _children) = padRight Max $ hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
   Just $ withAttr normalAttr $ str $ toString title,
   statusWidget
