@@ -149,8 +149,8 @@ listDrawElement appState ix isSelected (SomeNode (SingleBranchNode ed@(EntityDat
   Just $ branchLine _toggled branch appState _state
   ]
 
-listDrawElement _appState ix isSelected (SomeNode (SingleCommitNode ed@(EntityData {_static=commit, _state, ..}))) = wrapper ix isSelected ed [
-  Just $ commitLine _toggled commit
+listDrawElement appState ix isSelected (SomeNode (SingleCommitNode ed@(EntityData {_static=commit, _state, ..}))) = wrapper ix isSelected ed [
+  Just $ commitLine (_appNow appState) _toggled commit
   , do
       guard _toggled
       guardFetchedOrHasPrevious _state $ \detailedCommit ->

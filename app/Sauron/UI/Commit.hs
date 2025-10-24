@@ -6,28 +6,44 @@ module Sauron.UI.Commit (
 import Brick
 import Brick.Widgets.Border
 import qualified Data.Text as T
+import Data.Time
 import qualified Data.Vector as V
 import GitHub
 import Relude
 import Sauron.UI.AttrMap
+import Sauron.UI.Util.TimeDiff
 
 
-commitLine :: Bool -> Commit -> Widget n
-commitLine toggled (Commit {commitSha, commitGitCommit, commitAuthor}) = vBox [line1, line2]
+commitLine :: UTCTime -> Bool -> Commit -> Widget n
+commitLine now toggled (Commit {commitSha, commitGitCommit, commitAuthor}) =
+  if toggled then vBox [line1, line2] else vBox [line1]
   where
+    commitMessage = toString $ gitCommitMessage commitGitCommit
+    displayMessage = if toggled then commitMessage else takeWhile (/= '\n') commitMessage
+
+    (authorName, commitTime) = case commitAuthor of
+      Just author ->
+        let user = gitCommitAuthor commitGitCommit
+        in (toString (untagName (simpleUserLogin author)), gitUserDate user)
+      Nothing ->
+        let user = gitCommitAuthor commitGitCommit
+        in (toString (gitUserName user), gitUserDate user)
+
+    timeAgo = timeFromNow (diffUTCTime now commitTime)
+
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
-      , withAttr normalAttr $ str $ toString $ gitCommitMessage commitGitCommit
+      , withAttr normalAttr $ str displayMessage
+      , str " • "
+      , withAttr usernameAttr $ str authorName
+      , str $ " committed " <> timeAgo
+      , padLeft Max $ withAttr hashAttr $ str $ take 7 $ toString $ untagName commitSha
       ]
 
-    line2 = padRight Max $ padLeft (Pad 4) $ hBox [
-      str "Commit "
-      , withAttr hashAttr $ str $ take 7 $ toString $ untagName commitSha
-      , case commitAuthor of
-          Just author -> str (" by " <> toString (untagName (simpleUserLogin author)))
-          Nothing -> case gitCommitAuthor commitGitCommit of
-            gitAuthor -> str (" by " <> toString (gitUserName gitAuthor))
-      ]
+    line2 = padRight Max $ padLeft (Pad 4) $
+      withAttr normalAttr $ str $ if toggled && '\n' `elem` commitMessage
+        then drop 1 $ dropWhile (/= '\n') commitMessage
+        else ""
 
 
 commitInner :: Commit -> Widget n
