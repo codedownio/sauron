@@ -34,10 +34,13 @@ commitLine now toggled (Commit {commitSha, commitGitCommit, commitAuthor}) =
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
       , withAttr normalAttr $ str displayMessage
-      , str " • "
-      , withAttr usernameAttr $ str authorName
-      , str $ " committed " <> timeAgo
-      , padLeft Max $ withAttr hashAttr $ str $ take 7 $ toString $ untagName commitSha
+      , padLeft Max $ hBox [
+          str timeAgo
+          , str " • "
+          , withAttr usernameAttr $ str authorName
+          , str " • "
+          , withAttr hashAttr $ str $ take 7 $ toString $ untagName commitSha
+        ]
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $
