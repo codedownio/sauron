@@ -71,6 +71,8 @@ refresh bc item@(SingleJobNode (EntityData {_state})) parents@(findRepoParent ->
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 refresh bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc
+refresh bc (SingleCommitNode (EntityData {_static=commit, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+  liftIO $ void $ async $ liftIO $ runReaderT (fetchCommitDetails owner name (commitSha commit) _state) bc
 refresh _ (SingleNotificationNode _) _ = return ()
 refresh _ _ _ = return ()
 

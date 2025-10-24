@@ -150,7 +150,7 @@ type family NodeState a where
   NodeState SingleWorkflowT = WithTotalCount Job
   NodeState SingleJobT = (Job, [JobLogGroup])
   NodeState SingleBranchT = V.Vector Commit
-  NodeState SingleCommitT = ()
+  NodeState SingleCommitT = Commit
   NodeState SingleNotificationT = ()
   NodeState JobLogGroupT = ()
   NodeState HeadingT = ()

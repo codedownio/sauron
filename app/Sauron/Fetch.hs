@@ -19,6 +19,7 @@ module Sauron.Fetch (
 
   , fetchBranches
   , fetchBranchCommits
+  , fetchCommitDetails
 
   , fetchNotifications
 
@@ -169,6 +170,17 @@ fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..}
         writeTVar _state (Fetched commits)
         (writeTVar _children =<<) $ forM (V.toList commits) $ \commit@(Commit {..}) ->
           SingleCommitNode <$> makeEmptyElem bc commit ("/commit/" <> T.pack (toString (untagName commitSha))) (_depth + 1)
+
+fetchCommitDetails :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Name Commit -> TVar (Fetchable Commit) -> m ()
+fetchCommitDetails owner name commitSha commitVar = do
+  BaseContext {auth, manager} <- ask
+  bracketOnError_ (atomically $ markFetching commitVar)
+                  (atomically $ writeTVar commitVar (Errored "Commit details fetch failed with exception.")) $
+    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commitR owner name commitSha)) >>= \case
+      Left err -> atomically $ writeTVar commitVar (Errored (show err))
+      Right (responseBody -> detailedCommit) -> atomically $ writeTVar commitVar (Fetched detailedCommit)
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m

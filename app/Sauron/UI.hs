@@ -25,7 +25,7 @@ import Sauron.UI.Border
 import Sauron.UI.BottomBar
 import Sauron.UI.Branch
 import Sauron.UI.CommentModal (renderModal)
-import Sauron.UI.Commit
+import Sauron.UI.Commit (commitLine, commitInner)
 import Sauron.UI.Issue
 import Sauron.UI.Job
 import Sauron.UI.Notification
@@ -149,8 +149,14 @@ listDrawElement appState ix isSelected (SomeNode (SingleBranchNode ed@(EntityDat
   Just $ branchLine _toggled branch appState _state
   ]
 
-listDrawElement _appState ix isSelected (SomeNode (SingleCommitNode ed@(EntityData {_static=commit, ..}))) = wrapper ix isSelected ed [
+listDrawElement _appState ix isSelected (SomeNode (SingleCommitNode ed@(EntityData {_static=commit, _state, ..}))) = wrapper ix isSelected ed [
   Just $ commitLine _toggled commit
+  , do
+      guard _toggled
+      guardFetchedOrHasPrevious _state $ \detailedCommit ->
+        return $ padLeft (Pad 4) $
+          fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
+            commitInner detailedCommit
   ]
 
 -- * Jobs
