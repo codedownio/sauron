@@ -174,6 +174,11 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeNode item@(getEnt
     hasStartedInitialFetch (SomeNode (RepoNode (EntityData {_children}))) = do
       and <$> mapM hasStartedInitialFetch _children
     hasStartedInitialFetch (SomeNode (HeadingNode {})) = return True
+    hasStartedInitialFetch (SomeNode (SingleJobNode (EntityData {..}))) =
+      case _state of
+        Fetched (_, logs) -> return (not (null logs))  -- Only consider fetched if logs are present
+        Fetching (Just (_, logs)) -> return (not (null logs))  -- Only consider fetching if logs are present
+        _ -> return False
     hasStartedInitialFetch (SomeNode (getEntityData -> (EntityData {..}))) = return (isFetchingOrFetched _state)
 
     isFetchingOrFetched :: Fetchable a -> Bool
