@@ -245,6 +245,7 @@ jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
 
     renderLogLine content
       | "[command]" `T.isPrefixOf` content = hBox $ renderCommandLine content
+      | "##[error]" `T.isPrefixOf` content = hBox $ renderErrorLine content
       | otherwise = hBox $ parseAnsiText content
 
     renderCommandLine content =
@@ -252,6 +253,10 @@ jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
       in [ str "▶ "
          , withAttr commandAttr $ str $ toString commandText
          ]
+
+    renderErrorLine content =
+      let text = T.drop 9 content  -- Remove "##[error]"
+      in [ withAttr erroredAttr $ str $ toString text ]
 
 paginatedHeading ::
   EntityData Fixed a
