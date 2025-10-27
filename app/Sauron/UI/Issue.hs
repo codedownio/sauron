@@ -56,10 +56,12 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
     comments :: [Widget n]
     comments = fmap renderComment (toList cs)
 
-    -- TODO: use issueCommentUpdatedAt
-    renderComment (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), ..}) = hLimit maxCommentWidth $ borderWithLabel
-      (topLabel username)
+    renderComment (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) = hLimit maxCommentWidth $ borderWithLabel
+      (commentTopLabel username issueCommentCreatedAt)
       (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
+
+    commentTopLabel username commentTime = (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now commentTime)}|])
+                      & padLeftRight 1
 
     topLabel username = (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
                       & padLeftRight 1
