@@ -11,6 +11,7 @@
 
 module Sauron.Types where
 
+import Brick.BChan
 import Brick.Forms
 import Brick.Widgets.Edit (Editor)
 import qualified Brick.Widgets.List as L
@@ -266,6 +267,7 @@ data BaseContext = BaseContext {
   , manager :: Manager
   , getIdentifier :: IO Int
   , getIdentifierSTM :: STM Int
+  , eventChan :: BChan AppEvent
   }
 
 data ClickableName =
@@ -275,6 +277,7 @@ data ClickableName =
   | InfoBar
   | TextForm
   | CommentModal
+  | CommentModalContent
   | CommentEditor
   deriving (Show, Ord, Eq)
 
@@ -347,12 +350,30 @@ emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 data AppEvent =
   ListUpdate (V.Vector (SomeNode Fixed))
   | AnimationTick
+  | TimeUpdated UTCTime
+  | CommentModalEvent CommentModalEvent
+
+data CommentModalEvent =
+  CommentSubmitted (Either Error Comment)
+  | IssueClosedWithComment (Either Error Issue)
+  | CommentsRefreshed (V.Vector IssueComment)
+  | OpenCommentModal Issue (V.Vector IssueComment) Bool (Name Owner) (Name Repo)
+
+data SubmissionState =
+  NotSubmitting
+  | SubmittingComment
+  | SubmittingCloseWithComment
+  deriving (Show, Eq)
 
 data ModalState =
   CommentModalState {
     _commentEditor :: Editor Text ClickableName
-    , _commentIssueNumber :: Int
-    , _issueIsPR :: Bool  -- True for PR, False for Issue
+    , _commentIssue :: Issue
+    , _commentIssueComments :: V.Vector IssueComment
+    , _issueIsPR :: Bool
+    , _commentRepoOwner :: Name Owner
+    , _commentRepoName :: Name Repo
+    , _submissionState :: SubmissionState
   }
 
 data AppState = AppState {

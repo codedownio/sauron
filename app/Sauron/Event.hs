@@ -6,7 +6,7 @@ module Sauron.Event (appEvent) where
 
 import Brick as B
 import Brick.Forms
-import Brick.Widgets.Edit (editorText, handleEditorEvent)
+import Brick.Widgets.Edit (handleEditorEvent)
 import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
@@ -18,6 +18,8 @@ import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude hiding (Down, pi)
 import Sauron.Actions
+import Sauron.Actions.Util (findRepoParent)
+import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.Paging
 import Sauron.Types
@@ -29,17 +31,29 @@ appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (l
 
 appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
 
+appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModalEvent s commentModalEvent
+
+appEvent _s (AppEvent (TimeUpdated newTime)) = do
+  -- Update the current time for accurate timestamps
+  modify (appNow .~ newTime)
+
+
 -- Handle modal events
 appEvent (_appModal -> Just modalState) e = case e of
   VtyEvent ev -> case modalState of
     CommentModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> modify (appModal .~ Nothing)
-      (V.EvKey V.KEnter [V.MCtrl]) -> do
-        -- TODO: Submit comment
-        modify (appModal .~ Nothing)
-      (V.EvKey V.KEnter [V.MCtrl, V.MShift]) -> do
-        -- TODO: Close issue/PR with comment
-        modify (appModal .~ Nothing)
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> modify (appModal .~ Nothing)
+      (V.EvKey V.KEnter [V.MMeta]) -> do
+        s <- get
+        modify (appModal . _Just . submissionState .~ SubmittingComment)
+        liftIO $ submitComment s modalState
+      (V.EvKey V.KEnter [V.MMeta, V.MShift]) -> do
+        s <- get
+        modify (appModal . _Just . submissionState .~ SubmittingCloseWithComment)
+        liftIO $ closeWithComment s modalState
+      (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll CommentModalContent) Down
+      (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll CommentModalContent) Up
       _ -> zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
   _ -> return ()
 
@@ -122,14 +136,12 @@ appEvent s (VtyEvent e) = case e of
       modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
 
   V.EvKey c [] | c == commentKey -> do
-    withFixedElemAndParents s $ \(SomeNode el) _variableEl _parents -> do
-      case el of
-        SingleIssueNode (EntityData {_static=Issue{issueNumber=(IssueNumber number)}}) -> do
-          let editor = editorText CommentEditor Nothing ""
-          modify (appModal .~ Just (CommentModalState editor number False))
-        SinglePullNode (EntityData {_static=Issue{issueNumber=(IssueNumber number)}}) -> do
-          let editor = editorText CommentEditor Nothing ""
-          modify (appModal .~ Just (CommentModalState editor number True))
+    withFixedElemAndParents s $ \(SomeNode el) _variableEl parents -> do
+      case (el, findRepoParent parents) of
+        (SingleIssueNode (EntityData {_static=issue, _state}), Just (RepoNode (EntityData {_static=(owner, name)}))) -> do
+          fetchCommentsAndOpenModal (s ^. appBaseContext) issue False owner name
+        (SinglePullNode (EntityData {_static=issue, _state}), Just (RepoNode (EntityData {_static=(owner, name)}))) -> do
+          fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
         _ -> return ()
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
@@ -220,3 +232,4 @@ fetchNotificationHtmlUrl _baseContext notification = do
   -- Simply use GitHub's notification URL - this is what GitHub web UI does
   -- and it will redirect to the appropriate issue/PR/comment automatically
   openBrowserToUrl (toString $ getUrl $ notificationUrl notification)
+

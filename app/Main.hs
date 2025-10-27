@@ -61,7 +61,8 @@ main :: IO ()
 main = do
   CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode} <- parseCliArgs
 
-  baseContext@(BaseContext {..}) <- buildBaseContext
+  eventChan <- newBChan 10
+  baseContext@(BaseContext {auth, requestSemaphore}) <- buildBaseContext eventChan
 
   currentUser@(User {userLogin}) <- withGithubApiSemaphore' requestSemaphore (github auth userInfoCurrentR) >>= \case
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
@@ -103,13 +104,17 @@ main = do
         }
 
 
-  eventChan <- newBChan 10
-
   -- Animation timer thread
   _ <- async $
     forever $ do
       threadDelay 200000  -- 200ms delay for animation
       writeBChan eventChan AnimationTick
+
+  -- Time update thread - update every 30 seconds for accurate timestamps
+  _ <- async $
+    forever $ do
+      threadDelay 30000000  -- 30 seconds
+      getCurrentTime >>= writeBChan eventChan . TimeUpdated
 
   listElemsVar <- newTVarIO listElemsFixed
   eventAsync <- async $
@@ -136,8 +141,8 @@ main = do
     void $ customMain initialVty buildVty (Just eventChan) (mkApp colorMode) (initialState { _appColorMode = colorMode })
 
 
-buildBaseContext :: IO BaseContext
-buildBaseContext = do
+buildBaseContext :: BChan AppEvent -> IO BaseContext
+buildBaseContext eventChan = do
   CliArgs {..} <- parseCliArgs
 
   githubApiSemaphore <- newQSem cliConcurrentGithubApiLimit
@@ -182,4 +187,5 @@ buildBaseContext = do
     , manager = manager
     , getIdentifier = getIdentifier
     , getIdentifierSTM = getIdentifierSTM
+    , eventChan = eventChan
     }
