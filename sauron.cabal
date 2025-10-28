@@ -59,6 +59,7 @@ executable sauron
       Sauron.UI.Branch
       Sauron.UI.CommentModal
       Sauron.UI.Commit
+      Sauron.UI.Event
       Sauron.UI.Issue
       Sauron.UI.Job
       Sauron.UI.Keys

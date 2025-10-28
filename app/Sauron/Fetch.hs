@@ -43,6 +43,7 @@ import Network.HTTP.Conduit
 import qualified Network.URI as URI
 import Relude
 import Sauron.Actions.Util
+import Sauron.Event.CommentModal (fetchCommentsAndEvents)
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
 import Sauron.Types
@@ -210,28 +211,28 @@ fetchWorkflows owner name (PaginatedWorkflowsNode (EntityData {..})) = do
 
 fetchIssueComments :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector IssueComment)) -> m ()
+  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> m ()
 fetchIssueComments owner name issueNumber inner = do
-  BaseContext {auth, manager} <- ask
+  ctx <- ask
   bracketOnError_ (atomically $ markFetching inner)
-                  (atomically $ writeTVar inner (Errored "Issue comments fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
+                  (atomically $ writeTVar inner (Errored "Issue comments and events fetch failed with exception.")) $
+    liftIO (fetchCommentsAndEvents ctx owner name (unIssueNumber issueNumber)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
-      Right v -> atomically $ writeTVar inner (Fetched (responseBody v))
+      Right merged -> atomically $ writeTVar inner (Fetched merged)
 
 fetchPullComments :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector IssueComment)) -> m ()
+  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> m ()
 fetchPullComments owner name issueNumber inner = do
-  BaseContext {auth, manager} <- ask
+  ctx <- ask
   bracketOnError_ (atomically $ markFetching inner)
-                  (atomically $ writeTVar inner (Errored "Pull comments fetch failed with exception.")) $
+                  (atomically $ writeTVar inner (Errored "Pull comments and events fetch failed with exception.")) $
     -- pullRequestCommentsR returns comments on the "unified diff"
     -- there are also "commit comments" and "issue comments".
     -- The last one are the most common on PRs, so we use commentsR
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commentsR owner name issueNumber FetchAll)) >>= \case
+    liftIO (fetchCommentsAndEvents ctx owner name (unIssueNumber issueNumber)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
-      Right v -> atomically $ writeTVar inner (Fetched (responseBody v))
+      Right merged -> atomically $ writeTVar inner (Fetched merged)
 
 fetchWorkflowJobs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m

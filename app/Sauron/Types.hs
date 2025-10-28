@@ -146,8 +146,8 @@ type family NodeState a where
   NodeState PaginatedReposT = SearchResult Repo
   NodeState PaginatedBranchesT = V.Vector Branch
   NodeState PaginatedNotificationsT = V.Vector Notification
-  NodeState SingleIssueT = V.Vector IssueComment
-  NodeState SinglePullT = V.Vector IssueComment
+  NodeState SingleIssueT = V.Vector (Either IssueEvent IssueComment)
+  NodeState SinglePullT = V.Vector (Either IssueEvent IssueComment)
   NodeState SingleWorkflowT = WithTotalCount Job
   NodeState SingleJobT = (Job, [JobLogGroup])
   NodeState SingleBranchT = V.Vector Commit
@@ -356,8 +356,8 @@ data AppEvent =
 data CommentModalEvent =
   CommentSubmitted (Either Error Comment)
   | IssueClosedWithComment (Either Error Issue)
-  | CommentsRefreshed (V.Vector IssueComment)
-  | OpenCommentModal Issue (V.Vector IssueComment) Bool (Name Owner) (Name Repo)
+  | CommentsRefreshed (V.Vector (Either IssueEvent IssueComment))
+  | OpenCommentModal Issue (V.Vector (Either IssueEvent IssueComment)) Bool (Name Owner) (Name Repo)
 
 data SubmissionState =
   NotSubmitting
@@ -369,7 +369,7 @@ data ModalState =
   CommentModalState {
     _commentEditor :: Editor Text ClickableName
     , _commentIssue :: Issue
-    , _commentIssueComments :: V.Vector IssueComment
+    , _commentIssueComments :: V.Vector (Either IssueEvent IssueComment)
     , _issueIsPR :: Bool
     , _commentRepoOwner :: Name Owner
     , _commentRepoName :: Name Repo

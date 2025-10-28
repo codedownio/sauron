@@ -54,6 +54,8 @@ appEvent (_appModal -> Just modalState) e = case e of
         liftIO $ closeWithComment s modalState
       (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll CommentModalContent) Down
       (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll CommentModalContent) Up
+      (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll CommentModalContent) 1
+      (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll CommentModalContent) (-1)
       _ -> zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
   _ -> return ()
 

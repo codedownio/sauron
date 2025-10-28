@@ -6,8 +6,8 @@ import Brick
 import Brick.Widgets.Border
 import Brick.Widgets.Center
 import Brick.Widgets.Edit (Editor, getEditContents, renderEditor)
+import Data.String.Interpolate
 import qualified Data.Text as T
-import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude
@@ -16,36 +16,40 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Issue (issueInner, maxCommentWidth)
 import Sauron.UI.Markdown (markdownToWidgetsWithWidth)
 
-renderModal :: AppState -> ModalState -> Widget ClickableName
-renderModal appState (CommentModalState editor issue comments isPR owner name submissionState') =
-  renderCommentModal appState editor issue comments isPR owner name submissionState'
 
-renderCommentModal :: AppState -> Editor Text ClickableName -> Issue -> V.Vector IssueComment -> Bool -> Name Owner -> Name Repo -> SubmissionState -> Widget ClickableName
-renderCommentModal appState editor issue comments isPR _owner _name submissionState' =
+renderModal :: AppState -> ModalState -> Widget ClickableName
+renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber=(IssueNumber num)}), ..}) =
   vBox [
+    hCenter $ withAttr boldText $ str modalTitle
+
+    , hBorder
+
     -- Scrollable content area with issue and comments
-    padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport CommentModalContent Vertical $
+    , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport CommentModalContent Vertical $
       hLimit maxCommentWidth $ vBox [
-        issueInner (appState ^. appNow) issue comments
+        issueInner (appState ^. appNow) issue _commentIssueComments
         , hBorder
         , str " "
-        , renderCommentEditor editor isPR issue
+        , renderCommentEditor _commentEditor
       ]
     , hBorder
-    , buttonSection editor issue submissionState'
+    , buttonSection _commentEditor issue _submissionState
   ]
   & border
   & withAttr normalAttr
-  & hLimit 120
-  & vLimitPercent 80
+  & hLimit (maxCommentWidth + 4)
+  & vLimitPercent 90
   & centerLayer
+  where
+    typ :: Text
+    typ = if _issueIsPR then "Pull Request" else "Issue"
 
-renderCommentEditor :: Editor Text ClickableName -> Bool -> Issue -> Widget ClickableName
-renderCommentEditor editor isPR issue =
+    modalTitle = [i|Comment on #{typ} \##{num}|]
+
+renderCommentEditor :: Editor Text ClickableName -> Widget ClickableName
+renderCommentEditor editor =
   vLimit 12 $ vBox [
-    hCenter $ withAttr boldText $ str modalTitle
-    , hBorder
-    , hBox [
+    hBox [
       -- Left: Editor
       vBox [
         withAttr italicText $ str "Write your comment:"
@@ -69,9 +73,6 @@ renderCommentEditor editor isPR issue =
     ]
   ]
   where
-    modalTitle = if isPR
-                 then "Comment on Pull Request #" <> show (issueNumber issue)
-                 else "Comment on Issue #" <> show (issueNumber issue)
     text = T.unlines $ getEditContents editor
 
 buttonSection :: Editor Text ClickableName -> Issue -> SubmissionState -> Widget ClickableName
