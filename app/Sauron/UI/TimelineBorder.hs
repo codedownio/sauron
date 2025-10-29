@@ -5,9 +5,12 @@ module Sauron.UI.TimelineBorder (
 ) where
 
 import Brick
-import Brick.Widgets.Border
 import Relude
 import Sauron.UI.AttrMap (timelineBorderAttr)
+
+
+timelineHBorder :: Widget n
+timelineHBorder = withAttr timelineBorderAttr $ vLimit 1 $ fill '─'
 
 firstTimelineBorder :: Widget n -> Widget n -> Widget n
 firstTimelineBorder label content =
@@ -17,7 +20,8 @@ firstTimelineBorder label content =
       , withAttr timelineBorderAttr $ str "┴"
       , withAttr timelineBorderAttr $ str "─"
       , label
-      , withAttr timelineBorderAttr hBorder
+      , withAttr timelineBorderAttr $ str "─"
+      , timelineHBorder
       , withAttr timelineBorderAttr $ str "┐"
     ],
     hBox [
@@ -28,7 +32,7 @@ firstTimelineBorder label content =
     hBox [
       withAttr timelineBorderAttr $ str "└───"
       , withAttr timelineBorderAttr $ str "┬"
-      , withAttr timelineBorderAttr hBorder
+      , timelineHBorder
       , withAttr timelineBorderAttr $ str "┘"
     ]
   ]
@@ -42,7 +46,7 @@ middleTimelineBorder label content =
       , withAttr timelineBorderAttr $ str "─"
       , label
       , withAttr timelineBorderAttr $ str "─"
-      , withAttr timelineBorderAttr hBorder
+      , timelineHBorder
       , withAttr timelineBorderAttr $ str "┐"
     ],
     hBox [
@@ -53,7 +57,7 @@ middleTimelineBorder label content =
     hBox [
       withAttr timelineBorderAttr $ str "└───"
       , withAttr timelineBorderAttr $ str "┬"
-      , withAttr timelineBorderAttr hBorder
+      , timelineHBorder
       , withAttr timelineBorderAttr $ str "┘"
     ]
   ]
@@ -67,7 +71,7 @@ lastTimelineBorder label content =
       , withAttr timelineBorderAttr $ str "─"
       , label
       , withAttr timelineBorderAttr $ str "─"
-      , withAttr timelineBorderAttr hBorder
+      , timelineHBorder
       , withAttr timelineBorderAttr $ str "┐"
     ],
     hBox [
@@ -78,7 +82,7 @@ lastTimelineBorder label content =
     hBox [
       withAttr timelineBorderAttr $ str "└───"
       , withAttr timelineBorderAttr $ str "┴"
-      , withAttr timelineBorderAttr hBorder
+      , timelineHBorder
       , withAttr timelineBorderAttr $ str "┘"
     ]
   ]
