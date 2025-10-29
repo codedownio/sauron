@@ -85,6 +85,29 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
 
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
+
+  -- Event colors (GitHub-style)
+  , (eventClosedColor, fg (select solarizedViolet))
+  , (eventReopenedColor, fg (select solarizedGreen))
+  , (eventAssignedColor, fg (select solarizedBlue))
+  , (eventUnassignedColor, fg (select midGray))
+  , (eventLabeledColor, fg (select solarizedBlue))
+  , (eventUnlabeledColor, fg (select midGray))
+  , (eventMilestoneColor, fg (select solarizedGreen))
+  , (eventRenamedColor, fg (select solarizedOrange))
+  , (eventLockedColor, fg (select solarizedYellow))
+  , (eventUnlockedColor, fg (select midGray))
+  , (eventReferencedColor, fg (select midGray))
+  , (eventMergedColor, fg (select solarizedViolet))
+  , (eventMentionedColor, fg (select solarizedBlue))
+  , (eventSubscribedColor, fg (select solarizedGreen))
+  , (eventUnsubscribedColor, fg (select midGray))
+  , (eventReviewColor, fg (select solarizedYellow))
+  , (eventDuplicateColor, fg (select midGray))
+  , (eventProjectColor, fg (select solarizedGreen))
+  , (eventConvertedColor, fg (select solarizedBlue))
+  , (eventRefDeletedColor, fg V.red)
+  , (eventRefRestoredColor, fg (select solarizedGreen))
   ] <> attrMappingsForStyle Sky.breezeDark)
   where
     select = selectColor colorMode
@@ -149,6 +172,30 @@ codeText = mkAttrName "code-text"
 codeBlockText = mkAttrName "code-block-text"
 horizontalRuleAttr = mkAttrName "horizontal-rule"
 commandAttr = mkAttrName "command"
+
+-- * Event colors
+
+eventClosedColor = mkAttrName "eventClosedColor"
+eventReopenedColor = mkAttrName "eventReopenedColor"
+eventAssignedColor = mkAttrName "eventAssignedColor"
+eventUnassignedColor = mkAttrName "eventUnassignedColor"
+eventLabeledColor = mkAttrName "eventLabeledColor"
+eventUnlabeledColor = mkAttrName "eventUnlabeledColor"
+eventMilestoneColor = mkAttrName "eventMilestoneColor"
+eventRenamedColor = mkAttrName "eventRenamedColor"
+eventLockedColor = mkAttrName "eventLockedColor"
+eventUnlockedColor = mkAttrName "eventUnlockedColor"
+eventReferencedColor = mkAttrName "eventReferencedColor"
+eventMergedColor = mkAttrName "eventMergedColor"
+eventMentionedColor = mkAttrName "eventMentionedColor"
+eventSubscribedColor = mkAttrName "eventSubscribedColor"
+eventUnsubscribedColor = mkAttrName "eventUnsubscribedColor"
+eventReviewColor = mkAttrName "eventReviewColor"
+eventDuplicateColor = mkAttrName "eventDuplicateColor"
+eventProjectColor = mkAttrName "eventProjectColor"
+eventConvertedColor = mkAttrName "eventConvertedColor"
+eventRefDeletedColor = mkAttrName "eventRefDeletedColor"
+eventRefRestoredColor = mkAttrName "eventRefRestoredColor"
 
 -- * Color Fallback System
 

@@ -15,7 +15,7 @@ import GitHub.Data.Name
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Event (getEventIcon, getEventDescription)
+import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
 import Sauron.UI.Issue (maxCommentWidth)
 import Sauron.UI.Markdown
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
@@ -52,12 +52,18 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
 
     comments :: [Widget n]
     comments = case inner of
-      Fetched cs -> fmap renderItem (toList cs)
+      Fetched cs ->
+        let items = fmap renderItem (toList cs)
+        in if null items then [] else verticalLine : addVerticalLines items
       Fetching maybeCs -> case maybeCs of
-        Just cs -> fmap renderItem (toList cs) ++ [strWrap [i|Refreshing comments...|]]
-        Nothing -> [strWrap [i|Fetching comments...|]]
-      Errored err -> [strWrap [i|Failed to fetch comments: #{err}|]]
-      NotFetched -> [strWrap [i|Comments not fetched.|]]
+        Just cs ->
+          let items = fmap renderItem (toList cs) ++ [strWrap [i|Refreshing comments...|]]
+          in if null items then [] else verticalLine : addVerticalLines items
+        Nothing -> [verticalLine, strWrap [i|Fetching comments...|]]
+      Errored err -> [verticalLine, strWrap [i|Failed to fetch comments: #{err}|]]
+      NotFetched -> [verticalLine, strWrap [i|Comments not fetched.|]]
+
+    verticalLine = padLeftRight 2 $ str "│"
 
     renderItem (Right comment) = renderComment comment
     renderItem (Left event) = renderEvent event
@@ -71,11 +77,11 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
       let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
             N username -> username
           eventText = getEventDescription (issueEventType issueEvent)
-          icon = getEventIcon (issueEventType issueEvent)
+          iconWidget = getEventIconWithColor (issueEventType issueEvent)
           timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
       in hLimit maxCommentWidth $
            padLeftRight 2 $ hBox [
-             str icon
+             iconWidget
              , str " "
              , withAttr usernameAttr $ str (toString actorName)
              , str " "
@@ -86,3 +92,9 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
 
     topLabel username = ((withAttr usernameAttr (str [i|#{username} |])) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
                       & padLeftRight 1
+
+    -- Add vertical timeline lines after each item except the last
+    addVerticalLines :: [Widget n] -> [Widget n]
+    addVerticalLines [] = []
+    addVerticalLines [item] = [item]  -- No line after the last item
+    addVerticalLines (item:items) = item : verticalLine : addVerticalLines items

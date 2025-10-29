@@ -16,7 +16,7 @@ import GitHub.Data.Name
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Event (getEventIcon, getEventDescription)
+import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
 import Sauron.UI.Markdown
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff
@@ -44,7 +44,7 @@ issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) animationCo
 
 issueInner :: UTCTime -> Issue -> V.Vector (Either IssueEvent IssueComment) -> Widget n
 -- issueInner now issue body cs = vBox [strWrap (show issue), strWrap (show body), strWrap (show cs)]
-issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs = vBox (addFirst commentsAndEvents)
+issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs = vBox (addFirst commentsAndEventsWithLines)
   where
     addFirst = case issueBody of
       Nothing -> (firstCell "*No description provided.*" :)
@@ -57,6 +57,12 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
     commentsAndEvents :: [Widget n]
     commentsAndEvents = fmap renderItem (toList cs)
 
+    commentsAndEventsWithLines = if null commentsAndEvents 
+      then []
+      else verticalLine : addVerticalLines commentsAndEvents
+
+    verticalLine = padLeftRight 2 $ str "│"
+
     renderItem (Right comment) = renderComment comment
     renderItem (Left event) = renderEvent event
 
@@ -68,11 +74,11 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
       let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
             N username -> username
           eventText = getEventDescription (issueEventType issueEvent)
-          icon = getEventIcon (issueEventType issueEvent)
+          iconWidget = getEventIconWithColor (issueEventType issueEvent)
           timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
       in hLimit maxCommentWidth $
            padLeftRight 2 $ hBox [
-             str icon
+             iconWidget
              , str " "
              , withAttr usernameAttr $ str (toString actorName)
              , str " "
@@ -87,4 +93,10 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
 
     topLabel username = (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
                       & padLeftRight 1
+
+    -- Add vertical timeline lines after each item except the last
+    addVerticalLines :: [Widget n] -> [Widget n]
+    addVerticalLines [] = []
+    addVerticalLines [item] = [item]  -- No line after the last item
+    addVerticalLines (item:items) = item : verticalLine : addVerticalLines items
 
