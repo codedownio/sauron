@@ -18,6 +18,7 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
 import Sauron.UI.Issue (maxCommentWidth)
 import Sauron.UI.Markdown
+import Sauron.UI.TimelineBorder
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff
 
@@ -53,25 +54,43 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
     comments :: [Widget n]
     comments = case inner of
       Fetched cs ->
-        let items = fmap renderItem (toList cs)
-        in if null items then [] else verticalLine : addVerticalLines items
+        let items = toList cs
+        in if null items then [] else verticalLine : renderItemsWithTimeline items
       Fetching maybeCs -> case maybeCs of
         Just cs ->
-          let items = fmap renderItem (toList cs) ++ [strWrap [i|Refreshing comments...|]]
-          in if null items then [] else verticalLine : addVerticalLines items
+          let items = toList cs
+          in if null items then [verticalLine, strWrap [i|Refreshing comments...|]] 
+             else verticalLine : renderItemsWithTimeline items ++ [strWrap [i|Refreshing comments...|]]
         Nothing -> [verticalLine, strWrap [i|Fetching comments...|]]
       Errored err -> [verticalLine, strWrap [i|Failed to fetch comments: #{err}|]]
       NotFetched -> [verticalLine, strWrap [i|Comments not fetched.|]]
 
-    verticalLine = padLeftRight 2 $ str "│"
+    verticalLine = withAttr timelineBorderAttr $ str "    │"  -- 4 spaces then blue vertical line
 
-    renderItem (Right comment) = renderComment comment
-    renderItem (Left event) = renderEvent event
+    renderItemsWithTimeline :: [Either IssueEvent IssueComment] -> [Widget n]
+    renderItemsWithTimeline items = 
+      let indexedItems = zip [0..] items
+          totalItems = length items
+      in fmap (\(idx, item) -> renderItemWithBorder idx totalItems item) indexedItems
 
-    -- TODO: use pullCommentUpdatedAt
-    renderComment (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), ..}) = hLimit maxCommentWidth $ borderWithLabel
-      (topLabel username)
-      (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
+    renderItemWithBorder :: Int -> Int -> Either IssueEvent IssueComment -> Widget n
+    renderItemWithBorder idx totalItems item = 
+      case item of
+        Right comment -> renderComment idx totalItems comment
+        Left event -> renderEvent event
+
+    renderComment :: Int -> Int -> IssueComment -> Widget n
+    renderComment idx totalItems (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), ..}) = 
+      let borderFunc = if totalItems == 1 
+                       then firstTimelineBorder
+                       else if idx == 0 
+                       then firstTimelineBorder
+                       else if idx == totalItems - 1 
+                       then lastTimelineBorder
+                       else middleTimelineBorder
+      in hLimit maxCommentWidth $ borderFunc
+           (topLabel username)
+           (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
 
     renderEvent issueEvent =
       let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
@@ -92,9 +111,3 @@ pullInner now (Issue {..}) body inner = vBox (firstCell : comments)
 
     topLabel username = ((withAttr usernameAttr (str [i|#{username} |])) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
                       & padLeftRight 1
-
-    -- Add vertical timeline lines after each item except the last
-    addVerticalLines :: [Widget n] -> [Widget n]
-    addVerticalLines [] = []
-    addVerticalLines [item] = [item]  -- No line after the last item
-    addVerticalLines (item:items) = item : verticalLine : addVerticalLines items

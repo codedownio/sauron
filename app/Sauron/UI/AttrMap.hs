@@ -108,6 +108,9 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   , (eventConvertedColor, fg (select solarizedBlue))
   , (eventRefDeletedColor, fg V.red)
   , (eventRefRestoredColor, fg (select solarizedGreen))
+
+  -- Timeline colors
+  , (timelineBorderAttr, fg (select solarizedBlue))
   ] <> attrMappingsForStyle Sky.breezeDark)
   where
     select = selectColor colorMode
@@ -196,6 +199,10 @@ eventProjectColor = mkAttrName "eventProjectColor"
 eventConvertedColor = mkAttrName "eventConvertedColor"
 eventRefDeletedColor = mkAttrName "eventRefDeletedColor"
 eventRefRestoredColor = mkAttrName "eventRefRestoredColor"
+
+-- * Timeline colors
+
+timelineBorderAttr = mkAttrName "timelineBorder"
 
 -- * Color Fallback System
 
