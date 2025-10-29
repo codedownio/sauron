@@ -4,10 +4,17 @@ module Sauron.UI.Issue (
   , issueInner
 
   , maxCommentWidth
+
+  -- Common timeline rendering functions
+  , renderTimelineItem
+  , renderItemWithBorder
+  , renderComment
+  , renderEvent
+  , commentTopLabel
+  , topLabel
   ) where
 
 import Brick
-import Brick.Widgets.Border
 import Data.String.Interpolate
 import Data.Time
 import qualified Data.Vector as V
@@ -18,8 +25,8 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
 import Sauron.UI.Markdown
-import Sauron.UI.TimelineBorder
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
+import Sauron.UI.TimelineBorder
 import Sauron.UI.Util.TimeDiff
 
 
@@ -45,71 +52,76 @@ issueLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) animationCo
 
 issueInner :: UTCTime -> Issue -> V.Vector (Either IssueEvent IssueComment) -> Widget n
 -- issueInner now issue body cs = vBox [strWrap (show issue), strWrap (show body), strWrap (show cs)]
-issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs = vBox (addFirst commentsAndEventsWithLines)
+issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs =
+  allItems
+  & zip [0..]
+  & fmap (uncurry (renderTimelineItem now (length allItems)))
+  & vBox
   where
-    addFirst = case issueBody of
-      Nothing -> (firstCell "*No description provided.*" :)
-      Just body -> (firstCell body :)
-
-    firstCell body = hLimit maxCommentWidth $ borderWithLabel
-      (topLabel openerUsername)
-      (markdownToWidgetsWithWidth (maxCommentWidth - 2) body)
-
     commentsAndEvents :: [Either IssueEvent IssueComment]
     commentsAndEvents = toList cs
 
-    commentsAndEventsWithLines = if null commentsAndEvents 
-      then []
-      else verticalLine : renderItemsWithTimeline commentsAndEvents
+    issueDescriptionBody = fromMaybe "*No description provided.*" issueBody
 
-    verticalLine = withAttr timelineBorderAttr $ str "    │"  -- 4 spaces then blue vertical line
+    -- allItems :: _
+    allItems = (Left (openerUsername, issueDescriptionBody, issueCreatedAt), "")
+             : fmap (\item -> (Right item, "")) commentsAndEvents
 
-    renderItemsWithTimeline :: [Either IssueEvent IssueComment] -> [Widget n]
-    renderItemsWithTimeline items = 
-      let indexedItems = zip [0..] items
-          totalItems = length items
-      in fmap (\(idx, item) -> renderItemWithBorder idx totalItems item) indexedItems
+-- * Util, exported for Pull.hs
 
-    renderItemWithBorder :: Int -> Int -> Either IssueEvent IssueComment -> Widget n
-    renderItemWithBorder idx totalItems item = 
-      case item of
-        Right comment -> renderComment idx totalItems comment
-        Left event -> renderEvent event
+renderTimelineItem :: UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) (Either IssueEvent IssueComment), Text) -> Widget n
+renderTimelineItem now totalItems idx (itemType, _extraBody) =
+  let borderFunc = if totalItems == 1
+                   then standaloneTimelineBorder
+                   else if idx == 0
+                   then firstTimelineBorder
+                   else if idx == totalItems - 1
+                   then lastTimelineBorder
+                   else middleTimelineBorder
+  in case itemType of
+    Left (username, descriptionBody, createdAt) -> -- Issue/PR description
+      hLimit maxCommentWidth $ borderFunc
+        (topLabel username createdAt now)
+        (markdownToWidgetsWithWidth (maxCommentWidth - 2) descriptionBody)
+    Right item -> renderItemWithBorder now borderFunc item
 
-    renderComment :: Int -> Int -> IssueComment -> Widget n
-    renderComment idx totalItems (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) = 
-      let borderFunc = if totalItems == 1 
-                       then firstTimelineBorder  -- Only one item, timeline starts and ends
-                       else if idx == 0 
-                       then firstTimelineBorder  -- First item
-                       else if idx == totalItems - 1 
-                       then lastTimelineBorder   -- Last item
-                       else middleTimelineBorder -- Middle item
-      in hLimit maxCommentWidth $ borderFunc
-           (commentTopLabel username issueCommentCreatedAt)
-           (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
+topLabel :: Text -> UTCTime -> UTCTime -> Widget n
+topLabel username createdAt now =
+  (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|opened #{timeFromNow (diffUTCTime now createdAt)}|])
+    & padLeftRight 1
 
-    renderEvent issueEvent =
-      let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
-            N username -> username
-          eventText = getEventDescription (issueEventType issueEvent)
-          iconWidget = getEventIconWithColor (issueEventType issueEvent)
-          timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
-      in hLimit maxCommentWidth $
-           padLeftRight 2 $ hBox [
-             iconWidget
-             , str " "
-             , withAttr usernameAttr $ str (toString actorName)
-             , str " "
-             , str eventText
-             , str " "
-             , withAttr italicText $ str timeAgo
-           ]
+renderItemWithBorder :: UTCTime -> (Widget n -> Widget n -> Widget n) -> Either IssueEvent IssueComment -> Widget n
+renderItemWithBorder now borderFunc item =
+  case item of
+    Right comment -> renderComment now borderFunc comment
+    Left event -> renderEvent now event
 
-    commentTopLabel username commentTime = (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now commentTime)}|])
-                      & padLeftRight 1
+renderComment :: UTCTime -> (Widget n -> Widget n -> Widget n) -> IssueComment -> Widget n
+renderComment now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) =
+  hLimit maxCommentWidth $ borderFunc
+    (commentTopLabel username commentTime now)
+    (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
+  where commentTime = issueCommentCreatedAt
 
+renderEvent :: UTCTime -> IssueEvent -> Widget n
+renderEvent now issueEvent =
+  let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
+        N username -> username
+      eventText = getEventDescription (issueEventType issueEvent)
+      iconWidget = getEventIconWithColor (issueEventType issueEvent)
+      timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
+  in hLimit maxCommentWidth $
+       padLeft (Pad 4) $ hBox [
+         iconWidget
+         , str " "
+         , withAttr usernameAttr $ str (toString actorName)
+         , str " "
+         , str eventText
+         , str " "
+         , withAttr italicText $ str timeAgo
+       ]
 
-    topLabel username = (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now issueCreatedAt)}|])
-                      & padLeftRight 1
-
+commentTopLabel :: Text -> UTCTime -> UTCTime -> Widget n
+commentTopLabel username commentTime now =
+  (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now commentTime)}|])
+    & padLeftRight 1
