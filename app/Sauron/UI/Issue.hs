@@ -83,18 +83,18 @@ renderTimelineItem now totalItems idx (itemType, _extraBody) =
       hLimit maxCommentWidth $ borderFunc
         (topLabel username createdAt now)
         (markdownToWidgetsWithWidth (maxCommentWidth - 2) descriptionBody)
-    Right item -> renderItemWithBorder now borderFunc item
+    Right item -> renderItemWithBorder now (idx == totalItems - 1) borderFunc item
 
 topLabel :: Text -> UTCTime -> UTCTime -> Widget n
 topLabel username createdAt now =
   (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|opened #{timeFromNow (diffUTCTime now createdAt)}|])
     & padLeftRight 1
 
-renderItemWithBorder :: UTCTime -> (Widget n -> Widget n -> Widget n) -> Either IssueEvent IssueComment -> Widget n
-renderItemWithBorder now borderFunc item =
+renderItemWithBorder :: UTCTime -> Bool -> (Widget n -> Widget n -> Widget n) -> Either IssueEvent IssueComment -> Widget n
+renderItemWithBorder now isLast borderFunc item =
   case item of
     Right comment -> renderComment now borderFunc comment
-    Left event -> renderEvent now event
+    Left event -> renderEvent now isLast event
 
 renderComment :: UTCTime -> (Widget n -> Widget n -> Widget n) -> IssueComment -> Widget n
 renderComment now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) =
@@ -103,23 +103,27 @@ renderComment now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simple
     (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
   where commentTime = issueCommentCreatedAt
 
-renderEvent :: UTCTime -> IssueEvent -> Widget n
-renderEvent now issueEvent =
+renderEvent :: UTCTime -> Bool -> IssueEvent -> Widget n
+renderEvent now isLast issueEvent =
   let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
         N username -> username
       eventText = getEventDescription (issueEventType issueEvent)
       iconWidget = getEventIconWithColor (issueEventType issueEvent)
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
-  in hLimit maxCommentWidth $
-       padLeft (Pad 4) $ hBox [
-         iconWidget
-         , str " "
-         , withAttr usernameAttr $ str (toString actorName)
-         , str " "
-         , str eventText
-         , str " "
-         , withAttr italicText $ str timeAgo
-       ]
+      eventLine = hLimit maxCommentWidth $
+        padLeft (Pad 4) $ hBox [
+          iconWidget
+          , str "  "
+          , withAttr usernameAttr $ str (toString actorName)
+          , str " "
+          , str eventText
+          , str " "
+          , withAttr italicText $ str timeAgo
+        ]
+      continuationLine = if isLast
+        then emptyWidget
+        else hLimit maxCommentWidth $ padLeft (Pad 4) $ withAttr timelineBorderAttr $ str "│"
+  in vBox [eventLine, continuationLine]
 
 commentTopLabel :: Text -> UTCTime -> UTCTime -> Widget n
 commentTopLabel username commentTime now =

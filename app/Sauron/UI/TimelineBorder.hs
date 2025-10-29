@@ -91,7 +91,7 @@ lastTimelineBorder label content =
 
       let topBorder = hBox [
             withAttr timelineBorderAttr $ str "┌───"
-            , withAttr timelineBorderAttr $ str "┼"
+            , withAttr timelineBorderAttr $ str "┴"
             , withAttr timelineBorderAttr $ str "─"
             , label
             , withAttr timelineBorderAttr $ str "─"
@@ -100,7 +100,7 @@ lastTimelineBorder label content =
             ]
           bottomBorder = hBox [
             withAttr timelineBorderAttr $ str "└───"
-            , withAttr timelineBorderAttr $ str "┴"
+            , withAttr timelineBorderAttr $ str "─"
             , timelineHBorder
             , withAttr timelineBorderAttr $ str "┘"
             ]
