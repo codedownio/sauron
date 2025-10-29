@@ -178,7 +178,6 @@ test-suite test
     , process
     , relude
     , sandwich
-    , sauron
     , skylighting
     , stm
     , string-interpolate
