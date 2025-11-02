@@ -165,14 +165,13 @@ listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {
   Just $ case _state of
     Fetched (job, _) -> jobLine (_appAnimationCounter appState) _toggled job _state
     Fetching (Just (job, _)) -> jobLine (_appAnimationCounter appState) _toggled job _state
-    _ -> str "Loading job..."
+    Fetching Nothing -> str "Loading job..."
   , do
       guard _toggled
-      case _state of
-        Fetched (job, logs) -> return $ padLeft (Pad 4) $
+      guardFetchedOrHasPrevious _state $ \(job, logs) ->
+        return $ padLeft (Pad 4) $
           fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
             jobInner (_appAnimationCounter appState) job (Just logs)
-        _ -> return $ str "No job data"
   ]
 
 -- * Notifications
