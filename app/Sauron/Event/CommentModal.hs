@@ -7,54 +7,24 @@ module Sauron.Event.CommentModal (
   closeWithComment,
   refreshIssueComments,
   fetchCommentsAndOpenModal,
-  fetchCommentsAndEvents
+  fetchIssueCommentsAndEvents
 ) where
 
 import Brick as B
 import Brick.BChan
 import Brick.Widgets.Edit (editorText, getEditContents)
 import Control.Monad.IO.Unlift
-import Data.Proxy
 import qualified Data.Text as T
 import Data.Time
-import qualified Data.Vector as Vec
+import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Network.HTTP.Client (responseBody)
 import Relude
 import Sauron.Actions.Util (withGithubApiSemaphore')
+import Sauron.Fetch (fetchIssueCommentsAndEvents)
 import Sauron.Types
 import UnliftIO.Async
-
--- | Merge comments and events by timestamp, newest first
-mergeCommentsAndEvents :: Vec.Vector IssueComment -> Vec.Vector IssueEvent -> Vec.Vector (Either IssueEvent IssueComment)
-mergeCommentsAndEvents comments events =
-  let commentEntries = fmap (\c -> (issueCommentCreatedAt c, Right c)) comments
-      eventEntries = fmap (\e -> (issueEventCreatedAt e, Left e)) events
-      allEntries = Vec.toList commentEntries <> Vec.toList eventEntries
-      sortedEntries = sortOn fst allEntries -- Sort by timestamp, newest first
-  in Vec.fromList (fmap snd sortedEntries)
-
--- | Fetch both comments and events for an issue, then merge them
-fetchCommentsAndEvents :: BaseContext -> Name Owner -> Name Repo -> Int -> IO (Either Error (Vec.Vector (Either IssueEvent IssueComment)))
-fetchCommentsAndEvents baseContext owner name issueNumber = do
-  -- Fetch comments
-  commentsResult <- withGithubApiSemaphore' (requestSemaphore baseContext)
-    (executeRequestWithMgrAndRes (manager baseContext) (auth baseContext)
-      (commentsR owner name (IssueNumber issueNumber) FetchAll))
-
-  -- Fetch events
-  eventsResult <- withGithubApiSemaphore' (requestSemaphore baseContext)
-    (executeRequestWithMgrAndRes (manager baseContext) (auth baseContext)
-      (eventsForIssueR owner name (GitHub.mkId (Proxy :: Proxy Issue) issueNumber) FetchAll))
-
-  case (commentsResult, eventsResult) of
-    (Right commentsResponse, Right eventsResponse) -> do
-      let comments = responseBody commentsResponse
-      let events = responseBody eventsResponse
-      return $ Right $ mergeCommentsAndEvents comments events
-    (Left err, _) -> return $ Left err
-    (_, Left err) -> return $ Left err
 
 
 handleCommentModalEvent :: AppState -> CommentModalEvent -> EventM ClickableName AppState ()
@@ -91,7 +61,7 @@ handleCommentModalEvent _s (CommentsRefreshed comments) = do
 handleCommentModalEvent _s (OpenCommentModal issue comments isPR owner name) = do
   -- Open the comment modal with fresh comments and scroll to bottom
   let editor = editorText CommentEditor Nothing ""
-  modify (appModal .~ Just (CommentModalState editor issue comments isPR owner name NotSubmitting))
+  modify (appModal ?~ CommentModalState editor issue comments isPR owner name NotSubmitting)
   vScrollToEnd (viewportScroll CommentModalContent)
 
 submitComment :: AppState -> ModalState -> IO ()
@@ -130,14 +100,12 @@ closeWithCommentAsync (BaseContext {auth, manager, requestSemaphore}) owner name
 
   -- Then close the issue/PR
   let editIssue = EditIssue Nothing Nothing Nothing (Just StateClosed) Nothing Nothing
-  result <- withGithubApiSemaphore' requestSemaphore (executeRequestWithMgrAndRes manager auth (editIssueR owner name (IssueNumber issueNumber) editIssue))
-  return $ fmap responseBody result
+  fmap responseBody <$> withGithubApiSemaphore' requestSemaphore (executeRequestWithMgrAndRes manager auth (editIssueR owner name (IssueNumber issueNumber) editIssue))
 
 refreshIssueComments :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> EventM ClickableName AppState ()
 refreshIssueComments baseContext owner name issueNumber _isPR = do
   liftIO $ void $ async $ do
-    result <- fetchCommentsAndEvents baseContext owner name issueNumber
-    case result of
+    fetchIssueCommentsAndEvents baseContext owner name issueNumber >>= \case
       Right merged -> do
         -- Send an event to update the modal with new comments and events
         now <- getCurrentTime
@@ -148,8 +116,7 @@ refreshIssueComments baseContext owner name issueNumber _isPR = do
 fetchCommentsAndOpenModal :: BaseContext -> Issue -> Bool -> Name Owner -> Name Repo -> EventM ClickableName AppState ()
 fetchCommentsAndOpenModal baseContext issue@(Issue {issueNumber=(IssueNumber issueNum)}) isPR owner name = do
   liftIO $ void $ async $ do
-    result <- fetchCommentsAndEvents baseContext owner name issueNum
-    case result of
+    fetchIssueCommentsAndEvents baseContext owner name issueNum >>= \case
       Right merged -> do
         -- Send event to open modal with fresh comments and events
         now <- getCurrentTime
@@ -157,4 +124,4 @@ fetchCommentsAndOpenModal baseContext issue@(Issue {issueNumber=(IssueNumber iss
         writeBChan (eventChan baseContext) (TimeUpdated now)
       Left _err -> do
         -- On error, open modal with empty comments and events
-        writeBChan (eventChan baseContext) (CommentModalEvent (OpenCommentModal issue Vec.empty isPR owner name))
+        writeBChan (eventChan baseContext) (CommentModalEvent (OpenCommentModal issue V.empty isPR owner name))

@@ -16,6 +16,7 @@ module Sauron.Fetch (
   , fetchIssues
   , fetchIssue
   , fetchIssueComments
+  , fetchIssueCommentsAndEvents
 
   , fetchBranches
   , fetchBranchCommits
@@ -31,22 +32,24 @@ module Sauron.Fetch (
   ) where
 
 import Control.Exception.Safe (bracketOnError_)
+import Control.Monad (foldM)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
+import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (UTCTime(..))
 import qualified Data.Vector as V
 import GitHub
-import Network.HTTP.Conduit
+import Network.HTTP.Conduit hiding (Proxy)
 import qualified Network.URI as URI
 import Relude
 import Sauron.Actions.Util
-import Sauron.Event.CommentModal (fetchCommentsAndEvents)
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
 import Sauron.Types
+import UnliftIO.Async
 
 
 fetchRepo :: (
@@ -216,9 +219,39 @@ fetchIssueComments owner name issueNumber inner = do
   ctx <- ask
   bracketOnError_ (atomically $ markFetching inner)
                   (atomically $ writeTVar inner (Errored "Issue comments and events fetch failed with exception.")) $
-    liftIO (fetchCommentsAndEvents ctx owner name (unIssueNumber issueNumber)) >>= \case
+    liftIO (fetchIssueCommentsAndEvents ctx owner name (unIssueNumber issueNumber)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right merged -> atomically $ writeTVar inner (Fetched merged)
+
+fetchIssueCommentsAndEvents :: BaseContext -> Name Owner -> Name Repo -> Int -> IO (Either Error (V.Vector (Either IssueEvent IssueComment)))
+fetchIssueCommentsAndEvents baseContext owner name issueNumber = do
+  let fetchComments =
+        withGithubApiSemaphore' (requestSemaphore baseContext)
+          (executeRequestWithMgrAndRes (manager baseContext) (auth baseContext)
+            (commentsR owner name (IssueNumber issueNumber) FetchAll))
+
+  let fetchEvents =
+        withGithubApiSemaphore' (requestSemaphore baseContext)
+          (executeRequestWithMgrAndRes (manager baseContext) (auth baseContext)
+            (eventsForIssueR owner name (GitHub.mkId (Proxy :: Proxy Issue) issueNumber) FetchAll))
+
+  (commentsResult, eventsResult) <- concurrently fetchComments fetchEvents
+
+  case (commentsResult, eventsResult) of
+    (Right commentsResponse, Right eventsResponse) -> do
+      let comments = responseBody commentsResponse
+      let events = responseBody eventsResponse
+      return $ Right $ mergeCommentsAndEvents comments events
+    (Left err, _) -> return $ Left err
+    (_, Left err) -> return $ Left err
+  where
+    mergeCommentsAndEvents :: V.Vector IssueComment -> V.Vector IssueEvent -> V.Vector (Either IssueEvent IssueComment)
+    mergeCommentsAndEvents comments events =
+      let commentEntries = fmap (\c -> (issueCommentCreatedAt c, Right c)) comments
+          eventEntries = fmap (\e -> (issueEventCreatedAt e, Left e)) events
+          allEntries = V.toList commentEntries <> V.toList eventEntries
+          sortedEntries = sortOn fst allEntries -- Sort by timestamp, newest first
+      in V.fromList (fmap snd sortedEntries)
 
 fetchPullComments :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -230,7 +263,7 @@ fetchPullComments owner name issueNumber inner = do
     -- pullRequestCommentsR returns comments on the "unified diff"
     -- there are also "commit comments" and "issue comments".
     -- The last one are the most common on PRs, so we use commentsR
-    liftIO (fetchCommentsAndEvents ctx owner name (unIssueNumber issueNumber)) >>= \case
+    liftIO (fetchIssueCommentsAndEvents ctx owner name (unIssueNumber issueNumber)) >>= \case
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right merged -> atomically $ writeTVar inner (Fetched merged)
 
@@ -250,11 +283,37 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
         atomically $ writeTVar _state (Errored (show err))
       Right (responseBody -> wtc@(WithTotalCount results _totalCount)) -> atomically $ do
         writeTVar _state (Fetched wtc)
-        (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) -> do
-          entityData <- makeEmptyElem bc () "" (_depth + 1)
-          let EntityData {_state = jobState} = entityData
-          writeTVar jobState (Fetched (job, []))
-          return $ SingleJobNode entityData
+
+        -- Preserve existing job nodes and their toggle state
+        existingChildren <- readTVar _children
+
+        -- Build a map of existing jobs by their IDs
+        existingJobsMap <- foldM (\acc node -> case node of
+          SingleJobNode (EntityData {_state=jobState}) -> do
+            currentState <- readTVar jobState
+            case currentState of
+              Fetched (existingJob, _) -> return $ Map.insert (jobId existingJob) node acc
+              Fetching (Just (existingJob, _)) -> return $ Map.insert (jobId existingJob) node acc
+              _ -> return acc
+          ) (Map.empty :: Map.Map (Id Job) (Node Variable SingleJobT)) existingChildren
+
+        (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {jobId}) -> do
+          case Map.lookup jobId existingJobsMap of
+            Just existingNode@(SingleJobNode existingEntityData) -> do
+              -- Update existing node's job data while preserving toggle state
+              let EntityData {_state = jobState} = existingEntityData
+              currentState <- readTVar jobState
+              case currentState of
+                Fetched (_, logGroups) -> writeTVar jobState (Fetched (job, logGroups))
+                Fetching (Just (_, logGroups)) -> writeTVar jobState (Fetching (Just (job, logGroups)))
+                _ -> writeTVar jobState (Fetched (job, []))
+              return existingNode
+            Nothing -> do
+              -- Create new node for new jobs
+              entityData <- makeEmptyElem bc () "" (_depth + 1)
+              let EntityData {_state = jobState} = entityData
+              writeTVar jobState (Fetched (job, []))
+              return $ SingleJobNode entityData
           -- writeTVar (_state child) (PaginatedItemJob)
   -- TODO: do pagination for these jobs? The web UI doesn't seem to...
   -- bc <- ask
