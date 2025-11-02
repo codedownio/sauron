@@ -108,6 +108,7 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   , (eventConvertedColor, fg (select solarizedBlue))
   , (eventRefDeletedColor, fg V.red)
   , (eventRefRestoredColor, fg (select solarizedGreen))
+  , (eventRefUnknownColor, fg V.red)
 
   -- Timeline colors
   , (timelineBorderAttr, fg (select solarizedBlue))
@@ -199,6 +200,7 @@ eventProjectColor = mkAttrName "eventProjectColor"
 eventConvertedColor = mkAttrName "eventConvertedColor"
 eventRefDeletedColor = mkAttrName "eventRefDeletedColor"
 eventRefRestoredColor = mkAttrName "eventRefRestoredColor"
+eventRefUnknownColor = mkAttrName "eventRefUnknownColor"
 
 -- * Timeline colors
 

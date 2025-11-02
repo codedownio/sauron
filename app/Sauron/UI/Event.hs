@@ -5,6 +5,7 @@ module Sauron.UI.Event (
 ) where
 
 import Brick (AttrName, withAttr, str, Widget)
+import Data.String.Interpolate
 import GitHub (EventType(..))
 import Relude
 import Sauron.UI.AttrMap
@@ -26,55 +27,61 @@ getEventIcon eventType = case eventType of
   Referenced -> "&"
   Merged -> "→"
   Mentioned -> "»"
-  Subscribed -> "+"
+  Subscribed -> "⊕"
   Unsubscribed -> "-"
   ReviewRequested -> "?"
   ReviewDismissed -> "×"
   ReviewRequestRemoved -> "?"
   MarkedAsDuplicate -> "="
   UnmarkedAsDuplicate -> "="
-  AddedToProject -> "+"
+  AddedToProject -> "⊕"
+  AddedToProjectV2 -> "⊕"
   MovedColumnsInProject -> "↑"
+  ProjectItemStatusChanged -> "↔"
   RemovedFromProject -> "-"
   ConvertedNoteToIssue -> "*"
   HeadRefDeleted -> "∅"
   HeadRefRestored -> "↪"
+  Unknown _ -> "?"
 
 -- | Get a colored icon widget for an event type using GitHub's color scheme
 getEventIconWithColor :: EventType -> Widget n
-getEventIconWithColor eventType = 
+getEventIconWithColor eventType =
   withAttr (getEventColorAttr eventType) (str (getEventIcon eventType))
 
 -- | Get the color attribute for each event type based on GitHub's colors
 getEventColorAttr :: EventType -> AttrName
 getEventColorAttr eventType = case eventType of
-  Closed -> eventClosedColor              -- Purple/violet
-  Reopened -> eventReopenedColor          -- Green
-  Assigned -> eventAssignedColor          -- Blue
-  ActorUnassigned -> eventUnassignedColor -- Gray
-  Labeled -> eventLabeledColor            -- Blue
-  Unlabeled -> eventUnlabeledColor        -- Gray
-  Milestoned -> eventMilestoneColor       -- Green
-  Demilestoned -> eventMilestoneColor     -- Green
-  Renamed -> eventRenamedColor            -- Orange
-  Locked -> eventLockedColor              -- Yellow/orange
-  Unlocked -> eventUnlockedColor          -- Gray
-  Referenced -> eventReferencedColor      -- Gray
-  Merged -> eventMergedColor              -- Purple
-  Mentioned -> eventMentionedColor        -- Blue
-  Subscribed -> eventSubscribedColor      -- Green
-  Unsubscribed -> eventUnsubscribedColor  -- Gray
-  ReviewRequested -> eventReviewColor     -- Yellow
-  ReviewDismissed -> eventReviewColor     -- Yellow
-  ReviewRequestRemoved -> eventReviewColor -- Yellow
-  MarkedAsDuplicate -> eventDuplicateColor -- Gray
-  UnmarkedAsDuplicate -> eventDuplicateColor -- Gray
-  AddedToProject -> eventProjectColor     -- Green
-  MovedColumnsInProject -> eventProjectColor -- Green
-  RemovedFromProject -> eventProjectColor -- Green
-  ConvertedNoteToIssue -> eventConvertedColor -- Blue
-  HeadRefDeleted -> eventRefDeletedColor  -- Red
-  HeadRefRestored -> eventRefRestoredColor -- Green
+  Closed -> eventClosedColor
+  Reopened -> eventReopenedColor
+  Assigned -> eventAssignedColor
+  ActorUnassigned -> eventUnassignedColor
+  Labeled -> eventLabeledColor
+  Unlabeled -> eventUnlabeledColor
+  Milestoned -> eventMilestoneColor
+  Demilestoned -> eventMilestoneColor
+  Renamed -> eventRenamedColor
+  Locked -> eventLockedColor
+  Unlocked -> eventUnlockedColor
+  Referenced -> eventReferencedColor
+  Merged -> eventMergedColor
+  Mentioned -> eventMentionedColor
+  Subscribed -> eventSubscribedColor
+  Unsubscribed -> eventUnsubscribedColor
+  ReviewRequested -> eventReviewColor
+  ReviewDismissed -> eventReviewColor
+  ReviewRequestRemoved -> eventReviewColor
+  MarkedAsDuplicate -> eventDuplicateColor
+  UnmarkedAsDuplicate -> eventDuplicateColor
+  AddedToProject -> eventProjectColor
+  AddedToProjectV2 -> eventProjectColor
+  MovedColumnsInProject -> eventProjectColor
+  ProjectItemStatusChanged -> eventProjectColor
+  RemovedFromProject -> eventProjectColor
+  ConvertedNoteToIssue -> eventConvertedColor
+  HeadRefDeleted -> eventRefDeletedColor
+  HeadRefRestored -> eventRefRestoredColor
+  Unknown _ -> eventRefRestoredColor
 
 getEventDescription :: EventType -> String
 getEventDescription eventType = case eventType of
@@ -100,8 +107,11 @@ getEventDescription eventType = case eventType of
   MarkedAsDuplicate -> "marked this as duplicate"
   UnmarkedAsDuplicate -> "unmarked this as duplicate"
   AddedToProject -> "added this to a project"
+  AddedToProjectV2 -> "added this to a project"
   MovedColumnsInProject -> "moved this in a project"
+  ProjectItemStatusChanged -> "changed the status in a project"
   RemovedFromProject -> "removed this from a project"
   ConvertedNoteToIssue -> "converted note to issue"
   HeadRefDeleted -> "deleted the head branch"
   HeadRefRestored -> "restored the head branch"
+  Unknown t -> [i|#{t} (unknown event type)|]

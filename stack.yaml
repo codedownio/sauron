@@ -23,7 +23,8 @@ extra-deps:
   # - fix JobStep type to make some fields optional
   # - Repo: add subscribers_count
   # - Fix getNotificationsR
-  commit: 614148cbe9f7047e9d776d98cc536b63adda51f1
+  # - EventType: add more constructors + a catchall called Unknown
+  commit: 73099ec89571b1819ecf6283d2b3957bd0dff31d
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
