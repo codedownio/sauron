@@ -57,6 +57,14 @@ appEvent (_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll CommentModalContent) 1
       (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll CommentModalContent) (-1)
       _ -> zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
+    NodeModalState {} -> case ev of
+      (V.EvKey V.KEsc []) -> modify (appModal .~ Nothing)
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> modify (appModal .~ Nothing)
+      (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll NodeModalContent) Down
+      (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll NodeModalContent) Up
+      (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll NodeModalContent) 1
+      (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll NodeModalContent) (-1)
+      _ -> return () -- No other interactions for NodeModal
   _ -> return ()
 
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
@@ -134,6 +142,10 @@ appEvent s (VtyEvent e) = case e of
         (SinglePullNode (EntityData {_static=issue, _state}), Just (RepoNode (EntityData {_static=(owner, name)}))) -> do
           fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
         _ -> return ()
+
+  V.EvKey c [] | c == nodeModalKey -> do
+    withFixedElemAndParents s $ \(SomeNode el) _variableEl _parents -> do
+      modify (appModal ?~ NodeModalState (SomeNode el) s)
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups

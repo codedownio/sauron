@@ -5,7 +5,9 @@ module Main (main) where
 
 import Brick as B
 import Brick.BChan
+import Brick.Widgets.Center
 import Brick.Widgets.List
+import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Control.Concurrent.STM (retry)
 import Control.Monad
@@ -17,6 +19,7 @@ import qualified Data.Vector as V
 import GitHub
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.CrossPlatform as V
+import Lens.Micro
 import Network.HTTP.Client (newManager)
 import Relude hiding (Down)
 import Sauron.Actions
@@ -34,6 +37,11 @@ import Sauron.Setup.ReposFromCurrentDirectory
 import Sauron.Types
 import Sauron.UI
 import Sauron.UI.AttrMap (buildAdaptiveAttrMap)
+import Sauron.UI.Border (borderWithCounts)
+import Sauron.UI.BottomBar
+import Sauron.UI.CommentModal (renderModal)
+import Sauron.UI.NodeModal (renderNodeModal)
+import Sauron.UI.TopBox (topBox)
 import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
@@ -56,6 +64,21 @@ mkApp colorMode = App {
   , appAttrMap = const (buildAdaptiveAttrMap colorMode)
   }
 
+drawUI :: AppState -> [Widget ClickableName]
+drawUI app = case _appModal app of
+  Nothing -> [mainUI]
+  Just modalState -> case modalState of
+    CommentModalState {} -> [renderModal app modalState, mainUI]
+    NodeModalState {} -> [renderNodeModal app modalState, mainUI]
+  where
+    mainUI = vBox [
+      topBox app
+      , borderWithCounts app
+      -- , fixedHeightOrViewportPercent (InnerViewport [i|viewport_debugging|]) 50 $
+      --     vBox [border $ strWrap (show item <> "\n") | item <- toList (app ^. appMainList)]
+      , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
+      , clickable InfoBar $ bottomBar app
+      ]
 
 main :: IO ()
 main = do

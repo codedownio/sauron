@@ -45,6 +45,7 @@ renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber
     typ = if _issueIsPR then "Pull Request" else "Issue"
 
     modalTitle = [i|Comment on #{typ} \##{num}|]
+renderModal _ _ = str "Invalid modal state for CommentModal" -- This should never happen
 
 renderCommentEditor :: Editor Text ClickableName -> Widget ClickableName
 renderCommentEditor editor =

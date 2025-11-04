@@ -2,29 +2,25 @@
 {-# LANGUAGE GADTs #-}
 
 module Sauron.UI (
-  drawUI
+  listDrawElement
+  , listDrawElement'
   ) where
 
 import Brick
 import Brick.Widgets.Border
 import Brick.Widgets.Center
-import qualified Brick.Widgets.List as L
 import Control.Monad
 import Data.Maybe
 import Data.String.Interpolate
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub hiding (Status)
-import Lens.Micro hiding (ix)
 import Relude
 import Sauron.Fetch.Core
 import Sauron.Types
 import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
-import Sauron.UI.Border
-import Sauron.UI.BottomBar
 import Sauron.UI.Branch
-import Sauron.UI.CommentModal (renderModal)
 import Sauron.UI.Commit (commitLine, commitInner)
 import Sauron.UI.Issue
 import Sauron.UI.Job
@@ -34,30 +30,18 @@ import Sauron.UI.Pull
 import Sauron.UI.Repo
 import Sauron.UI.Search
 import Sauron.UI.Statuses (getQuarterCircleSpinner, statusToIconAnimated, chooseWorkflowStatus)
-import Sauron.UI.TopBox
 import Sauron.UI.Util
 import Sauron.UI.Workflow
 
 
-drawUI :: AppState -> [Widget ClickableName]
-drawUI app = case _appModal app of
-  Nothing -> [mainUI]
-  Just modalState -> [renderModal app modalState, mainUI]
-  where
-    mainUI = vBox [
-      topBox app
-      , borderWithCounts app
-      -- , fixedHeightOrViewportPercent (InnerViewport [i|viewport_debugging|]) 50 $
-      --     vBox [border $ strWrap (show item <> "\n") | item <- toList (app ^. appMainList)]
-      , hCenter $ padAll 1 $ L.renderListWithIndex (listDrawElement app) True (app ^. appMainList)
-      , clickable InfoBar $ bottomBar app
-      ]
-
 listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget ClickableName
+listDrawElement appState ix isSelected node@(SomeNode inner) = wrapper ix isSelected (getEntityData inner) $ listDrawElement' appState node
+
+listDrawElement' :: AppState -> SomeNode Fixed -> Widget ClickableName
 
 -- * Repos
 
-listDrawElement appState ix isSelected (SomeNode (PaginatedReposNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (PaginatedReposNode ed@(EntityData {..}))) = vBox $ catMaybes [
   Just $ case _state of
     Fetched (SearchResult totalCount repos) -> paginatedHeading ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount}|])
     Fetching maybeRepos -> case maybeRepos of
@@ -66,13 +50,13 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedReposNode ed@(EntityD
     NotFetched -> paginatedHeading ed appState "Repositories" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Repositories" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeNode (RepoNode x@(EntityData {_static=(owner, name), ..}))) = wrapper ix isSelected x [
+listDrawElement' appState (SomeNode (RepoNode (EntityData {_static=(owner, name), ..}))) = vBox $ catMaybes [
   Just $ renderRepoLine _toggled (owner, name) _state _healthCheck (_appAnimationCounter appState)
   ]
 
 -- * Issues
 
-listDrawElement appState ix isSelected (SomeNode (PaginatedIssuesNode x@(EntityData {_state}))) = wrapper ix isSelected x [
+listDrawElement' appState (SomeNode (PaginatedIssuesNode x@(EntityData {_state}))) = vBox $ catMaybes [
   Just $ case _state of
     Fetched (SearchResult totalCount _xs) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount})|])
     Fetching maybeIssues -> case maybeIssues of
@@ -81,7 +65,7 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedIssuesNode x@(EntityD
     NotFetched -> paginatedHeading x appState "Issues" (str [i|(not fetched)|])
     Errored err -> paginatedHeading x appState "Issues" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeNode (SingleIssueNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (SingleIssueNode (EntityData {_static=issue, ..}))) = vBox $ catMaybes [
   Just $ issueLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
@@ -93,7 +77,7 @@ listDrawElement appState ix isSelected (SomeNode (SingleIssueNode ed@(EntityData
 
 -- * Pulls
 
-listDrawElement appState ix isSelected (SomeNode (PaginatedPullsNode ed@(EntityData {_state}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (PaginatedPullsNode ed@(EntityData {_state}))) = vBox $ catMaybes [
   Just $ case _state of
     Fetched (SearchResult totalCount _xs) -> paginatedHeading ed appState "Pulls" (str [i|(#{totalCount})|])
     Fetching maybePulls -> case maybePulls of
@@ -102,7 +86,7 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedPullsNode ed@(EntityD
     NotFetched -> paginatedHeading ed appState "Pulls" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Pulls" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeNode (SinglePullNode ed@(EntityData {_static=issue, ..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (SinglePullNode (EntityData {_static=issue, ..}))) = vBox $ catMaybes [
   Just $ pullLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
   , do
       guard _toggled
@@ -114,7 +98,7 @@ listDrawElement appState ix isSelected (SomeNode (SinglePullNode ed@(EntityData 
 
 -- * Workflows
 
-listDrawElement appState ix isSelected (SomeNode (PaginatedWorkflowsNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (PaginatedWorkflowsNode ed@(EntityData {..}))) = vBox $ catMaybes [
   Just $ case _state of
     Fetched (WithTotalCount _xs totalCount) -> paginatedHeading ed appState "Actions" (str [i|(#{totalCount})|])
     Fetching maybeWorkflows -> case maybeWorkflows of
@@ -123,7 +107,7 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedWorkflowsNode ed@(Ent
     NotFetched -> paginatedHeading ed appState "Actions" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Actions" (str [i|(error fetching: #{err})|])
   ]
-listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityData {_static=wf, ..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (SingleWorkflowNode (EntityData {_static=wf, ..}))) = vBox $ catMaybes [
   Just $ workflowLine (_appAnimationCounter appState) _toggled wf _state
   , do
       guard _toggled
@@ -135,7 +119,7 @@ listDrawElement appState ix isSelected (SomeNode (SingleWorkflowNode ed@(EntityD
 
 -- * Branches and commits
 
-listDrawElement appState ix isSelected (SomeNode (PaginatedBranchesNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (PaginatedBranchesNode ed@(EntityData {..}))) = vBox $ catMaybes [
   Just $ case _state of
     Fetched branches -> paginatedHeading ed appState "Branches" (countWidget _pageInfo branches)
     Fetching maybeBranches -> case maybeBranches of
@@ -145,11 +129,11 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedBranchesNode ed@(Enti
     Errored err -> paginatedHeading ed appState "Branches" (str [i|(error fetching: #{err})|])
   ]
 
-listDrawElement appState ix isSelected (SomeNode (SingleBranchNode ed@(EntityData {_static=branch, _state, ..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (SingleBranchNode (EntityData {_static=branch, _state, ..}))) = vBox $ catMaybes [
   Just $ branchLine _toggled branch appState _state
   ]
 
-listDrawElement appState ix isSelected (SomeNode (SingleCommitNode ed@(EntityData {_static=commit, _state, ..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (SingleCommitNode (EntityData {_static=commit, _state, ..}))) = vBox $ catMaybes [
   Just $ commitLine (_appNow appState) _toggled commit
   , do
       guard _toggled
@@ -161,7 +145,7 @@ listDrawElement appState ix isSelected (SomeNode (SingleCommitNode ed@(EntityDat
 
 -- * Jobs
 
-listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (SingleJobNode (EntityData {..}))) = vBox $ catMaybes [
   Just $ case _state of
     Fetched (job, _) -> jobLine (_appAnimationCounter appState) _toggled job _state
     Fetching (Just (job, _)) -> jobLine (_appAnimationCounter appState) _toggled job _state
@@ -178,7 +162,7 @@ listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {
 
 -- * Notifications
 
-listDrawElement appState ix isSelected (SomeNode (PaginatedNotificationsNode ed@(EntityData {..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (PaginatedNotificationsNode ed@(EntityData {..}))) = vBox $ catMaybes [
   Just $ case _state of
     Fetched notifications -> paginatedHeading ed appState "Notifications" (countWidget _pageInfo notifications)
     Fetching maybeNotifications -> case maybeNotifications of
@@ -188,7 +172,7 @@ listDrawElement appState ix isSelected (SomeNode (PaginatedNotificationsNode ed@
     Errored err -> paginatedHeading ed appState "Notifications" (str [i|(error fetching: #{err})|])
   ]
 
-listDrawElement appState ix isSelected (SomeNode (SingleNotificationNode ed@(EntityData {_static=notification, ..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (SingleNotificationNode (EntityData {_static=notification, ..}))) = vBox $ catMaybes [
   Just $ notificationLine (_appNow appState) _toggled notification (_appAnimationCounter appState) _state
   , do
       guard _toggled
@@ -199,7 +183,7 @@ listDrawElement appState ix isSelected (SomeNode (SingleNotificationNode ed@(Ent
 
 -- * Job Log Groups
 
-listDrawElement appState ix isSelected (SomeNode (JobLogGroupNode ed@(EntityData {_static=jobLogGroup, ..}))) = wrapper ix isSelected ed [
+listDrawElement' appState (SomeNode (JobLogGroupNode (EntityData {_static=jobLogGroup, ..}))) = vBox $ catMaybes [
   Just $ jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
   , do
       guard _toggled
@@ -213,7 +197,7 @@ listDrawElement appState ix isSelected (SomeNode (JobLogGroupNode ed@(EntityData
 
 -- * Headings
 
-listDrawElement _appState ix isSelected (SomeNode (HeadingNode ed@(EntityData {_static=label, ..}))) = wrapper ix isSelected ed [
+listDrawElement' _appState (SomeNode (HeadingNode (EntityData {_static=label, ..}))) = vBox $ catMaybes [
   Just $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
     , Just (hBox [str (toString label)])
@@ -277,5 +261,5 @@ countWidget pageInfo items = case pageInfoLastPage pageInfo of
   Just lastPage -> str [i|(~#{lastPage * pageSize})|]
   Nothing -> str [i|(#{V.length items})|]
 
-wrapper :: Int -> Bool -> EntityData a f -> [Maybe (Widget ClickableName)] -> Widget ClickableName
-wrapper ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id) . vBox . catMaybes
+wrapper :: Int -> Bool -> EntityData a f -> Widget ClickableName -> Widget ClickableName
+wrapper ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id)

@@ -279,6 +279,7 @@ data ClickableName =
   | CommentModal
   | CommentModalContent
   | CommentEditor
+  | NodeModalContent
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -374,6 +375,10 @@ data ModalState =
     , _commentRepoOwner :: Name Owner
     , _commentRepoName :: Name Repo
     , _submissionState :: SubmissionState
+  }
+  | NodeModalState {
+    _nodeModalSomeNode :: SomeNode Fixed
+    , _nodeModalAppState :: AppState
   }
 
 data AppState = AppState {

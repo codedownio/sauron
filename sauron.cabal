@@ -68,6 +68,7 @@ executable sauron
       Sauron.UI.Markdown.Footnotes
       Sauron.UI.Markdown.Table
       Sauron.UI.Markdown.Wrapping
+      Sauron.UI.NodeModal
       Sauron.UI.Notification
       Sauron.UI.Pagination
       Sauron.UI.Pull
