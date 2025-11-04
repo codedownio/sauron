@@ -31,7 +31,7 @@ lastPageKey = V.KChar 'L'
 
 editSearchKey = V.KChar 's'
 commentKey = V.KChar 'c'
-nodeModalKey = V.KChar 'z'
+zoomModalKey = V.KChar 'z'
 
 exitKey = V.KChar 'q'
 

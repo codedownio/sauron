@@ -1,5 +1,5 @@
-module Sauron.UI.NodeModal (
-  renderNodeModal,
+module Sauron.UI.Modals.ZoomModal (
+  renderZoomModal,
   ) where
 
 import Brick
@@ -10,13 +10,13 @@ import Sauron.Types
 import Sauron.UI
 import Sauron.UI.AttrMap
 
-renderNodeModal :: AppState -> ModalState -> Widget ClickableName
-renderNodeModal _appState (NodeModalState {_nodeModalSomeNode=someNode, _nodeModalAppState=modalAppState}) =
+renderZoomModal :: AppState -> ModalState -> Widget ClickableName
+renderZoomModal _appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModalAppState=modalAppState}) =
   vBox [
     hCenter $ withAttr boldText $ str modalTitle
     , hBorder
     -- Scrollable content area with node content
-    , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport NodeModalContent Vertical $
+    , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport ZoomModalContent Vertical $
       vBox [
         renderNodeContent modalAppState someNode
       ]
@@ -30,7 +30,7 @@ renderNodeModal _appState (NodeModalState {_nodeModalSomeNode=someNode, _nodeMod
   & centerLayer
   where
     modalTitle = "Node Contents"
-renderNodeModal _ _ = str "Invalid modal state" -- This should never happen
+renderZoomModal _ _ = str "Invalid modal state" -- This should never happen
 
 renderNodeContent :: AppState -> SomeNode Fixed -> Widget ClickableName
 renderNodeContent appState someNode = listDrawElement' appState someNode

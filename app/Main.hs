@@ -39,8 +39,8 @@ import Sauron.UI
 import Sauron.UI.AttrMap (buildAdaptiveAttrMap)
 import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
-import Sauron.UI.CommentModal (renderModal)
-import Sauron.UI.NodeModal (renderNodeModal)
+import Sauron.UI.Modals.CommentModal (renderModal)
+import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TopBox (topBox)
 import System.IO.Error (userError)
 import UnliftIO.Async
@@ -69,7 +69,7 @@ drawUI app = case _appModal app of
   Nothing -> [mainUI]
   Just modalState -> case modalState of
     CommentModalState {} -> [renderModal app modalState, mainUI]
-    NodeModalState {} -> [renderNodeModal app modalState, mainUI]
+    ZoomModalState {} -> [renderZoomModal app modalState, mainUI]
   where
     mainUI = vBox [
       topBox app

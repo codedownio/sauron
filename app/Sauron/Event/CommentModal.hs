@@ -40,7 +40,7 @@ handleCommentModalEvent s (CommentSubmitted result) = case result of
         refreshIssueComments (s ^. appBaseContext) owner name issueNum isPR
         vScrollToEnd (viewportScroll CommentModalContent)
       Nothing -> return ()
-      Just (NodeModalState _ _) -> return () -- NodeModal doesn't support comment operations
+      Just (ZoomModalState _ _) -> return () -- ZoomModal doesn't support comment operations
   Left _err -> do
     -- Reset submission state on error
     modify (appModal . _Just . submissionState .~ NotSubmitting)
@@ -76,7 +76,7 @@ submitComment s (CommentModalState editor issue _comments _isPR owner name _subm
       now <- getCurrentTime
       writeBChan (eventChan baseContext) (CommentModalEvent (CommentSubmitted result))
       writeBChan (eventChan baseContext) (TimeUpdated now)
-submitComment _ _ = return () -- NodeModalState doesn't support comments
+submitComment _ _ = return () -- ZoomModalState doesn't support comments
 
 closeWithComment :: AppState -> ModalState -> IO ()
 closeWithComment s (CommentModalState editor issue _comments isPR owner name _submissionState) = do
@@ -88,7 +88,7 @@ closeWithComment s (CommentModalState editor issue _comments isPR owner name _su
     now <- getCurrentTime
     writeBChan (eventChan baseContext) (CommentModalEvent (IssueClosedWithComment result))
     writeBChan (eventChan baseContext) (TimeUpdated now)
-closeWithComment _ _ = return () -- NodeModalState doesn't support comments
+closeWithComment _ _ = return () -- ZoomModalState doesn't support comments
 
 submitCommentAsync :: BaseContext -> Name Owner -> Name Repo -> Int -> Text -> IO (Either Error Comment)
 submitCommentAsync (BaseContext {auth, manager, requestSemaphore}) owner name issueNumber commentBody = do

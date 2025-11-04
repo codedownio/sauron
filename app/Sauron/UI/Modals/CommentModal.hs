@@ -1,4 +1,4 @@
-module Sauron.UI.CommentModal (
+module Sauron.UI.Modals.CommentModal (
   renderModal,
   ) where
 

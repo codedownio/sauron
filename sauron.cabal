@@ -58,7 +58,6 @@ executable sauron
       Sauron.UI.Border
       Sauron.UI.BottomBar
       Sauron.UI.Branch
-      Sauron.UI.CommentModal
       Sauron.UI.Commit
       Sauron.UI.Event
       Sauron.UI.Issue
@@ -68,7 +67,8 @@ executable sauron
       Sauron.UI.Markdown.Footnotes
       Sauron.UI.Markdown.Table
       Sauron.UI.Markdown.Wrapping
-      Sauron.UI.NodeModal
+      Sauron.UI.Modals.CommentModal
+      Sauron.UI.Modals.ZoomModal
       Sauron.UI.Notification
       Sauron.UI.Pagination
       Sauron.UI.Pull
