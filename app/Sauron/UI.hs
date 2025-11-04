@@ -166,6 +166,8 @@ listDrawElement appState ix isSelected (SomeNode (SingleJobNode ed@(EntityData {
     Fetched (job, _) -> jobLine (_appAnimationCounter appState) _toggled job _state
     Fetching (Just (job, _)) -> jobLine (_appAnimationCounter appState) _toggled job _state
     Fetching Nothing -> str "Loading job..."
+    NotFetched -> str [i|Job not fetched|]
+    Errored e -> str [i|Job fetch errored: #{e}|]
   , do
       guard _toggled
       guardFetchedOrHasPrevious _state $ \(job, logs) ->
