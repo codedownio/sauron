@@ -1,7 +1,10 @@
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Sauron.UI.TopBox (
   topBox
+
+  , isSearchable'
   ) where
 
 import Brick
@@ -82,7 +85,12 @@ topBox app = hBox [columnPadding settingsColumn
       , hBox [str "["
              , highlightKeyIfPredicate isSearchable app (str $ showKey editSearchKey)
              , str "] "
-             , withAttr hotkeyMessageAttr $ str "Search"
+             , highlightMessageIfPredicate isSearchable app (str "Search")
+             ]
+      , hBox [str "["
+             , highlightKeyIfPredicate isSearchable app (str $ showKey zoomModalKey)
+             , str "] "
+             , highlightMessageIfPredicate isSearchable app (str "Zoom")
              ]
       , keyIndicator "q" "Exit"
       ]
@@ -92,7 +100,18 @@ hasPrevPageKey = const True -- TODO
 hasFirstPageKey = const True -- TODO
 hasLastPageKey = const True -- TODO
 
-isSearchable = const True -- TODO
+isSearchable s = case snd <$> listSelectedElement (s ^. appMainList) of
+  Nothing -> False
+  Just x -> isSearchable' x
+
+isSearchable' :: SomeNode f -> Bool
+isSearchable' (SomeNode (PaginatedIssuesNode {})) = True
+isSearchable' (SomeNode (PaginatedPullsNode {})) = True
+isSearchable' (SomeNode (PaginatedWorkflowsNode {})) = False
+isSearchable' (SomeNode (PaginatedReposNode {})) = True
+isSearchable' (SomeNode (PaginatedBranchesNode {})) = True
+isSearchable' (SomeNode (PaginatedNotificationsNode {})) = True
+isSearchable' _ = False
 
 columnPadding = padLeft (Pad 1) . padRight (Pad 3) -- . padTop (Pad 1)
 

@@ -24,6 +24,7 @@ import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
 import Sauron.Types
 import Sauron.UI.Keys
+import Sauron.UI.TopBox (isSearchable')
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
@@ -130,9 +131,10 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey c [] | c == lastPageKey -> tryNavigatePage s goLastPage
 
   V.EvKey c [] | c == editSearchKey -> do
-    withNthChildAndPaginationParent s $ \_fixedEl _el (SomeNode (getEntityData -> (EntityData {_ident, _search})), _) _parents -> do
-      search' <- readTVarIO _search
-      modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
+    withNthChildAndPaginationParent s $ \_fixedEl _el (sn@(SomeNode (getEntityData -> (EntityData {_ident, _search}))), _) _parents -> do
+      when (isSearchable' sn) $ do
+        search' <- readTVarIO _search
+        modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
 
   V.EvKey c [] | c == commentKey -> do
     withFixedElemAndParents s $ \(SomeNode el) _variableEl parents -> do
