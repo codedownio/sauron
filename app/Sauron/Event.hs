@@ -11,7 +11,6 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
-import Data.String.Interpolate
 import qualified Data.Vector as Vec
 import GitHub
 import qualified Graphics.Vty as V
@@ -21,6 +20,7 @@ import Sauron.Actions
 import Sauron.Actions.Util (findRepoParent)
 import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
+import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
 import Sauron.Types
 import Sauron.UI.Keys
@@ -113,18 +113,7 @@ appEvent s (VtyEvent e) = case e of
 
   V.EvKey c [] | c == openSelectedKey -> do
     withFixedElemAndParents s $ \(SomeNode el) _variableEl elems -> do
-      case viaNonEmpty head [x | (SomeNode x@(RepoNode {})) <- toList elems] of
-        Just (RepoNode (EntityData {_state})) ->
-          readTVarIO _state >>= \case
-            Fetched (Repo {repoHtmlUrl=(URL url)}) -> case el of
-              SingleNotificationNode (EntityData {_static=notification}) ->
-                liftIO $ fetchNotificationHtmlUrl (s ^. appBaseContext) notification
-              _ -> openBrowserToUrl (getNodeUrl (toString url) el)
-            _ -> return ()
-        Nothing -> case el of
-          SingleNotificationNode (EntityData {_static=notification}) ->
-            liftIO $ fetchNotificationHtmlUrl (s ^. appBaseContext) notification
-          _ -> openBrowserToUrl (getNodeUrl "" el)
+      openNode (s ^. appBaseContext) elems el
 
   -- Column 3
   V.EvKey c [] | c == nextPageKey -> tryNavigatePage s goNextPage
@@ -199,39 +188,3 @@ modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeNode item@(getEnt
     isFetchingOrFetched (Fetched {}) = True
     isFetchingOrFetched (Fetching {}) = True
     isFetchingOrFetched _ = False
-
-
-getNodeUrl :: String -> Node Fixed a -> String
-getNodeUrl repoBaseUrl (PaginatedIssuesNode _) = repoBaseUrl <> "/issues"
-getNodeUrl repoBaseUrl (PaginatedPullsNode _) = repoBaseUrl <> "/pulls"
-getNodeUrl repoBaseUrl (PaginatedWorkflowsNode _) = repoBaseUrl <> "/actions"
-getNodeUrl _repoBaseUrl (PaginatedReposNode _) = ""
-getNodeUrl repoBaseUrl (PaginatedBranchesNode _) = repoBaseUrl <> "/branches"
-getNodeUrl _repoBaseUrl (PaginatedNotificationsNode _) = "https://github.com/notifications"
-getNodeUrl repoBaseUrl (SingleIssueNode (EntityData {_static=issue})) = case issueHtmlUrl issue of
-  Just url -> toString $ getUrl url
-  Nothing -> repoBaseUrl <> [i|/issues/#{issueNumber issue}|]
-getNodeUrl repoBaseUrl (SinglePullNode (EntityData {_static=pull})) = case issueHtmlUrl pull of
-  Just url -> toString $ getUrl url
-  Nothing -> repoBaseUrl <> [i|/pulls/#{issueNumber pull}|]
-getNodeUrl _repoBaseUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) = toString $ getUrl $ workflowRunHtmlUrl workflowRun
-getNodeUrl _repoBaseUrl (SingleJobNode (EntityData {_state})) = case fetchableCurrent _state of
-  Just (job, _) -> toString $ getUrl $ jobHtmlUrl job
-  Nothing -> ""
-getNodeUrl repoBaseUrl (SingleBranchNode (EntityData {_static=branch})) = repoBaseUrl <> "/tree/" <> toString (branchName branch)
-getNodeUrl repoBaseUrl (SingleCommitNode (EntityData {_static=commit})) = repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit))
-getNodeUrl _repoBaseUrl (SingleNotificationNode (EntityData {_static=_notification})) =
-  -- We need to make API calls to get proper html_url fields, but getNodeUrl is pure
-  -- This should be handled asynchronously when the notification is opened
-  "placeholder://notification-url"
-getNodeUrl _repoBaseUrl (JobLogGroupNode _) = "" -- Job log groups don't have URLs
-getNodeUrl _repoBaseUrl (HeadingNode _) = "" -- Heading nodes don't have URLs
-getNodeUrl repoBaseUrl (RepoNode _) = repoBaseUrl
-
--- | Open notification using GitHub's notification URL
-fetchNotificationHtmlUrl :: BaseContext -> Notification -> IO ()
-fetchNotificationHtmlUrl _baseContext notification = do
-  -- Simply use GitHub's notification URL - this is what GitHub web UI does
-  -- and it will redirect to the appropriate issue/PR/comment automatically
-  openBrowserToUrl (toString $ getUrl $ notificationUrl notification)
-

@@ -33,6 +33,7 @@ executable sauron
       Sauron.Event
       Sauron.Event.CommentModal
       Sauron.Event.Helpers
+      Sauron.Event.Open
       Sauron.Event.Paging
       Sauron.Expanding
       Sauron.Fetch
