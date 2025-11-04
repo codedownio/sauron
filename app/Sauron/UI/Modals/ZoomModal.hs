@@ -5,10 +5,12 @@ module Sauron.UI.Modals.ZoomModal (
 import Brick
 import Brick.Widgets.Border
 import Brick.Widgets.Center
+import Lens.Micro
 import Relude
 import Sauron.Types
 import Sauron.UI
 import Sauron.UI.AttrMap
+
 
 renderZoomModal :: AppState -> ModalState -> Widget ClickableName
 renderZoomModal _appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModalAppState=modalAppState}) =
@@ -33,4 +35,8 @@ renderZoomModal _appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomMod
 renderZoomModal _ _ = str "Invalid modal state" -- This should never happen
 
 renderNodeContent :: AppState -> SomeNode Fixed -> Widget ClickableName
-renderNodeContent appState someNode = listDrawElement' appState someNode
+renderNodeContent appState (SomeNode inner) = listDrawElement' appState (SomeNode (over entityDataL transformEntityData inner))
+  where
+    transformEntityData :: EntityData Fixed a -> EntityData Fixed a
+    transformEntityData = set toggled True
+                        . over ident (\x -> -x) -- Flip the sign so the viewport doesn't collide with one in the main UI

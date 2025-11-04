@@ -396,5 +396,6 @@ data AppState = AppState {
   , _appColorMode :: V.ColorMode
   }
 
+makeLenses ''EntityData
 makeLenses ''ModalState
 makeLenses ''AppState

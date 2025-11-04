@@ -39,8 +39,8 @@ withNthChildAndPaginationParent :: (
 withNthChildAndPaginationParent s cb =
   withFixedElemAndParents s $ \fixedEl variableEl parents ->
     case L.dropWhile (not . isPaginationNode) (toList parents) of
-      (el@(getPaginationInfo -> Just pageInfo):rest) ->
-        cb fixedEl variableEl (el, pageInfo) (el :| rest)
+      (el@(getPaginationInfo -> Just pageInfo'):rest) ->
+        cb fixedEl variableEl (el, pageInfo') (el :| rest)
       _ -> return ()
 
 withNthChildAndRepoParent :: MonadIO m => AppState -> (SomeNode Fixed -> SomeNode Variable -> Node Variable RepoT -> m ()) -> m ()

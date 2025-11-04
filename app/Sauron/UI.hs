@@ -188,10 +188,10 @@ listDrawElement' appState (SomeNode (JobLogGroupNode (EntityData {_static=jobLog
   , do
       guard _toggled
       case jobLogGroup of
-        JobLogGroup _timestamp _title (Just _status) children ->
+        JobLogGroup _timestamp _title (Just _status) children' ->
           return $ padLeft (Pad 4) $
             fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident}|]) 50 $
-              jobLogGroupInner children
+              jobLogGroupInner children'
         _ -> Nothing
   ]
 
@@ -223,9 +223,9 @@ jobLogGroupInner :: [JobLogGroup] -> Widget n
 jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
   where
     renderLogGroup (JobLogLines _timestamp contents) = vBox $ map renderLogLine contents
-    renderLogGroup (JobLogGroup _timestamp title _status children) = vBox [
+    renderLogGroup (JobLogGroup _timestamp title _status children') = vBox [
       withAttr normalAttr $ str $ toString title,
-      vBox $ map renderLogGroup children
+      vBox $ map renderLogGroup children'
       ]
 
     renderLogLine content
@@ -257,7 +257,7 @@ paginatedHeading (EntityData {..}) appState l countInParens = hBox $ catMaybes [
   ]
 
 countWidget :: PageInfo -> V.Vector a -> Widget n
-countWidget pageInfo items = case pageInfoLastPage pageInfo of
+countWidget pageInfo' items = case pageInfoLastPage pageInfo' of
   Just lastPage -> str [i|(~#{lastPage * pageSize})|]
   Nothing -> str [i|(#{V.length items})|]
 

@@ -13,10 +13,10 @@ import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 
 
 branchLine :: Bool -> Branch -> AppState -> Fetchable (V.Vector Commit) -> Widget n
-branchLine toggled (Branch {branchName, branchCommit}) appState fetchableState = vBox [line1, line2]
+branchLine toggled' (Branch {branchName, branchCommit}) appState fetchableState = vBox [line1, line2]
   where
     line1 = hBox [
-      withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
+      withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr branchAttr $ str $ toString branchName
       , fetchableQuarterCircleSpinner (_appAnimationCounter appState) fetchableState
       , padLeft Max $ case fetchableState of

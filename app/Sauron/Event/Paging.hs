@@ -17,8 +17,8 @@ import UnliftIO.STM (stateTVar)
 
 tryNavigatePage :: AppState -> (PageInfo -> PageInfo) -> EventM ClickableName AppState ()
 tryNavigatePage s cb =
-  withNthChildAndPaginationParent s $ \_fixedEl _el (SomeNode paginationEl, pageInfo) parents -> do
-    didChange <- atomically $ stateTVar pageInfo $ \pi ->
+  withNthChildAndPaginationParent s $ \_fixedEl _el (SomeNode paginationEl, pageInfo') parents -> do
+    didChange <- atomically $ stateTVar pageInfo' $ \pi ->
       let pi' = cb pi in (pi' /= pi, pi')
     when didChange $ do
       -- Mark the pagination node selected

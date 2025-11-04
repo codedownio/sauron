@@ -14,7 +14,7 @@ import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
 
 notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable a -> Widget n
-notificationLine now toggled (Notification {..}) animationCounter fetchableState =
+notificationLine now toggled' (Notification {..}) animationCounter fetchableState =
   if notificationUnread
     -- then withAttr unreadNotificationAttr $ vBox [line1, line2]
     then vBox [line1, line2]
@@ -24,7 +24,7 @@ notificationLine now toggled (Notification {..}) animationCounter fetchableState
     RepoRef {repoRefOwner=(SimpleOwner {..}), ..} = notificationRepo
 
     line1 = hBox (catMaybes [
-      Just $ withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
+      Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , Just $ withAttr normalAttr $ str $ toString subjectTitle
       , if notificationUnread then Just (withAttr blueDotAttr $ str " ●") else Nothing
       , Just $ fetchableQuarterCircleSpinner animationCounter fetchableState

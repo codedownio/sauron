@@ -20,10 +20,10 @@ import Sauron.UI.Util.TimeDiff
 
 
 pullLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable a -> Widget n
-pullLine now toggled (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
+pullLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
   where
     line1 = hBox [
-      withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
+      withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString issueTitle
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ str "" -- (if pullComments > 0 then [i|🗨  #{pullComments}|] else "")
