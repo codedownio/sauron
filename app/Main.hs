@@ -109,12 +109,16 @@ main = do
 
   now <- getCurrentTime
 
+  let modal :: Maybe (ModalState Variable) = Nothing
+  let modalFixed :: Maybe (ModalState Fixed) = Nothing
+
   let initialState =
         AppState {
           _appUser = currentUser
           , _appBaseContext = baseContext
 
-          , _appModal = Nothing
+          , _appModalVariable = modal
+          , _appModal = modalFixed
 
           , _appForm = Nothing
 
@@ -143,9 +147,9 @@ main = do
       getCurrentTime >>= writeBChan eventChan . TimeUpdated
 
   listElemsVar <- newTVarIO listElemsFixed
-  eventAsync <- async $
+  listElemsFixerAsync <- async $
     forever $ do
-      handleAny (\e -> putStrLn [i|Got exception in event async: #{e}|] >> threadDelay refreshPeriod) $ do
+      handleAny (\e -> putStrLn [i|Got exception in list elems fixer async: #{e}|] >> threadDelay refreshPeriod) $ do
         newFixed <- atomically $ do
           currentFixed <- readTVar listElemsVar
           newFixed <- mapM fixSomeNode listElems
@@ -156,6 +160,20 @@ main = do
         writeBChan eventChan (ListUpdate (getExpandedList newFixed))
         threadDelay refreshPeriod
 
+  modalVar <- newTVarIO modal
+  modalFixerAsync <- async $
+    forever $ do
+      handleAny (\e -> putStrLn [i|Got exception in modal fixer async: #{e}|] >> threadDelay refreshPeriod) $ do
+        newFixed <- atomically $ do
+          currentFixed <- readTVar modalVar
+          newFixed <- fixModal todo
+          when (newFixed == currentFixed) retry
+
+          writeTVar listElemsVar newFixed
+          return newFixed
+        writeBChan eventChan (ModalUpdate (getExpandedList newFixed))
+        threadDelay refreshPeriod
+
   let buildVty = do
         v <- V.userConfig >>= V.mkVty
         when (V.supportsMode (V.outputIface v) V.Mouse) $
@@ -163,7 +181,7 @@ main = do
         return v
   initialVty <- buildVty
   let colorMode = fromMaybe (V.outputColorMode (V.outputIface initialVty)) cliColorMode
-  flip onException (cancel eventAsync) $
+  flip onException (cancel listElemsFixerAsync >> cancel modalFixerAsync) $
     void $ customMain initialVty buildVty (Just eventChan) (mkApp colorMode) (initialState { _appColorMode = colorMode })
 
 

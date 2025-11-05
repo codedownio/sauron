@@ -351,6 +351,7 @@ emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
 data AppEvent =
   ListUpdate (V.Vector (SomeNode Fixed))
+  | ModalUpdate (Maybe (ModalState Fixed))
   | AnimationTick
   | TimeUpdated UTCTime
   | CommentModalEvent CommentModalEvent
@@ -386,6 +387,7 @@ data AppState = AppState {
   _appUser :: User
   , _appBaseContext :: BaseContext
 
+  , _appModalVariable :: Maybe (ModalState Variable)
   , _appModal :: Maybe (ModalState Fixed)
 
   , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
