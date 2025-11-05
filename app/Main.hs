@@ -109,7 +109,7 @@ main = do
 
   now <- getCurrentTime
 
-  let modal :: Maybe (ModalState Variable) = Nothing
+  modalVariableTVar <- newTVarIO (Nothing :: Maybe (ModalState Variable))
   let modalFixed :: Maybe (ModalState Fixed) = Nothing
 
   let initialState =
@@ -117,7 +117,7 @@ main = do
           _appUser = currentUser
           , _appBaseContext = baseContext
 
-          , _appModalVariable = modal
+          , _appModalVariable = modalVariableTVar
           , _appModal = modalFixed
 
           , _appForm = Nothing
@@ -160,18 +160,21 @@ main = do
         writeBChan eventChan (ListUpdate (getExpandedList newFixed))
         threadDelay refreshPeriod
 
-  modalVar <- newTVarIO modal
+  modalFixedVar <- newTVarIO modalFixed
   modalFixerAsync <- async $
     forever $ do
       handleAny (\e -> putStrLn [i|Got exception in modal fixer async: #{e}|] >> threadDelay refreshPeriod) $ do
         newFixed <- atomically $ do
-          currentFixed <- readTVar modalVar
-          newFixed <- fixModal todo
+          currentFixed <- readTVar modalFixedVar
+          currentVariable <- readTVar modalVariableTVar
+          newFixed <- case currentVariable of
+            Nothing -> return Nothing
+            Just variableModal -> Just <$> fixModal variableModal
           when (newFixed == currentFixed) retry
 
-          writeTVar listElemsVar newFixed
+          writeTVar modalFixedVar newFixed
           return newFixed
-        writeBChan eventChan (ModalUpdate (getExpandedList newFixed))
+        writeBChan eventChan (ModalUpdate newFixed)
         threadDelay refreshPeriod
 
   let buildVty = do

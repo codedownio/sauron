@@ -7,11 +7,28 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Sauron.Fix (fixSomeNode) where
+module Sauron.Fix (
+  fixSomeNode
+  , fixModal
+  ) where
 
 import Relude
 import Sauron.Types
 
+
+fixModal :: ModalState Variable -> STM (ModalState Fixed)
+fixModal (CommentModalState {..}) = return $ CommentModalState {
+  _commentEditor = _commentEditor
+  , _commentIssue = _commentIssue
+  , _commentIssueComments = _commentIssueComments
+  , _issueIsPR = _issueIsPR
+  , _commentRepoOwner = _commentRepoOwner
+  , _commentRepoName = _commentRepoName
+  , _submissionState = _submissionState
+  }
+fixModal (ZoomModalState sn) = do
+  fixedNode <- fixSomeNode sn
+  return $ ZoomModalState fixedNode
 
 fixSomeNode :: SomeNode Variable -> STM (SomeNode Fixed)
 fixSomeNode (SomeNode item) = SomeNode <$> fixNode item

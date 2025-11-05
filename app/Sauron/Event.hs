@@ -30,6 +30,8 @@ import Sauron.UI.TopBox (isSearchable')
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
 appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (listSelected $ s ^. appMainList))
 
+appEvent _ (AppEvent (ModalUpdate newModal)) = modify (appModal .~ newModal)
+
 appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
 
 appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModalEvent s commentModalEvent
@@ -40,17 +42,19 @@ appEvent _s (AppEvent (TimeUpdated newTime)) = do
 
 
 -- Handle modal events
-appEvent (_appModal -> Just modalState) e = case e of
+appEvent s@(_appModal -> Just modalState) e = case e of
   VtyEvent ev -> case modalState of
     CommentModalState {} -> case ev of
-      (V.EvKey V.KEsc []) -> modify (appModal .~ Nothing)
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> modify (appModal .~ Nothing)
+      (V.EvKey V.KEsc []) -> do
+        modify (appModal .~ Nothing)
+        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> do
+        modify (appModal .~ Nothing)
+        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
       (V.EvKey V.KEnter [V.MMeta]) -> do
-        s <- get
         modify (appModal . _Just . submissionState .~ SubmittingComment)
         liftIO $ submitComment s modalState
       (V.EvKey V.KEnter [V.MMeta, V.MShift]) -> do
-        s <- get
         modify (appModal . _Just . submissionState .~ SubmittingCloseWithComment)
         liftIO $ closeWithComment s modalState
       (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll CommentModalContent) Down
@@ -59,8 +63,12 @@ appEvent (_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll CommentModalContent) (-1)
       _ -> zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
     ZoomModalState {} -> case ev of
-      (V.EvKey V.KEsc []) -> modify (appModal .~ Nothing)
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> modify (appModal .~ Nothing)
+      (V.EvKey V.KEsc []) -> do
+        modify (appModal .~ Nothing)
+        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> do
+        modify (appModal .~ Nothing)
+        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
       (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll ZoomModalContent) Down
       (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll ZoomModalContent) Up
       (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll ZoomModalContent) 1
@@ -146,13 +154,10 @@ appEvent s (VtyEvent e) = case e of
         _ -> return ()
 
   V.EvKey c [] | c == zoomModalKey -> do
-    withFixedElemAndParents s $ \sn@(SomeNode el) (SomeNode variableEl) parents -> do
-      if _state (getEntityData el) == NotFetched
-        then do
-          refresh (s ^. appBaseContext) variableEl parents
-          modify (appModal ?~ ZoomModalState sn s)
-        else
-          modify (appModal ?~ ZoomModalState sn s)
+    withFixedElemAndParents s $ \(SomeNode el) (SomeNode variableEl) parents -> do
+      when (_state (getEntityData el) == NotFetched) $
+        refresh (s ^. appBaseContext) variableEl parents
+      liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups

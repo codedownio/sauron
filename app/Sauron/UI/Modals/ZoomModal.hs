@@ -19,14 +19,14 @@ import Sauron.UI.Issue (maxCommentWidth)
 
 
 renderZoomModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderZoomModal _appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModalAppState=modalAppState}) =
+renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode}) =
   vBox [
     hCenter $ withAttr boldText $ str modalTitle
     , hBorder
     -- Scrollable content area with node content
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport ZoomModalContent Vertical $
       hLimit maxCommentWidth $ vBox [
-        renderNodeContent modalAppState someNode
+        renderNodeContent appState someNode
       ]
     , hBorder
     , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] to close"

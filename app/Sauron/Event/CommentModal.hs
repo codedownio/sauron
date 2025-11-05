@@ -40,7 +40,7 @@ handleCommentModalEvent s (CommentSubmitted result) = case result of
         refreshIssueComments (s ^. appBaseContext) owner name issueNum isPR
         vScrollToEnd (viewportScroll CommentModalContent)
       Nothing -> return ()
-      Just (ZoomModalState _ _) -> return () -- ZoomModal doesn't support comment operations
+      Just (ZoomModalState _) -> return () -- ZoomModal doesn't support comment operations
   Left _err -> do
     -- Reset submission state on error
     modify (appModal . _Just . submissionState .~ NotSubmitting)
