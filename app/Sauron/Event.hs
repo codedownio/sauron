@@ -146,8 +146,13 @@ appEvent s (VtyEvent e) = case e of
         _ -> return ()
 
   V.EvKey c [] | c == zoomModalKey -> do
-    withFixedElemAndParents s $ \(SomeNode el) _variableEl _parents -> do
-      modify (appModal ?~ ZoomModalState (SomeNode el) s)
+    withFixedElemAndParents s $ \sn@(SomeNode el) (SomeNode variableEl) parents -> do
+      if _state (getEntityData el) == NotFetched
+        then do
+          refresh (s ^. appBaseContext) variableEl parents
+          modify (appModal ?~ ZoomModalState sn s)
+        else
+          modify (appModal ?~ ZoomModalState sn s)
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups

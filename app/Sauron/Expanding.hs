@@ -38,7 +38,7 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
           RepoNode (EntityData {..}) -> forM_ _children $ \y -> tell (expandNodes y)
 
     expandTyped :: (
-      Foldable t, MonadWriter [SomeNode Fixed] m, Eq (Node Fixed a), Typeable a
+      Foldable t, MonadWriter [SomeNode Fixed] m, Eq (Node Fixed a), Eq (NodeState a), Typeable a
       ) => t (Node Fixed a) -> m ()
     expandTyped xs = forM_ xs $ \y -> tell (expandNodes (SomeNode y))
 

@@ -17,7 +17,7 @@ import Sauron.UI.Issue (issueInner, maxCommentWidth)
 import Sauron.UI.Markdown (markdownToWidgetsWithWidth)
 
 
-renderModal :: AppState -> ModalState -> Widget ClickableName
+renderModal :: AppState -> ModalState Fixed -> Widget ClickableName
 renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber=(IssueNumber num)}), ..}) =
   vBox [
     hCenter $ withAttr boldText $ str modalTitle

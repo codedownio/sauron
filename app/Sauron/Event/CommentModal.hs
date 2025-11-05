@@ -65,7 +65,7 @@ handleCommentModalEvent _s (OpenCommentModal issue comments isPR owner name) = d
   modify (appModal ?~ CommentModalState editor issue comments isPR owner name NotSubmitting)
   vScrollToEnd (viewportScroll CommentModalContent)
 
-submitComment :: AppState -> ModalState -> IO ()
+submitComment :: AppState -> ModalState Fixed -> IO ()
 submitComment s (CommentModalState editor issue _comments _isPR owner name _submissionState) = do
   let commentText = T.unlines $ getEditContents editor
   unless (T.null $ T.strip commentText) $ do
@@ -78,7 +78,7 @@ submitComment s (CommentModalState editor issue _comments _isPR owner name _subm
       writeBChan (eventChan baseContext) (TimeUpdated now)
 submitComment _ _ = return () -- ZoomModalState doesn't support comments
 
-closeWithComment :: AppState -> ModalState -> IO ()
+closeWithComment :: AppState -> ModalState Fixed -> IO ()
 closeWithComment s (CommentModalState editor issue _comments isPR owner name _submissionState) = do
   let commentText = T.unlines $ getEditContents editor
   let baseContext = s ^. appBaseContext

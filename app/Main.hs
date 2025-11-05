@@ -113,14 +113,17 @@ main = do
         AppState {
           _appUser = currentUser
           , _appBaseContext = baseContext
+
+          , _appModal = Nothing
+
+          , _appForm = Nothing
+
           , _appMainListVariable = listElems
           , _appMainList = list MainList (getExpandedList listElemsFixed) 1
 
           , _appSortBy = SortByStars
           , _appNow = now
 
-          , _appForm = Nothing
-          , _appModal = Nothing
           , _appAnimationCounter = 0
 
           , _appColorMode = V.FullColor

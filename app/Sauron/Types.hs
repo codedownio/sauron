@@ -181,6 +181,7 @@ data SomeNode f where
   SomeNode :: (
     Show (Node f a)
     , Eq (Node Fixed a)
+    , Eq (NodeState a)
     , Typeable a
     ) => { unSomeNode :: Node f a } -> SomeNode f
 
@@ -366,7 +367,7 @@ data SubmissionState =
   | SubmittingCloseWithComment
   deriving (Show, Eq)
 
-data ModalState =
+data ModalState f =
   CommentModalState {
     _commentEditor :: Editor Text ClickableName
     , _commentIssue :: Issue
@@ -384,13 +385,17 @@ data ModalState =
 data AppState = AppState {
   _appUser :: User
   , _appBaseContext :: BaseContext
+
+  , _appModal :: Maybe (ModalState Fixed)
+
+  , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
+
   , _appMainListVariable :: V.Vector (SomeNode Variable)
   , _appMainList :: L.List ClickableName (SomeNode Fixed)
+
   , _appSortBy :: SortBy
   , _appNow :: UTCTime
 
-  , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
-  , _appModal :: Maybe ModalState
   , _appAnimationCounter :: Int
 
   , _appColorMode :: V.ColorMode
