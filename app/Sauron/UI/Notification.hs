@@ -1,9 +1,14 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Sauron.UI.Notification (
   notificationLine
   , notificationInner
   ) where
 
 import Brick
+import Control.Monad
 import Data.String.Interpolate
 import Data.Time
 import GitHub
@@ -12,6 +17,15 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
+
+
+instance ListDrawable Fixed 'SingleNotificationT where
+  drawLine appState (EntityData {_static=notification, ..}) =
+    notificationLine (_appNow appState) _toggled notification (_appAnimationCounter appState) _state
+
+  drawInner appState (EntityData {_static=notification, _ident, ..}) = do
+    guard _toggled
+    return $ notificationInner (_appNow appState) notification
 
 notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable a -> Widget n
 notificationLine now toggled' (Notification {..}) animationCounter fetchableState =

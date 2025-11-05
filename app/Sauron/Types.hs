@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -11,6 +12,7 @@
 
 module Sauron.Types where
 
+import Brick
 import Brick.BChan
 import Brick.Forms
 import Brick.Widgets.Edit (Editor)
@@ -29,6 +31,18 @@ import Network.HTTP.Client (Manager)
 import Relude
 import qualified Text.Show
 import UnliftIO.Async
+
+
+-- * ListDrawable typeclass
+
+-- | Typeclass for rendering nodes in the list
+class ListDrawable f a where
+  -- | Draw the main line for a node (the summary/header line)
+  drawLine :: AppState -> EntityData f a -> Widget ClickableName
+
+  -- | Draw the inner content when the node is toggled open
+  -- This should return Nothing if the node doesn't support inner content
+  drawInner :: AppState -> EntityData f a -> Maybe (Widget ClickableName)
 
 
 -- * Main list elem
@@ -383,9 +397,9 @@ data ModalState f =
   }
 
 instance Eq (ModalState Fixed) where
-  (CommentModalState _editor1 issue1 comments1 isPR1 owner1 name1 submission1) == 
+  (CommentModalState _editor1 issue1 comments1 isPR1 owner1 name1 submission1) ==
     (CommentModalState _editor2 issue2 comments2 isPR2 owner2 name2 submission2) =
-    issue1 == issue2 && comments1 == comments2 && isPR1 == isPR2 && 
+    issue1 == issue2 && comments1 == comments2 && isPR1 == isPR2 &&
     owner1 == owner2 && name1 == name2 && submission1 == submission2
   (ZoomModalState node1) == (ZoomModalState node2) = node1 == node2
   _ == _ = False
@@ -409,6 +423,7 @@ data AppState = AppState {
 
   , _appColorMode :: V.ColorMode
   }
+
 
 makeLenses ''EntityData
 makeLenses ''ModalState

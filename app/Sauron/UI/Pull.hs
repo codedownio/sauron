@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Sauron.UI.Pull (
   pullLine
@@ -7,6 +9,7 @@ module Sauron.UI.Pull (
   ) where
 
 import Brick
+import Control.Monad
 import Data.String.Interpolate
 import Data.Time
 import GitHub
@@ -14,10 +17,20 @@ import GitHub.Data.Name
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (renderTimelineItem)
+import Sauron.UI.Issue (renderTimelineItem, issueInner)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
+import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 
+
+instance ListDrawable Fixed 'SinglePullT where
+  drawLine appState (EntityData {_static=issue, ..}) =
+    pullLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
+
+  drawInner appState (EntityData {_static=issue, _state, _ident, ..}) = do
+    guard _toggled
+    guardFetchedOrHasPrevious _state $ \comments ->
+      return $ issueInner (_appNow appState) issue comments
 
 pullLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable a -> Widget n
 pullLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]

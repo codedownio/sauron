@@ -1,3 +1,7 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Sauron.UI.Branch (
   branchLine
   ) where
@@ -11,6 +15,12 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 
+
+instance ListDrawable Fixed 'SingleBranchT where
+  drawLine appState (EntityData {_static=branch, _state, ..}) =
+    branchLine _toggled branch appState _state
+
+  drawInner _ _ = Nothing
 
 branchLine :: Bool -> Branch -> AppState -> Fetchable (V.Vector Commit) -> Widget n
 branchLine toggled' (Branch {branchName, branchCommit}) appState fetchableState = vBox [line1, line2]

@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Sauron.UI.Repo (
   renderRepoLine
@@ -13,6 +16,12 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Statuses
 import Sauron.UI.Util
 
+
+instance ListDrawable Fixed 'RepoT where
+  drawLine appState (EntityData {_static=(owner, name), ..}) =
+    renderRepoLine _toggled (owner, name) _state _healthCheck (_appAnimationCounter appState)
+
+  drawInner _ _ = Nothing
 
 renderRepoLine :: Bool -> (Name Owner, Name Repo) -> Fetchable Repo -> Fetchable HealthCheckResult -> Int -> Widget n
 renderRepoLine isToggled (owner, name) fetchableRepo fetchableHealthCheck animationCounter = hBox $ catMaybes [

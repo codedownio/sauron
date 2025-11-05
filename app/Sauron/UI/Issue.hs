@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Sauron.UI.Issue (
   issueLine
@@ -15,6 +18,7 @@ module Sauron.UI.Issue (
   ) where
 
 import Brick
+import Control.Monad
 import Data.String.Interpolate
 import Data.Time
 import qualified Data.Vector as V
@@ -27,8 +31,18 @@ import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
 import Sauron.UI.Markdown
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.TimelineBorder
+import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 
+
+instance ListDrawable Fixed 'SingleIssueT where
+  drawLine appState (EntityData {_static=issue, ..}) =
+    issueLine (_appNow appState) _toggled issue (_appAnimationCounter appState) _state
+
+  drawInner appState (EntityData {_static=issue, _state, _ident, ..}) = do
+    guard _toggled
+    guardFetchedOrHasPrevious _state $ \comments ->
+      return $ issueInner (_appNow appState) issue comments
 
 maxCommentWidth :: Int
 maxCommentWidth = 120

@@ -1,3 +1,7 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Sauron.UI.Commit (
   commitLine,
   commitInner
@@ -5,21 +9,34 @@ module Sauron.UI.Commit (
 
 import Brick
 import Brick.Widgets.Border
+import Control.Monad
 import qualified Data.Text as T
 import Data.Time
 import qualified Data.Vector as V
 import GitHub
 import Relude
+import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 
 
+instance ListDrawable Fixed 'SingleCommitT where
+  drawLine appState (EntityData {_static=commit, _state, ..}) =
+    commitLine (_appNow appState) _toggled commit
+
+  drawInner _appState (EntityData {_state, _ident, ..}) = do
+    guard _toggled
+    guardFetchedOrHasPrevious _state $ \detailedCommit ->
+      return $ commitInner detailedCommit
+
+
 commitLine :: UTCTime -> Bool -> Commit -> Widget n
-commitLine now toggled (Commit {commitSha, commitGitCommit, commitAuthor}) =
-  if toggled then vBox [line1, line2] else vBox [line1]
+commitLine now toggled' (Commit {commitSha, commitGitCommit, commitAuthor}) =
+  if toggled' then vBox [line1, line2] else vBox [line1]
   where
     commitMessage = toString $ gitCommitMessage commitGitCommit
-    displayMessage = if toggled then commitMessage else takeWhile (/= '\n') commitMessage
+    displayMessage = if toggled' then commitMessage else takeWhile (/= '\n') commitMessage
 
     (authorName, commitTime) = case commitAuthor of
       Just author ->
@@ -32,7 +49,7 @@ commitLine now toggled (Commit {commitSha, commitGitCommit, commitAuthor}) =
     timeAgo = timeFromNow (diffUTCTime now commitTime)
 
     line1 = hBox [
-      withAttr openMarkerAttr $ str (if toggled then "[-] " else "[+] ")
+      withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str displayMessage
       , padLeft Max $ hBox [
           str timeAgo
@@ -44,7 +61,7 @@ commitLine now toggled (Commit {commitSha, commitGitCommit, commitAuthor}) =
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $
-      withAttr normalAttr $ str $ if toggled && '\n' `elem` commitMessage
+      withAttr normalAttr $ str $ if toggled' && '\n' `elem` commitMessage
         then drop 1 $ dropWhile (/= '\n') commitMessage
         else ""
 
