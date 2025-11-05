@@ -4,6 +4,9 @@
 module Sauron.UI (
   listDrawElement
   , listDrawElement'
+
+  , drawNodeLine
+  , drawNodeInner
   ) where
 
 import Brick
@@ -36,6 +39,11 @@ listDrawElement' appState (SomeNode inner) =
   ]
 
 -- Pattern match on specific node types to call their instances
+--
+-- TODO: don't do this. The problem is that we define all these orphan
+-- ListDrawable instances in different files, which are downstream of Types.hs.
+-- We can't add a ListDrawable f a to the context of SomeNode f, because
+--
 drawNodeLine :: AppState -> Node Fixed a -> Widget ClickableName
 drawNodeLine appState node = case node of
   HeadingNode ed -> drawLine appState ed

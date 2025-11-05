@@ -41,8 +41,13 @@ renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode}) =
 renderZoomModal _ _ = str "Invalid modal state" -- This should never happen
 
 renderNodeContent :: AppState -> SomeNode Fixed -> Widget ClickableName
-renderNodeContent appState (SomeNode inner) = listDrawElement' appState (SomeNode (over entityDataL transformEntityData inner))
+renderNodeContent appState (SomeNode inner) = vBox $ catMaybes [
+  Just $ drawNodeLine appState inner'
+  , fmap (padLeft (Pad 1)) (drawNodeInner appState inner')
+  ]
   where
+    inner' = over entityDataL transformEntityData inner
+
     transformEntityData :: EntityData Fixed a -> EntityData Fixed a
     transformEntityData = set toggled True
                         . over ident (\x -> -x) -- Flip the sign so the viewport doesn't collide with one in the main UI
