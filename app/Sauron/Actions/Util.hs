@@ -69,7 +69,7 @@ requestToUrl req = case req of
   Command _method paths _body -> pathsToUrl paths
   where
     pathsToUrl :: [Text] -> Text
-    pathsToUrl = T.intercalate "/"
+    pathsToUrl = ("/" <>) . T.intercalate "/"
 
 executeRequestWithLogging :: (MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error (Response a))
 executeRequestWithLogging request = do
