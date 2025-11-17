@@ -21,7 +21,7 @@ import GitHub
 import Lens.Micro
 import Network.HTTP.Client (responseBody)
 import Relude
-import Sauron.Actions.Util (withGithubApiSemaphore')
+import Sauron.Actions.Util (withGithubApiSemaphore', executeRequestWithLoggingDirect)
 import Sauron.Fetch (fetchIssueCommentsAndEvents)
 import Sauron.Types
 import UnliftIO.Async
@@ -41,6 +41,7 @@ handleCommentModalEvent s (CommentSubmitted result) = case result of
         vScrollToEnd (viewportScroll CommentModalContent)
       Nothing -> return ()
       Just (ZoomModalState _) -> return () -- ZoomModal doesn't support comment operations
+      Just LogModalState -> return () -- LogModal doesn't support comment operations
   Left _err -> do
     -- Reset submission state on error
     modify (appModal . _Just . submissionState .~ NotSubmitting)
@@ -91,19 +92,19 @@ closeWithComment s (CommentModalState editor issue _comments isPR owner name _su
 closeWithComment _ _ = return () -- ZoomModalState doesn't support comments
 
 submitCommentAsync :: BaseContext -> Name Owner -> Name Repo -> Int -> Text -> IO (Either Error Comment)
-submitCommentAsync (BaseContext {auth, manager, requestSemaphore}) owner name issueNumber commentBody = do
-  result <- withGithubApiSemaphore' requestSemaphore (executeRequestWithMgrAndRes manager auth (createCommentR owner name (IssueNumber issueNumber) commentBody))
+submitCommentAsync baseContext@(BaseContext {requestSemaphore}) owner name issueNumber commentBody = do
+  result <- withGithubApiSemaphore' requestSemaphore (executeRequestWithLoggingDirect baseContext (createCommentR owner name (IssueNumber issueNumber) commentBody))
   return $ fmap responseBody result
 
 closeWithCommentAsync :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> Text -> IO (Either Error Issue)
-closeWithCommentAsync (BaseContext {auth, manager, requestSemaphore}) owner name issueNumber _isPR commentBody = do
+closeWithCommentAsync baseContext@(BaseContext {requestSemaphore}) owner name issueNumber _isPR commentBody = do
   -- First submit comment if there is one
   unless (T.null $ T.strip commentBody) $ do
-    void $ withGithubApiSemaphore' requestSemaphore (executeRequestWithMgrAndRes manager auth (createCommentR owner name (IssueNumber issueNumber) commentBody))
+    void $ withGithubApiSemaphore' requestSemaphore (executeRequestWithLoggingDirect baseContext (createCommentR owner name (IssueNumber issueNumber) commentBody))
 
   -- Then close the issue/PR
   let editIssue = EditIssue Nothing Nothing Nothing (Just StateClosed) Nothing Nothing
-  fmap responseBody <$> withGithubApiSemaphore' requestSemaphore (executeRequestWithMgrAndRes manager auth (editIssueR owner name (IssueNumber issueNumber) editIssue))
+  fmap responseBody <$> withGithubApiSemaphore' requestSemaphore (executeRequestWithLoggingDirect baseContext (editIssueR owner name (IssueNumber issueNumber) editIssue))
 
 refreshIssueComments :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> EventM ClickableName AppState ()
 refreshIssueComments baseContext owner name issueNumber _isPR = do

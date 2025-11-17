@@ -11,8 +11,9 @@ import Control.Exception.Safe (handleAny)
 import Control.Monad.IO.Class
 import Data.String.Interpolate
 import GitHub
+import Network.HTTP.Client (responseBody)
 import Relude
-import Sauron.Actions.Util (findRepoParent)
+import Sauron.Actions.Util (findRepoParent, withGithubApiSemaphore, executeRequestWithLogging)
 import Sauron.Fetch (fetchWorkflowJobs)
 import Sauron.Types
 import Sauron.UI.Statuses
@@ -35,8 +36,7 @@ startWorkflowHealthCheckIfNeeded ::
 startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityData {_static=workflowRun, ..})) parents = do
   case findRepoParent parents of
     Just (RepoNode (EntityData {_static=(owner, name)})) | hasRunningWorkflow workflowRun -> do
-      currentThread <- readTVarIO _healthCheckThread
-      case currentThread of
+      readTVarIO _healthCheckThread >>= \case
         Nothing -> do
           newThread <- async $ runWorkflowHealthCheckLoop baseContext owner name node
           atomically $ writeTVar _healthCheckThread (Just newThread)
@@ -48,7 +48,13 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
     runWorkflowHealthCheckLoop bc owner name wfNode@(SingleWorkflowNode (EntityData {_static=staticWorkflowRun, ..})) =
       handleAny (\e -> putStrLn [i|Workflow health check thread crashed: #{e}|]) $
       forever $ do
-        if hasRunningWorkflow staticWorkflowRun
+        -- Check the current workflow run status by fetching from GitHub
+        currentWorkflowRun <- liftIO $ flip runReaderT bc $ do
+          withGithubApiSemaphore (executeRequestWithLogging (workflowRunR owner name (workflowRunWorkflowRunId staticWorkflowRun))) >>= \case
+            Left _err -> return staticWorkflowRun  -- Fall back to static data if fetch fails
+            Right (responseBody -> response) -> return response
+
+        if hasRunningWorkflow currentWorkflowRun
           then do
             -- Refresh the workflow jobs
             liftIO $ flip runReaderT bc $

@@ -112,6 +112,12 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
 
   -- Timeline colors
   , (timelineBorderAttr, fg (select solarizedBlue))
+
+  -- Log levels
+  , (errorLogAttr, fg V.red)
+  , (warningLogAttr, fg V.yellow)
+  , (infoLogAttr, fg V.white)
+  , (debugLogAttr, fg (select midGray))
   ] <> attrMappingsForStyle Sky.breezeDark)
   where
     select = selectColor colorMode
@@ -205,6 +211,13 @@ eventRefUnknownColor = mkAttrName "eventRefUnknownColor"
 -- * Timeline colors
 
 timelineBorderAttr = mkAttrName "timelineBorder"
+
+-- * Log levels
+
+errorLogAttr = mkAttrName "error"
+warningLogAttr = mkAttrName "warning"
+infoLogAttr = mkAttrName "info"
+debugLogAttr = mkAttrName "debug"
 
 -- * Color Fallback System
 

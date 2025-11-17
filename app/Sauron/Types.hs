@@ -18,6 +18,7 @@ import Brick.Forms
 import Brick.Widgets.Edit (Editor)
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
+import Control.Monad.Logger (LogLevel(..))
 import Data.String.Interpolate
 import Data.Text ()
 import Data.Time
@@ -295,6 +296,7 @@ data ClickableName =
   | CommentModalContent
   | CommentEditor
   | ZoomModalContent
+  | LogModalContent
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -361,6 +363,14 @@ data PageInfo = PageInfo {
 emptyPageInfo :: PageInfo
 emptyPageInfo = PageInfo 1 Nothing Nothing Nothing Nothing
 
+-- * Logging
+
+data LogEntry = LogEntry {
+  _logEntryTimestamp :: UTCTime
+  , _logEntryLevel :: LogLevel
+  , _logEntryMessage :: Text
+  } deriving (Show, Eq)
+
 -- * Overall app state
 
 data AppEvent =
@@ -369,6 +379,7 @@ data AppEvent =
   | AnimationTick
   | TimeUpdated UTCTime
   | CommentModalEvent CommentModalEvent
+  | LogEntryAdded LogEntry
 
 data CommentModalEvent =
   CommentSubmitted (Either Error Comment)
@@ -395,6 +406,7 @@ data ModalState f =
   | ZoomModalState {
     _zoomModalSomeNode :: SomeNode f
   }
+  | LogModalState
 
 instance Eq (ModalState Fixed) where
   (CommentModalState _editor1 issue1 comments1 isPR1 owner1 name1 submission1) ==
@@ -402,6 +414,7 @@ instance Eq (ModalState Fixed) where
     issue1 == issue2 && comments1 == comments2 && isPR1 == isPR2 &&
     owner1 == owner2 && name1 == name2 && submission1 == submission2
   (ZoomModalState node1) == (ZoomModalState node2) = node1 == node2
+  LogModalState == LogModalState = True
   _ == _ = False
 
 data AppState = AppState {
@@ -422,9 +435,12 @@ data AppState = AppState {
   , _appAnimationCounter :: Int
 
   , _appColorMode :: V.ColorMode
+
+  , _appLogs :: Seq LogEntry
   }
 
 
 makeLenses ''EntityData
 makeLenses ''ModalState
+makeLenses ''LogEntry
 makeLenses ''AppState

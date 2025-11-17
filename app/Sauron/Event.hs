@@ -11,6 +11,7 @@ import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Function
+import qualified Data.Sequence as Seq
 import qualified Data.Vector as Vec
 import GitHub
 import qualified Graphics.Vty as V
@@ -39,6 +40,10 @@ appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModal
 appEvent _s (AppEvent (TimeUpdated newTime)) = do
   -- Update the current time for accurate timestamps
   modify (appNow .~ newTime)
+
+appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
+  -- Add log entry to the logs sequence
+  modify (appLogs %~ (Seq.|> logEntry))
 
 
 -- Handle modal events
@@ -74,6 +79,18 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll ZoomModalContent) 1
       (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll ZoomModalContent) (-1)
       _ -> return () -- No other interactions for ZoomModal
+    LogModalState -> case ev of
+      (V.EvKey V.KEsc []) -> do
+        modify (appModal .~ Nothing)
+        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> do
+        modify (appModal .~ Nothing)
+        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+      (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll LogModalContent) Down
+      (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll LogModalContent) Up
+      (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) 1
+      (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) (-1)
+      _ -> return () -- No other interactions for LogModal
   _ -> return ()
 
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
@@ -159,6 +176,10 @@ appEvent s (VtyEvent e) = case e of
         refresh (s ^. appBaseContext) variableEl parents
       liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
 
+  V.EvKey (V.KChar 'l') [V.MCtrl] -> do
+    modify (appModal .~ Just LogModalState)
+    liftIO $ atomically $ writeTVar (_appModalVariable s) (Just LogModalState)
+
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
     -- liftIO $ mapM_ cancelNode (s ^. appRunTreeBase)
@@ -189,26 +210,10 @@ handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
       _ -> return ()
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
-modifyToggled s cb = withFixedElemAndParents s $ \fixedEl (SomeNode item@(getEntityData -> mle)) parents -> do
+modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode item@(getEntityData -> mle)) parents -> do
   isOpen <- liftIO $ atomically $ do
     modifyTVar' (_toggled mle) cb
     readTVar (_toggled mle)
-  when isOpen $
-    unlessM (hasStartedInitialFetch fixedEl) $
-      refresh (s ^. appBaseContext) item parents
-  where
-    hasStartedInitialFetch :: (MonadIO m) => SomeNode Fixed -> m Bool
-    hasStartedInitialFetch (SomeNode (RepoNode (EntityData {_children}))) = do
-      and <$> mapM hasStartedInitialFetch _children
-    hasStartedInitialFetch (SomeNode (HeadingNode {})) = return True
-    hasStartedInitialFetch (SomeNode (SingleJobNode (EntityData {..}))) =
-      case _state of
-        Fetched (_, logs) -> return (not (null logs))  -- Only consider fetched if logs are present
-        Fetching (Just (_, logs)) -> return (not (null logs))  -- Only consider fetching if logs are present
-        _ -> return False
-    hasStartedInitialFetch (SomeNode (getEntityData -> (EntityData {..}))) = return (isFetchingOrFetched _state)
-
-    isFetchingOrFetched :: Fetchable a -> Bool
-    isFetchingOrFetched (Fetched {}) = True
-    isFetchingOrFetched (Fetching {}) = True
-    isFetchingOrFetched _ = False
+  when isOpen $ do
+    atomically (getExistentialChildrenWrapped item)
+      >>= refreshVisibleNodes (_appBaseContext s) (someNode : (toList parents))

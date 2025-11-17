@@ -32,13 +32,11 @@ fetchPaginated'' :: (
   -> (Either Text (res, PageInfo) -> STM ())
   -> m ()
 fetchPaginated'' mkReq pageInfoVar stateVar cb = do
-  BaseContext {auth, manager} <- ask
-
   PageInfo {pageInfoCurrentPage} <- readTVarIO pageInfoVar
 
   bracketOnError_ (atomically $ markFetching stateVar)
                   (atomically $ writeTVar stateVar (Errored "Fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (mkReq (FetchPage (PageParams (Just pageSize) (Just pageInfoCurrentPage))))) >>= \case
+    withGithubApiSemaphore (executeRequestWithLogging (mkReq (FetchPage (PageParams (Just pageSize) (Just pageInfoCurrentPage))))) >>= \case
       Left err -> atomically $ do
         cb $ Left (show err)
 

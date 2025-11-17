@@ -10,6 +10,7 @@ module Sauron.Actions (
 
   , refresh
   , refreshAll
+  , refreshVisibleNodes
   ) where
 
 import Brick as B
@@ -38,9 +39,8 @@ refresh :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode V
 refresh _bc _item@(HeadingNode (EntityData {_children})) _parents = do
   return ()
   -- readTVarIO _children >>= mapM_ (\(SomeNode child) -> refresh bc child ((SomeNode item) :| toList _parents))
-refresh bc item@(RepoNode (EntityData {_static=(owner, name), _state})) _parents = do
+refresh bc (RepoNode (EntityData {_static=(owner, name), _state})) _parents = do
   liftIO $ void $ async $ flip runReaderT bc $ fetchRepo owner name _state
-  liftIO $ atomically (getExistentialChildrenWrapped item) >>= mapM_ (\(SomeNode childItem) -> refresh bc childItem (SomeNode item :| toList _parents))
 refresh bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
 refresh bc item@(PaginatedPullsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
@@ -81,14 +81,21 @@ refreshAll :: (
   ) => V.Vector (SomeNode Variable) -> m ()
 refreshAll elems = do
   baseContext <- ask
-  liftIO $ refreshVisibleNodes baseContext [] (V.toList elems)
+  refreshVisibleNodes baseContext [] (V.toList elems)
+
+refreshVisibleNodes :: MonadIO m => BaseContext -> [SomeNode Variable] -> [SomeNode Variable] -> m ()
+refreshVisibleNodes baseContext parents nodes = do
+  forM_ nodes $ \someNode@(SomeNode node) -> do
+    stateValue <- readTVarIO (_state (getEntityData node))
+    unless (isFetchingOrFetched stateValue) $
+      refresh baseContext node (someNode :| parents)
+
+    whenM (readTVarIO (_toggled (getEntityData node))) $
+      atomically (getExistentialChildrenWrapped node)
+        >>= refreshVisibleNodes baseContext (someNode : parents)
 
   where
-    refreshVisibleNodes :: BaseContext -> [SomeNode Variable] -> [SomeNode Variable] -> IO ()
-    refreshVisibleNodes baseContext parents nodes = do
-      forM_ nodes $ \someNode@(SomeNode node) -> do
-        refresh baseContext node (someNode :| parents)
-
-        whenM (readTVarIO (_toggled (getEntityData node))) $
-          atomically (getExistentialChildrenWrapped node)
-            >>= refreshVisibleNodes baseContext (someNode : parents)
+    isFetchingOrFetched :: Fetchable a -> Bool
+    isFetchingOrFetched (Fetched {}) = True
+    isFetchingOrFetched (Fetching {}) = True
+    isFetchingOrFetched _ = False

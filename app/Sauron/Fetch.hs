@@ -56,10 +56,9 @@ fetchRepo :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> TVar (Fetchable Repo) -> m ()
 fetchRepo owner name repoVar = do
-  BaseContext {auth} <- ask
   bracketOnError_ (atomically $ markFetching repoVar)
                   (atomically $ writeTVar repoVar (Errored "Repo fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ github auth (repositoryR owner name)) >>= \case
+    withGithubApiSemaphore (githubWithLogging (repositoryR owner name)) >>= \case
       Left err -> atomically $ writeTVar repoVar (Errored (show err))
       Right x -> atomically $ writeTVar repoVar (Fetched x)
 
@@ -162,11 +161,11 @@ fetchBranchCommits :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Node Variable SingleBranchT -> m ()
 fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..})) = do
-  bc@(BaseContext {auth, manager}) <- ask
+  bc <- ask
   let branchSha = branchCommitSha $ branchCommit branch
   bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Branch commits fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commitsWithOptionsForR owner name (FetchAtLeast 10) [CommitQuerySha branchSha])) >>= \case
+    withGithubApiSemaphore (executeRequestWithLogging (commitsWithOptionsForR owner name (FetchAtLeast 10) [CommitQuerySha branchSha])) >>= \case
       Left err -> atomically $ do
         writeTVar _state (Errored (show err))
         writeTVar _children []
@@ -179,10 +178,9 @@ fetchCommitDetails :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Name Commit -> TVar (Fetchable Commit) -> m ()
 fetchCommitDetails owner name commitSha commitVar = do
-  BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ markFetching commitVar)
                   (atomically $ writeTVar commitVar (Errored "Commit details fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (commitR owner name commitSha)) >>= \case
+    withGithubApiSemaphore (executeRequestWithLogging (commitR owner name commitSha)) >>= \case
       Left err -> atomically $ writeTVar commitVar (Errored (show err))
       Right (responseBody -> detailedCommit) -> atomically $ writeTVar commitVar (Fetched detailedCommit)
 
@@ -190,10 +188,9 @@ fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable Issue) -> m ()
 fetchIssue owner name issueNumber issueVar = do
-  BaseContext {auth, manager} <- ask
   bracketOnError_ (atomically $ markFetching issueVar)
                   (atomically $ writeTVar issueVar (Errored "Issue fetch failed with exception.")) $
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (issueR owner name issueNumber)) >>= \case
+    withGithubApiSemaphore (executeRequestWithLogging (issueR owner name issueNumber)) >>= \case
       Left err -> atomically $ writeTVar issueVar (Errored (show err))
       Right x -> atomically $ writeTVar issueVar (Fetched (responseBody x))
 
@@ -227,12 +224,12 @@ fetchIssueCommentsAndEvents :: BaseContext -> Name Owner -> Name Repo -> Int -> 
 fetchIssueCommentsAndEvents baseContext owner name issueNumber = do
   let fetchComments =
         withGithubApiSemaphore' (requestSemaphore baseContext)
-          (executeRequestWithMgrAndRes (manager baseContext) (auth baseContext)
+          (executeRequestWithLoggingDirect baseContext
             (commentsR owner name (IssueNumber issueNumber) FetchAll))
 
   let fetchEvents =
         withGithubApiSemaphore' (requestSemaphore baseContext)
-          (executeRequestWithMgrAndRes (manager baseContext) (auth baseContext)
+          (executeRequestWithLoggingDirect baseContext
             (eventsForIssueR owner name (GitHub.mkId (Proxy :: Proxy Issue) issueNumber) FetchAll))
 
   (commentsResult, eventsResult) <- concurrently fetchComments fetchEvents
@@ -271,13 +268,13 @@ fetchWorkflowJobs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Id WorkflowRun -> Node Variable SingleWorkflowT -> m ()
 fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})) = do
-  bc@(BaseContext {auth, manager}) <- ask
+  bc <- ask
   bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Workflow jobs fetch failed with exception.")) $
     -- pullRequestCommentsR returns comments on the "unified diff"
     -- there are also "commit comments" and "issue comments".
     -- The last one are the most common on PRs, so we use commentsR
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
+    withGithubApiSemaphore (executeRequestWithLogging (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
       Left err -> do
         -- traceM [i|Error fetching workflow jobs: #{err}|]
         atomically $ writeTVar _state (Errored (show err))
@@ -362,8 +359,7 @@ fetchJob :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Id Job -> Node Variable SingleJobT -> m ()
 fetchJob owner name jobId (SingleJobNode (EntityData {_state})) = do
-  BaseContext {auth, manager} <- ask
-  withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (jobR owner name jobId)) >>= \case
+  withGithubApiSemaphore (executeRequestWithLogging (jobR owner name jobId)) >>= \case
     Left _err -> return () -- Silently fail for health checks
     Right (responseBody -> updatedJob) -> liftIO $ atomically $ do
       currentState <- readTVar _state

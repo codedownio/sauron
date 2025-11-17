@@ -12,7 +12,7 @@ import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import Relude
-import Sauron.Actions.Util (withGithubApiSemaphore)
+import Sauron.Actions.Util (withGithubApiSemaphore, githubWithLogging)
 import Sauron.Options
 import Sauron.Types
 import Sauron.UI.Statuses
@@ -27,7 +27,7 @@ newHealthCheckThread ::
   -> TVar (Fetchable HealthCheckResult)
   -> PeriodSpec
   -> IO (Async ())
-newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $
+newHealthCheckThread baseContext (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $
   handleAny (\e -> putStrLn [i|Health check thread crashed: #{e}|]) $
   forever $ do
     -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?
@@ -40,7 +40,7 @@ newHealthCheckThread baseContext@(BaseContext {auth}) (owner, name) repoVar heal
       bracketOnError_ (atomically $ markFetching healthCheckVar)
                       (atomically $ writeTVar healthCheckVar (Errored "Health check fetch failed with exception.")) $ do
         let search' = optionsWorkflowRunBranch defaultBranch
-        withGithubApiSemaphore (liftIO $ github auth (workflowRunsR owner name search' (FetchAtLeast 1))) >>= \case
+        withGithubApiSemaphore (githubWithLogging (workflowRunsR owner name search' (FetchAtLeast 1))) >>= \case
           Left err -> atomically $ writeTVar healthCheckVar (Errored (show err))
           Right (WithTotalCount {withTotalCountItems=(V.toList -> ((WorkflowRun {..}):_))}) -> do
             let result = HealthCheckWorkflowResult (chooseWorkflowStatus (fromMaybe workflowRunStatus workflowRunConclusion))

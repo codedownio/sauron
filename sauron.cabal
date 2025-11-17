@@ -68,6 +68,7 @@ executable sauron
       Sauron.UI.Markdown.Table
       Sauron.UI.Markdown.Wrapping
       Sauron.UI.Modals.CommentModal
+      Sauron.UI.Modals.LogModal
       Sauron.UI.Modals.ZoomModal
       Sauron.UI.Notification
       Sauron.UI.Pagination
@@ -119,6 +120,7 @@ executable sauron
     , lens-regex-pcre
     , microlens
     , microlens-th
+    , monad-logger
     , mtl
     , network-uri
     , optparse-applicative
@@ -174,6 +176,7 @@ test-suite test
     , http-conduit
     , http-types
     , microlens
+    , monad-logger
     , mtl
     , network-uri
     , pandoc-types

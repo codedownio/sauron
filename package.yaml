@@ -33,6 +33,7 @@ dependencies:
 - http-conduit
 - http-types
 - microlens
+- monad-logger
 - mtl
 - network-uri
 - pandoc-types

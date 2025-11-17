@@ -23,7 +23,7 @@ import Lens.Micro
 import Network.HTTP.Client (newManager)
 import Relude hiding (Down)
 import Sauron.Actions
-import Sauron.Actions.Util
+import Sauron.Actions.Util (githubWithLoggingDirect, withGithubApiSemaphore')
 import Sauron.Auth
 import Sauron.Event
 import Sauron.Expanding
@@ -40,6 +40,7 @@ import Sauron.UI.AttrMap (buildAdaptiveAttrMap)
 import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
 import Sauron.UI.Modals.CommentModal (renderModal)
+import Sauron.UI.Modals.LogModal (renderLogModal)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TopBox (topBox)
 import System.IO.Error (userError)
@@ -70,6 +71,7 @@ drawUI app = case _appModal app of
   Just modalState -> case modalState of
     CommentModalState {} -> [renderModal app modalState, mainUI]
     ZoomModalState {} -> [renderZoomModal app modalState, mainUI]
+    LogModalState -> [renderLogModal app modalState, mainUI]
   where
     mainUI = vBox [
       topBox app
@@ -85,9 +87,9 @@ main = do
   CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode} <- parseCliArgs
 
   eventChan <- newBChan 10
-  baseContext@(BaseContext {auth, requestSemaphore}) <- buildBaseContext eventChan
+  baseContext@(BaseContext {requestSemaphore}) <- buildBaseContext eventChan
 
-  currentUser@(User {userLogin}) <- withGithubApiSemaphore' requestSemaphore (github auth userInfoCurrentR) >>= \case
+  currentUser@(User {userLogin}) <- withGithubApiSemaphore' requestSemaphore (githubWithLoggingDirect baseContext userInfoCurrentR) >>= \case
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
 
@@ -131,6 +133,8 @@ main = do
           , _appAnimationCounter = 0
 
           , _appColorMode = V.FullColor
+
+          , _appLogs = mempty
         }
 
 
