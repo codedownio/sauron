@@ -23,7 +23,7 @@ import Lens.Micro
 import Network.HTTP.Client (newManager)
 import Relude hiding (Down)
 import Sauron.Actions
-import Sauron.Actions.Util (githubWithLoggingDirect, withGithubApiSemaphore')
+import Sauron.Actions.Util (githubWithLogging', withGithubApiSemaphore')
 import Sauron.Auth
 import Sauron.Event
 import Sauron.Expanding
@@ -89,7 +89,7 @@ main = do
   eventChan <- newBChan 10
   baseContext@(BaseContext {requestSemaphore}) <- buildBaseContext eventChan
 
-  currentUser@(User {userLogin}) <- withGithubApiSemaphore' requestSemaphore (githubWithLoggingDirect baseContext userInfoCurrentR) >>= \case
+  currentUser@(User {userLogin}) <- withGithubApiSemaphore' requestSemaphore (githubWithLogging' baseContext userInfoCurrentR) >>= \case
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
 

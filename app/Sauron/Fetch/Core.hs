@@ -36,7 +36,7 @@ fetchPaginated'' mkReq pageInfoVar stateVar cb = do
 
   bracketOnError_ (atomically $ markFetching stateVar)
                   (atomically $ writeTVar stateVar (Errored "Fetch failed with exception.")) $
-    withGithubApiSemaphore (executeRequestWithLogging (mkReq (FetchPage (PageParams (Just pageSize) (Just pageInfoCurrentPage))))) >>= \case
+    withGithubApiSemaphore (githubWithLoggingResponse (mkReq (FetchPage (PageParams (Just pageSize) (Just pageInfoCurrentPage))))) >>= \case
       Left err -> atomically $ do
         cb $ Left (show err)
 

@@ -19,9 +19,8 @@ import Data.Time
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
-import Network.HTTP.Client (responseBody)
 import Relude
-import Sauron.Actions.Util (withGithubApiSemaphore', executeRequestWithLoggingDirect)
+import Sauron.Actions.Util
 import Sauron.Fetch (fetchIssueCommentsAndEvents)
 import Sauron.Types
 import UnliftIO.Async
@@ -93,18 +92,17 @@ closeWithComment _ _ = return () -- ZoomModalState doesn't support comments
 
 submitCommentAsync :: BaseContext -> Name Owner -> Name Repo -> Int -> Text -> IO (Either Error Comment)
 submitCommentAsync baseContext@(BaseContext {requestSemaphore}) owner name issueNumber commentBody = do
-  result <- withGithubApiSemaphore' requestSemaphore (executeRequestWithLoggingDirect baseContext (createCommentR owner name (IssueNumber issueNumber) commentBody))
-  return $ fmap responseBody result
+  withGithubApiSemaphore' requestSemaphore $ githubWithLogging' baseContext (createCommentR owner name (IssueNumber issueNumber) commentBody)
 
 closeWithCommentAsync :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> Text -> IO (Either Error Issue)
 closeWithCommentAsync baseContext@(BaseContext {requestSemaphore}) owner name issueNumber _isPR commentBody = do
   -- First submit comment if there is one
   unless (T.null $ T.strip commentBody) $ do
-    void $ withGithubApiSemaphore' requestSemaphore (executeRequestWithLoggingDirect baseContext (createCommentR owner name (IssueNumber issueNumber) commentBody))
+    void $ withGithubApiSemaphore' requestSemaphore (githubWithLogging' baseContext (createCommentR owner name (IssueNumber issueNumber) commentBody))
 
   -- Then close the issue/PR
   let editIssue = EditIssue Nothing Nothing Nothing (Just StateClosed) Nothing Nothing
-  fmap responseBody <$> withGithubApiSemaphore' requestSemaphore (executeRequestWithLoggingDirect baseContext (editIssueR owner name (IssueNumber issueNumber) editIssue))
+  withGithubApiSemaphore' requestSemaphore (githubWithLogging' baseContext (editIssueR owner name (IssueNumber issueNumber) editIssue))
 
 refreshIssueComments :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> EventM ClickableName AppState ()
 refreshIssueComments baseContext owner name issueNumber _isPR = do

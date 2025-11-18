@@ -6,10 +6,10 @@ module Sauron.Actions.Util (
   withGithubApiSemaphore
   , withGithubApiSemaphore'
 
-  , executeRequestWithLogging
-  , executeRequestWithLoggingDirect
   , githubWithLogging
-  , githubWithLoggingDirect
+  , githubWithLoggingResponse
+  , githubWithLogging'
+  , githubWithLogging''
 
   , openBrowserToUrl
 
@@ -24,10 +24,12 @@ import Control.Monad.IO.Class
 import Control.Monad.Logger (LogLevel(..))
 import Control.Monad.Reader
 import Data.Aeson (FromJSON)
+import qualified Data.List as L
 import qualified Data.Text as T
 import Data.Time
 import GitHub
-import Network.HTTP.Client (Response)
+import Network.HTTP.Client (Response, responseBody, responseHeaders)
+import Network.HTTP.Types.Header (hContentLength)
 import Relude
 import Sauron.Types
 import UnliftIO.Process
@@ -71,36 +73,37 @@ requestToUrl req = case req of
     pathsToUrl :: [Text] -> Text
     pathsToUrl = ("/" <>) . T.intercalate "/"
 
-executeRequestWithLogging :: (MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error (Response a))
-executeRequestWithLogging request = do
-  BaseContext {auth, manager, eventChan} <- ask
-  result <- liftIO $ executeRequestWithMgrAndRes manager auth request
-  logResult eventChan request result
-  return result
-
 githubWithLogging :: (MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error a)
-githubWithLogging request = do
-  bc <- ask
-  githubWithLoggingDirect bc request
+githubWithLogging request = fmap responseBody <$> githubWithLoggingResponse request
 
-executeRequestWithLoggingDirect :: (MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error (Response a))
-executeRequestWithLoggingDirect (BaseContext {..}) request = do
+githubWithLoggingResponse :: (MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error (Response a))
+githubWithLoggingResponse request = ask >>= flip githubWithLogging'' request
+
+githubWithLogging' :: (MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error a)
+githubWithLogging' bc request = fmap responseBody <$> githubWithLogging'' bc request
+
+githubWithLogging'' :: (MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error (Response a))
+githubWithLogging'' (BaseContext {..}) request = do
   result <- liftIO $ executeRequestWithMgrAndRes manager auth request
   logResult eventChan request result
   return result
 
-githubWithLoggingDirect :: (MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error a)
-githubWithLoggingDirect (BaseContext {auth, eventChan}) request = do
-  result <- liftIO $ github auth request
-  logResult eventChan request result
-  return result
-
-logResult :: (MonadIO m) => BChan AppEvent -> Request k a -> Either Error b -> m ()
+logResult :: (MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Response b) -> m ()
 logResult eventChan request result = do
   now <- liftIO getCurrentTime
   let url = requestToUrl request
   let (level, msg) = case result of
         Left err -> (LevelError, "Failed: " <> url <> " - " <> show err)
-        Right _ -> (LevelInfo, url)
+        Right response ->
+          let sizeInfo = case getResponseSize response of
+                Nothing -> ""
+                Just size -> " (" <> show size <> " bytes)"
+          in (LevelInfo, url <> sizeInfo)
   let logEntry = LogEntry now level msg
   liftIO $ writeBChan eventChan (LogEntryAdded logEntry)
+  where
+    getResponseSize :: Response a -> Maybe Int
+    getResponseSize response = do
+      contentLengthHeader <- L.lookup hContentLength (responseHeaders response)
+      let contentLengthText :: Text = decodeUtf8 contentLengthHeader
+      readMaybe (toString contentLengthText)

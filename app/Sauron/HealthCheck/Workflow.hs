@@ -11,9 +11,8 @@ import Control.Exception.Safe (handleAny)
 import Control.Monad.IO.Class
 import Data.String.Interpolate
 import GitHub
-import Network.HTTP.Client (responseBody)
 import Relude
-import Sauron.Actions.Util (findRepoParent, withGithubApiSemaphore, executeRequestWithLogging)
+import Sauron.Actions.Util
 import Sauron.Fetch (fetchWorkflowJobs)
 import Sauron.Types
 import Sauron.UI.Statuses
@@ -50,9 +49,9 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
       forever $ do
         -- Check the current workflow run status by fetching from GitHub
         currentWorkflowRun <- liftIO $ flip runReaderT bc $ do
-          withGithubApiSemaphore (executeRequestWithLogging (workflowRunR owner name (workflowRunWorkflowRunId staticWorkflowRun))) >>= \case
+          withGithubApiSemaphore (githubWithLogging (workflowRunR owner name (workflowRunWorkflowRunId staticWorkflowRun))) >>= \case
             Left _err -> return staticWorkflowRun  -- Fall back to static data if fetch fails
-            Right (responseBody -> response) -> return response
+            Right response -> return response
 
         if hasRunningWorkflow currentWorkflowRun
           then do

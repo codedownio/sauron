@@ -165,11 +165,11 @@ fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..}
   let branchSha = branchCommitSha $ branchCommit branch
   bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Branch commits fetch failed with exception.")) $
-    withGithubApiSemaphore (executeRequestWithLogging (commitsWithOptionsForR owner name (FetchAtLeast 10) [CommitQuerySha branchSha])) >>= \case
+    withGithubApiSemaphore (githubWithLogging (commitsWithOptionsForR owner name (FetchAtLeast 10) [CommitQuerySha branchSha])) >>= \case
       Left err -> atomically $ do
         writeTVar _state (Errored (show err))
         writeTVar _children []
-      Right (responseBody -> commits) -> atomically $ do
+      Right commits -> atomically $ do
         writeTVar _state (Fetched commits)
         (writeTVar _children =<<) $ forM (V.toList commits) $ \commit@(Commit {..}) ->
           SingleCommitNode <$> makeEmptyElem bc commit ("/commit/" <> T.pack (toString (untagName commitSha))) (_depth + 1)
@@ -180,9 +180,9 @@ fetchCommitDetails :: (
 fetchCommitDetails owner name commitSha commitVar = do
   bracketOnError_ (atomically $ markFetching commitVar)
                   (atomically $ writeTVar commitVar (Errored "Commit details fetch failed with exception.")) $
-    withGithubApiSemaphore (executeRequestWithLogging (commitR owner name commitSha)) >>= \case
+    withGithubApiSemaphore (githubWithLogging (commitR owner name commitSha)) >>= \case
       Left err -> atomically $ writeTVar commitVar (Errored (show err))
-      Right (responseBody -> detailedCommit) -> atomically $ writeTVar commitVar (Fetched detailedCommit)
+      Right detailedCommit -> atomically $ writeTVar commitVar (Fetched detailedCommit)
 
 fetchIssue :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -190,9 +190,9 @@ fetchIssue :: (
 fetchIssue owner name issueNumber issueVar = do
   bracketOnError_ (atomically $ markFetching issueVar)
                   (atomically $ writeTVar issueVar (Errored "Issue fetch failed with exception.")) $
-    withGithubApiSemaphore (executeRequestWithLogging (issueR owner name issueNumber)) >>= \case
+    withGithubApiSemaphore (githubWithLogging (issueR owner name issueNumber)) >>= \case
       Left err -> atomically $ writeTVar issueVar (Errored (show err))
-      Right x -> atomically $ writeTVar issueVar (Fetched (responseBody x))
+      Right x -> atomically $ writeTVar issueVar (Fetched x)
 
 fetchWorkflows :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -224,20 +224,18 @@ fetchIssueCommentsAndEvents :: BaseContext -> Name Owner -> Name Repo -> Int -> 
 fetchIssueCommentsAndEvents baseContext owner name issueNumber = do
   let fetchComments =
         withGithubApiSemaphore' (requestSemaphore baseContext)
-          (executeRequestWithLoggingDirect baseContext
+          (githubWithLogging' baseContext
             (commentsR owner name (IssueNumber issueNumber) FetchAll))
 
   let fetchEvents =
         withGithubApiSemaphore' (requestSemaphore baseContext)
-          (executeRequestWithLoggingDirect baseContext
+          (githubWithLogging' baseContext
             (eventsForIssueR owner name (GitHub.mkId (Proxy :: Proxy Issue) issueNumber) FetchAll))
 
   (commentsResult, eventsResult) <- concurrently fetchComments fetchEvents
 
   case (commentsResult, eventsResult) of
-    (Right commentsResponse, Right eventsResponse) -> do
-      let comments = responseBody commentsResponse
-      let events = responseBody eventsResponse
+    (Right comments, Right events) -> do
       return $ Right $ mergeCommentsAndEvents comments events
     (Left err, _) -> return $ Left err
     (_, Left err) -> return $ Left err
@@ -274,11 +272,11 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
     -- pullRequestCommentsR returns comments on the "unified diff"
     -- there are also "commit comments" and "issue comments".
     -- The last one are the most common on PRs, so we use commentsR
-    withGithubApiSemaphore (executeRequestWithLogging (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
+    withGithubApiSemaphore (githubWithLogging (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
       Left err -> do
         -- traceM [i|Error fetching workflow jobs: #{err}|]
         atomically $ writeTVar _state (Errored (show err))
-      Right (responseBody -> wtc@(WithTotalCount results _totalCount)) -> atomically $ do
+      Right wtc@(WithTotalCount results _totalCount) -> atomically $ do
         writeTVar _state (Fetched wtc)
 
         -- Preserve existing job nodes and their toggle state
@@ -287,8 +285,7 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
         -- Build a map of existing jobs by their IDs
         existingJobsMap <- foldM (\acc node -> case node of
           SingleJobNode (EntityData {_state=jobState}) -> do
-            currentState <- readTVar jobState
-            case currentState of
+            readTVar jobState >>= \case
               Fetched (existingJob, _) -> return $ Map.insert (jobId existingJob) node acc
               Fetching (Just (existingJob, _)) -> return $ Map.insert (jobId existingJob) node acc
               _ -> return acc
@@ -336,6 +333,7 @@ fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})
       Left err -> atomically $ writeTVar _state (Errored (show err))
       Right response -> do
         let uri = responseBody response
+
         -- traceM [i|Jobs URI: #{uri}|]
         logs <- simpleHttp (URI.uriToString id uri "")
 
@@ -359,7 +357,7 @@ fetchJob :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Id Job -> Node Variable SingleJobT -> m ()
 fetchJob owner name jobId (SingleJobNode (EntityData {_state})) = do
-  withGithubApiSemaphore (executeRequestWithLogging (jobR owner name jobId)) >>= \case
+  withGithubApiSemaphore (githubWithLoggingResponse (jobR owner name jobId)) >>= \case
     Left _err -> return () -- Silently fail for health checks
     Right (responseBody -> updatedJob) -> liftIO $ atomically $ do
       currentState <- readTVar _state
