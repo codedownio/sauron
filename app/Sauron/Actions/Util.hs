@@ -92,13 +92,14 @@ logResult :: (MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Respo
 logResult eventChan request result = do
   now <- liftIO getCurrentTime
   let url = requestToUrl request
-  let (level, msg) = case result of
-        Left err -> (LevelError, "Failed: " <> url <> " - " <> show err)
+  let level = case result of Left _ -> LevelError; _ -> LevelInfo
+  let msg = case result of
+        Left err -> "Failed: " <> url <> " - " <> show err
         Right response ->
           let sizeInfo = case getResponseSize response of
-                Nothing -> ""
+                Nothing -> " " <> show (responseHeaders response)
                 Just size -> " (" <> show size <> " bytes)"
-          in (LevelInfo, url <> sizeInfo)
+          in (url <> sizeInfo)
   let logEntry = LogEntry now level msg
   liftIO $ writeBChan eventChan (LogEntryAdded logEntry)
   where
