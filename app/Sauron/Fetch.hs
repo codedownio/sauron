@@ -19,6 +19,10 @@ module Sauron.Fetch (
   , fetchIssueCommentsAndEvents
 
   , fetchBranches
+  , fetchOverallBranches
+  , fetchYourBranches
+  , fetchActiveBranches
+  , fetchStaleBranches
   , fetchBranchCommits
   , fetchCommitDetails
 
@@ -31,15 +35,17 @@ module Sauron.Fetch (
   , makeEmptyElem
   ) where
 
+import Brick.BChan (writeBChan)
 import Control.Exception.Safe (bracketOnError_)
 import Control.Monad (foldM)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
+import Control.Monad.Logger (LogLevel(..))
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Data.Time.Calendar (fromGregorian)
-import Data.Time.Clock (UTCTime(..))
+import Data.Time.Clock (UTCTime(..), getCurrentTime)
 import qualified Data.Vector as V
 import GitHub
 import Network.HTTP.Conduit hiding (Proxy)
@@ -48,6 +54,7 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
+import qualified Sauron.GraphQL as GraphQL
 import Sauron.Types
 import UnliftIO.Async
 
@@ -141,6 +148,171 @@ fetchBranches owner name (PaginatedBranchesNode (EntityData {..})) = do
       writeTVar _state (Fetched branches)
       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
         SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+
+fetchYourBranches :: (
+  MonadReader BaseContext m, MonadIO m
+  ) => Name Owner -> Name Repo -> Node Variable PaginatedYourBranchesT -> m ()
+fetchYourBranches owner name (PaginatedYourBranchesNode (EntityData {..})) = do
+  bc <- ask
+
+  -- Use GraphQL for efficient "Your branches" query
+  liftIO $ logToModal bc "fetchYourBranches: Starting GraphQL query"
+  case getAuthToken bc of
+    Nothing -> liftIO $ do
+      logToModal bc "fetchYourBranches: No auth token available"
+      atomically $ writeTVar _state (Errored "No auth token available for GraphQL query")
+    Just authToken -> do
+      liftIO $ logToModal bc $ "fetchYourBranches: Got auth token: " <> T.take 10 authToken <> "..."
+      currentUserName <- liftIO $ getUserName bc
+      case currentUserName of
+        Nothing -> liftIO $ do
+          logToModal bc "fetchYourBranches: Could not get current user name"
+          atomically $ writeTVar _state (Errored "Could not get current user name")
+        Just userName -> liftIO $ do
+          logToModal bc $ "fetchYourBranches: Got username: " <> userName
+          logToModal bc $ "fetchYourBranches: Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name
+          -- Fetch branches with commit info using GraphQL
+          result <- GraphQL.queryBranchesWithCommits (logToModal bc) authToken (toPathPart owner) (toPathPart name) 10
+          case result of
+            Left err -> atomically $ do
+              writeTVar _state (Errored $ toText err)
+              writeTVar _children []
+            Right branchesWithCommits -> do
+              -- Filter to only branches authored by current user and sort by date
+              let yourBranches = GraphQL.sortBranchesByDate $ GraphQL.filterBranchesByAuthor userName branchesWithCommits
+              -- Convert GraphQL results to sauron Branch format
+              let branches = V.fromList $ map graphqlBranchToGithubBranch yourBranches
+              -- Store the enhanced branch data in app state
+              let branchDataMap = Map.fromList [(GraphQL.branchName branch, branch) | branch <- yourBranches]
+              writeBChan (eventChan bc) (BranchDataUpdated branchDataMap)
+              atomically $ do
+                writeTVar _state (Fetched branches)
+                (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
+                  SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+          logToModal bc $ "fetchYourBranches: Processing complete, found " <> show (case result of
+            Left _ -> 0
+            Right branchesWithCommits -> length $ GraphQL.filterBranchesByAuthor userName branchesWithCommits) <> " your branches"
+
+fetchActiveBranches :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Node Variable PaginatedActiveBranchesT -> m ()
+fetchActiveBranches owner name (PaginatedActiveBranchesNode (EntityData {..})) = do
+  bc <- ask
+  _currentTime <- liftIO getCurrentTime
+  -- let threeMonthsAgo = addUTCTime (-90 * 24 * 60 * 60) currentTime -- 90 days
+
+  -- For now, since filtering requires async IO, just fetch all branches
+  -- TODO: Implement efficient filtering with background worker or streaming approach
+  fetchPaginated'' (branchesForR owner name) _pageInfo _state $ \case
+    Left err -> do
+      writeTVar _state (Errored (show err))
+      writeTVar _children []
+    Right (branches, newPageInfo) -> do
+      writeTVar _pageInfo newPageInfo
+      -- For now, return all branches until we implement proper async filtering
+      writeTVar _state (Fetched branches)
+      (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
+        SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+
+fetchStaleBranches :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Node Variable PaginatedStaleBranchesT -> m ()
+fetchStaleBranches owner name (PaginatedStaleBranchesNode (EntityData {..})) = do
+  bc <- ask
+  _currentTime <- liftIO getCurrentTime
+  -- let threeMonthsAgo = addUTCTime (-90 * 24 * 60 * 60) currentTime -- 90 days
+
+  -- For now, since filtering requires async IO, just fetch all branches
+  -- TODO: Implement efficient filtering with background worker or streaming approach
+  fetchPaginated'' (branchesForR owner name) _pageInfo _state $ \case
+    Left err -> do
+      writeTVar _state (Errored (show err))
+      writeTVar _children []
+    Right (branches, newPageInfo) -> do
+      writeTVar _pageInfo newPageInfo
+      -- For now, return all branches until we implement proper async filtering
+      writeTVar _state (Fetched branches)
+      (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
+        SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+
+fetchOverallBranches :: (
+  MonadReader BaseContext m, MonadIO m
+  ) => Name Owner -> Name Repo -> Node Variable OverallBranchesT -> m ()
+fetchOverallBranches _owner _name (OverallBranchesNode (EntityData {..})) = do
+  bc <- ask
+  -- Create categorized branch sections similar to GitHub's interface
+  categorizedChildren <- atomically $ do
+    yourBranchesEd <- makeEmptyElem bc () "your-branches" (_depth + 1)
+    activeBranchesEd <- makeEmptyElem bc () "active-branches" (_depth + 1)
+    staleBranchesEd <- makeEmptyElem bc () "stale-branches" (_depth + 1)
+    let nodes = [ SomeNode (PaginatedYourBranchesNode yourBranchesEd)
+                , SomeNode (PaginatedActiveBranchesNode activeBranchesEd)
+                , SomeNode (PaginatedStaleBranchesNode staleBranchesEd)
+                ]
+    return nodes
+
+  atomically $ do
+    writeTVar _state (Fetched ())
+    writeTVar _children categorizedChildren
+
+-- Helper functions for branch categorization
+
+-- Helper function to log to the modal
+logToModal :: BaseContext -> Text -> IO ()
+logToModal bc msg = do
+  now <- getCurrentTime
+  let logEntry = LogEntry now LevelInfo msg
+  writeBChan (eventChan bc) (LogEntryAdded logEntry)
+
+getUserName :: BaseContext -> IO (Maybe Text)
+getUserName bc = do
+  -- Get the current authenticated user's name from GitHub API
+  result <- runReaderT (withGithubApiSemaphore (githubWithLogging userInfoCurrentR)) bc
+  case result of
+    Left _err -> return Nothing
+    Right user -> return $ Just $ toPathPart $ userLogin user
+
+-- Helper function to extract auth token for GraphQL queries
+getAuthToken :: BaseContext -> Maybe Text
+getAuthToken bc = case auth bc of
+  OAuth token -> Just $ decodeUtf8 token
+  _ -> Nothing  -- Only OAuth tokens supported for now
+
+-- Convert GraphQL BranchWithCommit to GitHub Branch format
+graphqlBranchToGithubBranch :: GraphQL.BranchWithCommit -> Branch
+graphqlBranchToGithubBranch GraphQL.BranchWithCommit{..} = Branch
+  { branchName = branchName
+  , branchCommit = BranchCommit
+      { branchCommitSha = fromMaybe "unknown" commitOid
+      , branchCommitUrl = URL $ "https://github.com/commit/" <> fromMaybe "unknown" commitOid
+      }
+  }
+
+-- TODO: Implement filtering functions using background processing or redesigned fetch approach
+-- The current STM-based approach doesn't allow IO operations in the callback
+-- filterBranchesByUser :: BaseContext -> Name Owner -> Name Repo -> Maybe Text -> V.Vector Branch -> IO (V.Vector Branch)
+-- filterBranchesByUser _bc _owner _name _userName branches = return branches -- Return all branches for now
+
+-- filterBranchesByActivity :: BaseContext -> Name Owner -> Name Repo -> UTCTime -> V.Vector Branch -> Bool -> IO (V.Vector Branch)
+-- filterBranchesByActivity _bc _owner _name _cutoffTime branches _includeRecent = return branches -- Return all branches for now
+
+-- Example of using the new branch filtering API for protected branches
+-- fetchProtectedBranches :: (
+--   MonadReader BaseContext m, MonadIO m, MonadMask m
+--   ) => Name Owner -> Name Repo -> Node Variable PaginatedYourBranchesT -> m ()
+-- fetchProtectedBranches owner name (PaginatedYourBranchesNode (EntityData {..})) = do
+--   bc <- ask
+--   -- Use branchesWithOptionsForR to fetch only protected branches
+--   let fetchWithProtectedFilter = \fetchCount -> branchesWithOptionsForR owner name fetchCount [BranchQueryProtected True]
+--   fetchPaginated'' fetchWithProtectedFilter _pageInfo _state $ \case
+--     Left err -> do
+--       writeTVar _state (Errored (show err))
+--       writeTVar _children []
+--     Right (branches, newPageInfo) -> do
+--       writeTVar _pageInfo newPageInfo
+--       writeTVar _state (Fetched branches)
+--       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
+--         SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
 
 fetchNotifications :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m

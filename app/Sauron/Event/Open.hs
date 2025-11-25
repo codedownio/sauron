@@ -33,6 +33,7 @@ getNodeUrl (PaginatedIssuesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just 
 getNodeUrl (PaginatedPullsNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/pulls")
 getNodeUrl (PaginatedWorkflowsNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/actions")
 getNodeUrl (PaginatedBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches")
+getNodeUrl (OverallBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches")
 getNodeUrl (PaginatedNotificationsNode _) _ = Just "https://github.com/notifications"
 getNodeUrl (SingleIssueNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SinglePullNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)

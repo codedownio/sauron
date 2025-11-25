@@ -135,6 +135,8 @@ main = do
           , _appColorMode = V.FullColor
 
           , _appLogs = mempty
+
+          , _appBranchData = mempty
         }
 
 

@@ -30,6 +30,7 @@ import Lens.Micro
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
 import Relude
+import qualified Sauron.GraphQL as GraphQL
 import qualified Text.Show
 import UnliftIO.Async
 
@@ -57,6 +58,10 @@ data Node f (a :: NodeTyp) where
   PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> Node f 'PaginatedWorkflowsT
   PaginatedReposNode :: EntityData f 'PaginatedReposT -> Node f 'PaginatedReposT
   PaginatedBranchesNode :: EntityData f 'PaginatedBranchesT -> Node f 'PaginatedBranchesT
+  OverallBranchesNode :: EntityData f 'OverallBranchesT -> Node f 'OverallBranchesT
+  PaginatedYourBranchesNode :: EntityData f 'PaginatedYourBranchesT -> Node f 'PaginatedYourBranchesT
+  PaginatedActiveBranchesNode :: EntityData f 'PaginatedActiveBranchesT -> Node f 'PaginatedActiveBranchesT
+  PaginatedStaleBranchesNode :: EntityData f 'PaginatedStaleBranchesT -> Node f 'PaginatedStaleBranchesT
   PaginatedNotificationsNode :: EntityData f 'PaginatedNotificationsT -> Node f 'PaginatedNotificationsT
 
   SingleIssueNode :: EntityData f 'SingleIssueT -> Node f 'SingleIssueT
@@ -77,6 +82,10 @@ data NodeTyp =
   | PaginatedWorkflowsT
   | PaginatedReposT
   | PaginatedBranchesT
+  | OverallBranchesT
+  | PaginatedYourBranchesT
+  | PaginatedActiveBranchesT
+  | PaginatedStaleBranchesT
   | PaginatedNotificationsT
 
   | SingleIssueT
@@ -99,6 +108,10 @@ instance Show (Node f a) where
   show (PaginatedWorkflowsNode (EntityData {..})) = [i|PaginatedWorkflowsNode<#{_ident}>|]
   show (PaginatedReposNode (EntityData {..})) = [i|PaginatedReposNode<#{_ident}>|]
   show (PaginatedBranchesNode (EntityData {..})) = [i|PaginatedBranchesNode<#{_ident}>|]
+  show (OverallBranchesNode (EntityData {..})) = [i|OverallBranchesNode<#{_ident}>|]
+  show (PaginatedYourBranchesNode (EntityData {..})) = [i|PaginatedYourBranchesNode<#{_ident}>|]
+  show (PaginatedActiveBranchesNode (EntityData {..})) = [i|PaginatedActiveBranchesNode<#{_ident}>|]
+  show (PaginatedStaleBranchesNode (EntityData {..})) = [i|PaginatedStaleBranchesNode<#{_ident}>|]
   show (PaginatedNotificationsNode (EntityData {..})) = [i|PaginatedNotificationsNode<#{_ident}>|]
 
   show (SingleIssueNode (EntityData {..})) = [i|SingleIssueNode<#{_ident}>|]
@@ -142,6 +155,10 @@ type family NodeStatic a where
   NodeStatic PaginatedWorkflowsT = ()
   NodeStatic PaginatedReposT = Name User
   NodeStatic PaginatedBranchesT = ()
+  NodeStatic OverallBranchesT = ()
+  NodeStatic PaginatedYourBranchesT = ()
+  NodeStatic PaginatedActiveBranchesT = ()
+  NodeStatic PaginatedStaleBranchesT = ()
   NodeStatic PaginatedNotificationsT = ()
   NodeStatic SingleIssueT = Issue
   NodeStatic SinglePullT = Issue
@@ -160,6 +177,10 @@ type family NodeState a where
   NodeState PaginatedWorkflowsT = WithTotalCount WorkflowRun
   NodeState PaginatedReposT = SearchResult Repo
   NodeState PaginatedBranchesT = V.Vector Branch
+  NodeState OverallBranchesT = ()
+  NodeState PaginatedYourBranchesT = V.Vector Branch
+  NodeState PaginatedActiveBranchesT = V.Vector Branch
+  NodeState PaginatedStaleBranchesT = V.Vector Branch
   NodeState PaginatedNotificationsT = V.Vector Notification
   NodeState SingleIssueT = V.Vector (Either IssueEvent IssueComment)
   NodeState SinglePullT = V.Vector (Either IssueEvent IssueComment)
@@ -178,6 +199,10 @@ type family NodeChildType f a where
   NodeChildType f PaginatedWorkflowsT = Node f SingleWorkflowT
   NodeChildType f PaginatedReposT = Node f RepoT
   NodeChildType f PaginatedBranchesT = Node f SingleBranchT
+  NodeChildType f OverallBranchesT = SomeNode f
+  NodeChildType f PaginatedYourBranchesT = Node f SingleBranchT
+  NodeChildType f PaginatedActiveBranchesT = Node f SingleBranchT
+  NodeChildType f PaginatedStaleBranchesT = Node f SingleBranchT
   NodeChildType f PaginatedNotificationsT = Node f SingleNotificationT
   NodeChildType f SingleIssueT = ()
   NodeChildType f SinglePullT = ()
@@ -218,6 +243,7 @@ getExistentialChildrenWrapped node = case node of
   -- These types have SomeNode children
   HeadingNode ed -> readTVar (_children ed)
   RepoNode ed -> readTVar (_children ed)
+  OverallBranchesNode ed -> readTVar (_children ed)
 
   -- These types have specific GADT constructor children, so wrap them
   PaginatedIssuesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
@@ -225,6 +251,9 @@ getExistentialChildrenWrapped node = case node of
   PaginatedWorkflowsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedReposNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedYourBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedActiveBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedStaleBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   PaginatedNotificationsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleWorkflowNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleJobNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
@@ -249,6 +278,10 @@ entityDataL f (PaginatedPullsNode ed) = PaginatedPullsNode <$> f ed
 entityDataL f (PaginatedWorkflowsNode ed) = PaginatedWorkflowsNode <$> f ed
 entityDataL f (PaginatedReposNode ed) = PaginatedReposNode <$> f ed
 entityDataL f (PaginatedBranchesNode ed) = PaginatedBranchesNode <$> f ed
+entityDataL f (OverallBranchesNode ed) = OverallBranchesNode <$> f ed
+entityDataL f (PaginatedYourBranchesNode ed) = PaginatedYourBranchesNode <$> f ed
+entityDataL f (PaginatedActiveBranchesNode ed) = PaginatedActiveBranchesNode <$> f ed
+entityDataL f (PaginatedStaleBranchesNode ed) = PaginatedStaleBranchesNode <$> f ed
 entityDataL f (PaginatedNotificationsNode ed) = PaginatedNotificationsNode <$> f ed
 entityDataL f (SingleIssueNode ed) = SingleIssueNode <$> f ed
 entityDataL f (SinglePullNode ed) = SinglePullNode <$> f ed
@@ -380,6 +413,7 @@ data AppEvent =
   | TimeUpdated UTCTime
   | CommentModalEvent CommentModalEvent
   | LogEntryAdded LogEntry
+  | BranchDataUpdated (Map Text GraphQL.BranchWithCommit)
 
 data CommentModalEvent =
   CommentSubmitted (Either Error Comment)
@@ -437,6 +471,9 @@ data AppState = AppState {
   , _appColorMode :: V.ColorMode
 
   , _appLogs :: Seq LogEntry
+
+  -- Enhanced branch data from GraphQL queries
+  , _appBranchData :: Map Text GraphQL.BranchWithCommit
   }
 
 

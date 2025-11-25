@@ -68,12 +68,54 @@ instance ListDrawable Fixed 'PaginatedWorkflowsT where
 
 instance ListDrawable Fixed 'PaginatedBranchesT where
   drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched branches -> paginatedHeading ed appState "Branches" (countWidget _pageInfo branches)
+    Fetched branches -> paginatedHeading ed appState "All Branches" (countWidget _pageInfo branches)
     Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "Branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "Branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Branches" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Branches" (str [i|(error fetching: #{err})|])
+      Just branches -> paginatedHeading ed appState "All Branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "All Branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "All Branches" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "All Branches" (str [i|(error fetching: #{err})|])
+
+  drawInner _ _ = Nothing
+
+instance ListDrawable Fixed 'OverallBranchesT where
+  drawLine _appState (EntityData {_static=(), _toggled}) = hBox $ catMaybes [
+    Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+    , Just (hBox [str "GitHub-style Branches"])
+    , Just (padLeft Max (str " "))
+    ]
+
+  drawInner _ _ = Nothing
+
+instance ListDrawable Fixed 'PaginatedYourBranchesT where
+  drawLine appState ed@(EntityData {..}) = case _state of
+    Fetched branches -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches)
+    Fetching maybeBranches -> case maybeBranches of
+      Just branches -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "Your branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Your branches" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Your branches" (str [i|(error fetching: #{err})|])
+
+  drawInner _ _ = Nothing
+
+instance ListDrawable Fixed 'PaginatedActiveBranchesT where
+  drawLine appState ed@(EntityData {..}) = case _state of
+    Fetched branches -> paginatedHeading ed appState "Active branches" (countWidget _pageInfo branches)
+    Fetching maybeBranches -> case maybeBranches of
+      Just branches -> paginatedHeading ed appState "Active branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "Active branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Active branches" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Active branches" (str [i|(error fetching: #{err})|])
+
+  drawInner _ _ = Nothing
+
+instance ListDrawable Fixed 'PaginatedStaleBranchesT where
+  drawLine appState ed@(EntityData {..}) = case _state of
+    Fetched branches -> paginatedHeading ed appState "Stale branches" (countWidget _pageInfo branches)
+    Fetching maybeBranches -> case maybeBranches of
+      Just branches -> paginatedHeading ed appState "Stale branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeading ed appState "Stale branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeading ed appState "Stale branches" (str [i|(not fetched)|])
+    Errored err -> paginatedHeading ed appState "Stale branches" (str [i|(error fetching: #{err})|])
 
   drawInner _ _ = Nothing
 

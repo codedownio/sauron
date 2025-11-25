@@ -53,6 +53,10 @@ drawNodeLine appState node = case node of
   PaginatedWorkflowsNode ed -> drawLine appState ed
   PaginatedReposNode ed -> drawLine appState ed
   PaginatedBranchesNode ed -> drawLine appState ed
+  OverallBranchesNode ed -> drawLine appState ed
+  PaginatedYourBranchesNode ed -> drawLine appState ed
+  PaginatedActiveBranchesNode ed -> drawLine appState ed
+  PaginatedStaleBranchesNode ed -> drawLine appState ed
   PaginatedNotificationsNode ed -> drawLine appState ed
   SingleIssueNode ed -> drawLine appState ed
   SinglePullNode ed -> drawLine appState ed
@@ -72,6 +76,10 @@ drawNodeInner appState node = case node of
   PaginatedWorkflowsNode ed -> drawInner appState ed
   PaginatedReposNode ed -> drawInner appState ed
   PaginatedBranchesNode ed -> drawInner appState ed
+  OverallBranchesNode ed -> drawInner appState ed
+  PaginatedYourBranchesNode ed -> drawInner appState ed
+  PaginatedActiveBranchesNode ed -> drawInner appState ed
+  PaginatedStaleBranchesNode ed -> drawInner appState ed
   PaginatedNotificationsNode ed -> drawInner appState ed
   SingleIssueNode ed -> drawInner appState ed
   SinglePullNode ed -> drawInner appState ed

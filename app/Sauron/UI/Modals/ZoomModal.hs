@@ -70,6 +70,14 @@ generateModalTitle (SomeNode inner) =
       "Workflow Runs"
     PaginatedBranchesNode _ ->
       "Branches"
+    OverallBranchesNode _ ->
+      "Branches"
+    PaginatedYourBranchesNode _ ->
+      "Your Branches"
+    PaginatedActiveBranchesNode _ ->
+      "Active Branches"
+    PaginatedStaleBranchesNode _ ->
+      "Stale Branches"
     PaginatedNotificationsNode _ ->
       "Notifications"
     SingleIssueNode (EntityData {_static = Issue {issueNumber = IssueNumber num, issueTitle}}) ->

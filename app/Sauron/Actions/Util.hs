@@ -97,7 +97,7 @@ logResult eventChan request result = do
         Left err -> "Failed: " <> url <> " - " <> show err
         Right response ->
           let sizeInfo = case getResponseSize response of
-                Nothing -> " " <> show (responseHeaders response)
+                Nothing -> "" -- " " <> show (responseHeaders response)
                 Just size -> " (" <> show size <> " bytes)"
           in (url <> sizeInfo)
   let logEntry = LogEntry now level msg

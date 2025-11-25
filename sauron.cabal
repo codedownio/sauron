@@ -41,6 +41,7 @@ executable sauron
       Sauron.Fetch.ParseJobLogs
       Sauron.Filter
       Sauron.Fix
+      Sauron.GraphQL
       Sauron.HealthCheck
       Sauron.HealthCheck.Common
       Sauron.HealthCheck.Job
@@ -121,6 +122,7 @@ executable sauron
     , microlens
     , microlens-th
     , monad-logger
+    , morpheus-graphql-client
     , mtl
     , network-uri
     , optparse-applicative
@@ -177,6 +179,7 @@ test-suite test
     , http-types
     , microlens
     , monad-logger
+    , morpheus-graphql-client
     , mtl
     , network-uri
     , pandoc-types

@@ -91,6 +91,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _ident = workflowsIdentifier
         } :: Node Variable PaginatedWorkflowsT
 
+  -- Traditional flat branches list
   branchesVar <- newTVarIO NotFetched
   branchesToggledVar <- newTVarIO False
   branchesChildrenVar <- newTVarIO []
@@ -113,8 +114,31 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _ident = branchesIdentifier
         } :: Node Variable PaginatedBranchesT
 
+  -- New GitHub-style categorized branches
+  categorizedBranchesStateVar <- newTVarIO NotFetched
+  categorizedBranchesToggledVar <- newTVarIO False
+  categorizedBranchesChildrenVar <- newTVarIO []
+  categorizedBranchesSearchVar <- newTVarIO SearchNone
+  categorizedBranchesPageInfoVar <- newTVarIO $ PageInfo 1 Nothing Nothing Nothing Nothing
+  categorizedBranchesHealthCheckVar <- newTVarIO NotFetched
+  categorizedBranchesHealthCheckThreadVar <- newTVarIO Nothing
+  categorizedBranchesIdentifier <- liftIO getIdentifier
+  let categorizedBranchesChild = OverallBranchesNode $ EntityData {
+        _static = ()
+        , _state = categorizedBranchesStateVar
+        , _urlSuffix = "branches/categorized"
+        , _toggled = categorizedBranchesToggledVar
+        , _children = categorizedBranchesChildrenVar
+        , _search = categorizedBranchesSearchVar
+        , _pageInfo = categorizedBranchesPageInfoVar
+        , _healthCheck = categorizedBranchesHealthCheckVar
+        , _healthCheckThread = categorizedBranchesHealthCheckThreadVar
+        , _depth = repoDepth + 1
+        , _ident = categorizedBranchesIdentifier
+        } :: Node Variable OverallBranchesT
+
   repoIdentifier <- liftIO getIdentifier
-  childrenVar <- newTVarIO [SomeNode issuesChild, SomeNode pullsChild, SomeNode workflowsChild, SomeNode branchesChild]
+  childrenVar <- newTVarIO [SomeNode issuesChild, SomeNode pullsChild, SomeNode workflowsChild, SomeNode branchesChild, SomeNode categorizedBranchesChild]
   searchVar <- newTVarIO SearchNone
   pageInfoVar <- newTVarIO emptyPageInfo
   repoHealthCheckThreadVar <- newTVarIO hcThread
