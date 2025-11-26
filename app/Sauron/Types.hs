@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
@@ -19,6 +20,7 @@ import Brick.Widgets.Edit (Editor)
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Control.Monad.Logger (LogLevel(..))
+import Data.Aeson
 import Data.String.Interpolate
 import Data.Text ()
 import Data.Time
@@ -30,7 +32,6 @@ import Lens.Micro
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
 import Relude
-import qualified Sauron.GraphQL as GraphQL
 import qualified Text.Show
 import UnliftIO.Async
 
@@ -164,7 +165,7 @@ type family NodeStatic a where
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun
   NodeStatic SingleJobT = ()
-  NodeStatic SingleBranchT = Branch
+  NodeStatic SingleBranchT = (Branch, Maybe BranchWithInfo)
   NodeStatic SingleCommitT = Commit
   NodeStatic SingleNotificationT = Notification
   NodeStatic JobLogGroupT = JobLogGroup
@@ -178,7 +179,7 @@ type family NodeState a where
   NodeState PaginatedReposT = SearchResult Repo
   NodeState PaginatedBranchesT = V.Vector Branch
   NodeState OverallBranchesT = ()
-  NodeState PaginatedYourBranchesT = V.Vector Branch
+  NodeState PaginatedYourBranchesT = (V.Vector Branch, Map Text BranchWithInfo)
   NodeState PaginatedActiveBranchesT = V.Vector Branch
   NodeState PaginatedStaleBranchesT = V.Vector Branch
   NodeState PaginatedNotificationsT = V.Vector Notification
@@ -293,6 +294,29 @@ entityDataL f (SingleNotificationNode ed) = SingleNotificationNode <$> f ed
 entityDataL f (JobLogGroupNode ed) = JobLogGroupNode <$> f ed
 entityDataL f (HeadingNode ed) = HeadingNode <$> f ed
 entityDataL f (RepoNode ed) = RepoNode <$> f ed
+
+-- * Data types beyond "github" package
+
+data GraphQLPullRequest = GraphQLPullRequest {
+  prNumber :: Maybe Int
+  , prTitle :: Maybe Text
+  , prUrl :: Maybe Text
+  } deriving (Show, Eq, Generic)
+instance FromJSON GraphQLPullRequest where
+  parseJSON = withObject "GraphQLPullRequest" $ \o -> GraphQLPullRequest
+    <$> o .:? "number"
+    <*> o .:? "title"
+    <*> o .:? "url"
+
+data BranchWithInfo = BranchWithInfo {
+  branchWithInfoBranchName :: Text
+  , branchWithInfoCommitOid :: Maybe Text
+  , branchWithInfoCommitAuthor :: Maybe Text
+  , branchWithInfoAuthorEmail :: Maybe Text
+  , branchWithInfoCommitDate :: Maybe Text
+  , branchWithInfoCheckStatus :: Maybe Text
+  , branchWithInfoAssociatedPR :: Maybe GraphQLPullRequest
+  } deriving (Show, Eq)
 
 -- * Misc
 
@@ -413,7 +437,6 @@ data AppEvent =
   | TimeUpdated UTCTime
   | CommentModalEvent CommentModalEvent
   | LogEntryAdded LogEntry
-  | BranchDataUpdated (Map Text GraphQL.BranchWithCommit)
 
 data CommentModalEvent =
   CommentSubmitted (Either Error Comment)
@@ -471,9 +494,6 @@ data AppState = AppState {
   , _appColorMode :: V.ColorMode
 
   , _appLogs :: Seq LogEntry
-
-  -- Enhanced branch data from GraphQL queries
-  , _appBranchData :: Map Text GraphQL.BranchWithCommit
   }
 
 

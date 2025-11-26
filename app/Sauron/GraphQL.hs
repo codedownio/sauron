@@ -2,8 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Sauron.GraphQL (
-  BranchWithCommit(..)
-  , queryBranchesWithCommits
+  queryBranchesWithCommits
   , sortBranchesByDate
   , filterBranchesByAuthor
   , prNumber
@@ -18,6 +17,7 @@ import Data.Time.Format (parseTimeM, defaultTimeLocale)
 import Network.HTTP.Conduit (responseTimeoutMicro)
 import Network.HTTP.Simple
 import Relude
+import Sauron.Types hiding (PageInfo)
 
 -- GitHub GraphQL API endpoint
 githubGraphQLEndpoint :: String
@@ -112,23 +112,11 @@ data RefNode = RefNode {
 instance FromJSON RefNode
 
 data AssociatedPRs = AssociatedPRs {
-  prNodes :: Maybe [PullRequest]
+  prNodes :: Maybe [GraphQLPullRequest]
   } deriving (Show, Generic)
 
 instance FromJSON AssociatedPRs where
   parseJSON = withObject "AssociatedPRs" $ \o -> AssociatedPRs <$> o .:? "nodes"
-
-data PullRequest = PullRequest {
-  prNumber :: Maybe Int
-  , prTitle :: Maybe Text
-  , prUrl :: Maybe Text
-  } deriving (Show, Eq, Generic)
-
-instance FromJSON PullRequest where
-  parseJSON = withObject "PullRequest" $ \o -> PullRequest
-    <$> o .:? "number"
-    <*> o .:? "title"
-    <*> o .:? "url"
 
 data Target = Target {
   oid :: Maybe Text
@@ -191,7 +179,7 @@ data GraphQLRequest = GraphQLRequest {
   } deriving (Show, Generic)
 instance ToJSON GraphQLRequest
 
-queryBranchesWithCommits :: MonadIO m => (Text -> IO ()) -> Text -> Text -> Text -> Int -> m (Either Text [BranchWithCommit])
+queryBranchesWithCommits :: MonadIO m => (Text -> IO ()) -> Text -> Text -> Text -> Int -> m (Either Text [BranchWithInfo])
 queryBranchesWithCommits debugFn authToken owner' repoName first' = liftIO $ do
   debugFn $ "GraphQL query for " <> owner' <> "/" <> repoName <> " (first " <> show first' <> ")"
   let requestPayload = GraphQLRequest
@@ -241,51 +229,41 @@ queryBranchesWithCommits debugFn authToken owner' repoName first' = liftIO $ do
           debugFn "No data returned from GitHub"
           return $ Left "No data returned from GitHub"
 
-refNodeToBranch :: RefNode -> Maybe BranchWithCommit
+refNodeToBranch :: RefNode -> Maybe BranchWithInfo
 refNodeToBranch refNode = do
   let branchName = name refNode
   target' <- target refNode
   let prInfo = associatedPullRequests refNode >>= prNodes >>= viaNonEmpty head
-  return $ BranchWithCommit
-    { branchName = branchName
-    , commitOid = oid target'
-    , commitAuthor = author target' >>= user >>= login
-    , authorEmail = author target' >>= email
-    , commitDate = committedDate target'
-    , checkStatus = statusCheckRollup target' >>= statusState
-    , associatedPR = prInfo
+  return $ BranchWithInfo {
+    branchWithInfoBranchName = branchName
+    , branchWithInfoCommitOid = oid target'
+    , branchWithInfoCommitAuthor = author target' >>= user >>= login
+    , branchWithInfoAuthorEmail = author target' >>= email
+    , branchWithInfoCommitDate = committedDate target'
+    , branchWithInfoCheckStatus = statusCheckRollup target' >>= statusState
+    , branchWithInfoAssociatedPR = prInfo
     }
 
-data BranchWithCommit = BranchWithCommit {
-  branchName :: Text
-  , commitOid :: Maybe Text
-  , commitAuthor :: Maybe Text
-  , authorEmail :: Maybe Text
-  , commitDate :: Maybe Text
-  , checkStatus :: Maybe Text
-  , associatedPR :: Maybe PullRequest
-  } deriving (Show, Eq)
-
-filterBranchesByAuthor :: Text -> [BranchWithCommit] -> [BranchWithCommit]
+filterBranchesByAuthor :: Text -> [BranchWithInfo] -> [BranchWithInfo]
 filterBranchesByAuthor currentUser branches =
-  filter (\branch -> commitAuthor branch == Just currentUser) branches
+  filter (\branch -> branchWithInfoCommitAuthor branch == Just currentUser) branches
 
-sortBranchesByDate :: [BranchWithCommit] -> [BranchWithCommit]
+sortBranchesByDate :: [BranchWithInfo] -> [BranchWithInfo]
 sortBranchesByDate branches = sortBy (comparing (Down . commitDateUtc)) branches
   where
-    commitDateUtc :: BranchWithCommit -> Maybe UTCTime
-    commitDateUtc branch = commitDate branch >>= parseISODate
+    commitDateUtc :: BranchWithInfo -> Maybe UTCTime
+    commitDateUtc branch = branchWithInfoCommitDate branch >>= parseISODate
 
     parseISODate :: Text -> Maybe UTCTime
     parseISODate dateStr = parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr)
 
-filterBranchesByActivity :: UTCTime -> [BranchWithCommit] -> [BranchWithCommit]
+filterBranchesByActivity :: UTCTime -> [BranchWithInfo] -> [BranchWithInfo]
 filterBranchesByActivity cutoffTime branches =
   filter (isBranchActive cutoffTime) branches
   where
-    isBranchActive :: UTCTime -> BranchWithCommit -> Bool
+    isBranchActive :: UTCTime -> BranchWithInfo -> Bool
     isBranchActive cutoff branch =
-      case commitDate branch of
+      case branchWithInfoCommitDate branch of
         Nothing -> False
         Just dateStr ->
           case parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr) of

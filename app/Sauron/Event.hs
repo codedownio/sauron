@@ -45,9 +45,6 @@ appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
   -- Add log entry to the logs sequence
   modify (appLogs %~ (Seq.|> logEntry))
 
-appEvent _s (AppEvent (BranchDataUpdated branchData)) = do
-  -- Update the branch data map
-  modify (appBranchData .~ branchData)
 
 
 -- Handle modal events

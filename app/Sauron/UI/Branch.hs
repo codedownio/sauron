@@ -7,7 +7,6 @@ module Sauron.UI.Branch (
   ) where
 
 import Brick
-import qualified Data.Map as Map
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime, diffUTCTime)
@@ -23,16 +22,14 @@ import Sauron.UI.Util.TimeDiff (timeFromNow)
 
 
 instance ListDrawable Fixed 'SingleBranchT where
-  drawLine appState (EntityData {_static=branch, _state, ..}) =
-    branchLine _toggled branch appState _state
+  drawLine appState (EntityData {_static=(branch, maybeBranchData), _state, ..}) =
+    branchLine _toggled branch maybeBranchData appState _state
 
   drawInner _ _ = Nothing
 
-branchLine :: Bool -> Branch -> AppState -> Fetchable (V.Vector Commit) -> Widget n
-branchLine toggled' (Branch {branchName, branchCommit}) appState fetchableState = vBox [line1, line2]
+branchLine :: Bool -> Branch -> Maybe BranchWithInfo -> AppState -> Fetchable (V.Vector Commit) -> Widget n
+branchLine toggled' (Branch {branchName, branchCommit}) maybeBranchData appState fetchableState = vBox [line1, line2]
   where
-    -- Get enhanced branch data from the app state
-    maybeBranchData = Map.lookup branchName (_appBranchData appState)
 
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
@@ -58,10 +55,10 @@ branchLine toggled' (Branch {branchName, branchCommit}) appState fetchableState 
       ]
 
     -- Helper function to format commit time from GraphQL data using timeFromNow
-    formatCommitTime :: Maybe GraphQL.BranchWithCommit -> String
+    formatCommitTime :: Maybe BranchWithInfo -> String
     formatCommitTime Nothing = "Unknown"
     formatCommitTime (Just branchData) =
-      case GraphQL.commitDate branchData of
+      case branchWithInfoCommitDate branchData of
         Nothing -> "Unknown"
         Just dateStr ->
           case parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr) :: Maybe UTCTime of
@@ -69,10 +66,10 @@ branchLine toggled' (Branch {branchName, branchCommit}) appState fetchableState 
             Just commitTime -> timeFromNow (diffUTCTime (_appNow appState) commitTime)
 
     -- Helper function to format check status
-    formatCheckStatus :: Maybe GraphQL.BranchWithCommit -> String
+    formatCheckStatus :: Maybe BranchWithInfo -> String
     formatCheckStatus Nothing = "No checks"
     formatCheckStatus (Just branchData) =
-      case GraphQL.checkStatus branchData of
+      case branchWithInfoCheckStatus branchData of
         Nothing -> "No checks"
         Just "SUCCESS" -> "✓ Checks"
         Just "FAILURE" -> "✗ Failed"
@@ -80,10 +77,10 @@ branchLine toggled' (Branch {branchName, branchCommit}) appState fetchableState 
         Just status -> toString status
 
     -- Helper function to format PR info
-    formatPRInfo :: Maybe GraphQL.BranchWithCommit -> String
+    formatPRInfo :: Maybe BranchWithInfo -> String
     formatPRInfo Nothing = "No PR"
     formatPRInfo (Just branchData) =
-      case GraphQL.associatedPR branchData of
+      case branchWithInfoAssociatedPR branchData of
         Nothing -> "No PR"
         Just pr -> case GraphQL.prNumber pr of
           Nothing -> "PR: Unknown"

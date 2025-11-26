@@ -147,7 +147,7 @@ fetchBranches owner name (PaginatedBranchesNode (EntityData {..})) = do
       writeTVar _pageInfo newPageInfo
       writeTVar _state (Fetched branches)
       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
-        SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+        SingleBranchNode <$> makeEmptyElem bc (branch, Nothing) ("/tree/" <> branchName) (_depth + 1)
 
 fetchYourBranches :: (
   MonadReader BaseContext m, MonadIO m
@@ -182,13 +182,13 @@ fetchYourBranches owner name (PaginatedYourBranchesNode (EntityData {..})) = do
               let yourBranches = GraphQL.sortBranchesByDate $ GraphQL.filterBranchesByAuthor userName branchesWithCommits
               -- Convert GraphQL results to sauron Branch format
               let branches = V.fromList $ map graphqlBranchToGithubBranch yourBranches
-              -- Store the enhanced branch data in app state
-              let branchDataMap = Map.fromList [(GraphQL.branchName branch, branch) | branch <- yourBranches]
-              writeBChan (eventChan bc) (BranchDataUpdated branchDataMap)
+              -- Store the enhanced branch data in the node state
+              let branchDataMap = Map.fromList [(branchWithInfoBranchName branch, branch) | branch <- yourBranches]
               atomically $ do
-                writeTVar _state (Fetched branches)
-                (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
-                  SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+                writeTVar _state (Fetched (branches, branchDataMap))
+                (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) -> do
+                  let graphqlData = Map.lookup branchName branchDataMap
+                  SingleBranchNode <$> makeEmptyElem bc (branch, graphqlData) ("/tree/" <> branchName) (_depth + 1)
           logToModal bc $ "fetchYourBranches: Processing complete, found " <> show (case result of
             Left _ -> 0
             Right branchesWithCommits -> length $ GraphQL.filterBranchesByAuthor userName branchesWithCommits) <> " your branches"
@@ -212,7 +212,7 @@ fetchActiveBranches owner name (PaginatedActiveBranchesNode (EntityData {..})) =
       -- For now, return all branches until we implement proper async filtering
       writeTVar _state (Fetched branches)
       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
-        SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+        SingleBranchNode <$> makeEmptyElem bc (branch, Nothing) ("/tree/" <> branchName) (_depth + 1)
 
 fetchStaleBranches :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -233,7 +233,7 @@ fetchStaleBranches owner name (PaginatedStaleBranchesNode (EntityData {..})) = d
       -- For now, return all branches until we implement proper async filtering
       writeTVar _state (Fetched branches)
       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
-        SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+        SingleBranchNode <$> makeEmptyElem bc (branch, Nothing) ("/tree/" <> branchName) (_depth + 1)
 
 fetchOverallBranches :: (
   MonadReader BaseContext m, MonadIO m
@@ -278,13 +278,13 @@ getAuthToken bc = case auth bc of
   OAuth token -> Just $ decodeUtf8 token
   _ -> Nothing  -- Only OAuth tokens supported for now
 
--- Convert GraphQL BranchWithCommit to GitHub Branch format
-graphqlBranchToGithubBranch :: GraphQL.BranchWithCommit -> Branch
-graphqlBranchToGithubBranch GraphQL.BranchWithCommit{..} = Branch
-  { branchName = branchName
+-- Convert GraphQL BranchWithInfo to GitHub Branch format
+graphqlBranchToGithubBranch :: BranchWithInfo -> Branch
+graphqlBranchToGithubBranch BranchWithInfo{..} = Branch
+  { branchName = branchWithInfoBranchName
   , branchCommit = BranchCommit
-      { branchCommitSha = fromMaybe "unknown" commitOid
-      , branchCommitUrl = URL $ "https://github.com/commit/" <> fromMaybe "unknown" commitOid
+      { branchCommitSha = fromMaybe "unknown" branchWithInfoCommitOid
+      , branchCommitUrl = URL $ "https://github.com/commit/" <> fromMaybe "unknown" branchWithInfoCommitOid
       }
   }
 
@@ -332,7 +332,7 @@ fetchNotifications (PaginatedNotificationsNode (EntityData {..})) = do
 fetchBranchCommits :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Node Variable SingleBranchT -> m ()
-fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..})) = do
+fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=(branch, _graphqlData), ..})) = do
   bc <- ask
   let branchSha = branchCommitSha $ branchCommit branch
   bracketOnError_ (atomically $ markFetching _state)
