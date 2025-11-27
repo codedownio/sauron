@@ -70,6 +70,7 @@ data Node f (a :: NodeTyp) where
   SingleWorkflowNode :: EntityData f 'SingleWorkflowT -> Node f 'SingleWorkflowT
   SingleJobNode :: EntityData f 'SingleJobT -> Node f 'SingleJobT
   SingleBranchNode :: EntityData f 'SingleBranchT -> Node f 'SingleBranchT
+  SingleBranchWithInfoNode :: EntityData f 'SingleBranchWithInfoT -> Node f 'SingleBranchWithInfoT
   SingleCommitNode :: EntityData f 'SingleCommitT -> Node f 'SingleCommitT
   SingleNotificationNode :: EntityData f 'SingleNotificationT -> Node f 'SingleNotificationT
   JobLogGroupNode :: EntityData f 'JobLogGroupT -> Node f 'JobLogGroupT
@@ -94,6 +95,7 @@ data NodeTyp =
   | SingleWorkflowT
   | SingleJobT
   | SingleBranchT
+  | SingleBranchWithInfoT
   | SingleCommitT
   | SingleNotificationT
   | JobLogGroupT
@@ -120,6 +122,7 @@ instance Show (Node f a) where
   show (SingleWorkflowNode (EntityData {..})) = [i|SingleWorkflowNode<#{_ident}>|]
   show (SingleJobNode (EntityData {..})) = [i|SingleJobNode<#{_ident}>|]
   show (SingleBranchNode (EntityData {..})) = [i|SingleBranchNode<#{_ident}>|]
+  show (SingleBranchWithInfoNode (EntityData {..})) = [i|SingleBranchWithInfoNode<#{_ident}>|]
   show (SingleCommitNode (EntityData {..})) = [i|SingleCommitNode<#{_ident}>|]
   show (SingleNotificationNode (EntityData {..})) = [i|SingleNotificationNode<#{_ident}>|]
   show (JobLogGroupNode (EntityData {..})) = [i|JobLogGroupNode<#{_ident}>|]
@@ -165,7 +168,8 @@ type family NodeStatic a where
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun
   NodeStatic SingleJobT = ()
-  NodeStatic SingleBranchT = (Branch, Maybe BranchWithInfo)
+  NodeStatic SingleBranchT = Branch
+  NodeStatic SingleBranchWithInfoT = BranchWithInfo
   NodeStatic SingleCommitT = Commit
   NodeStatic SingleNotificationT = Notification
   NodeStatic JobLogGroupT = JobLogGroup
@@ -179,15 +183,16 @@ type family NodeState a where
   NodeState PaginatedReposT = SearchResult Repo
   NodeState PaginatedBranchesT = V.Vector Branch
   NodeState OverallBranchesT = ()
-  NodeState PaginatedYourBranchesT = (V.Vector Branch, Map Text BranchWithInfo)
-  NodeState PaginatedActiveBranchesT = V.Vector Branch
-  NodeState PaginatedStaleBranchesT = V.Vector Branch
+  NodeState PaginatedYourBranchesT = V.Vector BranchWithInfo
+  NodeState PaginatedActiveBranchesT = V.Vector BranchWithInfo
+  NodeState PaginatedStaleBranchesT = V.Vector BranchWithInfo
   NodeState PaginatedNotificationsT = V.Vector Notification
   NodeState SingleIssueT = V.Vector (Either IssueEvent IssueComment)
   NodeState SinglePullT = V.Vector (Either IssueEvent IssueComment)
   NodeState SingleWorkflowT = WithTotalCount Job
   NodeState SingleJobT = (Job, [JobLogGroup])
   NodeState SingleBranchT = V.Vector Commit
+  NodeState SingleBranchWithInfoT = V.Vector Commit
   NodeState SingleCommitT = Commit
   NodeState SingleNotificationT = ()
   NodeState JobLogGroupT = ()
@@ -201,15 +206,16 @@ type family NodeChildType f a where
   NodeChildType f PaginatedReposT = Node f RepoT
   NodeChildType f PaginatedBranchesT = Node f SingleBranchT
   NodeChildType f OverallBranchesT = SomeNode f
-  NodeChildType f PaginatedYourBranchesT = Node f SingleBranchT
-  NodeChildType f PaginatedActiveBranchesT = Node f SingleBranchT
-  NodeChildType f PaginatedStaleBranchesT = Node f SingleBranchT
+  NodeChildType f PaginatedYourBranchesT = Node f SingleBranchWithInfoT
+  NodeChildType f PaginatedActiveBranchesT = Node f SingleBranchWithInfoT
+  NodeChildType f PaginatedStaleBranchesT = Node f SingleBranchWithInfoT
   NodeChildType f PaginatedNotificationsT = Node f SingleNotificationT
   NodeChildType f SingleIssueT = ()
   NodeChildType f SinglePullT = ()
   NodeChildType f SingleWorkflowT = Node f SingleJobT
   NodeChildType f SingleJobT = Node f JobLogGroupT
   NodeChildType f SingleBranchT = Node f SingleCommitT
+  NodeChildType f SingleBranchWithInfoT = Node f SingleCommitT
   NodeChildType f SingleCommitT = ()
   NodeChildType f SingleNotificationT = ()
   NodeChildType f JobLogGroupT = Node f JobLogGroupT
@@ -259,6 +265,7 @@ getExistentialChildrenWrapped node = case node of
   SingleWorkflowNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleJobNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   SingleBranchNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  SingleBranchWithInfoNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
   JobLogGroupNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
 
   -- These are leaf nodes with no meaningful children
@@ -289,6 +296,7 @@ entityDataL f (SinglePullNode ed) = SinglePullNode <$> f ed
 entityDataL f (SingleWorkflowNode ed) = SingleWorkflowNode <$> f ed
 entityDataL f (SingleJobNode ed) = SingleJobNode <$> f ed
 entityDataL f (SingleBranchNode ed) = SingleBranchNode <$> f ed
+entityDataL f (SingleBranchWithInfoNode ed) = SingleBranchWithInfoNode <$> f ed
 entityDataL f (SingleCommitNode ed) = SingleCommitNode <$> f ed
 entityDataL f (SingleNotificationNode ed) = SingleNotificationNode <$> f ed
 entityDataL f (JobLogGroupNode ed) = JobLogGroupNode <$> f ed

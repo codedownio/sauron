@@ -22,8 +22,17 @@ import Sauron.UI.Util.TimeDiff (timeFromNow)
 
 
 instance ListDrawable Fixed 'SingleBranchT where
-  drawLine appState (EntityData {_static=(branch, maybeBranchData), _state, ..}) =
-    branchLine _toggled branch maybeBranchData appState _state
+  drawLine appState (EntityData {_static=branch, _state, ..}) =
+    branchLine _toggled branch Nothing appState _state
+
+  drawInner _ _ = Nothing
+
+instance ListDrawable Fixed 'SingleBranchWithInfoT where
+  drawLine appState (EntityData {_static=branchInfo, _state, ..}) =
+    let branchCommit = BranchCommit (fromMaybe "" (branchWithInfoCommitOid branchInfo)) 
+                                   (URL "")  -- placeholder URL
+        branch = Branch (branchWithInfoBranchName branchInfo) branchCommit
+    in branchLine _toggled branch (Just branchInfo) appState _state
 
   drawInner _ _ = Nothing
 

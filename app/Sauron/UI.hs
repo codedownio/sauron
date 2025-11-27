@@ -63,6 +63,7 @@ drawNodeLine appState node = case node of
   SingleWorkflowNode ed -> drawLine appState ed
   SingleJobNode ed -> drawLine appState ed
   SingleBranchNode ed -> drawLine appState ed
+  SingleBranchWithInfoNode ed -> drawLine appState ed
   SingleCommitNode ed -> drawLine appState ed
   SingleNotificationNode ed -> drawLine appState ed
   JobLogGroupNode ed -> drawLine appState ed
@@ -86,6 +87,7 @@ drawNodeInner appState node = case node of
   SingleWorkflowNode ed -> drawInner appState ed
   SingleJobNode ed -> drawInner appState ed
   SingleBranchNode ed -> drawInner appState ed
+  SingleBranchWithInfoNode ed -> drawInner appState ed
   SingleCommitNode ed -> drawInner appState ed
   SingleNotificationNode ed -> drawInner appState ed
   JobLogGroupNode ed -> drawInner appState ed

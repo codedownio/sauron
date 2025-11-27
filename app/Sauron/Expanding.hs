@@ -35,6 +35,7 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
           SingleWorkflowNode (EntityData {..}) -> expandTyped _children
           SingleJobNode (EntityData {..}) -> expandTyped _children
           SingleBranchNode (EntityData {..}) -> expandTyped _children
+          SingleBranchWithInfoNode (EntityData {..}) -> expandTyped _children
           SingleCommitNode (EntityData {..}) -> expandChildless _children
           SingleNotificationNode (EntityData {..}) -> expandChildless _children
           JobLogGroupNode (EntityData {..}) -> expandTyped _children

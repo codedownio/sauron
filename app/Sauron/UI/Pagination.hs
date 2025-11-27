@@ -88,9 +88,9 @@ instance ListDrawable Fixed 'OverallBranchesT where
 
 instance ListDrawable Fixed 'PaginatedYourBranchesT where
   drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched (branches, _branchData) -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches)
-    Fetching maybeBranchesData -> case maybeBranchesData of
-      Just (branches, _branchData) -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+    Fetched branches -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches)
+    Fetching maybeBranches -> case maybeBranches of
+      Just branches -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
       Nothing -> paginatedHeading ed appState "Your branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Your branches" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Your branches" (str [i|(error fetching: #{err})|])

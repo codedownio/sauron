@@ -257,15 +257,16 @@ sortBranchesByDate branches = sortBy (comparing (Down . commitDateUtc)) branches
     parseISODate :: Text -> Maybe UTCTime
     parseISODate dateStr = parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr)
 
-filterBranchesByActivity :: UTCTime -> [BranchWithInfo] -> [BranchWithInfo]
-filterBranchesByActivity cutoffTime branches =
-  filter (isBranchActive cutoffTime) branches
-  where
-    isBranchActive :: UTCTime -> BranchWithInfo -> Bool
-    isBranchActive cutoff branch =
-      case branchWithInfoCommitDate branch of
-        Nothing -> False
-        Just dateStr ->
-          case parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr) of
-            Nothing -> False
-            Just commitTime -> commitTime > cutoff
+-- TODO: Implement active/stale branch filtering
+-- filterBranchesByActivity :: UTCTime -> [BranchWithInfo] -> [BranchWithInfo]
+-- filterBranchesByActivity cutoffTime branches =
+--   filter (isBranchActive cutoffTime) branches
+--   where
+--     isBranchActive :: UTCTime -> BranchWithInfo -> Bool
+--     isBranchActive cutoff branch =
+--       case branchWithInfoCommitDate branch of
+--         Nothing -> False
+--         Just dateStr ->
+--           case parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr) of
+--             Nothing -> False
+--             Just commitTime -> commitTime > cutoff

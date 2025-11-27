@@ -39,7 +39,8 @@ getNodeUrl (SingleIssueNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)
 getNodeUrl (SinglePullNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) _ = Just (toString $ getUrl $ workflowRunHtmlUrl workflowRun)
 getNodeUrl (SingleJobNode (EntityData {_state=(fetchableCurrent -> Just (job, _))})) _ = Just (toString $ getUrl $ jobHtmlUrl job)
-getNodeUrl (SingleBranchNode (EntityData {_static=(branch, _)})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchName branch))
+getNodeUrl (SingleBranchNode (EntityData {_static=branch})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchName branch))
+getNodeUrl (SingleBranchWithInfoNode (EntityData {_static=branchInfo})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchWithInfoBranchName branchInfo))
 getNodeUrl (SingleCommitNode (EntityData {_static=commit})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit)))
 getNodeUrl (RepoNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just repoBaseUrl
 getNodeUrl _ _ = Nothing

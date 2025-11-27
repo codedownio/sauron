@@ -91,8 +91,10 @@ generateModalTitle (SomeNode inner) =
         Fetched (job, _) -> "Job: " <> T.unpack (untagName (jobName job))
         Fetching (Just (job, _)) -> "Job: " <> T.unpack (untagName (jobName job))
         _ -> "Job"
-    SingleBranchNode (EntityData {_static = (Branch {branchName}, _)}) ->
+    SingleBranchNode (EntityData {_static = Branch {branchName}}) ->
       "Branch: " <> T.unpack branchName
+    SingleBranchWithInfoNode (EntityData {_static = branchInfo}) ->
+      "Branch: " <> T.unpack (branchWithInfoBranchName branchInfo)
     SingleCommitNode (EntityData {_static = Commit {commitGitCommit = GitCommit {gitCommitMessage}}}) ->
       "Commit: " <> T.unpack (T.take 50 gitCommitMessage) <> if T.length gitCommitMessage > 50 then "..." else ""
     SingleNotificationNode (EntityData {_static = Notification {notificationSubject = Subject {subjectTitle}}}) ->
