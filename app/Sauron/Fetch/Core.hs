@@ -1,16 +1,23 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Sauron.Fetch.Core (
-  fetchPaginated'',
-  pageSize
+  fetchPaginated''
+  , pageSize
+
+  , makeEmptyElem
+
+  , logToModal
 ) where
 
+import Brick.BChan (writeBChan)
 import Control.Exception.Safe (bracketOnError_)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
+import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.Aeson
 import qualified Data.List as L
+import Data.Time
 import GitHub
 import Network.HTTP.Client (responseBody)
 import Network.HTTP.Types.URI (QueryItem, parseQuery)
@@ -58,3 +65,38 @@ fetchPaginated'' mkReq pageInfoVar stateVar cb = do
                 }
 
           cb $ Right (responseBody x, pgInfo)
+
+makeEmptyElem :: BaseContext -> NodeStatic a -> Text -> Int -> STM (EntityData Variable a)
+makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
+  stateVar <- newTVar NotFetched
+  ident' <- getIdentifierSTM
+  toggledVar <- newTVar False
+  childrenVar <- newTVar []
+  searchVar <- newTVar $ SearchNone
+  pageInfoVar <- newTVar emptyPageInfo
+  healthCheckVar <- newTVar NotFetched
+  healthCheckThreadVar <- newTVar Nothing
+  return $ EntityData {
+    _static = typ'
+    , _state = stateVar
+
+    , _urlSuffix = urlSuffix'
+
+    , _toggled = toggledVar
+    , _children = childrenVar
+
+    , _search = searchVar
+    , _pageInfo = pageInfoVar
+
+    , _healthCheck = healthCheckVar
+    , _healthCheckThread = healthCheckThreadVar
+
+    , _depth = depth'
+    , _ident = ident'
+}
+
+logToModal :: MonadIO m => BaseContext -> Text -> m ()
+logToModal bc msg = do
+  now <- liftIO getCurrentTime
+  let logEntry = LogEntry now LevelInfo msg
+  liftIO $ writeBChan (eventChan bc) (LogEntryAdded logEntry)

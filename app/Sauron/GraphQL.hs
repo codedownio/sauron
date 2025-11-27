@@ -5,6 +5,8 @@ module Sauron.GraphQL (
   queryBranchesWithCommits
   , sortBranchesByDate
   , filterBranchesByAuthor
+  , filterBranchesByActivity
+  , filterBranchesByInactivity
   , prNumber
   ) where
 
@@ -12,12 +14,13 @@ import Control.Exception.Safe (try)
 import Data.Aeson
 import Data.String.Interpolate
 import qualified Data.Text as T
-import Data.Time.Clock (UTCTime)
+import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime)
 import Data.Time.Format (parseTimeM, defaultTimeLocale)
 import Network.HTTP.Conduit (responseTimeoutMicro)
 import Network.HTTP.Simple
 import Relude
 import Sauron.Types hiding (PageInfo)
+import System.IO.Unsafe (unsafePerformIO)
 
 -- GitHub GraphQL API endpoint
 githubGraphQLEndpoint :: String
@@ -257,16 +260,36 @@ sortBranchesByDate branches = sortBy (comparing (Down . commitDateUtc)) branches
     parseISODate :: Text -> Maybe UTCTime
     parseISODate dateStr = parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr)
 
--- TODO: Implement active/stale branch filtering
--- filterBranchesByActivity :: UTCTime -> [BranchWithInfo] -> [BranchWithInfo]
--- filterBranchesByActivity cutoffTime branches =
---   filter (isBranchActive cutoffTime) branches
---   where
---     isBranchActive :: UTCTime -> BranchWithInfo -> Bool
---     isBranchActive cutoff branch =
---       case branchWithInfoCommitDate branch of
---         Nothing -> False
---         Just dateStr ->
---           case parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr) of
---             Nothing -> False
---             Just commitTime -> commitTime > cutoff
+-- Filter branches that have activity within the specified number of days
+filterBranchesByActivity :: Int -> [BranchWithInfo] -> [BranchWithInfo]
+filterBranchesByActivity daysCutoff branches = unsafePerformIO $ do
+  currentTime <- getCurrentTime
+  return $ filter (isBranchActive currentTime daysCutoff) branches
+  where
+    isBranchActive :: UTCTime -> Int -> BranchWithInfo -> Bool
+    isBranchActive currentTime days branch =
+      case branchWithInfoCommitDate branch of
+        Nothing -> False
+        Just dateStr ->
+          case parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr) of
+            Nothing -> False
+            Just commitTime ->
+              let cutoffTime = addUTCTime (fromIntegral (-days * 24 * 60 * 60)) currentTime
+              in commitTime > cutoffTime
+
+-- Filter branches that have NO activity within the specified number of days (stale branches)
+filterBranchesByInactivity :: Int -> [BranchWithInfo] -> [BranchWithInfo]
+filterBranchesByInactivity daysCutoff branches = unsafePerformIO $ do
+  currentTime <- getCurrentTime
+  return $ filter (isBranchStale currentTime daysCutoff) branches
+  where
+    isBranchStale :: UTCTime -> Int -> BranchWithInfo -> Bool
+    isBranchStale currentTime days branch =
+      case branchWithInfoCommitDate branch of
+        Nothing -> True  -- No commit date means it's probably stale
+        Just dateStr ->
+          case parseTimeM True defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" (toString dateStr) of
+            Nothing -> True  -- Can't parse date, consider stale
+            Just commitTime ->
+              let cutoffTime = addUTCTime (fromIntegral (-days * 24 * 60 * 60)) currentTime
+              in commitTime <= cutoffTime
