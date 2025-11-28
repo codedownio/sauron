@@ -153,6 +153,7 @@ fetchBranchesWithFilter :: (
   )
   => Name Owner
   -> Name Repo
+  -> Maybe Text
   -> TVar (Fetchable (V.Vector BranchWithInfo))
   -> TVar [Node Variable SingleBranchWithInfoT]
   -> TVar PageInfo
@@ -161,7 +162,7 @@ fetchBranchesWithFilter :: (
   -> ([BranchWithInfo] -> [BranchWithInfo])
   -> Text
   -> m ()
-fetchBranchesWithFilter owner name stateVar childrenVar pageInfoVar depth' logPrefix filterFn logSuffix = do
+fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageInfoVar depth' logPrefix filterFn logSuffix = do
   bc <- ask
 
   bracketOnError_ (atomically $ markFetching stateVar)
@@ -184,7 +185,7 @@ fetchBranchesWithFilter owner name stateVar childrenVar pageInfoVar depth' logPr
           let branchesToFetch = max 100 (currentPage * pageSize * 3)  -- Fetch at least 100, or enough for 3 pages worth
 
           -- Fetch branches with commit info using GraphQL
-          result <- GraphQL.queryBranchesWithCommits (logToModal bc) authToken (toPathPart owner) (toPathPart name) branchesToFetch
+          result <- GraphQL.queryBranchesWithInfos (logToModal bc) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
           case result of
             Left err -> atomically $ do
               writeTVar stateVar (Errored $ toText err)
@@ -224,16 +225,15 @@ fetchBranchesWithFilter owner name stateVar childrenVar pageInfoVar depth' logPr
 
 fetchYourBranches :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Node Variable PaginatedYourBranchesT -> m ()
-fetchYourBranches owner name (PaginatedYourBranchesNode (EntityData {..})) = do
+  ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedYourBranchesT -> m ()
+fetchYourBranches owner name repoDefaultBranch (PaginatedYourBranchesNode (EntityData {..})) = do
   bc <- ask
-  currentUserName <- liftIO $ getUserName bc
-  case currentUserName of
+  liftIO (getUserName bc) >>= \case
     Nothing -> liftIO $ do
       logToModal bc "fetchYourBranches: Could not get current user name"
       atomically $ writeTVar _state (Errored "Could not get current user name")
     Just userName ->
-      fetchBranchesWithFilter owner name _state _children _pageInfo _depth "fetchYourBranches"
+      fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchYourBranches"
         (GraphQL.filterBranchesByAuthor userName) "your branches"
   where
     getUserName :: BaseContext -> IO (Maybe Text)
@@ -246,16 +246,16 @@ fetchYourBranches owner name (PaginatedYourBranchesNode (EntityData {..})) = do
 
 fetchActiveBranches :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Node Variable PaginatedActiveBranchesT -> m ()
-fetchActiveBranches owner name (PaginatedActiveBranchesNode (EntityData {..})) =
-  fetchBranchesWithFilter owner name _state _children _pageInfo _depth "fetchActiveBranches"
+  ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedActiveBranchesT -> m ()
+fetchActiveBranches owner name repoDefaultBranch (PaginatedActiveBranchesNode (EntityData {..})) =
+  fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchActiveBranches"
     (GraphQL.filterBranchesByActivity 90) "active branches"
 
 fetchStaleBranches :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Node Variable PaginatedStaleBranchesT -> m ()
-fetchStaleBranches owner name (PaginatedStaleBranchesNode (EntityData {..})) =
-  fetchBranchesWithFilter owner name _state _children _pageInfo _depth "fetchStaleBranches"
+  ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedStaleBranchesT -> m ()
+fetchStaleBranches owner name repoDefaultBranch (PaginatedStaleBranchesNode (EntityData {..})) =
+  fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchStaleBranches"
     (GraphQL.filterBranchesByInactivity 90) "stale branches"
 
 fetchOverallBranches :: (

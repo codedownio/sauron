@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Sauron.GraphQL (
-  queryBranchesWithCommits
+  queryBranchesWithInfos
   , sortBranchesByDate
   , filterBranchesByAuthor
   , filterBranchesByActivity
@@ -30,7 +30,12 @@ getBranchesQuery :: Text
 getBranchesQuery = [i|
   query GetBranchesWithCommits($owner: String!, $name: String!, $first: Int!, $defaultBranch: String!) {
     repository(owner: $owner, name: $name) {
-      defaultBranchRef { name }
+      defaultBranchRef {
+        name
+        target {
+          oid
+        }
+      }
       refs(refPrefix: "refs/heads/", first: $first) {
         nodes {
           name
@@ -55,17 +60,18 @@ getBranchesQuery = [i|
             aheadBy
             behindBy
           }
-          associatedPullRequests(states: OPEN, first: 1) {
-            nodes {
-              number
-              title
-              url
-            }
-          }
         }
         pageInfo {
           hasNextPage
           endCursor
+        }
+      }
+      pullRequests(states: OPEN, first: 100) {
+        nodes {
+          number
+          title
+          url
+          headRefName
         }
       }
     }
@@ -89,14 +95,18 @@ instance FromJSON RepositoryData
 data Repository = Repository {
   refs :: Maybe Refs
   , defaultBranchRef :: Maybe DefaultBranchRef
+  , pullRequests :: Maybe PullRequests
   } deriving (Show, Generic)
 instance FromJSON Repository
 
 data DefaultBranchRef = DefaultBranchRef {
   defaultBranchName :: Maybe Text
+  , defaultBranchTarget :: Maybe Target
   } deriving (Show, Generic)
 instance FromJSON DefaultBranchRef where
-  parseJSON = withObject "DefaultBranchRef" $ \o -> DefaultBranchRef <$> o .:? "name"
+  parseJSON = withObject "DefaultBranchRef" $ \o -> DefaultBranchRef
+    <$> o .:? "name"
+    <*> o .:? "target"
 
 data Refs = Refs {
   nodes :: Maybe [RefNode]
@@ -104,24 +114,35 @@ data Refs = Refs {
   } deriving (Show, Generic)
 instance FromJSON Refs
 
+data PullRequests = PullRequests {
+  prNodes :: Maybe [GraphQLPullRequestWithHead]
+  } deriving (Show, Generic)
+instance FromJSON PullRequests where
+  parseJSON = withObject "PullRequests" $ \o -> PullRequests <$> o .:? "nodes"
+
+data GraphQLPullRequestWithHead = GraphQLPullRequestWithHead {
+  prWithHeadNumber :: Maybe Int
+  , prWithHeadTitle :: Maybe Text
+  , prWithHeadUrl :: Maybe Text
+  , prWithHeadRefName :: Maybe Text
+  } deriving (Show, Generic)
+instance FromJSON GraphQLPullRequestWithHead where
+  parseJSON = withObject "GraphQLPullRequestWithHead" $ \o -> GraphQLPullRequestWithHead
+    <$> o .:? "number"
+    <*> o .:? "title"
+    <*> o .:? "url"
+    <*> o .:? "headRefName"
+
 data RefNode = RefNode {
   name :: Text
   , target :: Maybe Target
   , branchCompare :: Maybe BranchComparison
-  , associatedPullRequests :: Maybe AssociatedPRs
   } deriving (Show, Generic)
 instance FromJSON RefNode where
   parseJSON = withObject "RefNode" $ \o -> RefNode
     <$> o .: "name"
     <*> o .:? "target"
     <*> o .:? "compare"
-    <*> o .:? "associatedPullRequests"
-
-data AssociatedPRs = AssociatedPRs {
-  prNodes :: Maybe [GraphQLPullRequest]
-  } deriving (Show, Generic)
-instance FromJSON AssociatedPRs where
-  parseJSON = withObject "AssociatedPRs" $ \o -> AssociatedPRs <$> o .:? "nodes"
 
 data BranchComparison = BranchComparison {
   aheadBy :: Maybe Int
@@ -190,110 +211,68 @@ data GraphQLRequest = GraphQLRequest {
   } deriving (Show, Generic)
 instance ToJSON GraphQLRequest
 
--- First, let's create a simple query to get just the default branch name
-getDefaultBranchQuery :: Text
-getDefaultBranchQuery = [i|
-  query GetDefaultBranch($owner: String!, $name: String!) {
-    repository(owner: $owner, name: $name) {
-      defaultBranchRef { name }
-    }
-  }
-  |]
 
-queryBranchesWithCommits :: MonadIO m => (Text -> IO ()) -> Text -> Text -> Text -> Int -> m (Either Text [BranchWithInfo])
-queryBranchesWithCommits debugFn authToken owner' repoName first' = liftIO $ do
+queryBranchesWithInfos :: MonadIO m => (Text -> IO ()) -> Text -> Text -> Text -> Maybe Text -> Int -> m (Either Text [BranchWithInfo])
+queryBranchesWithInfos debugFn authToken owner' repoName repoDefaultBranch first' = liftIO $ do
   debugFn $ "GraphQL query for " <> owner' <> "/" <> repoName <> " (first " <> show first' <> ")"
 
-  -- First, get the default branch name
-  let defaultBranchPayload = GraphQLRequest
-        { query = getDefaultBranchQuery
-        , variables = BranchVariables owner' repoName 1 "main"  -- default branch field is not used in this query
+  let defaultBranch = fromMaybe "main" repoDefaultBranch
+  let requestPayload = GraphQLRequest {
+        query = getBranchesQuery
+        , variables = BranchVariables owner' repoName first' defaultBranch
         }
 
-  defaultBranchResult <- try $ do
-    debugFn "Getting default branch name"
+  result :: Either SomeException BranchResponse <- try $ do
     initialRequest <- parseRequest githubGraphQLEndpoint
     let httpRequest = setRequestMethod "POST"
                     $ setRequestHeader "Authorization" ["Bearer " <> encodeUtf8 authToken]
                     $ setRequestHeader "Content-Type" ["application/json"]
                     $ setRequestHeader "User-Agent" ["sauron-app"]
                     $ setRequestResponseTimeout (responseTimeoutMicro (30 * 1000000))
-                    $ setRequestBodyJSON defaultBranchPayload
+                    $ setRequestBodyJSON requestPayload
                     $ initialRequest
-    response <- httpJSON httpRequest
-    let body = getResponseBody response :: BranchResponse
-    return body
 
-  case defaultBranchResult of
+    getResponseBody <$> httpJSON httpRequest
+
+  case result of
     Left (ex :: SomeException) -> do
-      debugFn $ "Default branch query failed: " <> T.pack (show ex)
-      return $ Left $ "Default branch query failed: " <> T.pack (show ex)
-    Right defaultBranchBody -> do
-      case (data' defaultBranchBody, errors defaultBranchBody) of
+      debugFn $ "GraphQL HTTP request failed: " <> T.pack (show ex)
+      return $ Left $ "HTTP request failed: " <> T.pack (show ex)
+    Right body -> do
+      debugFn "Processing GraphQL response body"
+      case (data' body, errors body) of
         (Just repoData, Nothing) -> do
-          let defaultBranchName' = fromMaybe "main" $ repository repoData >>= defaultBranchRef >>= defaultBranchName
-          debugFn $ "Found default branch: " <> defaultBranchName'
-
-          -- Now query branches with comparison to default branch
-          let requestPayload = GraphQLRequest
-                { query = getBranchesQuery
-                , variables = BranchVariables owner' repoName first' defaultBranchName'
-                }
-          debugFn $ "GraphQL query: " <> T.take 200 getBranchesQuery
-
-          result <- try $ do
-            debugFn "Creating HTTP request for branches with comparison"
-            initialRequest <- parseRequest githubGraphQLEndpoint
-            let httpRequest = setRequestMethod "POST"
-                            $ setRequestHeader "Authorization" ["Bearer " <> encodeUtf8 authToken]
-                            $ setRequestHeader "Content-Type" ["application/json"]
-                            $ setRequestHeader "User-Agent" ["sauron-app"]
-                            $ setRequestResponseTimeout (responseTimeoutMicro (30 * 1000000))
-                            $ setRequestBodyJSON requestPayload
-                            $ initialRequest
-
-            debugFn "Sending GraphQL HTTP request"
-            response <- httpJSON httpRequest
-            debugFn "HTTP response received, parsing JSON"
-            let body = getResponseBody response :: BranchResponse
-            debugFn "GraphQL response parsed successfully"
-            return body
-
-          case result of
-            Left (ex :: SomeException) -> do
-              debugFn $ "GraphQL HTTP request failed: " <> T.pack (show ex)
-              return $ Left $ "HTTP request failed: " <> T.pack (show ex)
-            Right body -> do
-              debugFn "Processing GraphQL response body"
-              case (data' body, errors body) of
-                (Just repoData, Nothing) -> do
-                  debugFn "GraphQL success, processing data"
-                  case repository repoData >>= refs >>= nodes of
-                    Just refNodes -> do
-                      debugFn $ "Found " <> show (length refNodes) <> " branches"
-                      return $ Right $ mapMaybe refNodeToBranch refNodes
-                    Nothing -> do
-                      debugFn "No branches found in response"
-                      return $ Right []
-                (_, Just errs) -> do
-                  debugFn $ "GraphQL errors: " <> T.intercalate ", " (map message errs)
-                  return $ Left $ T.intercalate ", " (map message errs)
-                (Nothing, Nothing) -> do
-                  debugFn "No data returned from GitHub"
-                  return $ Left "No data returned from GitHub"
+          case (repository repoData >>= refs >>= nodes, repository repoData >>= pullRequests >>= prNodes) of
+            (Just refNodes, maybePullRequests) -> do
+              let pullRequestList = fromMaybe [] maybePullRequests
+              debugFn $ "Found " <> show (length refNodes) <> " branches and " <> show (length pullRequestList) <> " pull requests"
+              return $ Right $ mapMaybe (refNodeToBranchWithComparison defaultBranch pullRequestList) refNodes
+            (Nothing, _) -> do
+              debugFn "No branches found in response"
+              return $ Right []
         (_, Just errs) -> do
-          debugFn $ "Default branch query errors: " <> T.intercalate ", " (map message errs)
+          debugFn $ "GraphQL errors: " <> T.intercalate ", " (map message errs)
           return $ Left $ T.intercalate ", " (map message errs)
         (Nothing, Nothing) -> do
-          debugFn "No data returned from GitHub for default branch query"
-          return $ Left "No data returned from GitHub for default branch query"
+          debugFn "No data returned from GitHub"
+          return $ Left "No data returned from GitHub"
 
-refNodeToBranch :: RefNode -> Maybe BranchWithInfo
-refNodeToBranch refNode = do
+refNodeToBranchWithComparison :: Text -> [GraphQLPullRequestWithHead] -> RefNode -> Maybe BranchWithInfo
+refNodeToBranchWithComparison defaultBranchName pullRequests refNode = do
   let branchName = name refNode
   target' <- target refNode
-  let prInfo = associatedPullRequests refNode >>= prNodes >>= viaNonEmpty head
+  let prInfo = findPullRequestForBranch branchName pullRequests
   let compareInfo = branchCompare refNode
+
+  -- Extract ahead/behind counts from the GraphQL comparison
+  let (aheadCount, behindCount) = case compareInfo of
+        Just comparison -> (aheadBy comparison, behindBy comparison)
+        Nothing ->
+          -- Fallback: if this is the default branch, it's up to date
+          if branchName == defaultBranchName
+            then (Just 0, Just 0)
+            else (Nothing, Nothing)
+
   return $ BranchWithInfo {
     branchWithInfoBranchName = branchName
     , branchWithInfoCommitOid = oid target'
@@ -302,9 +281,19 @@ refNodeToBranch refNode = do
     , branchWithInfoCommitDate = committedDate target'
     , branchWithInfoCheckStatus = statusCheckRollup target' >>= statusState
     , branchWithInfoAssociatedPR = prInfo
-    , branchWithInfoAheadBy = compareInfo >>= aheadBy
-    , branchWithInfoBehindBy = compareInfo >>= behindBy
+    , branchWithInfoAheadBy = aheadCount
+    , branchWithInfoBehindBy = behindCount
     }
+
+findPullRequestForBranch :: Text -> [GraphQLPullRequestWithHead] -> Maybe GraphQLPullRequest
+findPullRequestForBranch branchName pullRequests =
+  case find (\pr -> prWithHeadRefName pr == Just branchName) pullRequests of
+    Just prWithHead -> Just $ GraphQLPullRequest {
+      prNumber = prWithHeadNumber prWithHead
+      , prTitle = prWithHeadTitle prWithHead
+      , prUrl = prWithHeadUrl prWithHead
+    }
+    Nothing -> Nothing
 
 filterBranchesByAuthor :: Text -> [BranchWithInfo] -> [BranchWithInfo]
 filterBranchesByAuthor currentUser branches =
