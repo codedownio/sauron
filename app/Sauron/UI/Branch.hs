@@ -49,7 +49,7 @@ branchLine toggled' (Branch {branchName, branchCommit}) maybeBranchData appState
       , hLimitPercent 12 $
           padRight Max $ str $ formatCheckStatus maybeBranchData
       , hLimitPercent 10 $
-          padRight Max $ str "↑0 ↓0"  -- Placeholder for ahead/behind
+          padRight Max $ str $ formatAheadBehind maybeBranchData
       , hLimitPercent 15 $
           padRight Max $ str $ formatPRInfo maybeBranchData
       , fetchableQuarterCircleSpinner (_appAnimationCounter appState) fetchableState
@@ -94,3 +94,11 @@ branchLine toggled' (Branch {branchName, branchCommit}) maybeBranchData appState
         Just pr -> case GraphQL.prNumber pr of
           Nothing -> "PR: Unknown"
           Just num -> "PR #" <> show num
+
+    -- Helper function to format ahead/behind counts
+    formatAheadBehind :: Maybe BranchWithInfo -> String
+    formatAheadBehind Nothing = "↑? ↓?"
+    formatAheadBehind (Just branchData) =
+      let ahead = fromMaybe 0 (branchWithInfoAheadBy branchData)
+          behind = fromMaybe 0 (branchWithInfoBehindBy branchData)
+      in "↑" <> show ahead <> " ↓" <> show behind

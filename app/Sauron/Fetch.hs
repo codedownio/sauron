@@ -175,9 +175,14 @@ fetchBranchesWithFilter owner name stateVar childrenVar pageInfoVar depth' logPr
         logToModal bc $ logPrefix <> ": Got auth token: " <> T.take 10 authToken <> "..."
         liftIO $ do
           logToModal bc $ logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name
-          -- Read current page info to determine how many branches to fetch
+          -- Read current page info to determine pagination
           currentPageInfo <- readTVarIO pageInfoVar
-          let branchesToFetch = pageInfoCurrentPage currentPageInfo * pageSize
+          let currentPage = pageInfoCurrentPage currentPageInfo
+
+          -- Fetch a substantial number of branches to enable client-side filtering and pagination
+          -- We fetch more than we need to allow for filtering (many branches may be filtered out)
+          let branchesToFetch = max 100 (currentPage * pageSize * 3)  -- Fetch at least 100, or enough for 3 pages worth
+
           -- Fetch branches with commit info using GraphQL
           result <- GraphQL.queryBranchesWithCommits (logToModal bc) authToken (toPathPart owner) (toPathPart name) branchesToFetch
           case result of
@@ -186,10 +191,14 @@ fetchBranchesWithFilter owner name stateVar childrenVar pageInfoVar depth' logPr
               writeTVar childrenVar []
             Right branchesWithCommits -> do
               -- Apply the provided filter function and sort by date
-              let filteredBranches = GraphQL.sortBranchesByDate $ filterFn branchesWithCommits
-              let currentPage = pageInfoCurrentPage currentPageInfo
-              let totalBranches = length filteredBranches
-              let totalPages = (totalBranches + pageSize - 1) `div` pageSize  -- Ceiling division
+              let allFilteredBranches = GraphQL.sortBranchesByDate $ filterFn branchesWithCommits
+              let totalBranches = length allFilteredBranches
+              let totalPages = max 1 $ (totalBranches + pageSize - 1) `div` pageSize  -- Ceiling division, at least 1 page
+
+              -- Calculate the slice for the current page
+              let startIdx = (currentPage - 1) * pageSize
+              let currentPageBranches = take pageSize $ drop startIdx allFilteredBranches
+
               let newPageInfo = PageInfo {
                     pageInfoCurrentPage = currentPage
                     , pageInfoFirstPage = if totalPages > 0 then Just 1 else Nothing
@@ -197,11 +206,12 @@ fetchBranchesWithFilter owner name stateVar childrenVar pageInfoVar depth' logPr
                     , pageInfoNextPage = if currentPage < totalPages then Just (currentPage + 1) else Nothing
                     , pageInfoLastPage = if totalPages > 0 then Just totalPages else Nothing
                     }
-              -- Store the enhanced branch data in the node state
+
+              -- Store only the current page's branches in the node state
               atomically $ do
                 writeTVar pageInfoVar newPageInfo
-                writeTVar stateVar (Fetched (V.fromList filteredBranches))
-                (writeTVar childrenVar =<<) $ forM filteredBranches $ \branchInfo ->
+                writeTVar stateVar (Fetched (V.fromList currentPageBranches))
+                (writeTVar childrenVar =<<) $ forM currentPageBranches $ \branchInfo ->
                   SingleBranchWithInfoNode <$> makeEmptyElem bc branchInfo ("/tree/" <> branchWithInfoBranchName branchInfo) (depth' + 1)
           logToModal bc $ logPrefix <> ": Processing complete, found " <> show (case result of
             Left _ -> 0

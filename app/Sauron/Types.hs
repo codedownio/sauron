@@ -324,6 +324,8 @@ data BranchWithInfo = BranchWithInfo {
   , branchWithInfoCommitDate :: Maybe Text
   , branchWithInfoCheckStatus :: Maybe Text
   , branchWithInfoAssociatedPR :: Maybe GraphQLPullRequest
+  , branchWithInfoAheadBy :: Maybe Int
+  , branchWithInfoBehindBy :: Maybe Int
   } deriving (Show, Eq)
 
 -- * Misc
