@@ -16,6 +16,7 @@ import Data.String.Interpolate
 import Relude
 import Sauron.Types
 import Sauron.UI.Branch ()
+import Sauron.UI.BranchWithInfo ()
 import Sauron.UI.Commit ()
 import Sauron.UI.Issue ()
 import Sauron.UI.Job ()

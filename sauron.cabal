@@ -59,6 +59,7 @@ executable sauron
       Sauron.UI.Border
       Sauron.UI.BottomBar
       Sauron.UI.Branch
+      Sauron.UI.BranchWithInfo
       Sauron.UI.Commit
       Sauron.UI.Event
       Sauron.UI.Issue
