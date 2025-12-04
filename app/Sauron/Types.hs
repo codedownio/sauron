@@ -443,6 +443,7 @@ data LogEntry = LogEntry {
   _logEntryTimestamp :: UTCTime
   , _logEntryLevel :: LogLevel
   , _logEntryMessage :: Text
+  , _logEntryDuration :: Maybe NominalDiffTime
   } deriving (Show, Eq)
 
 -- * Overall app state

@@ -40,6 +40,7 @@ import Control.Exception.Safe (bracketOnError_)
 import Control.Monad (foldM)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
+import Control.Monad.Logger (LogLevel(..))
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
@@ -171,11 +172,11 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
                   (atomically $ writeTVar stateVar (Errored $ logPrefix <> " fetch failed with exception.")) $ do
     case getAuthToken bc of
       Nothing -> liftIO $ do
-        logToModal bc $ logPrefix <> ": No auth token available"
+        logToModal bc LevelError (logPrefix <> ": No auth token available") Nothing
         atomically $ writeTVar stateVar (Errored "No auth token available for GraphQL query")
       Just authToken -> do
         liftIO $ do
-          logToModal bc $ logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name
+          logToModal bc LevelInfo (logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name) Nothing
           -- Read current page info to determine pagination
           currentPageInfo <- readTVarIO pageInfoVar
           let currentPage = pageInfoCurrentPage currentPageInfo
@@ -185,7 +186,7 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
           let branchesToFetch = max 100 (currentPage * pageSize * 3)  -- Fetch at least 100, or enough for 3 pages worth
 
           -- Fetch branches with commit info using GraphQL
-          result <- GraphQL.queryBranchesWithInfos (logToModal bc) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
+          result <- GraphQL.queryBranchesWithInfos (\msg -> logToModal bc LevelDebug msg Nothing) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
           case result of
             Left err -> atomically $ do
               writeTVar stateVar (Errored $ toText err)
@@ -218,9 +219,9 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
                 writeTVar stateVar (Fetched (V.fromList currentPageBranches))
                 (writeTVar childrenVar =<<) $ forM currentPageBranches $ \branchInfo ->
                   SingleBranchWithInfoNode <$> makeEmptyElem bc (branchInfo, columnWidths) ("/tree/" <> branchWithInfoBranchName branchInfo) (depth' + 1)
-          logToModal bc $ logPrefix <> ": Processing complete, found " <> show (case result of
+          logToModal bc LevelInfo (logPrefix <> ": Processing complete, found " <> show (case result of
             Left _ -> 0
-            Right branchesWithCommits -> length $ filterFn branchesWithCommits) <> " " <> logSuffix
+            Right branchesWithCommits -> length $ filterFn branchesWithCommits) <> " " <> logSuffix) Nothing
   where
     getAuthToken :: BaseContext -> Maybe Text
     getAuthToken bc = case auth bc of
@@ -243,7 +244,7 @@ fetchYourBranches owner name repoDefaultBranch (PaginatedYourBranchesNode (Entit
   bc <- ask
   liftIO (getUserName bc) >>= \case
     Nothing -> liftIO $ do
-      logToModal bc "fetchYourBranches: Could not get current user name"
+      logToModal bc LevelError "fetchYourBranches: Could not get current user name" Nothing
       atomically $ writeTVar _state (Errored "Could not get current user name")
     Just userName ->
       fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchYourBranches"
@@ -493,7 +494,7 @@ fetchJobLogs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
 fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})) = do
-  BaseContext {auth, manager} <- ask
+  bc@(BaseContext {auth, manager}) <- ask
   bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
     -- First, get the download URI
@@ -507,8 +508,6 @@ fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})
 
         let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
         -- traceM [i|parsedLogs: #{parsedLogs}|]
-
-        bc <- ask
         children' <- liftIO $ atomically $ do
           mapM (createJobStepNode bc (_depth + 1) parsedLogs) (V.toList jobSteps)
 

@@ -93,6 +93,10 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll LogModalContent) Up
       (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) 1
       (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) (-1)
+      (V.EvKey V.KUp []) -> vScrollBy (viewportScroll LogModalContent) (-1)
+      (V.EvKey V.KDown []) -> vScrollBy (viewportScroll LogModalContent) 1
+      (V.EvKey V.KPageUp []) -> vScrollPage (viewportScroll LogModalContent) Up
+      (V.EvKey V.KPageDown []) -> vScrollPage (viewportScroll LogModalContent) Down
       _ -> return () -- No other interactions for LogModal
   _ -> return ()
 

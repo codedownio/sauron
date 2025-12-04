@@ -84,12 +84,15 @@ githubWithLogging' bc request = fmap responseBody <$> githubWithLogging'' bc req
 
 githubWithLogging'' :: (MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error (Response a))
 githubWithLogging'' (BaseContext {..}) request = do
+  startTime <- liftIO getCurrentTime
   result <- liftIO $ executeRequestWithMgrAndRes manager auth request
-  logResult eventChan request result
+  endTime <- liftIO getCurrentTime
+  let duration = diffUTCTime endTime startTime
+  logResult eventChan request result (Just duration)
   return result
 
-logResult :: (MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Response b) -> m ()
-logResult eventChan request result = do
+logResult :: (MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Response b) -> Maybe NominalDiffTime -> m ()
+logResult eventChan request result maybeDuration = do
   now <- liftIO getCurrentTime
   let url = requestToUrl request
   let level = case result of Left _ -> LevelError; _ -> LevelInfo
@@ -100,7 +103,7 @@ logResult eventChan request result = do
                 Nothing -> "" -- " " <> show (responseHeaders response)
                 Just size -> " (" <> show size <> " bytes)"
           in (url <> sizeInfo)
-  let logEntry = LogEntry now level msg
+  let logEntry = LogEntry now level msg maybeDuration
   liftIO $ writeBChan eventChan (LogEntryAdded logEntry)
   where
     getResponseSize :: Response a -> Maybe Int

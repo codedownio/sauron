@@ -39,13 +39,16 @@ renderLogEntries currentTime logs =
     else toList $ fmap (renderLogEntry currentTime) logs
 
 renderLogEntry :: UTCTime -> LogEntry -> Widget ClickableName
-renderLogEntry _currentTime (LogEntry timestamp level message) =
+renderLogEntry _currentTime (LogEntry timestamp level message maybeDuration) =
   hBox [
     withAttr timeAttr $ str (formatLogTime timestamp)
     , str " "
     , withAttr levelAttr $ str (formatLevel level)
     , str " "
     , txtWrap message
+    , case maybeDuration of
+        Nothing -> emptyWidget
+        Just duration -> hBox [str " ", formatDuration duration]
   ]
   where
     levelAttr = case level of
@@ -56,6 +59,17 @@ renderLogEntry _currentTime (LogEntry timestamp level message) =
       _            -> normalAttr
 
     timeAttr = debugLogAttr  -- Use a muted color for timestamps
+
+    formatDuration :: NominalDiffTime -> Widget ClickableName
+    formatDuration duration =
+      let durationMs = round (duration * 1000) :: Integer
+          durationAttr
+            | durationMs < 100   = debugLogAttr      -- Fast (< 100ms) - gray
+            | durationMs < 1000  = infoLogAttr       -- Normal (100-1000ms) - white
+            | durationMs < 5000  = warningLogAttr    -- Slow (1-5s) - yellow
+            | otherwise          = errorLogAttr      -- Very slow (>5s) - red
+          durationText = show durationMs <> "ms"
+      in withAttr durationAttr $ str durationText
 
 formatLevel :: LogLevel -> String
 formatLevel LevelError = "[ERROR]"

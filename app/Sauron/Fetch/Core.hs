@@ -7,6 +7,7 @@ module Sauron.Fetch.Core (
   , makeEmptyElem
 
   , logToModal
+  , withLogToModal
 ) where
 
 import Brick.BChan (writeBChan)
@@ -95,8 +96,17 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
     , _ident = ident'
 }
 
-logToModal :: MonadIO m => BaseContext -> Text -> m ()
-logToModal bc msg = do
+logToModal :: MonadIO m => BaseContext -> LogLevel -> Text -> Maybe NominalDiffTime -> m ()
+logToModal bc level msg maybeDuration = do
   now <- liftIO getCurrentTime
-  let logEntry = LogEntry now LevelInfo msg
+  let logEntry = LogEntry now level msg maybeDuration
   liftIO $ writeBChan (eventChan bc) (LogEntryAdded logEntry)
+
+withLogToModal :: MonadIO m => BaseContext -> LogLevel -> Text -> m a -> m a
+withLogToModal bc level msg action = do
+  startTime <- liftIO getCurrentTime
+  result <- action
+  endTime <- liftIO getCurrentTime
+  let duration = diffUTCTime endTime startTime
+  logToModal bc level msg (Just duration)
+  return result
