@@ -23,7 +23,7 @@ renderLogModal appState LogModalState =
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport LogModalContent Vertical $
       vBox (renderLogEntries (appState ^. appNow) (appState ^. appLogs))
     , hBorder
-    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close"
+    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs"
   ]
   & border
   & withAttr normalAttr
@@ -41,9 +41,9 @@ renderLogEntries currentTime logs =
 renderLogEntry :: UTCTime -> LogEntry -> Widget ClickableName
 renderLogEntry _currentTime (LogEntry timestamp level message) =
   hBox [
-    withAttr levelAttr $ str (formatLevel level)
+    withAttr timeAttr $ str (formatLogTime timestamp)
     , str " "
-    , withAttr timeAttr $ str (formatLogTime timestamp)
+    , withAttr levelAttr $ str (formatLevel level)
     , str " "
     , txtWrap message
   ]
@@ -55,14 +55,14 @@ renderLogEntry _currentTime (LogEntry timestamp level message) =
       LevelDebug   -> debugLogAttr
       _            -> normalAttr
 
-    timeAttr = normalAttr
+    timeAttr = debugLogAttr  -- Use a muted color for timestamps
 
 formatLevel :: LogLevel -> String
 formatLevel LevelError = "[ERROR]"
-formatLevel LevelWarn = "[WARN] "
-formatLevel LevelInfo = "[INFO] "
+formatLevel LevelWarn = "[WARN]"
+formatLevel LevelInfo = "[INFO]"
 formatLevel LevelDebug = "[DEBUG]"
 formatLevel (LevelOther t) = "[" <> toString t <> "]"
 
 formatLogTime :: UTCTime -> String
-formatLogTime = formatTime defaultTimeLocale "%H:%M:%S"
+formatLogTime = formatTime defaultTimeLocale "%H:%M:%S.%06q"

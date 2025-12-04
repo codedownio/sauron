@@ -87,6 +87,8 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> do
         modify (appModal .~ Nothing)
         liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+      (V.EvKey (V.KChar 'c') []) -> do
+        modify (appLogs .~ Seq.empty)
       (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll LogModalContent) Down
       (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll LogModalContent) Up
       (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) 1
@@ -178,8 +180,10 @@ appEvent s (VtyEvent e) = case e of
       liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
 
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do
-    modify (appModal .~ Just LogModalState)
+    modify (appModal ?~ LogModalState)
     liftIO $ atomically $ writeTVar (_appModalVariable s) (Just LogModalState)
+    -- Scroll to the bottom of the log modal content to show latest logs
+    vScrollToEnd (viewportScroll LogModalContent)
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
@@ -195,7 +199,7 @@ appEvent _s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
 appEvent _s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
   vScrollBy (viewportScroll MainList) 1
 appEvent _s (MouseDown (ListRow n) V.BLeft _ _) = do
-  modify (appMainList %~ (listMoveTo n))
+  modify (appMainList %~ listMoveTo n)
 
 appEvent _ _ = return ()
 

@@ -169,13 +169,11 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
 
   bracketOnError_ (atomically $ markFetching stateVar)
                   (atomically $ writeTVar stateVar (Errored $ logPrefix <> " fetch failed with exception.")) $ do
-    logToModal bc $ logPrefix <> ": Starting GraphQL query"
     case getAuthToken bc of
       Nothing -> liftIO $ do
         logToModal bc $ logPrefix <> ": No auth token available"
         atomically $ writeTVar stateVar (Errored "No auth token available for GraphQL query")
       Just authToken -> do
-        logToModal bc $ logPrefix <> ": Got auth token: " <> T.take 10 authToken <> "..."
         liftIO $ do
           logToModal bc $ logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name
           -- Read current page info to determine pagination
