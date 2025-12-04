@@ -40,11 +40,12 @@ import Control.Exception.Safe (bracketOnError_)
 import Control.Monad (foldM)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Data.Time.Calendar (fromGregorian)
-import Data.Time.Clock (UTCTime(..))
+import Data.Time.Clock (UTCTime(..), getCurrentTime)
 import qualified Data.Vector as V
 import GitHub
 import Network.HTTP.Conduit hiding (Proxy)
@@ -55,6 +56,7 @@ import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
 import qualified Sauron.GraphQL as GraphQL
 import Sauron.Types
+import Sauron.UI.BranchWithInfo (formatCommitTimeText, formatPRInfoText, formatCheckStatusWithWidth, formatAheadBehindWithWidth)
 import UnliftIO.Async
 
 
@@ -208,12 +210,16 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
                     , pageInfoLastPage = if totalPages > 0 then Just totalPages else Nothing
                     }
 
+              -- Calculate column widths based on all branches in current page
+              currentTime <- getCurrentTime
+              let columnWidths = calculateColumnWidths currentTime currentPageBranches
+
               -- Store only the current page's branches in the node state
               atomically $ do
                 writeTVar pageInfoVar newPageInfo
                 writeTVar stateVar (Fetched (V.fromList currentPageBranches))
                 (writeTVar childrenVar =<<) $ forM currentPageBranches $ \branchInfo ->
-                  SingleBranchWithInfoNode <$> makeEmptyElem bc branchInfo ("/tree/" <> branchWithInfoBranchName branchInfo) (depth' + 1)
+                  SingleBranchWithInfoNode <$> makeEmptyElem bc (branchInfo, columnWidths) ("/tree/" <> branchWithInfoBranchName branchInfo) (depth' + 1)
           logToModal bc $ logPrefix <> ": Processing complete, found " <> show (case result of
             Left _ -> 0
             Right branchesWithCommits -> length $ filterFn branchesWithCommits) <> " " <> logSuffix
@@ -222,6 +228,15 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
     getAuthToken bc = case auth bc of
       OAuth token -> Just $ decodeUtf8 token
       _ -> Nothing  -- Only OAuth tokens supported for now
+
+    calculateColumnWidths :: UTCTime -> [BranchWithInfo] -> ColumnWidths
+    calculateColumnWidths _ [] = ColumnWidths 0 0 0 0  -- Default widths for empty list
+    calculateColumnWidths currentTime branches = ColumnWidths {
+      cwCommitTime = fromMaybe 0 $ viaNonEmpty List.maximum $ map (T.length . formatCommitTimeText currentTime) branches
+      , cwCheckStatus = fromMaybe 0 $ viaNonEmpty List.maximum $ map (snd . formatCheckStatusWithWidth) branches
+      , cwAheadBehind = fromMaybe 0 $ viaNonEmpty List.maximum $ map (snd . formatAheadBehindWithWidth) branches
+      , cwPRInfo = fromMaybe 0 $ viaNonEmpty List.maximum $ map (T.length . formatPRInfoText) branches
+    }
 
 fetchYourBranches :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -313,7 +328,7 @@ fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..}
 fetchBranchWithInfoCommits :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Node Variable SingleBranchWithInfoT -> m ()
-fetchBranchWithInfoCommits owner name (SingleBranchWithInfoNode (EntityData {_static=branchInfo, ..})) = do
+fetchBranchWithInfoCommits owner name (SingleBranchWithInfoNode (EntityData {_static=(branchInfo, _columnWidths), ..})) = do
   bc <- ask
   case branchWithInfoCommitOid branchInfo of
     Nothing -> atomically $ writeTVar _state (Errored "No commit OID available for branch with info")

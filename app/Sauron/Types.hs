@@ -169,7 +169,7 @@ type family NodeStatic a where
   NodeStatic SingleWorkflowT = WorkflowRun
   NodeStatic SingleJobT = ()
   NodeStatic SingleBranchT = Branch
-  NodeStatic SingleBranchWithInfoT = BranchWithInfo
+  NodeStatic SingleBranchWithInfoT = (BranchWithInfo, ColumnWidths)
   NodeStatic SingleCommitT = Commit
   NodeStatic SingleNotificationT = Notification
   NodeStatic JobLogGroupT = JobLogGroup
@@ -326,6 +326,13 @@ data BranchWithInfo = BranchWithInfo {
   , branchWithInfoAssociatedPR :: Maybe GraphQLPullRequest
   , branchWithInfoAheadBy :: Maybe Int
   , branchWithInfoBehindBy :: Maybe Int
+  } deriving (Show, Eq)
+
+data ColumnWidths = ColumnWidths {
+  cwCommitTime :: Int
+  , cwCheckStatus :: Int
+  , cwAheadBehind :: Int
+  , cwPRInfo :: Int
   } deriving (Show, Eq)
 
 -- * Misc

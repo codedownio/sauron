@@ -93,7 +93,7 @@ generateModalTitle (SomeNode inner) =
         _ -> "Job"
     SingleBranchNode (EntityData {_static = Branch {branchName}}) ->
       "Branch: " <> T.unpack branchName
-    SingleBranchWithInfoNode (EntityData {_static = branchInfo}) ->
+    SingleBranchWithInfoNode (EntityData {_static = (branchInfo, _columnWidths)}) ->
       "Branch: " <> T.unpack (branchWithInfoBranchName branchInfo)
     SingleCommitNode (EntityData {_static = Commit {commitGitCommit = GitCommit {gitCommitMessage}}}) ->
       "Commit: " <> T.unpack (T.take 50 gitCommitMessage) <> if T.length gitCommitMessage > 50 then "..." else ""
