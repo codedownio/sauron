@@ -9,6 +9,7 @@ import Brick.Forms
 import Brick.Widgets.Edit (handleEditorEvent)
 import Brick.Widgets.List
 import Control.Monad
+import Control.Monad.Logger (LogLevel(..))
 import Control.Monad.IO.Unlift
 import Data.Function
 import qualified Data.Sequence as Seq
@@ -97,6 +98,18 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey V.KDown []) -> vScrollBy (viewportScroll LogModalContent) 1
       (V.EvKey V.KPageUp []) -> vScrollPage (viewportScroll LogModalContent) Up
       (V.EvKey V.KPageDown []) -> vScrollPage (viewportScroll LogModalContent) Down
+      (V.EvKey (V.KChar 'd') []) -> do
+        modify (appLogLevelFilter .~ LevelDebug)
+        vScrollToEnd (viewportScroll LogModalContent)
+      (V.EvKey (V.KChar 'i') []) -> do
+        modify (appLogLevelFilter .~ LevelInfo)
+        vScrollToEnd (viewportScroll LogModalContent)
+      (V.EvKey (V.KChar 'w') []) -> do
+        modify (appLogLevelFilter .~ LevelWarn)
+        vScrollToEnd (viewportScroll LogModalContent)
+      (V.EvKey (V.KChar 'e') []) -> do
+        modify (appLogLevelFilter .~ LevelError)
+        vScrollToEnd (viewportScroll LogModalContent)
       _ -> return () -- No other interactions for LogModal
   _ -> return ()
 

@@ -15,21 +15,29 @@ import Sauron.UI.AttrMap (errorLogAttr, warningLogAttr, infoLogAttr, debugLogAtt
 
 
 renderLogModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderLogModal appState LogModalState =
-  vBox [
-    hCenter $ withAttr boldText $ str "Application Logs"
+renderLogModal appState LogModalState = vBox [
+    hCenter $ withAttr boldText $ str ("Application Logs - Filter: " <> filterText)
     , hBorder
     -- Scrollable content area with log entries
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport LogModalContent Vertical $
-      vBox (renderLogEntries (appState ^. appNow) (appState ^. appLogs))
+      vBox (renderLogEntries (appState ^. appNow) filteredLogs)
     , hBorder
-    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs"
+    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs, [d/i/w/e] to filter levels"
   ]
   & border
   & withAttr normalAttr
   & hLimitPercent 80
   & vLimitPercent 90
   & centerLayer
+  where
+    currentFilter = appState ^. appLogLevelFilter
+    filteredLogs = filterLogsByLevel currentFilter (appState ^. appLogs)
+    filterText = case currentFilter of
+      LevelDebug -> "All"
+      LevelInfo -> "Info"
+      LevelWarn -> "Warn"
+      LevelError -> "Error"
+      LevelOther t -> toString t
 renderLogModal _ _ = str "Invalid modal state" -- This should never happen
 
 renderLogEntries :: UTCTime -> Seq LogEntry -> [Widget ClickableName]
@@ -80,3 +88,13 @@ formatLevel (LevelOther t) = "[" <> toString t <> "]"
 
 formatLogTime :: UTCTime -> String
 formatLogTime = formatTime defaultTimeLocale "%H:%M:%S.%06q"
+
+filterLogsByLevel :: LogLevel -> Seq LogEntry -> Seq LogEntry
+filterLogsByLevel filterLevel = Seq.filter (\logEntry -> logLevelPriority (_logEntryLevel logEntry) >= logLevelPriority filterLevel)
+  where
+    logLevelPriority :: LogLevel -> Int
+    logLevelPriority LevelError = 4
+    logLevelPriority LevelWarn = 3
+    logLevelPriority LevelInfo = 2
+    logLevelPriority LevelDebug = 1
+    logLevelPriority (LevelOther _) = 0

@@ -512,6 +512,8 @@ data AppState = AppState {
   , _appColorMode :: V.ColorMode
 
   , _appLogs :: Seq LogEntry
+
+  , _appLogLevelFilter :: LogLevel
   }
 
 
