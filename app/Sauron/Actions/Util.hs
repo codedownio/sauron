@@ -24,11 +24,13 @@ import Control.Monad.IO.Class
 import Control.Monad.Logger (LogLevel(..))
 import Control.Monad.Reader
 import Data.Aeson (FromJSON)
+import qualified Data.ByteString as BS
 import qualified Data.List as L
 import qualified Data.Text as T
 import Data.Time
 import GitHub
 import Network.HTTP.Client (Response, responseBody, responseHeaders)
+import Network.HTTP.Types (EscapeItem(..))
 import Network.HTTP.Types.Header (hContentLength)
 import Relude
 import Sauron.Types
@@ -66,12 +68,28 @@ findRepoParent elems = viaNonEmpty head [x | SomeNode x@(RepoNode _) <- toList e
 
 requestToUrl :: Request k a -> Text
 requestToUrl req = case req of
-  Query paths _queryString -> pathsToUrl paths
-  PagedQuery paths _queryString _fetchCount -> pathsToUrl paths
+  Query paths queryString -> pathsToUrl paths <> formatQueryString queryString
+  PagedQuery paths queryString _fetchCount -> pathsToUrl paths <> formatQueryString queryString
   Command _method paths _body -> pathsToUrl paths
   where
     pathsToUrl :: [Text] -> Text
     pathsToUrl = ("/" <>) . T.intercalate "/"
+
+    formatQueryString :: QueryString -> Text
+    formatQueryString queryParams =
+      if null queryParams
+        then ""
+        else "?" <> T.intercalate "&" (map formatParam queryParams)
+
+    formatParam :: (BS.ByteString, [EscapeItem]) -> Text
+    formatParam (key, values) = keyText <> "=" <> valuesText
+      where
+        keyText = decodeUtf8 key
+        valuesText = T.intercalate "," $ map formatEscapeItem values
+
+    formatEscapeItem :: EscapeItem -> Text
+    formatEscapeItem (QE s) = decodeUtf8 s -- QE is already query-escaped
+    formatEscapeItem (QN s) = decodeUtf8 s
 
 githubWithLogging :: (MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error a)
 githubWithLogging request = fmap responseBody <$> githubWithLoggingResponse request
