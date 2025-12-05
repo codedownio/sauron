@@ -16,7 +16,6 @@ import Data.Time.Format (parseTimeM, defaultTimeLocale)
 import qualified Data.Vector as V
 import GitHub
 import Relude
-import qualified Sauron.GraphQL as GraphQL
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
@@ -76,7 +75,7 @@ formatCheckStatusWithWidth branchInfo =
     Nothing -> let text = "No checks" in (str text, length text)
     Just "SUCCESS" -> let widget = hBox [withAttr greenCheckAttr $ str "✓", str " Checks"] in (widget, 8) -- ✓ Checks = 8 chars
     Just "FAILURE" -> let widget = hBox [withAttr redXAttr $ str "✗", str " Failed"] in (widget, 8) -- ✗ Failed = 8 chars
-    Just "PENDING" -> let widget = hBox [withAttr queuedAttr $ str "⏳", str " Running"] in (widget, 9) -- ⏳ Running = 9 chars
+    Just "PENDING" -> let widget = hBox [withAttr queuedAttr $ str "●", str " Running"] in (widget, 9) -- ● Running = 9 chars
     Just status -> let text = toString status in (str text, T.length status)
 
 formatAheadBehindWithWidth :: BranchWithInfo -> (Widget n, Int)
@@ -110,6 +109,12 @@ formatPRInfoText :: BranchWithInfo -> Text
 formatPRInfoText branchInfo =
   case branchWithInfoAssociatedPR branchInfo of
     Nothing -> "No PR"
-    Just pr -> case GraphQL.prNumber pr of
+    Just pr -> case prNumber pr of
       Nothing -> "PR: Unknown"
-      Just num -> "PR #" <> show num
+      Just num ->
+        let stateText = case prState pr of
+              Just "OPEN" -> ""  -- Don't show state for open PRs
+              Just "MERGED" -> " (merged)"
+              Just "CLOSED" -> " (closed)"
+              _ -> ""
+        in "PR #" <> show num <> stateText

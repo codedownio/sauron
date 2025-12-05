@@ -309,12 +309,14 @@ data GraphQLPullRequest = GraphQLPullRequest {
   prNumber :: Maybe Int
   , prTitle :: Maybe Text
   , prUrl :: Maybe Text
+  , prState :: Maybe Text
   } deriving (Show, Eq, Generic)
 instance FromJSON GraphQLPullRequest where
   parseJSON = withObject "GraphQLPullRequest" $ \o -> GraphQLPullRequest
     <$> o .:? "number"
     <*> o .:? "title"
     <*> o .:? "url"
+    <*> o .:? "state"
 
 data BranchWithInfo = BranchWithInfo {
   branchWithInfoBranchName :: Text

@@ -7,7 +7,6 @@ module Sauron.GraphQL (
   , filterBranchesByAuthor
   , filterBranchesByActivity
   , filterBranchesByInactivity
-  , prNumber
   ) where
 
 import Control.Exception.Safe (try)
@@ -66,12 +65,13 @@ getBranchesQuery = [i|
           endCursor
         }
       }
-      pullRequests(states: OPEN, first: 100) {
+      pullRequests(states: [OPEN, CLOSED, MERGED], first: 100) {
         nodes {
           number
           title
           url
           headRefName
+          state
         }
       }
     }
@@ -125,6 +125,7 @@ data GraphQLPullRequestWithHead = GraphQLPullRequestWithHead {
   , prWithHeadTitle :: Maybe Text
   , prWithHeadUrl :: Maybe Text
   , prWithHeadRefName :: Maybe Text
+  , prWithHeadState :: Maybe Text
   } deriving (Show, Generic)
 instance FromJSON GraphQLPullRequestWithHead where
   parseJSON = withObject "GraphQLPullRequestWithHead" $ \o -> GraphQLPullRequestWithHead
@@ -132,6 +133,7 @@ instance FromJSON GraphQLPullRequestWithHead where
     <*> o .:? "title"
     <*> o .:? "url"
     <*> o .:? "headRefName"
+    <*> o .:? "state"
 
 data RefNode = RefNode {
   name :: Text
@@ -292,6 +294,7 @@ findPullRequestForBranch branchName pullRequests =
       prNumber = prWithHeadNumber prWithHead
       , prTitle = prWithHeadTitle prWithHead
       , prUrl = prWithHeadUrl prWithHead
+      , prState = prWithHeadState prWithHead
     }
     Nothing -> Nothing
 
