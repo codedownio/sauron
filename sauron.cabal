@@ -53,6 +53,7 @@ executable sauron
       Sauron.Setup.ReposFromConfigFile
       Sauron.Setup.ReposFromCurrentDirectory
       Sauron.Types
+      Sauron.Types.Branches
       Sauron.UI
       Sauron.UI.AnsiUtil
       Sauron.UI.AttrMap
@@ -62,6 +63,7 @@ executable sauron
       Sauron.UI.BranchWithInfo
       Sauron.UI.Commit
       Sauron.UI.Event
+      Sauron.UI.GitHubBranch
       Sauron.UI.Issue
       Sauron.UI.Job
       Sauron.UI.Keys

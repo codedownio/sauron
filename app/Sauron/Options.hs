@@ -26,6 +26,7 @@ import qualified Graphics.Vty as V
 import Options.Applicative
 import Relude
 import Sauron.Aeson
+import Sauron.Types.Branches ()
 
 
 -- * CLI

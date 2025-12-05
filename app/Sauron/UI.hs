@@ -18,6 +18,7 @@ import Sauron.Types
 import Sauron.UI.Branch ()
 import Sauron.UI.BranchWithInfo ()
 import Sauron.UI.Commit ()
+import Sauron.UI.GitHubBranch ()
 import Sauron.UI.Issue ()
 import Sauron.UI.Job ()
 import Sauron.UI.Notification ()
@@ -65,6 +66,7 @@ drawNodeLine appState node = case node of
   SingleJobNode ed -> drawLine appState ed
   SingleBranchNode ed -> drawLine appState ed
   SingleBranchWithInfoNode ed -> drawLine appState ed
+  GitHubBranchNode ed -> drawLine appState ed
   SingleCommitNode ed -> drawLine appState ed
   SingleNotificationNode ed -> drawLine appState ed
   JobLogGroupNode ed -> drawLine appState ed
@@ -89,6 +91,7 @@ drawNodeInner appState node = case node of
   SingleJobNode ed -> drawInner appState ed
   SingleBranchNode ed -> drawInner appState ed
   SingleBranchWithInfoNode ed -> drawInner appState ed
+  GitHubBranchNode ed -> drawInner appState ed
   SingleCommitNode ed -> drawInner appState ed
   SingleNotificationNode ed -> drawInner appState ed
   JobLogGroupNode ed -> drawInner appState ed

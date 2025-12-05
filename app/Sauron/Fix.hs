@@ -51,6 +51,7 @@ fixNode item@(SingleWorkflowNode ed) = fixTypedNode item ed
 fixNode item@(SingleJobNode ed) = fixTypedNode item ed
 fixNode item@(SingleBranchNode ed) = fixTypedNode item ed
 fixNode item@(SingleBranchWithInfoNode ed) = fixTypedNode item ed
+fixNode item@(GitHubBranchNode ed) = fixChildlessNode item ed
 fixNode item@(SingleCommitNode ed) = fixChildlessNode item ed
 fixNode item@(SingleNotificationNode ed) = fixChildlessNode item ed
 fixNode item@(JobLogGroupNode ed) = fixTypedNode item ed

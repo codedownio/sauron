@@ -32,6 +32,7 @@ import Lens.Micro
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
 import Relude
+import Sauron.Types.Branches
 import qualified Text.Show
 import UnliftIO.Async
 
@@ -71,6 +72,7 @@ data Node f (a :: NodeTyp) where
   SingleJobNode :: EntityData f 'SingleJobT -> Node f 'SingleJobT
   SingleBranchNode :: EntityData f 'SingleBranchT -> Node f 'SingleBranchT
   SingleBranchWithInfoNode :: EntityData f 'SingleBranchWithInfoT -> Node f 'SingleBranchWithInfoT
+  GitHubBranchNode :: EntityData f 'GitHubBranchT -> Node f 'GitHubBranchT
   SingleCommitNode :: EntityData f 'SingleCommitT -> Node f 'SingleCommitT
   SingleNotificationNode :: EntityData f 'SingleNotificationT -> Node f 'SingleNotificationT
   JobLogGroupNode :: EntityData f 'JobLogGroupT -> Node f 'JobLogGroupT
@@ -96,6 +98,7 @@ data NodeTyp =
   | SingleJobT
   | SingleBranchT
   | SingleBranchWithInfoT
+  | GitHubBranchT
   | SingleCommitT
   | SingleNotificationT
   | JobLogGroupT
@@ -123,6 +126,7 @@ instance Show (Node f a) where
   show (SingleJobNode (EntityData {..})) = [i|SingleJobNode<#{_ident}>|]
   show (SingleBranchNode (EntityData {..})) = [i|SingleBranchNode<#{_ident}>|]
   show (SingleBranchWithInfoNode (EntityData {..})) = [i|SingleBranchWithInfoNode<#{_ident}>|]
+  show (GitHubBranchNode (EntityData {..})) = [i|GitHubBranchNode<#{_ident}>|]
   show (SingleCommitNode (EntityData {..})) = [i|SingleCommitNode<#{_ident}>|]
   show (SingleNotificationNode (EntityData {..})) = [i|SingleNotificationNode<#{_ident}>|]
   show (JobLogGroupNode (EntityData {..})) = [i|JobLogGroupNode<#{_ident}>|]
@@ -170,6 +174,7 @@ type family NodeStatic a where
   NodeStatic SingleJobT = ()
   NodeStatic SingleBranchT = Branch
   NodeStatic SingleBranchWithInfoT = (BranchWithInfo, ColumnWidths)
+  NodeStatic GitHubBranchT = GitHubBranchInfo
   NodeStatic SingleCommitT = Commit
   NodeStatic SingleNotificationT = Notification
   NodeStatic JobLogGroupT = JobLogGroup
@@ -183,9 +188,9 @@ type family NodeState a where
   NodeState PaginatedReposT = SearchResult Repo
   NodeState PaginatedBranchesT = V.Vector Branch
   NodeState OverallBranchesT = ()
-  NodeState PaginatedYourBranchesT = V.Vector BranchWithInfo
-  NodeState PaginatedActiveBranchesT = V.Vector BranchWithInfo
-  NodeState PaginatedStaleBranchesT = V.Vector BranchWithInfo
+  NodeState PaginatedYourBranchesT = GitHubBranchesPayload
+  NodeState PaginatedActiveBranchesT = GitHubBranchesPayload
+  NodeState PaginatedStaleBranchesT = GitHubBranchesPayload
   NodeState PaginatedNotificationsT = V.Vector Notification
   NodeState SingleIssueT = V.Vector (Either IssueEvent IssueComment)
   NodeState SinglePullT = V.Vector (Either IssueEvent IssueComment)
@@ -196,6 +201,7 @@ type family NodeState a where
   NodeState SingleCommitT = Commit
   NodeState SingleNotificationT = ()
   NodeState JobLogGroupT = ()
+  NodeState GitHubBranchT = ()
   NodeState HeadingT = ()
   NodeState RepoT = Repo
 
@@ -206,9 +212,9 @@ type family NodeChildType f a where
   NodeChildType f PaginatedReposT = Node f RepoT
   NodeChildType f PaginatedBranchesT = Node f SingleBranchT
   NodeChildType f OverallBranchesT = SomeNode f
-  NodeChildType f PaginatedYourBranchesT = Node f SingleBranchWithInfoT
-  NodeChildType f PaginatedActiveBranchesT = Node f SingleBranchWithInfoT
-  NodeChildType f PaginatedStaleBranchesT = Node f SingleBranchWithInfoT
+  NodeChildType f PaginatedYourBranchesT = Node f GitHubBranchT
+  NodeChildType f PaginatedActiveBranchesT = Node f GitHubBranchT
+  NodeChildType f PaginatedStaleBranchesT = Node f GitHubBranchT
   NodeChildType f PaginatedNotificationsT = Node f SingleNotificationT
   NodeChildType f SingleIssueT = ()
   NodeChildType f SinglePullT = ()
@@ -219,6 +225,7 @@ type family NodeChildType f a where
   NodeChildType f SingleCommitT = ()
   NodeChildType f SingleNotificationT = ()
   NodeChildType f JobLogGroupT = Node f JobLogGroupT
+  NodeChildType f GitHubBranchT = ()
   NodeChildType f HeadingT = SomeNode f
   NodeChildType f RepoT = SomeNode f
 
@@ -273,6 +280,7 @@ getExistentialChildrenWrapped node = case node of
   SinglePullNode _ -> return []
   SingleCommitNode _ -> return []
   SingleNotificationNode _ -> return []
+  GitHubBranchNode _ -> return []
 
 getEntityData :: Node f a -> EntityData f a
 getEntityData node = node ^. entityDataL
@@ -300,6 +308,7 @@ entityDataL f (SingleBranchWithInfoNode ed) = SingleBranchWithInfoNode <$> f ed
 entityDataL f (SingleCommitNode ed) = SingleCommitNode <$> f ed
 entityDataL f (SingleNotificationNode ed) = SingleNotificationNode <$> f ed
 entityDataL f (JobLogGroupNode ed) = JobLogGroupNode <$> f ed
+entityDataL f (GitHubBranchNode ed) = GitHubBranchNode <$> f ed
 entityDataL f (HeadingNode ed) = HeadingNode <$> f ed
 entityDataL f (RepoNode ed) = RepoNode <$> f ed
 
@@ -327,6 +336,7 @@ data BranchWithInfo = BranchWithInfo {
   , branchWithInfoAheadBy :: Maybe Int
   , branchWithInfoBehindBy :: Maybe Int
   } deriving (Show, Eq)
+
 
 data ColumnWidths = ColumnWidths {
   cwCommitTime :: Int

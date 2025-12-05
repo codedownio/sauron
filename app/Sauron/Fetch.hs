@@ -27,6 +27,12 @@ module Sauron.Fetch (
   , fetchBranchWithInfoCommits
   , fetchCommitDetails
 
+  -- REST API branch fetching
+  , fetchGitHubBranches
+  , fetchGitHubYourBranches
+  , fetchGitHubActiveBranches
+  , fetchGitHubStaleBranches
+
   , fetchNotifications
 
   , fetchWorkflowJobs
@@ -41,12 +47,14 @@ import Control.Monad (foldM)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import Control.Monad.Logger (LogLevel(..))
-import qualified Data.List as List
+import Data.Aeson (eitherDecode')
+import qualified Data.List as L
+import qualified Data.List as List ()
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Data.Time.Calendar (fromGregorian)
-import Data.Time.Clock (UTCTime(..), getCurrentTime)
+import Data.Time.Clock (UTCTime(..), getCurrentTime, diffUTCTime)
 import qualified Data.Vector as V
 import GitHub
 import Network.HTTP.Conduit hiding (Proxy)
@@ -55,9 +63,10 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
-import qualified Sauron.GraphQL as GraphQL
+import qualified Sauron.GraphQL as GraphQL ()
 import Sauron.Types
-import Sauron.UI.BranchWithInfo (formatCommitTimeText, formatPRInfoText, formatCheckStatusWithWidth, formatAheadBehindWithWidth)
+import Sauron.Types.Branches
+import Sauron.UI.BranchWithInfo ()
 import UnliftIO.Async
 
 
@@ -151,126 +160,31 @@ fetchBranches owner name (PaginatedBranchesNode (EntityData {..})) = do
       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
         SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
 
-fetchBranchesWithFilter :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m
-  )
-  => Name Owner
-  -> Name Repo
-  -> Maybe Text
-  -> TVar (Fetchable (V.Vector BranchWithInfo))
-  -> TVar [Node Variable SingleBranchWithInfoT]
-  -> TVar PageInfo
-  -> Int
-  -> Text
-  -> ([BranchWithInfo] -> [BranchWithInfo])
-  -> Text
-  -> m ()
-fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageInfoVar depth' logPrefix filterFn logSuffix = do
-  bc <- ask
 
-  bracketOnError_ (atomically $ markFetching stateVar)
-                  (atomically $ writeTVar stateVar (Errored $ logPrefix <> " fetch failed with exception.")) $ do
-    case getAuthToken bc of
-      Nothing -> liftIO $ do
-        logToModal bc LevelError (logPrefix <> ": No auth token available") Nothing
-        atomically $ writeTVar stateVar (Errored "No auth token available for GraphQL query")
-      Just authToken -> do
-        liftIO $ do
-          logToModal bc LevelInfo (logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name) Nothing
-          -- Read current page info to determine pagination
-          currentPageInfo <- readTVarIO pageInfoVar
-          let currentPage = pageInfoCurrentPage currentPageInfo
-
-          -- Fetch a substantial number of branches to enable client-side filtering and pagination
-          -- We fetch more than we need to allow for filtering (many branches may be filtered out)
-          let branchesToFetch = max 100 (currentPage * pageSize * 3)  -- Fetch at least 100, or enough for 3 pages worth
-
-          -- Fetch branches with commit info using GraphQL
-          result <- GraphQL.queryBranchesWithInfos (\msg -> logToModal bc LevelDebug msg Nothing) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
-          case result of
-            Left err -> atomically $ do
-              writeTVar stateVar (Errored $ toText err)
-              writeTVar childrenVar []
-            Right branchesWithCommits -> do
-              -- Apply the provided filter function and sort by date
-              let allFilteredBranches = GraphQL.sortBranchesByDate $ filterFn branchesWithCommits
-              let totalBranches = length allFilteredBranches
-              let totalPages = max 1 $ (totalBranches + pageSize - 1) `div` pageSize  -- Ceiling division, at least 1 page
-
-              -- Calculate the slice for the current page
-              let startIdx = (currentPage - 1) * pageSize
-              let currentPageBranches = take pageSize $ drop startIdx allFilteredBranches
-
-              let newPageInfo = PageInfo {
-                    pageInfoCurrentPage = currentPage
-                    , pageInfoFirstPage = if totalPages > 0 then Just 1 else Nothing
-                    , pageInfoPrevPage = if currentPage > 1 then Just (currentPage - 1) else Nothing
-                    , pageInfoNextPage = if currentPage < totalPages then Just (currentPage + 1) else Nothing
-                    , pageInfoLastPage = if totalPages > 0 then Just totalPages else Nothing
-                    }
-
-              -- Calculate column widths based on all branches in current page
-              currentTime <- getCurrentTime
-              let columnWidths = calculateColumnWidths currentTime currentPageBranches
-
-              -- Store only the current page's branches in the node state
-              atomically $ do
-                writeTVar pageInfoVar newPageInfo
-                writeTVar stateVar (Fetched (V.fromList currentPageBranches))
-                (writeTVar childrenVar =<<) $ forM currentPageBranches $ \branchInfo ->
-                  SingleBranchWithInfoNode <$> makeEmptyElem bc (branchInfo, columnWidths) ("/tree/" <> branchWithInfoBranchName branchInfo) (depth' + 1)
-          logToModal bc LevelInfo (logPrefix <> ": Processing complete, found " <> show (case result of
-            Left _ -> 0
-            Right branchesWithCommits -> length $ filterFn branchesWithCommits) <> " " <> logSuffix) Nothing
-  where
-    getAuthToken :: BaseContext -> Maybe Text
-    getAuthToken bc = case auth bc of
-      OAuth token -> Just $ decodeUtf8 token
-      _ -> Nothing  -- Only OAuth tokens supported for now
-
-    calculateColumnWidths :: UTCTime -> [BranchWithInfo] -> ColumnWidths
-    calculateColumnWidths _ [] = ColumnWidths 0 0 0 0  -- Default widths for empty list
-    calculateColumnWidths currentTime branches = ColumnWidths {
-      cwCommitTime = fromMaybe 0 $ viaNonEmpty List.maximum $ map (T.length . formatCommitTimeText currentTime) branches
-      , cwCheckStatus = fromMaybe 0 $ viaNonEmpty List.maximum $ map (snd . formatCheckStatusWithWidth) branches
-      , cwAheadBehind = fromMaybe 0 $ viaNonEmpty List.maximum $ map (snd . formatAheadBehindWithWidth) branches
-      , cwPRInfo = fromMaybe 0 $ viaNonEmpty List.maximum $ map (T.length . formatPRInfoText) branches
-    }
-
+-- Wrapper functions for compatibility with the Action system
 fetchYourBranches :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedYourBranchesT -> m ()
-fetchYourBranches owner name repoDefaultBranch (PaginatedYourBranchesNode (EntityData {..})) = do
-  bc <- ask
-  liftIO (getUserName bc) >>= \case
-    Nothing -> liftIO $ do
-      logToModal bc LevelError "fetchYourBranches: Could not get current user name" Nothing
-      atomically $ writeTVar _state (Errored "Could not get current user name")
-    Just userName ->
-      fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchYourBranches"
-        (GraphQL.filterBranchesByAuthor userName) "your branches"
-  where
-    getUserName :: BaseContext -> IO (Maybe Text)
-    getUserName bc = do
-      -- Get the current authenticated user's name from GitHub API
-      result <- runReaderT (withGithubApiSemaphore (githubWithLogging userInfoCurrentR)) bc
-      case result of
-        Left _err -> return Nothing
-        Right user -> return $ Just $ toPathPart $ userLogin user
+fetchYourBranches owner name _repoDefaultBranch (PaginatedYourBranchesNode (EntityData {..})) = do
+  currentPageInfo <- liftIO $ readTVarIO _pageInfo
+  let currentPage = pageInfoCurrentPage currentPageInfo
+  fetchGitHubYourBranches owner name currentPage _state
 
 fetchActiveBranches :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedActiveBranchesT -> m ()
-fetchActiveBranches owner name repoDefaultBranch (PaginatedActiveBranchesNode (EntityData {..})) =
-  fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchActiveBranches"
-    (GraphQL.filterBranchesByActivity 90) "active branches"
+fetchActiveBranches owner name _repoDefaultBranch (PaginatedActiveBranchesNode (EntityData {..})) = do
+  currentPageInfo <- liftIO $ readTVarIO _pageInfo
+  let currentPage = pageInfoCurrentPage currentPageInfo
+  fetchGitHubActiveBranches owner name currentPage _state
 
 fetchStaleBranches :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedStaleBranchesT -> m ()
-fetchStaleBranches owner name repoDefaultBranch (PaginatedStaleBranchesNode (EntityData {..})) =
-  fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchStaleBranches"
-    (GraphQL.filterBranchesByInactivity 90) "stale branches"
+fetchStaleBranches owner name _repoDefaultBranch (PaginatedStaleBranchesNode (EntityData {..})) = do
+  currentPageInfo <- liftIO $ readTVarIO _pageInfo
+  let currentPage = pageInfoCurrentPage currentPageInfo
+  fetchGitHubStaleBranches owner name currentPage _state
 
 fetchOverallBranches :: (
   MonadReader BaseContext m, MonadIO m
@@ -460,7 +374,9 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
               _ -> return acc
           ) (Map.empty :: Map.Map (Id Job) (Node Variable SingleJobT)) existingChildren
 
-        (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {jobId}) -> do
+        let jobSortKeyFn = untagName . jobName
+
+        jobNamesAndNodes <- forM (V.toList results) $ \job@(Job {jobId}) -> do
           case Map.lookup jobId existingJobsMap of
             Just existingNode@(SingleJobNode existingEntityData) -> do
               -- Update existing node's job data while preserving toggle state
@@ -470,25 +386,21 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
                 Fetched (_, logGroups) -> writeTVar jobState (Fetched (job, logGroups))
                 Fetching (Just (_, logGroups)) -> writeTVar jobState (Fetching (Just (job, logGroups)))
                 _ -> writeTVar jobState (Fetched (job, []))
-              return existingNode
+              return (jobSortKeyFn job, existingNode)
             Nothing -> do
               -- Create new node for new jobs
               entityData <- makeEmptyElem bc () "" (_depth + 1)
-              let EntityData {_state = jobState} = entityData
+              let EntityData {_state=jobState} = entityData
               writeTVar jobState (Fetched (job, []))
-              return $ SingleJobNode entityData
-          -- writeTVar (_state child) (PaginatedItemJob)
-  -- TODO: do pagination for these jobs? The web UI doesn't seem to...
-  -- bc <- ask
-  -- fetchPaginated'' (jobsForWorkflowRunR owner name workflowRunId) _pageInfo (writeTVar _state) $ \case
-  --   Left err -> do
-  --     writeTVar _state (Errored (show err))
-  --     writeTVar _children []
-  --   Right (wtc@(WithTotalCount results _totalCount), newPageInfo) -> do
-  --     writeTVar _pageInfo newPageInfo
-  --     writeTVar _state (Fetched (PaginatedItemsJobs wtc))
-  --     (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {}) ->
-  --       makeEmptyElem bc (SingleJob job) "" (_depth + 1)
+              return (jobSortKeyFn job, SingleJobNode entityData)
+
+        -- TODO: do pagination for these jobs? The web UI doesn't seem to...
+
+        -- Sort by name
+        writeTVar _children $ jobNamesAndNodes
+          & L.sortBy (comparing fst)
+          & fmap snd
+
 
 fetchJobLogs :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -592,3 +504,66 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
     , _depth = depth'
     , _ident = ident'
   }
+
+-- * New GitHub REST API branch fetching
+
+-- | Fetch branches using GitHub's internal REST API endpoints
+fetchGitHubBranches :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Text -> Int -> TVar (Fetchable GitHubBranchesPayload) -> m ()
+fetchGitHubBranches owner name branchType page responseVar = do
+  bc@(BaseContext {auth, manager}) <- ask
+  bracketOnError_ (atomically $ markFetching responseVar)
+                  (atomically $ writeTVar responseVar (Errored "GitHub branches fetch failed with exception.")) $ do
+
+    -- Construct the GitHub internal API URL
+    let url = "https://github.com/" <> toPathPart owner <> "/" <> toPathPart name <> "/branches/" <> branchType
+    let urlWithPage = if page > 1 then url <> "?page=" <> T.pack (show page) else url
+
+    logToModal bc LevelDebug ("fetchGitHubBranches: " <> urlWithPage) Nothing
+
+    -- Make the HTTP request with API semaphore
+    (response, duration) <- withGithubApiSemaphore $ do
+      -- Create HTTP request
+      request <- liftIO $ parseRequest (T.unpack urlWithPage)
+      let authRequest = case auth of
+            OAuth token -> request { requestHeaders = [("Authorization", "token " <> token)] <> requestHeaders request }
+            _ -> request
+      let finalRequest = authRequest { requestHeaders = [("Accept", "application/json")] <> requestHeaders authRequest }
+
+      startTime <- liftIO getCurrentTime
+      response <- liftIO $ httpLbs finalRequest manager
+      endTime <- liftIO getCurrentTime
+      let duration = diffUTCTime endTime startTime
+      return (response, duration)
+
+    logToModal bc LevelDebug ("response body: " <> show (responseBody response)) Nothing
+
+    case eitherDecode' (responseBody response) of
+      Left err -> do
+        -- Try parsing as the wrapped response format
+        case eitherDecode' (responseBody response) :: Either String GitHubBranchesResponse of
+          Left err2 -> do
+            liftIO $ logToModal bc LevelError ("GitHub branches parse error: " <> T.pack err <> " | " <> T.pack err2) (Just duration)
+            liftIO $ atomically $ writeTVar responseVar (Errored $ "Parse error: " <> T.pack err)
+          Right wrappedResponse -> do
+            liftIO $ logToModal bc LevelInfo ("GitHub branches fetched: " <> T.pack (show (length (gitHubBranchesPayloadBranches (gitHubBranchesResponsePayload wrappedResponse)))) <> " branches") (Just duration)
+            liftIO $ atomically $ writeTVar responseVar (Fetched (gitHubBranchesResponsePayload wrappedResponse))
+      Right branchesPayload -> do
+        liftIO $ logToModal bc LevelInfo ("GitHub branches fetched: " <> T.pack (show (length (gitHubBranchesPayloadBranches branchesPayload))) <> " branches") (Just duration)
+        liftIO $ atomically $ writeTVar responseVar (Fetched branchesPayload)
+
+fetchGitHubYourBranches :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Int -> TVar (Fetchable GitHubBranchesPayload) -> m ()
+fetchGitHubYourBranches owner name = fetchGitHubBranches owner name "yours"
+
+fetchGitHubActiveBranches :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Int -> TVar (Fetchable GitHubBranchesPayload) -> m ()
+fetchGitHubActiveBranches owner name = fetchGitHubBranches owner name "active"
+
+fetchGitHubStaleBranches :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Int -> TVar (Fetchable GitHubBranchesPayload) -> m ()
+fetchGitHubStaleBranches owner name = fetchGitHubBranches owner name "stale"

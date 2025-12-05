@@ -17,6 +17,7 @@ import GitHub hiding (Status)
 import Relude
 import Sauron.Fetch.Core (pageSize)
 import Sauron.Types
+import Sauron.Types.Branches
 import Sauron.UI.AttrMap
 import Sauron.UI.Search
 import Sauron.UI.Statuses (getQuarterCircleSpinner)
@@ -88,9 +89,9 @@ instance ListDrawable Fixed 'OverallBranchesT where
 
 instance ListDrawable Fixed 'PaginatedYourBranchesT where
   drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched branches -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches)
-    Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+    Fetched branchesPayload -> paginatedHeading ed appState "Your branches" (branchPayloadCountWidget _pageInfo branchesPayload)
+    Fetching maybeBranchesPayload -> case maybeBranchesPayload of
+      Just branchesPayload -> paginatedHeading ed appState "Your branches" (branchPayloadCountWidget _pageInfo branchesPayload <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
       Nothing -> paginatedHeading ed appState "Your branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Your branches" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Your branches" (str [i|(error fetching: #{err})|])
@@ -99,9 +100,9 @@ instance ListDrawable Fixed 'PaginatedYourBranchesT where
 
 instance ListDrawable Fixed 'PaginatedActiveBranchesT where
   drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched branches -> paginatedHeading ed appState "Active branches" (countWidget _pageInfo branches)
-    Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "Active branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+    Fetched branchesPayload -> paginatedHeading ed appState "Active branches" (branchPayloadCountWidget _pageInfo branchesPayload)
+    Fetching maybeBranchesPayload -> case maybeBranchesPayload of
+      Just branchesPayload -> paginatedHeading ed appState "Active branches" (branchPayloadCountWidget _pageInfo branchesPayload <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
       Nothing -> paginatedHeading ed appState "Active branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Active branches" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Active branches" (str [i|(error fetching: #{err})|])
@@ -110,9 +111,9 @@ instance ListDrawable Fixed 'PaginatedActiveBranchesT where
 
 instance ListDrawable Fixed 'PaginatedStaleBranchesT where
   drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched branches -> paginatedHeading ed appState "Stale branches" (countWidget _pageInfo branches)
-    Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "Stale branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+    Fetched branchesPayload -> paginatedHeading ed appState "Stale branches" (branchPayloadCountWidget _pageInfo branchesPayload)
+    Fetching maybeBranchesPayload -> case maybeBranchesPayload of
+      Just branchesPayload -> paginatedHeading ed appState "Stale branches" (branchPayloadCountWidget _pageInfo branchesPayload <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
       Nothing -> paginatedHeading ed appState "Stale branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
     NotFetched -> paginatedHeading ed appState "Stale branches" (str [i|(not fetched)|])
     Errored err -> paginatedHeading ed appState "Stale branches" (str [i|(error fetching: #{err})|])
@@ -159,6 +160,11 @@ countWidget :: PageInfo -> V.Vector a -> Widget n
 countWidget pageInfo' items = case pageInfoLastPage pageInfo' of
   Just lastPage -> str [i|(~#{lastPage * pageSize})|]
   Nothing -> str [i|(#{V.length items})|]
+
+branchPayloadCountWidget :: PageInfo -> GitHubBranchesPayload -> Widget n
+branchPayloadCountWidget pageInfo' branchesPayload = case pageInfoLastPage pageInfo' of
+  Just lastPage -> str [i|(~#{lastPage * pageSize})|]
+  Nothing -> str [i|(#{length (gitHubBranchesPayloadBranches branchesPayload)})|]
 
 
 paginationInfo :: PageInfo -> Widget n
