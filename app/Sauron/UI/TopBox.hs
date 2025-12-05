@@ -110,6 +110,9 @@ isSearchable' (SomeNode (PaginatedPullsNode {})) = True
 isSearchable' (SomeNode (PaginatedWorkflowsNode {})) = False
 isSearchable' (SomeNode (PaginatedReposNode {})) = True
 isSearchable' (SomeNode (PaginatedBranchesNode {})) = True
+isSearchable' (SomeNode (PaginatedYourBranchesNode {})) = True
+isSearchable' (SomeNode (PaginatedActiveBranchesNode {})) = True
+isSearchable' (SomeNode (PaginatedStaleBranchesNode {})) = True
 isSearchable' (SomeNode (PaginatedNotificationsNode {})) = True
 isSearchable' _ = False
 

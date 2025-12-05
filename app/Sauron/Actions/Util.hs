@@ -24,11 +24,13 @@ import Control.Monad.IO.Class
 import Control.Monad.Logger (LogLevel(..))
 import Control.Monad.Reader
 import Data.Aeson (FromJSON)
+import qualified Data.ByteString as BS
 import qualified Data.List as L
 import qualified Data.Text as T
 import Data.Time
 import GitHub
 import Network.HTTP.Client (Response, responseBody, responseHeaders)
+import Network.HTTP.Types (EscapeItem(..))
 import Network.HTTP.Types.Header (hContentLength)
 import Relude
 import Sauron.Types
@@ -66,12 +68,28 @@ findRepoParent elems = viaNonEmpty head [x | SomeNode x@(RepoNode _) <- toList e
 
 requestToUrl :: Request k a -> Text
 requestToUrl req = case req of
-  Query paths _queryString -> pathsToUrl paths
-  PagedQuery paths _queryString _fetchCount -> pathsToUrl paths
+  Query paths queryString -> pathsToUrl paths <> formatQueryString queryString
+  PagedQuery paths queryString _fetchCount -> pathsToUrl paths <> formatQueryString queryString
   Command _method paths _body -> pathsToUrl paths
   where
     pathsToUrl :: [Text] -> Text
     pathsToUrl = ("/" <>) . T.intercalate "/"
+
+    formatQueryString :: QueryString -> Text
+    formatQueryString queryParams =
+      if null queryParams
+        then ""
+        else "?" <> T.intercalate "&" (map formatParam queryParams)
+
+    formatParam :: (BS.ByteString, [EscapeItem]) -> Text
+    formatParam (key, values) = keyText <> "=" <> valuesText
+      where
+        keyText = decodeUtf8 key
+        valuesText = T.intercalate "," $ map formatEscapeItem values
+
+    formatEscapeItem :: EscapeItem -> Text
+    formatEscapeItem (QE s) = decodeUtf8 s -- QE is already query-escaped
+    formatEscapeItem (QN s) = decodeUtf8 s
 
 githubWithLogging :: (MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error a)
 githubWithLogging request = fmap responseBody <$> githubWithLoggingResponse request
@@ -84,12 +102,15 @@ githubWithLogging' bc request = fmap responseBody <$> githubWithLogging'' bc req
 
 githubWithLogging'' :: (MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error (Response a))
 githubWithLogging'' (BaseContext {..}) request = do
+  startTime <- liftIO getCurrentTime
   result <- liftIO $ executeRequestWithMgrAndRes manager auth request
-  logResult eventChan request result
+  endTime <- liftIO getCurrentTime
+  let duration = diffUTCTime endTime startTime
+  logResult eventChan request result (Just duration)
   return result
 
-logResult :: (MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Response b) -> m ()
-logResult eventChan request result = do
+logResult :: (MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Response b) -> Maybe NominalDiffTime -> m ()
+logResult eventChan request result maybeDuration = do
   now <- liftIO getCurrentTime
   let url = requestToUrl request
   let level = case result of Left _ -> LevelError; _ -> LevelInfo
@@ -97,10 +118,10 @@ logResult eventChan request result = do
         Left err -> "Failed: " <> url <> " - " <> show err
         Right response ->
           let sizeInfo = case getResponseSize response of
-                Nothing -> " " <> show (responseHeaders response)
+                Nothing -> "" -- " " <> show (responseHeaders response)
                 Just size -> " (" <> show size <> " bytes)"
           in (url <> sizeInfo)
-  let logEntry = LogEntry now level msg
+  let logEntry = LogEntry now level msg maybeDuration
   liftIO $ writeBChan eventChan (LogEntryAdded logEntry)
   where
     getResponseSize :: Response a -> Maybe Int

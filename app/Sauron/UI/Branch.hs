@@ -2,9 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Sauron.UI.Branch (
-  branchLine
-  ) where
+module Sauron.UI.Branch () where
 
 import Brick
 import Data.String.Interpolate
@@ -18,16 +16,17 @@ import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 
 instance ListDrawable Fixed 'SingleBranchT where
   drawLine appState (EntityData {_static=branch, _state, ..}) =
-    branchLine _toggled branch appState _state
+    simpleBranchLine _toggled branch appState _state
 
   drawInner _ _ = Nothing
 
-branchLine :: Bool -> Branch -> AppState -> Fetchable (V.Vector Commit) -> Widget n
-branchLine toggled' (Branch {branchName, branchCommit}) appState fetchableState = vBox [line1, line2]
+simpleBranchLine :: Bool -> Branch -> AppState -> Fetchable (V.Vector Commit) -> Widget n
+simpleBranchLine toggled' (Branch {branchName, branchCommit}) appState fetchableState = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
-      , withAttr branchAttr $ str $ toString branchName
+      , hLimitPercent 40 $ withAttr branchAttr $
+          padRight Max $ txt branchName
       , fetchableQuarterCircleSpinner (_appAnimationCounter appState) fetchableState
       , padLeft Max $ case fetchableState of
           Fetched commits -> str [i|(#{V.length commits} commits)|]

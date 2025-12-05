@@ -67,6 +67,9 @@ getPaginationInfo (SomeNode (PaginatedPullsNode (EntityData {..}))) = Just _page
 getPaginationInfo (SomeNode (PaginatedWorkflowsNode (EntityData {..}))) = Just _pageInfo
 getPaginationInfo (SomeNode (PaginatedReposNode (EntityData {..}))) = Just _pageInfo
 getPaginationInfo (SomeNode (PaginatedBranchesNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo (SomeNode (PaginatedYourBranchesNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo (SomeNode (PaginatedActiveBranchesNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo (SomeNode (PaginatedStaleBranchesNode (EntityData {..}))) = Just _pageInfo
 getPaginationInfo (SomeNode (PaginatedNotificationsNode (EntityData {..}))) = Just _pageInfo
 getPaginationInfo _ = Nothing
 

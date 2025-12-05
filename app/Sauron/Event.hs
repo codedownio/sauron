@@ -9,6 +9,7 @@ import Brick.Forms
 import Brick.Widgets.Edit (handleEditorEvent)
 import Brick.Widgets.List
 import Control.Monad
+import Control.Monad.Logger (LogLevel(..))
 import Control.Monad.IO.Unlift
 import Data.Function
 import qualified Data.Sequence as Seq
@@ -44,6 +45,7 @@ appEvent _s (AppEvent (TimeUpdated newTime)) = do
 appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
   -- Add log entry to the logs sequence
   modify (appLogs %~ (Seq.|> logEntry))
+
 
 
 -- Handle modal events
@@ -86,10 +88,28 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> do
         modify (appModal .~ Nothing)
         liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+      (V.EvKey (V.KChar 'c') []) -> do
+        modify (appLogs .~ Seq.empty)
       (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll LogModalContent) Down
       (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll LogModalContent) Up
       (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) 1
       (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) (-1)
+      (V.EvKey V.KUp []) -> vScrollBy (viewportScroll LogModalContent) (-1)
+      (V.EvKey V.KDown []) -> vScrollBy (viewportScroll LogModalContent) 1
+      (V.EvKey V.KPageUp []) -> vScrollPage (viewportScroll LogModalContent) Up
+      (V.EvKey V.KPageDown []) -> vScrollPage (viewportScroll LogModalContent) Down
+      (V.EvKey (V.KChar 'd') []) -> do
+        modify (appLogLevelFilter .~ LevelDebug)
+        vScrollToEnd (viewportScroll LogModalContent)
+      (V.EvKey (V.KChar 'i') []) -> do
+        modify (appLogLevelFilter .~ LevelInfo)
+        vScrollToEnd (viewportScroll LogModalContent)
+      (V.EvKey (V.KChar 'w') []) -> do
+        modify (appLogLevelFilter .~ LevelWarn)
+        vScrollToEnd (viewportScroll LogModalContent)
+      (V.EvKey (V.KChar 'e') []) -> do
+        modify (appLogLevelFilter .~ LevelError)
+        vScrollToEnd (viewportScroll LogModalContent)
       _ -> return () -- No other interactions for LogModal
   _ -> return ()
 
@@ -177,8 +197,10 @@ appEvent s (VtyEvent e) = case e of
       liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
 
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do
-    modify (appModal .~ Just LogModalState)
+    modify (appModal ?~ LogModalState)
     liftIO $ atomically $ writeTVar (_appModalVariable s) (Just LogModalState)
+    -- Scroll to the bottom of the log modal content to show latest logs
+    vScrollToEnd (viewportScroll LogModalContent)
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
     -- Cancel everything and wait for cleanups
@@ -194,7 +216,7 @@ appEvent _s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
 appEvent _s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
   vScrollBy (viewportScroll MainList) 1
 appEvent _s (MouseDown (ListRow n) V.BLeft _ _) = do
-  modify (appMainList %~ (listMoveTo n))
+  modify (appMainList %~ listMoveTo n)
 
 appEvent _ _ = return ()
 

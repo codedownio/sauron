@@ -70,6 +70,14 @@ generateModalTitle (SomeNode inner) =
       "Workflow Runs"
     PaginatedBranchesNode _ ->
       "Branches"
+    OverallBranchesNode _ ->
+      "Branches"
+    PaginatedYourBranchesNode _ ->
+      "Your Branches"
+    PaginatedActiveBranchesNode _ ->
+      "Active Branches"
+    PaginatedStaleBranchesNode _ ->
+      "Stale Branches"
     PaginatedNotificationsNode _ ->
       "Notifications"
     SingleIssueNode (EntityData {_static = Issue {issueNumber = IssueNumber num, issueTitle}}) ->
@@ -85,6 +93,8 @@ generateModalTitle (SomeNode inner) =
         _ -> "Job"
     SingleBranchNode (EntityData {_static = Branch {branchName}}) ->
       "Branch: " <> T.unpack branchName
+    SingleBranchWithInfoNode (EntityData {_static = (branchInfo, _columnWidths)}) ->
+      "Branch: " <> T.unpack (branchWithInfoBranchName branchInfo)
     SingleCommitNode (EntityData {_static = Commit {commitGitCommit = GitCommit {gitCommitMessage}}}) ->
       "Commit: " <> T.unpack (T.take 50 gitCommitMessage) <> if T.length gitCommitMessage > 50 then "..." else ""
     SingleNotificationNode (EntityData {_static = Notification {notificationSubject = Subject {subjectTitle}}}) ->

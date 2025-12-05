@@ -16,6 +16,7 @@ import Data.String.Interpolate
 import Relude
 import Sauron.Types
 import Sauron.UI.Branch ()
+import Sauron.UI.BranchWithInfo ()
 import Sauron.UI.Commit ()
 import Sauron.UI.Issue ()
 import Sauron.UI.Job ()
@@ -53,12 +54,17 @@ drawNodeLine appState node = case node of
   PaginatedWorkflowsNode ed -> drawLine appState ed
   PaginatedReposNode ed -> drawLine appState ed
   PaginatedBranchesNode ed -> drawLine appState ed
+  OverallBranchesNode ed -> drawLine appState ed
+  PaginatedYourBranchesNode ed -> drawLine appState ed
+  PaginatedActiveBranchesNode ed -> drawLine appState ed
+  PaginatedStaleBranchesNode ed -> drawLine appState ed
   PaginatedNotificationsNode ed -> drawLine appState ed
   SingleIssueNode ed -> drawLine appState ed
   SinglePullNode ed -> drawLine appState ed
   SingleWorkflowNode ed -> drawLine appState ed
   SingleJobNode ed -> drawLine appState ed
   SingleBranchNode ed -> drawLine appState ed
+  SingleBranchWithInfoNode ed -> drawLine appState ed
   SingleCommitNode ed -> drawLine appState ed
   SingleNotificationNode ed -> drawLine appState ed
   JobLogGroupNode ed -> drawLine appState ed
@@ -72,12 +78,17 @@ drawNodeInner appState node = case node of
   PaginatedWorkflowsNode ed -> drawInner appState ed
   PaginatedReposNode ed -> drawInner appState ed
   PaginatedBranchesNode ed -> drawInner appState ed
+  OverallBranchesNode ed -> drawInner appState ed
+  PaginatedYourBranchesNode ed -> drawInner appState ed
+  PaginatedActiveBranchesNode ed -> drawInner appState ed
+  PaginatedStaleBranchesNode ed -> drawInner appState ed
   PaginatedNotificationsNode ed -> drawInner appState ed
   SingleIssueNode ed -> drawInner appState ed
   SinglePullNode ed -> drawInner appState ed
   SingleWorkflowNode ed -> drawInner appState ed
   SingleJobNode ed -> drawInner appState ed
   SingleBranchNode ed -> drawInner appState ed
+  SingleBranchWithInfoNode ed -> drawInner appState ed
   SingleCommitNode ed -> drawInner appState ed
   SingleNotificationNode ed -> drawInner appState ed
   JobLogGroupNode ed -> drawInner appState ed

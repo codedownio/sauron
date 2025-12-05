@@ -11,6 +11,7 @@ import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Control.Concurrent.STM (retry)
 import Control.Monad
+import Control.Monad.Logger (LogLevel(..))
 import Data.Function
 import Data.String.Interpolate
 import qualified Data.Text.IO as T
@@ -135,6 +136,8 @@ main = do
           , _appColorMode = V.FullColor
 
           , _appLogs = mempty
+
+          , _appLogLevelFilter = LevelInfo
         }
 
 
