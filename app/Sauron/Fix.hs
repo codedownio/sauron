@@ -29,7 +29,7 @@ fixModal (CommentModalState {..}) = return $ CommentModalState {
 fixModal (ZoomModalState sn) = do
   fixedNode <- fixSomeNode sn
   return $ ZoomModalState fixedNode
-fixModal LogModalState = return LogModalState
+fixModal (LogModalState logsList) = return (LogModalState logsList)
 
 fixSomeNode :: SomeNode Variable -> STM (SomeNode Fixed)
 fixSomeNode (SomeNode item) = SomeNode <$> fixNode item

@@ -1,5 +1,6 @@
 module Sauron.UI.Modals.LogModal (
-  renderLogModal
+  renderLogModal,
+  filterLogsByLevel
   ) where
 
 import Brick
@@ -15,14 +16,14 @@ import Sauron.UI.AttrMap (errorLogAttr, warningLogAttr, infoLogAttr, debugLogAtt
 
 
 renderLogModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderLogModal appState LogModalState = vBox [
-    hCenter $ withAttr boldText $ str ("Application Logs - Filter: " <> filterText)
+renderLogModal appState (LogModalState _) = vBox [
+    hCenter $ withAttr boldText $ str ("Application Logs - Filter: " <> filterText <> " (" <> show (Seq.length filteredLogs) <> " lines)")
     , hBorder
-    -- Scrollable content area with log entries
+    -- Simple scrollable viewport with scrollbar - always works
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport LogModalContent Vertical $
       vBox (renderLogEntries (appState ^. appNow) filteredLogs)
     , hBorder
-    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs, [d/i/w/e] to filter levels"
+    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs, [d/i/w/e] to filter levels, [↑↓] to scroll"
   ]
   & border
   & withAttr normalAttr

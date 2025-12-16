@@ -9,8 +9,8 @@ import Brick.Forms
 import Brick.Widgets.Edit (handleEditorEvent)
 import Brick.Widgets.List
 import Control.Monad
-import Control.Monad.Logger (LogLevel(..))
 import Control.Monad.IO.Unlift
+import Control.Monad.Logger (LogLevel(..))
 import Data.Function
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as Vec
@@ -81,7 +81,7 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll ZoomModalContent) 1
       (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll ZoomModalContent) (-1)
       _ -> return () -- No other interactions for ZoomModal
-    LogModalState -> case ev of
+    (LogModalState _) -> case ev of
       (V.EvKey V.KEsc []) -> do
         modify (appModal .~ Nothing)
         liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
@@ -98,6 +98,8 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey V.KDown []) -> vScrollBy (viewportScroll LogModalContent) 1
       (V.EvKey V.KPageUp []) -> vScrollPage (viewportScroll LogModalContent) Up
       (V.EvKey V.KPageDown []) -> vScrollPage (viewportScroll LogModalContent) Down
+      (V.EvKey V.KHome []) -> vScrollToBeginning (viewportScroll LogModalContent)
+      (V.EvKey V.KEnd []) -> vScrollToEnd (viewportScroll LogModalContent)
       (V.EvKey (V.KChar 'd') []) -> do
         modify (appLogLevelFilter .~ LevelDebug)
         vScrollToEnd (viewportScroll LogModalContent)
@@ -197,9 +199,9 @@ appEvent s (VtyEvent e) = case e of
       liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
 
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do
-    modify (appModal ?~ LogModalState)
-    liftIO $ atomically $ writeTVar (_appModalVariable s) (Just LogModalState)
-    -- Scroll to the bottom of the log modal content to show latest logs
+    let modalState = LogModalState (list LogModalContent (Vec.fromList []) 1)
+    modify (appModal ?~ modalState)
+    -- Scroll to the bottom to show latest logs
     vScrollToEnd (viewportScroll LogModalContent)
 
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do

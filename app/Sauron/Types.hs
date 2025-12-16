@@ -481,9 +481,11 @@ data ModalState f =
     , _submissionState :: SubmissionState
   }
   | ZoomModalState {
-    _zoomModalSomeNode :: SomeNode f
-  }
-  | LogModalState
+      _zoomModalSomeNode :: SomeNode f
+      }
+  | LogModalState {
+      _logModalList :: L.GenericList ClickableName V.Vector LogEntry
+      }
 
 instance Eq (ModalState Fixed) where
   (CommentModalState _editor1 issue1 comments1 isPR1 owner1 name1 submission1) ==
@@ -491,7 +493,7 @@ instance Eq (ModalState Fixed) where
     issue1 == issue2 && comments1 == comments2 && isPR1 == isPR2 &&
     owner1 == owner2 && name1 == name2 && submission1 == submission2
   (ZoomModalState node1) == (ZoomModalState node2) = node1 == node2
-  LogModalState == LogModalState = True
+  (LogModalState _list1) == (LogModalState _list2) = True  -- We'll consider all log modal states equal for simplicity
   _ == _ = False
 
 data AppState = AppState {

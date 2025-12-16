@@ -40,7 +40,7 @@ handleCommentModalEvent s (CommentSubmitted result) = case result of
         vScrollToEnd (viewportScroll CommentModalContent)
       Nothing -> return ()
       Just (ZoomModalState _) -> return () -- ZoomModal doesn't support comment operations
-      Just LogModalState -> return () -- LogModal doesn't support comment operations
+      Just (LogModalState _) -> return () -- LogModal doesn't support comment operations
   Left _err -> do
     -- Reset submission state on error
     modify (appModal . _Just . submissionState .~ NotSubmitting)

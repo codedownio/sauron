@@ -72,7 +72,7 @@ drawUI app = case _appModal app of
   Just modalState -> case modalState of
     CommentModalState {} -> [renderModal app modalState, mainUI]
     ZoomModalState {} -> [renderZoomModal app modalState, mainUI]
-    LogModalState -> [renderLogModal app modalState, mainUI]
+    LogModalState {} -> [renderLogModal app modalState, mainUI]
   where
     mainUI = vBox [
       topBox app
