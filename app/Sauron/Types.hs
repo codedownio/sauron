@@ -513,7 +513,8 @@ data AppState = AppState {
 
   , _appAnimationCounter :: Int
 
-  , _appColorMode :: V.ColorMode
+  , _appCliColorMode :: Maybe V.ColorMode
+  , _appActualColorMode :: V.ColorMode
 
   , _appLogs :: Seq LogEntry
 

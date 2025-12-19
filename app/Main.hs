@@ -133,7 +133,8 @@ main = do
 
           , _appAnimationCounter = 0
 
-          , _appColorMode = V.FullColor
+          , _appCliColorMode = Nothing
+          , _appActualColorMode = V.FullColor
 
           , _appLogs = mempty
 
@@ -190,9 +191,12 @@ main = do
           V.setMode (V.outputIface v) V.Mouse True
         return v
   initialVty <- buildVty
-  let colorMode = fromMaybe (V.outputColorMode (V.outputIface initialVty)) cliColorMode
-  flip onException (cancel listElemsFixerAsync >> cancel modalFixerAsync) $
-    void $ customMain initialVty buildVty (Just eventChan) (mkApp colorMode) (initialState { _appColorMode = colorMode })
+  flip onException (cancel listElemsFixerAsync >> cancel modalFixerAsync) $ do
+    let st = initialState {
+          _appCliColorMode = cliColorMode
+          , _appActualColorMode = V.outputColorMode (V.outputIface initialVty)
+          }
+    void $ customMain initialVty buildVty (Just eventChan) (mkApp (fromMaybe (V.outputColorMode (V.outputIface initialVty)) cliColorMode)) st
 
 
 buildBaseContext :: BChan AppEvent -> IO BaseContext

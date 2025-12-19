@@ -11,6 +11,7 @@ import Brick.Widgets.Skylighting (attrMappingsForStyle)
 import qualified Graphics.Vty as V
 import Relude hiding (on)
 import qualified Skylighting.Styles as Sky
+import qualified Skylighting.Types as SkyTypes
 
 
 mkAttrName :: String -> AttrName
@@ -83,6 +84,15 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   -- Command lines inside job logs
   , (commandAttr, fg (select solarizedBlue) & flip V.withStyle V.bold)
 
+  -- Diff line backgrounds
+  , (diffAddedAttr, select brightWhite `on` select diffAddedBg)
+  , (diffRemovedAttr, select brightWhite `on` select diffRemovedBg)
+  , (diffContextAttr, fg (select brightWhite))
+
+  -- Background-only diff attributes for syntax highlighting
+  , (diffAddedBgAttr, bg (select diffAddedBg))
+  , (diffRemovedBgAttr, bg (select diffRemovedBg))
+
   -- Forms
   , (E.editFocusedAttr, V.black `on` V.yellow)
 
@@ -118,7 +128,9 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   , (warningLogAttr, fg V.yellow)
   , (infoLogAttr, fg V.white)
   , (debugLogAttr, fg (select midGray))
-  ] <> attrMappingsForStyle Sky.breezeDark)
+  ]
+  <> attrMappingsForStyleNoBg Sky.breezeDark
+  )
   where
     select = selectColor colorMode
 
@@ -182,6 +194,16 @@ codeText = mkAttrName "code-text"
 codeBlockText = mkAttrName "code-block-text"
 horizontalRuleAttr = mkAttrName "horizontal-rule"
 commandAttr = mkAttrName "command"
+
+-- * Diff line backgrounds
+
+diffAddedAttr = mkAttrName "diff-added"
+diffRemovedAttr = mkAttrName "diff-removed"
+diffContextAttr = mkAttrName "diff-context"
+
+-- Background-only diff attributes for syntax highlighting
+diffAddedBgAttr = mkAttrName "diff-added-bg"
+diffRemovedBgAttr = mkAttrName "diff-removed-bg"
 
 -- * Event colors
 
@@ -304,5 +326,21 @@ brightWhite = (grayAtRGB 200, V.Color240 253, V.brightWhite, V.white, V.white)
 unreadNotificationBg :: ColorFallback
 unreadNotificationBg = (V.rgbColor 0x1a 0x2f 0x3a, V.Color240 236, V.brightBlack, V.black, V.black)
 
+-- Diff background colors (nuanced for capable terminals, ANSI fallbacks for compatibility)
+diffAddedBg :: ColorFallback
+diffAddedBg = (V.rgbColor 0x1a 0x3a 0x1a, V.Color240 28, V.green, V.green, V.black)
+
+diffRemovedBg :: ColorFallback
+diffRemovedBg = (V.rgbColor 0x3a 0x1a 0x1a, V.Color240 88, V.red, V.red, V.black)
+
 grayAtRGB :: Word8 -> V.Color
 grayAtRGB level = V.rgbColor level level level
+
+-- | Create attribute mappings from a skylighting style, but strip all background colors
+-- to avoid conflicts with our diff backgrounds
+attrMappingsForStyleNoBg :: SkyTypes.Style -> [(AttrName, V.Attr)]
+attrMappingsForStyleNoBg style =
+  map stripBackground (attrMappingsForStyle style)
+  where
+    stripBackground :: (AttrName, V.Attr) -> (AttrName, V.Attr)
+    stripBackground (name, attr) = (name, attr { V.attrBackColor = V.Default })

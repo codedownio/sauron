@@ -9,6 +9,7 @@ module Sauron.UI.Commit (
 
 import Brick
 import Brick.Widgets.Border
+import Brick.Widgets.Skylighting (renderRawSource)
 import Control.Monad
 import qualified Data.Text as T
 import Data.Time
@@ -19,6 +20,8 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
+import qualified Skylighting as Sky
+import qualified Skylighting.Core as SkyCore
 
 
 instance ListDrawable Fixed 'SingleCommitT where
@@ -99,7 +102,7 @@ renderCommitFiles files
         renderFileHeader fileFilename fileAdditions fileDeletions fileStatus,
         case filePatch of
           Nothing -> str ""
-          Just patch -> renderFilePatch patch
+          Just patch -> renderFilePatch fileFilename patch
       ]
 
     renderFileHeader :: Text -> Int -> Int -> Text -> Widget n
@@ -119,16 +122,50 @@ renderCommitFiles files
       withAttr redXAttr $ str $ "-" <> show deletions
       ]
 
-    renderFilePatch :: Text -> Widget n
-    renderFilePatch patch = vBox $ map renderPatchLine (T.lines patch)
+    renderFilePatch :: Text -> Text -> Widget n
+    renderFilePatch filename patch = vBox $ map (renderPatchLine filename) (T.lines patch)
 
-    renderPatchLine :: Text -> Widget n
-    renderPatchLine line
+    renderPatchLine :: Text -> Text -> Widget n
+    renderPatchLine filename line
       | T.isPrefixOf "+" line && not (T.isPrefixOf "+++" line) =
-          withAttr greenCheckAttr $ str $ toString line
+          hBox [
+            withAttr greenCheckAttr $ str "+",
+            renderSyntaxHighlightedLine filename diffAddedAttr (T.drop 1 line)
+          ]
       | T.isPrefixOf "-" line && not (T.isPrefixOf "---" line) =
-          withAttr redXAttr $ str $ toString line
+          hBox [
+            withAttr redXAttr $ str "-",
+            renderSyntaxHighlightedLine filename diffRemovedAttr (T.drop 1 line)
+          ]
       | T.isPrefixOf "@@" line =
-          withAttr hashAttr $ str $ toString line
+          hBox [
+            str " ",
+            withAttr hashAttr $ str $ toString line
+          ]
+      | T.isPrefixOf " " line =
+          hBox [
+            str " ",
+            renderSyntaxHighlightedLineNoBg filename (T.drop 1 line)
+          ]
       | otherwise =
-          withAttr normalAttr $ str $ toString line
+          hBox [
+            str " ",
+            withAttr normalAttr $ str $ toString line
+          ]
+
+renderSyntaxHighlightedLineNoBg :: Text -> Text -> Widget n
+renderSyntaxHighlightedLineNoBg filename lineContent =
+  case listToMaybe $ Sky.syntaxesByFilename Sky.defaultSyntaxMap (toString filename) of
+    Nothing -> str $ toString lineContent
+    Just syntax ->
+      case SkyCore.tokenize (SkyCore.TokenizerConfig Sky.defaultSyntaxMap False) syntax lineContent of
+        Left _ -> str $ toString lineContent
+        Right tokens -> renderRawSource txt tokens
+
+renderSyntaxHighlightedLine :: Text -> AttrName -> Text -> Widget n
+renderSyntaxHighlightedLine filename backgroundAttr lineContent =
+  -- Get syntax-highlighted widget without backgrounds, then apply our background
+  let syntaxWidget = renderSyntaxHighlightedLineNoBg filename lineContent
+  in if backgroundAttr == diffContextAttr
+       then syntaxWidget  -- No background for context lines
+       else withAttr backgroundAttr syntaxWidget

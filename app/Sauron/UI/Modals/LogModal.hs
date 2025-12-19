@@ -9,6 +9,7 @@ import Brick.Widgets.Center
 import Control.Monad.Logger (LogLevel(..))
 import qualified Data.Sequence as Seq
 import Data.Time
+import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude
 import Sauron.Types
@@ -17,7 +18,12 @@ import Sauron.UI.AttrMap (errorLogAttr, warningLogAttr, infoLogAttr, debugLogAtt
 
 renderLogModal :: AppState -> ModalState Fixed -> Widget ClickableName
 renderLogModal appState (LogModalState _) = vBox [
-    hCenter $ withAttr boldText $ str ("Application Logs - Filter: " <> filterText <> " (" <> show (Seq.length filteredLogs) <> " lines)")
+    hCenter $ withAttr boldText $ str (
+        "Application Logs - Filter: "
+        <> filterText
+        <> " (" <> show (Seq.length filteredLogs) <> " lines) - Colors: "
+        <> showColorModeMaybe (appState ^. appCliColorMode) <> " (cfg) / "
+        <> showColorMode (appState ^. appActualColorMode) <> " (actual)")
     , hBorder
     -- Simple scrollable viewport with scrollbar - always works
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport LogModalContent Vertical $
@@ -40,6 +46,17 @@ renderLogModal appState (LogModalState _) = vBox [
       LevelError -> "Error"
       LevelOther t -> toString t
 renderLogModal _ _ = str "Invalid modal state" -- This should never happen
+
+showColorModeMaybe :: Maybe V.ColorMode -> String
+showColorModeMaybe Nothing = "Nothing"
+showColorModeMaybe (Just x) = showColorMode x
+
+showColorMode :: V.ColorMode -> String
+showColorMode V.FullColor = "Full"
+showColorMode (V.ColorMode240 _) = "240"
+showColorMode V.ColorMode16 = "16"
+showColorMode V.ColorMode8 = "8"
+showColorMode V.NoColor = "None"
 
 renderLogEntries :: UTCTime -> Seq LogEntry -> [Widget ClickableName]
 renderLogEntries currentTime logs =
