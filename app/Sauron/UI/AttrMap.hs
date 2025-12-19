@@ -326,12 +326,12 @@ brightWhite = (grayAtRGB 200, V.Color240 253, V.brightWhite, V.white, V.white)
 unreadNotificationBg :: ColorFallback
 unreadNotificationBg = (V.rgbColor 0x1a 0x2f 0x3a, V.Color240 236, V.brightBlack, V.black, V.black)
 
--- Diff background colors (nuanced for capable terminals, ANSI fallbacks for compatibility)
+-- Diff background colors (distinct and vibrant for visibility)
 diffAddedBg :: ColorFallback
-diffAddedBg = (V.rgbColor 0x1a 0x3a 0x1a, V.Color240 28, V.green, V.green, V.black)
+diffAddedBg = (V.rgbColor 0x00 0x80 0x00, V.Color240 34, V.green, V.green, V.black)
 
 diffRemovedBg :: ColorFallback
-diffRemovedBg = (V.rgbColor 0x3a 0x1a 0x1a, V.Color240 88, V.red, V.red, V.black)
+diffRemovedBg = (V.rgbColor 0x80 0x00 0x00, V.Color240 124, V.red, V.red, V.black)
 
 grayAtRGB :: Word8 -> V.Color
 grayAtRGB level = V.rgbColor level level level
