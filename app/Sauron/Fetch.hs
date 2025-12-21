@@ -576,7 +576,6 @@ createJobStepNode bc depth' allLogs jobStep = do
     getLogTimestamp :: JobLogGroup -> UTCTime
     getLogTimestamp (JobLogLines timestamp _) = timestamp
     getLogTimestamp (JobLogGroup timestamp _ _ _) = timestamp
-    getLogTimestamp JobLogGroupNotFetched = UTCTime (fromGregorian 1970 1 1) 0
 
 createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
@@ -592,7 +591,6 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
     JobLogGroup _ _ Nothing children' -> do  -- Only nested log groups have children
       childElems <- mapM (createJobLogGroupChildren bc (depth' + 1)) children'
       newTVar childElems
-    JobLogGroupNotFetched -> newTVar []
 
   healthCheckVar2 <- newTVar NotFetched
   healthCheckThreadVar2 <- newTVar Nothing

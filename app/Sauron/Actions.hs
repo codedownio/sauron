@@ -93,6 +93,8 @@ refresh bc (JobLogGroupNode (EntityData {_state})) parents = do
         currentLogState <- readTVarIO _state
         case currentLogState of
           NotFetched -> do
+            -- Transition to Fetching state before starting fetch
+            atomically $ writeTVar _state (Fetching Nothing)
             jobState' <- readTVarIO jobState
             case jobState' of
               Fetched job -> do

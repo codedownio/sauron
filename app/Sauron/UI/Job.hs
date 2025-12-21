@@ -42,7 +42,10 @@ instance ListDrawable Fixed 'JobLogGroupT where
     Fetched jobLogGroup -> jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
     Fetching (Just jobLogGroup) -> jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
     Fetching Nothing -> str [i|Loading job logs...|]
-    NotFetched -> jobLogGroupLine (_appAnimationCounter appState) _toggled JobLogGroupNotFetched
+    NotFetched -> padRight Max $ hBox [
+      withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
+      , withAttr normalAttr $ str "Job logs"
+      ]
     Errored e -> str [i|Log group fetch errored: #{e}|]
 
   drawInner _appState (EntityData {_state, ..}) = do
@@ -66,10 +69,6 @@ jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status _
     statusWidget = case status of
       Just s -> Just $ padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus s
       Nothing -> Nothing
-jobLogGroupLine _animationCounter toggled' JobLogGroupNotFetched = padRight Max $ hBox [
-  withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
-  , withAttr normalAttr $ str "Job logs"
-  ]
 
 jobLogGroupInner :: [JobLogGroup] -> Widget n
 jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
@@ -79,7 +78,6 @@ jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
       withAttr normalAttr $ str $ toString title,
       vBox $ map renderLogGroup children'
       ]
-    renderLogGroup JobLogGroupNotFetched = str "Job logs not fetched"
 
     renderLogLine content
       | "[command]" `T.isPrefixOf` content = hBox $ renderCommandLine content

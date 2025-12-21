@@ -102,7 +102,6 @@ generateModalTitle (SomeNode inner) =
     JobLogGroupNode (EntityData {_state}) ->
       case _state of
         Fetched (JobLogGroup _ title _ _) -> "Log Group: " <> T.unpack title
-        Fetched JobLogGroupNotFetched -> "Job logs not fetched"
         Fetched (JobLogLines _ _) -> "Job log lines"
         NotFetched -> "Job logs not fetched"
         _ -> "Log Group"
