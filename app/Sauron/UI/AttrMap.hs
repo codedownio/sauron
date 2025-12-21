@@ -339,8 +339,8 @@ grayAtRGB level = V.rgbColor level level level
 -- | Create attribute mappings from a skylighting style, but strip all background colors
 -- to avoid conflicts with our diff backgrounds
 attrMappingsForStyleNoBg :: SkyTypes.Style -> [(AttrName, V.Attr)]
-attrMappingsForStyleNoBg style =
-  map stripBackground (attrMappingsForStyle style)
+attrMappingsForStyleNoBg colorStyle =
+  map stripBackground (attrMappingsForStyle colorStyle)
   where
     stripBackground :: (AttrName, V.Attr) -> (AttrName, V.Attr)
     stripBackground (name, attr) = (name, attr { V.attrBackColor = V.Default })

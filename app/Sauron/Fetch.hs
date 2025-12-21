@@ -31,6 +31,7 @@ module Sauron.Fetch (
 
   , fetchWorkflowJobs
   , fetchJobLogs
+  , fetchJobLogsAndReplaceChildren
   , fetchJob
 
   , makeEmptyElem
@@ -455,8 +456,8 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
         existingJobsMap <- foldM (\acc node -> case node of
           SingleJobNode (EntityData {_state=jobState}) -> do
             readTVar jobState >>= \case
-              Fetched (existingJob, _) -> return $ Map.insert (jobId existingJob) node acc
-              Fetching (Just (existingJob, _)) -> return $ Map.insert (jobId existingJob) node acc
+              Fetched existingJob -> return $ Map.insert (jobId existingJob) node acc
+              Fetching (Just existingJob) -> return $ Map.insert (jobId existingJob) node acc
               _ -> return acc
           ) (Map.empty :: Map.Map (Id Job) (Node Variable SingleJobT)) existingChildren
 
@@ -465,17 +466,20 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
             Just existingNode@(SingleJobNode existingEntityData) -> do
               -- Update existing node's job data while preserving toggle state
               let EntityData {_state = jobState} = existingEntityData
-              currentState <- readTVar jobState
-              case currentState of
-                Fetched (_, logGroups) -> writeTVar jobState (Fetched (job, logGroups))
-                Fetching (Just (_, logGroups)) -> writeTVar jobState (Fetching (Just (job, logGroups)))
-                _ -> writeTVar jobState (Fetched (job, []))
+              writeTVar jobState (Fetched job)
               return existingNode
             Nothing -> do
               -- Create new node for new jobs
               entityData <- makeEmptyElem bc () "" (_depth + 1)
-              let EntityData {_state = jobState} = entityData
-              writeTVar jobState (Fetched (job, []))
+              let EntityData {_state = jobState, _children = jobChildren} = entityData
+              writeTVar jobState (Fetched job)
+
+              -- Create dummy child for log fetching
+              dummyLogEntityData <- makeEmptyElem bc () "" (_depth + 2)
+              let EntityData {_state = dummyState} = dummyLogEntityData
+              writeTVar dummyState NotFetched
+              writeTVar jobChildren [JobLogGroupNode dummyLogEntityData]
+
               return $ SingleJobNode entityData
           -- writeTVar (_state child) (PaginatedItemJob)
   -- TODO: do pagination for these jobs? The web UI doesn't seem to...
@@ -497,28 +501,40 @@ fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})
   bc@(BaseContext {auth, manager}) <- ask
   bracketOnError_ (atomically $ markFetching _state)
                   (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
-    -- First, get the download URI
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
       Left err -> atomically $ writeTVar _state (Errored (show err))
       Right response -> do
-        let uri = responseBody response
-
-        -- traceM [i|Jobs URI: #{uri}|]
-        logs <- simpleHttp (URI.uriToString id uri "")
+        logs <- simpleHttp (URI.uriToString id (responseBody response) "")
 
         let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
-        -- traceM [i|parsedLogs: #{parsedLogs}|]
         children' <- liftIO $ atomically $ do
           mapM (createJobStepNode bc (_depth + 1) parsedLogs) (V.toList jobSteps)
 
         atomically $ do
           currentState <- readTVar _state
           case currentState of
-            Fetched (job, _) -> writeTVar _state (Fetched (job, parsedLogs))
-            Fetching (Just (job, _)) -> writeTVar _state (Fetched (job, parsedLogs))
+            Fetched job -> writeTVar _state (Fetched job)
+            Fetching (Just job) -> writeTVar _state (Fetched job)
             Fetching Nothing -> writeTVar _state (Errored "No job data available")
             _ -> writeTVar _state (Errored "Invalid job state")
           writeTVar _children children'
+
+fetchJobLogsAndReplaceChildren :: (
+  MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
+fetchJobLogsAndReplaceChildren owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {_children, _depth})) = do
+  bc@(BaseContext {auth, manager}) <- ask
+  withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
+    Left _ -> return () -- Silently fail for now
+    Right response -> do
+      logs <- simpleHttp (URI.uriToString id (responseBody response) "")
+
+      let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
+      children' <- liftIO $ atomically $ do
+        mapM (createJobStepNode bc (_depth + 1) parsedLogs) (V.toList jobSteps)
+
+      -- Replace the job's children with the actual log nodes
+      atomically $ writeTVar _children children'
 
 fetchJob :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -526,13 +542,12 @@ fetchJob :: (
 fetchJob owner name jobId (SingleJobNode (EntityData {_state})) = do
   withGithubApiSemaphore (githubWithLoggingResponse (jobR owner name jobId)) >>= \case
     Left _err -> return () -- Silently fail for health checks
-    Right (responseBody -> updatedJob) -> liftIO $ atomically $ do
-      currentState <- readTVar _state
-      case currentState of
-        Fetched (_, logGroups) -> writeTVar _state (Fetched (updatedJob, logGroups))
-        Fetching (Just (_, logGroups)) -> writeTVar _state (Fetching (Just (updatedJob, logGroups)))
-        Fetching Nothing -> writeTVar _state (Fetching (Just (updatedJob, [])))
-        _ -> writeTVar _state (Fetched (updatedJob, []))
+    Right (responseBody -> updatedJob) -> liftIO $ atomically $
+      readTVar _state >>= \case
+        Fetched _ -> writeTVar _state (Fetched updatedJob)
+        Fetching (Just _) -> writeTVar _state (Fetching (Just updatedJob))
+        Fetching Nothing -> writeTVar _state (Fetching (Just updatedJob))
+        _ -> writeTVar _state (Fetched updatedJob)
 
 -- * Util
 
@@ -561,10 +576,11 @@ createJobStepNode bc depth' allLogs jobStep = do
     getLogTimestamp :: JobLogGroup -> UTCTime
     getLogTimestamp (JobLogLines timestamp _) = timestamp
     getLogTimestamp (JobLogGroup timestamp _ _ _) = timestamp
+    getLogTimestamp JobLogGroupNotFetched = UTCTime (fromGregorian 1970 1 1) 0
 
 createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
-  stateVar <- newTVar (Fetched ())
+  stateVar <- newTVar (Fetched jobLogGroup)
   ident' <- getIdentifierSTM bc
   toggledVar <- newTVar False
   searchVar <- newTVar SearchNone
@@ -576,11 +592,12 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
     JobLogGroup _ _ Nothing children' -> do  -- Only nested log groups have children
       childElems <- mapM (createJobLogGroupChildren bc (depth' + 1)) children'
       newTVar childElems
+    JobLogGroupNotFetched -> newTVar []
 
   healthCheckVar2 <- newTVar NotFetched
   healthCheckThreadVar2 <- newTVar Nothing
   return $ JobLogGroupNode $ EntityData {
-    _static = jobLogGroup
+    _static = ()
     , _state = stateVar
     , _urlSuffix = ""
     , _toggled = toggledVar

@@ -94,7 +94,7 @@ renderCommitStats (Just (Stats {statsAdditions, statsDeletions, statsTotal})) = 
 renderCommitFiles :: V.Vector File -> Widget n
 renderCommitFiles files
   | V.null files = str "No files changed"
-  | otherwise = vBox $ V.toList $ V.imap (\i file -> if i == 0 then renderFile file else vBox [str "", renderFile file]) files
+  | otherwise = vBox $ V.toList $ V.imap (\idx file -> if idx == 0 then renderFile file else vBox [str "", renderFile file]) files
   where
     renderFile :: File -> Widget n
     renderFile (File {fileFilename, fileAdditions, fileDeletions, fileStatus, filePatch}) =

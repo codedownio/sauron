@@ -172,7 +172,7 @@ type family NodeStatic a where
   NodeStatic SingleBranchWithInfoT = (BranchWithInfo, ColumnWidths)
   NodeStatic SingleCommitT = Commit
   NodeStatic SingleNotificationT = Notification
-  NodeStatic JobLogGroupT = JobLogGroup
+  NodeStatic JobLogGroupT = ()
   NodeStatic HeadingT = Text
   NodeStatic RepoT = (Name Owner, Name Repo)
 
@@ -190,12 +190,12 @@ type family NodeState a where
   NodeState SingleIssueT = V.Vector (Either IssueEvent IssueComment)
   NodeState SinglePullT = V.Vector (Either IssueEvent IssueComment)
   NodeState SingleWorkflowT = WithTotalCount Job
-  NodeState SingleJobT = (Job, [JobLogGroup])
+  NodeState SingleJobT = Job
   NodeState SingleBranchT = V.Vector Commit
   NodeState SingleBranchWithInfoT = V.Vector Commit
   NodeState SingleCommitT = Commit
   NodeState SingleNotificationT = ()
-  NodeState JobLogGroupT = ()
+  NodeState JobLogGroupT = JobLogGroup
   NodeState HeadingT = ()
   NodeState RepoT = Repo
 
@@ -348,6 +348,7 @@ data SortBy =
 data JobLogGroup =
   JobLogLines UTCTime [Text]
   | JobLogGroup UTCTime Text (Maybe Text) [JobLogGroup]
+  | JobLogGroupNotFetched
   deriving (Show, Eq)
 
 type Var = TVar

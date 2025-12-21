@@ -26,27 +26,32 @@ import Sauron.UI.Util.TimeDiff
 
 instance ListDrawable Fixed 'SingleJobT where
   drawLine appState (EntityData {..}) = case _state of
-    Fetched (job, _) -> jobLine (_appAnimationCounter appState) _toggled job _state
-    Fetching (Just (job, _)) -> jobLine (_appAnimationCounter appState) _toggled job _state
-    Fetching Nothing -> str "Loading job..."
+    Fetched job -> jobLine (_appAnimationCounter appState) _toggled job _state
+    Fetching (Just job) -> jobLine (_appAnimationCounter appState) _toggled job _state
+    Fetching Nothing -> str [i|Loading job...|]
     NotFetched -> str [i|Job not fetched|]
     Errored e -> str [i|Job fetch errored: #{e}|]
 
   drawInner appState (EntityData {_state, _ident, ..}) = do
     guard _toggled
-    guardFetchedOrHasPrevious _state $ \(job, logs) ->
-      return $ jobInner (_appAnimationCounter appState) job (Just logs)
+    guardFetchedOrHasPrevious _state $ \job ->
+      return $ jobInner (_appAnimationCounter appState) job Nothing
 
 instance ListDrawable Fixed 'JobLogGroupT where
-  drawLine appState (EntityData {_static=jobLogGroup, ..}) =
-    jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
+  drawLine appState (EntityData {_state, ..}) = case _state of
+    Fetched jobLogGroup -> jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
+    Fetching (Just jobLogGroup) -> jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
+    Fetching Nothing -> str [i|Loading job logs...|]
+    NotFetched -> jobLogGroupLine (_appAnimationCounter appState) _toggled JobLogGroupNotFetched
+    Errored e -> str [i|Log group fetch errored: #{e}|]
 
-  drawInner _appState (EntityData {_static=jobLogGroup, _ident, ..}) = do
+  drawInner _appState (EntityData {_state, ..}) = do
     guard _toggled
-    case jobLogGroup of
-      JobLogGroup _timestamp _title (Just _status) children' ->
-        return $ jobLogGroupInner children'
-      _ -> Nothing
+    guardFetchedOrHasPrevious _state $ \jobLogGroup ->
+      case jobLogGroup of
+        JobLogGroup _timestamp _title (Just _status) children' ->
+          return $ jobLogGroupInner children'
+        _ -> Nothing
 
 jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
 jobLogGroupLine _animationCounter _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> padRight Max $ hBox $
@@ -61,6 +66,10 @@ jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status _
     statusWidget = case status of
       Just s -> Just $ padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus s
       Nothing -> Nothing
+jobLogGroupLine _animationCounter toggled' JobLogGroupNotFetched = padRight Max $ hBox [
+  withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
+  , withAttr normalAttr $ str "Job logs"
+  ]
 
 jobLogGroupInner :: [JobLogGroup] -> Widget n
 jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
@@ -70,6 +79,7 @@ jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
       withAttr normalAttr $ str $ toString title,
       vBox $ map renderLogGroup children'
       ]
+    renderLogGroup JobLogGroupNotFetched = str "Job logs not fetched"
 
     renderLogLine content
       | "[command]" `T.isPrefixOf` content = hBox $ renderCommandLine content

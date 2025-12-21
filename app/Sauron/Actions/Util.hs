@@ -14,6 +14,7 @@ module Sauron.Actions.Util (
   , openBrowserToUrl
 
   , findRepoParent
+  , findJobParent
 ) where
 
 import Brick.BChan
@@ -65,6 +66,9 @@ withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQ
 
 findRepoParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable RepoT)
 findRepoParent elems = viaNonEmpty head [x | SomeNode x@(RepoNode _) <- toList elems]
+
+findJobParent :: [SomeNode Variable] -> Maybe (Node Variable SingleJobT)
+findJobParent elems = viaNonEmpty head [x | SomeNode x@(SingleJobNode _) <- toList elems]
 
 requestToUrl :: Request k a -> Text
 requestToUrl req = case req of

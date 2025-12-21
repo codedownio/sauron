@@ -37,7 +37,7 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
     Just (RepoNode (EntityData {_static=(owner, name)})) -> do
       currentState <- readTVarIO _state
       case currentState of
-        Fetched (job, _) | hasRunningJob job -> do
+        Fetched job | hasRunningJob job -> do
           readTVarIO _healthCheckThread >>= \case
             Nothing -> do
               newThread <- async $ runJobHealthCheckLoop baseContext owner name node parents
@@ -53,7 +53,7 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
       forever $ do
         currentState <- readTVarIO _state
         case currentState of
-          Fetched (currentJob, _) | hasRunningJob currentJob -> do
+          Fetched currentJob | hasRunningJob currentJob -> do
             -- Fetch just this individual job to update its status
             liftIO $ flip runReaderT bc $
               fetchJob owner name (jobId currentJob) jobNode

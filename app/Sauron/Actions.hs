@@ -21,7 +21,7 @@ import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude
-import Sauron.Actions.Util (findRepoParent, openBrowserToUrl)
+import Sauron.Actions.Util (findRepoParent, findJobParent, openBrowserToUrl)
 import Sauron.Fetch
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
@@ -82,10 +82,28 @@ refresh bc item@(SingleJobNode (EntityData {_state})) parents@(findRepoParent ->
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
     currentState <- readTVarIO _state
     case currentState of
-      Fetched (job, _) -> fetchJobLogs owner name job item
-      Fetching (Just (job, _)) -> fetchJobLogs owner name job item
+      Fetched job -> fetchJob owner name (jobId job) item
+      Fetching (Just job) -> fetchJob owner name (jobId job) item
       _ -> return ()
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
+refresh bc (JobLogGroupNode (EntityData {_state})) parents = do
+  case findJobParent (toList parents) of
+    Just jobNode@(SingleJobNode (EntityData {_state=jobState})) ->
+      liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
+        currentLogState <- readTVarIO _state
+        case currentLogState of
+          NotFetched -> do
+            jobState' <- readTVarIO jobState
+            case jobState' of
+              Fetched job -> do
+                -- Find the repo parent for owner/name
+                case findRepoParent parents of
+                  Just (RepoNode (EntityData {_static=(owner, name)})) -> 
+                    fetchJobLogsAndReplaceChildren owner name job jobNode
+                  _ -> return ()
+              _ -> return ()
+          _ -> return ()
+    Nothing -> return ()
 refresh bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc
 refresh bc item@(SingleBranchWithInfoNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =

@@ -21,7 +21,7 @@ openNode _baseContext elems (JobLogGroupNode _) = case findParentJobNode (toList
   Just (SingleJobNode (EntityData {_state})) -> do
     jobState <- readTVarIO _state
     case fetchableCurrent jobState of
-      Just (job, _) -> openBrowserToUrl (toString $ getUrl $ jobHtmlUrl job)
+      Just job -> openBrowserToUrl (toString $ getUrl $ jobHtmlUrl job)
       Nothing -> return ()
   _ -> return ()
 openNode _baseContext elems el = case getNodeUrl el (toList elems) of
@@ -41,7 +41,7 @@ getNodeUrl (PaginatedNotificationsNode _) _ = Just "https://github.com/notificat
 getNodeUrl (SingleIssueNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SinglePullNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) _ = Just (toString $ getUrl $ workflowRunHtmlUrl workflowRun)
-getNodeUrl (SingleJobNode (EntityData {_state=(fetchableCurrent -> Just (job, _))})) _ = Just (toString $ getUrl $ jobHtmlUrl job)
+getNodeUrl (SingleJobNode (EntityData {_state=(fetchableCurrent -> Just job)})) _ = Just (toString $ getUrl $ jobHtmlUrl job)
 getNodeUrl (SingleBranchNode (EntityData {_static=branch})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchName branch))
 getNodeUrl (SingleBranchWithInfoNode (EntityData {_static=(branchInfo, _columnWidths)})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchWithInfoBranchName branchInfo))
 getNodeUrl (SingleCommitNode (EntityData {_static=commit})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit)))
