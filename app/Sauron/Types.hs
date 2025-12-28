@@ -143,7 +143,7 @@ data EntityData f a = EntityData {
 
   -- Health check fields (currently used only for repos)
   , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
-  , _healthCheckThread :: TVar (Maybe (Async ()))
+  , _healthCheckThread :: Switchable f (Maybe (Async (), Int))
 
   , _depth :: Int
   , _ident :: Int

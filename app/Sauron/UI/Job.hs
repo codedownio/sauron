@@ -16,18 +16,20 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import GitHub
 import Relude
+import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
 import Sauron.Types
 import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
 import Sauron.UI.Statuses (statusToIconAnimated, chooseWorkflowStatus, fetchableQuarterCircleSpinner)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
+import UnliftIO.Async (Async)
 
 
 instance ListDrawable Fixed 'SingleJobT where
   drawLine appState (EntityData {..}) = case _state of
-    Fetched job -> jobLine (_appAnimationCounter appState) _toggled job _state
-    Fetching (Just job) -> jobLine (_appAnimationCounter appState) _toggled job _state
+    Fetched job -> jobLine (_appAnimationCounter appState) _toggled job _state _healthCheckThread
+    Fetching (Just job) -> jobLine (_appAnimationCounter appState) _toggled job _state _healthCheckThread
     Fetching Nothing -> str [i|Loading job...|]
     NotFetched -> str [i|Job not fetched|]
     Errored e -> str [i|Job fetch errored: #{e}|]
@@ -94,14 +96,15 @@ jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
       let text = T.drop 9 content  -- Remove "##[error]"
       in [ withAttr erroredAttr $ str $ toString text ]
 
-jobLine :: Int -> Bool -> Job -> Fetchable a -> Widget n
-jobLine animationCounter toggled' (Job {..}) fetchableState = vBox [line1, line2]
+jobLine :: Int -> Bool -> Job -> Fetchable a -> Maybe (Async (), Int) -> Widget n
+jobLine animationCounter toggled' (Job {..}) fetchableState healthCheckThreadData = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString $ untagName jobName
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe jobStatus jobConclusion
       , fetchableQuarterCircleSpinner animationCounter fetchableState
+      , healthCheckIndicatorWidget healthCheckThreadData
       , padLeft Max $ str $ calculateDuration jobStartedAt jobCompletedAt
       ]
 

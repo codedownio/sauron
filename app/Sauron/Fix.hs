@@ -81,6 +81,7 @@ fixEntityData childrenFixed (EntityData {..}) = do
   searchFixed <- readTVar _search
   pageInfoFixed <- readTVar _pageInfo
   healthCheckFixed <- readTVar _healthCheck
+  healthCheckThreadFixed <- readTVar _healthCheckThread
 
   return $ EntityData {
     _static = _static
@@ -94,7 +95,7 @@ fixEntityData childrenFixed (EntityData {..}) = do
     , _pageInfo = pageInfoFixed
 
     , _healthCheck = healthCheckFixed
-    , _healthCheckThread = _healthCheckThread
+    , _healthCheckThread = healthCheckThreadFixed
 
     , _depth = _depth
     , _ident = _ident

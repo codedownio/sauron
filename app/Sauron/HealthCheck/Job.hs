@@ -4,20 +4,24 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Sauron.HealthCheck.Job (
-  startJobHealthCheckIfNeeded
+  startJobHealthCheckIfNeeded,
+  jobHealthCheckPeriodUs
   ) where
 
 import Control.Exception.Safe (handleAny)
 import Control.Monad.IO.Class
+import Control.Monad.Logger
 import Data.String.Interpolate
 import GitHub
 import Relude
 import Sauron.Actions.Util (findRepoParent)
 import Sauron.Fetch (fetchJob)
+import Sauron.Fetch.Core (logToModal)
 import Sauron.Types
 import Sauron.UI.Statuses
 import UnliftIO.Async
 import UnliftIO.Concurrent
+
 
 isJobCompleted :: Text -> Bool
 isJobCompleted status = case chooseWorkflowStatus status of
@@ -26,6 +30,9 @@ isJobCompleted status = case chooseWorkflowStatus status of
   WorkflowCancelled -> True
   WorkflowNeutral -> True
   _ -> False
+
+jobHealthCheckPeriodUs :: Int
+jobHealthCheckPeriodUs = 5_000_000
 
 startJobHealthCheckIfNeeded ::
   BaseContext
@@ -40,10 +47,11 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
         Fetched job | hasRunningJob job -> do
           readTVarIO _healthCheckThread >>= \case
             Nothing -> do
+              logToModal baseContext LevelInfo [i|Starting health check thread for job: #{untagName (jobName job)} (period: #{jobHealthCheckPeriodUs}us)|] Nothing
               newThread <- async $ runJobHealthCheckLoop baseContext owner name node parents
-              atomically $ writeTVar _healthCheckThread (Just newThread)
+              atomically $ writeTVar _healthCheckThread (Just (newThread, jobHealthCheckPeriodUs))
               return (Just newThread)
-            Just thread -> return (Just thread)
+            Just (thread, _) -> return (Just thread)
         _ -> return Nothing
     _ -> return Nothing
   where
@@ -57,7 +65,7 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
             -- Fetch just this individual job to update its status
             liftIO $ flip runReaderT bc $
               fetchJob owner name (jobId currentJob) jobNode
-            threadDelay (5 * 1000000) -- 5 seconds
+            threadDelay jobHealthCheckPeriodUs
           _ -> do
             -- Job is completed, clear the thread reference and stop
             atomically $ writeTVar _healthCheckThread Nothing

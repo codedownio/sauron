@@ -48,11 +48,13 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           healthCheckVar <- newTVarIO NotFetched
           hcThread <- case r of
             ConfigRepoSingle _ _ (HasSettings (RepoSettings {repoSettingsCheckPeriod=localPeriod})) -> do
-              let period = fromMaybe defaultHealthCheckPeriodUs (localPeriod <|> join (repoSettingsCheckPeriod <$> configSettings))
-              Just <$> lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar period)
+              let ps@(PeriodSpec period) = fromMaybe defaultHealthCheckPeriodUs (localPeriod <|> join (repoSettingsCheckPeriod <$> configSettings))
+              thread <- lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
+              pure (Just (thread, period))
             ConfigRepoSingle _ _ _ -> do
-              let period = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
-              Just <$> lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar period)
+              let ps@(PeriodSpec period) = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
+              thread <- lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
+              pure (Just (thread, period))
             ConfigRepoWildcard {} -> pure Nothing
           newRepoNode nsName repoVar healthCheckVar hcThread repoDepth (getIdentifier baseContext)
 

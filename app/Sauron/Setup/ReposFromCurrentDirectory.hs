@@ -86,9 +86,9 @@ reposFromCurrentDirectory :: BaseContext -> PeriodSpec -> (Name Owner, Name Repo
 reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
   repoVar <- newTVarIO NotFetched
   healthCheckVar <- newTVarIO NotFetched
-  let period = defaultHealthCheckPeriodUs
-  hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar period
-  node@(RepoNode (EntityData {..})) <- newRepoNode nsName repoVar healthCheckVar (Just hcThread) 0 (getIdentifier baseContext)
+  let ps@(PeriodSpec period) = defaultHealthCheckPeriodUs
+  hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar ps
+  node@(RepoNode (EntityData {..})) <- newRepoNode nsName repoVar healthCheckVar (Just (hcThread, period)) 0 (getIdentifier baseContext)
 
   atomically $ writeTVar _toggled True
 

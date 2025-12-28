@@ -18,7 +18,7 @@ newRepoNode ::
   => (Name Owner, Name Repo)
   -> TVar (Fetchable Repo)
   -> TVar (Fetchable HealthCheckResult)
-  -> Maybe (Async ())
+  -> Maybe (Async (), Int)
   -> Int
   -> IO Int
   -> m (Node Variable 'RepoT)

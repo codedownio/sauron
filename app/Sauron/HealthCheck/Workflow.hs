@@ -4,16 +4,19 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Sauron.HealthCheck.Workflow (
-  startWorkflowHealthCheckIfNeeded
+  startWorkflowHealthCheckIfNeeded,
+  workflowHealthCheckPeriodUs
   ) where
 
 import Control.Exception.Safe (handleAny)
 import Control.Monad.IO.Class
+import Control.Monad.Logger
 import Data.String.Interpolate
 import GitHub
 import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch (fetchWorkflowJobs)
+import Sauron.Fetch.Core (logToModal)
 import Sauron.Types
 import Sauron.UI.Statuses
 import UnliftIO.Async
@@ -27,6 +30,10 @@ isWorkflowCompleted status = case chooseWorkflowStatus status of
   WorkflowNeutral -> True
   _ -> False
 
+
+workflowHealthCheckPeriodUs :: Int
+workflowHealthCheckPeriodUs = 5_000_000
+
 startWorkflowHealthCheckIfNeeded ::
   BaseContext
   -> Node Variable 'SingleWorkflowT
@@ -37,10 +44,11 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
     Just (RepoNode (EntityData {_static=(owner, name)})) | hasRunningWorkflow workflowRun -> do
       readTVarIO _healthCheckThread >>= \case
         Nothing -> do
+          logToModal baseContext LevelInfo [i|Starting health check thread for workflow: #{workflowRunName workflowRun} (period: #{workflowHealthCheckPeriodUs}us)|] Nothing
           newThread <- async $ runWorkflowHealthCheckLoop baseContext owner name node
-          atomically $ writeTVar _healthCheckThread (Just newThread)
+          atomically $ writeTVar _healthCheckThread (Just (newThread, workflowHealthCheckPeriodUs))
           return (Just newThread)
-        Just thread -> return (Just thread)
+        Just (thread, _) -> return (Just thread)
     _ -> return Nothing
   where
     runWorkflowHealthCheckLoop :: BaseContext -> Name Owner -> Name Repo -> Node Variable 'SingleWorkflowT -> IO ()
@@ -58,7 +66,7 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
             -- Refresh the workflow jobs
             liftIO $ flip runReaderT bc $
               fetchWorkflowJobs owner name (workflowRunWorkflowRunId staticWorkflowRun) wfNode
-            threadDelay (5 * 1000000) -- 5 seconds
+            threadDelay workflowHealthCheckPeriodUs -- 5 seconds
           else do
             -- Workflow is completed, clear the thread reference and stop
             atomically $ writeTVar _healthCheckThread Nothing

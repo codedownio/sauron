@@ -24,6 +24,7 @@ import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
+import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForNodeAndChildren)
 import Sauron.Types
 import Sauron.UI.Keys
 import Sauron.UI.TopBox (isSearchable')
@@ -225,7 +226,7 @@ appEvent _ _ = return ()
 handleLeftArrow :: AppState -> EventM ClickableName AppState ()
 handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
   liftIO (readTVarIO (_toggled (getEntityData mle))) >>= \case
-    True -> liftIO $ atomically $ writeTVar (_toggled (getEntityData mle)) False
+    True -> modifyToggled s (const False)
     False -> case toList parents of
       _:(SomeNode parent):_ -> do
         expandedList <- gets (^. appMainList)
@@ -235,9 +236,16 @@ handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
 
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
 modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode item@(getEntityData -> mle)) parents -> do
+  wasOpen <- liftIO $ readTVarIO (_toggled mle)
   isOpen <- liftIO $ atomically $ do
     modifyTVar' (_toggled mle) cb
     readTVar (_toggled mle)
-  when isOpen $ do
+
+  -- Node opened: refresh visible nodes
+  when (not wasOpen && isOpen) $ do
     atomically (getExistentialChildrenWrapped item)
       >>= refreshVisibleNodes (_appBaseContext s) (someNode : (toList parents))
+
+  -- Node closed: stop healthcheck threads recursively
+  when (wasOpen && not isOpen) $
+    liftIO $ stopHealthCheckThreadsForNodeAndChildren (_appBaseContext s) someNode
