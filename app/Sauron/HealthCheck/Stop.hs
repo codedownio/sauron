@@ -11,6 +11,7 @@ import Brick
 import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Data.String.Interpolate
+import Data.Time (NominalDiffTime)
 import GitHub (untagName, jobName, workflowRunName)
 import Relude
 import Sauron.Fetch.Core (logToModal)
@@ -72,24 +73,10 @@ gatherAndClearHealthCheckThread someNode@(SomeNode node) = do
       PaginatedNotificationsNode _ -> return "Notifications"
       _ -> return "Unknown"
 
-formatPeriodMicroseconds :: Int -> Text
-formatPeriodMicroseconds us
-  | us >= 1_000_000 =
-    let seconds = fromIntegral us / 1_000_000 :: Double
-        formatted :: String = if seconds == fromIntegral (round seconds :: Int)
-                   then show (round seconds :: Int) <> "s"
-                   else show seconds <> "s"
-    in toText formatted
-  | us >= 1_000 =
-    let ms = fromIntegral us / 1_000 :: Double
-        formatted :: String = if ms == fromIntegral (round ms :: Int)
-                   then show (round ms :: Int) <> "ms"
-                   else show ms <> "ms"
-    in toText formatted
-  | otherwise = toText (show us <> "μs" :: String)
-
 healthCheckIndicatorWidget :: Maybe (Async (), Int) -> Widget n
 healthCheckIndicatorWidget healthCheckThreadData =
   case healthCheckThreadData of
-    Just (_, periodMicroseconds) -> str (" 👁[" <> toString (formatPeriodMicroseconds periodMicroseconds) <> "]")
+    Just (_, periodMicroseconds) ->
+      let diffTime = fromIntegral periodMicroseconds / 1_000_000 :: NominalDiffTime
+      in str (" ⟳[" <> show diffTime <> "]")
     Nothing -> str ""
