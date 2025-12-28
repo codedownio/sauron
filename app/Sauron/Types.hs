@@ -373,6 +373,7 @@ data ClickableName =
   | CommentEditor
   | ZoomModalContent
   | LogModalContent
+  | LogSplitContent
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -515,6 +516,7 @@ data AppState = AppState {
 
   , _appCliColorMode :: Maybe V.ColorMode
   , _appActualColorMode :: V.ColorMode
+  , _appSplitLogs :: Bool
 
   , _appLogs :: Seq LogEntry
 

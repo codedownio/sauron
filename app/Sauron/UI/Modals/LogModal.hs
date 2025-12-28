@@ -1,5 +1,6 @@
 module Sauron.UI.Modals.LogModal (
   renderLogModal,
+  renderLogPanel,
   filterLogsByLevel
   ) where
 
@@ -17,25 +18,31 @@ import Sauron.UI.AttrMap (errorLogAttr, warningLogAttr, infoLogAttr, debugLogAtt
 
 
 renderLogModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderLogModal appState (LogModalState _) = vBox [
-    hCenter $ withAttr boldText $ str (
-        "Application Logs - Filter: "
-        <> filterText
-        <> " (" <> show (Seq.length filteredLogs) <> " lines) - Colors: "
-        <> showColorModeMaybe (appState ^. appCliColorMode) <> " (cfg) / "
-        <> showColorMode (appState ^. appActualColorMode) <> " (actual)")
-    , hBorder
-    -- Simple scrollable viewport with scrollbar - always works
-    , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport LogModalContent Vertical $
-      vBox (renderLogEntries (appState ^. appNow) filteredLogs)
-    , hBorder
-    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs, [d/i/w/e] to filter levels, [↑↓] to scroll"
-  ]
+renderLogModal appState (LogModalState _) =
+  renderLogPanel appState LogModalContent
   & border
   & withAttr normalAttr
   & hLimitPercent 80
   & vLimitPercent 90
   & centerLayer
+renderLogModal _ _ = str "Invalid modal state" -- This should never happen
+
+-- | Render the log panel content, can be used in modal or split view
+renderLogPanel :: AppState -> ClickableName -> Widget ClickableName
+renderLogPanel appState viewportName = vBox [
+    hCenter $ withAttr boldText $ str (
+        "Application Logs - Filter: "
+        <> filterText
+        <> " (" <> show (Seq.length filteredLogs) <> " lines)"
+        <> " - Colors: " <> showColorModeMaybe (appState ^. appCliColorMode) <> " (cfg) / " <> showColorMode (appState ^. appActualColorMode) <> " (actual)"
+        )
+    , hBorder
+    -- Simple scrollable viewport with scrollbar - always works
+    , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport viewportName Vertical $
+      vBox (renderLogEntries (appState ^. appNow) filteredLogs)
+    , hBorder
+    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs, [d/i/w/e] to filter levels, [↑↓] to scroll"
+  ]
   where
     currentFilter = appState ^. appLogLevelFilter
     filteredLogs = filterLogsByLevel currentFilter (appState ^. appLogs)
@@ -45,7 +52,6 @@ renderLogModal appState (LogModalState _) = vBox [
       LevelWarn -> "Warn"
       LevelError -> "Error"
       LevelOther t -> toString t
-renderLogModal _ _ = str "Invalid modal state" -- This should never happen
 
 showColorModeMaybe :: Maybe V.ColorMode -> String
 showColorModeMaybe Nothing = "Nothing"

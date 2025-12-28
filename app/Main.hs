@@ -5,6 +5,7 @@ module Main (main) where
 
 import Brick as B
 import Brick.BChan
+import Brick.Widgets.Border (vBorder)
 import Brick.Widgets.Center
 import Brick.Widgets.List
 import qualified Brick.Widgets.List as L
@@ -41,7 +42,7 @@ import Sauron.UI.AttrMap (buildAdaptiveAttrMap)
 import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
 import Sauron.UI.Modals.CommentModal (renderModal)
-import Sauron.UI.Modals.LogModal (renderLogModal)
+import Sauron.UI.Modals.LogModal (renderLogModal, renderLogPanel)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TopBox (topBox)
 import System.IO.Error (userError)
@@ -68,12 +69,14 @@ mkApp colorMode = App {
 
 drawUI :: AppState -> [Widget ClickableName]
 drawUI app = case _appModal app of
-  Nothing -> [mainUI]
+  Nothing -> [ui]
   Just modalState -> case modalState of
-    CommentModalState {} -> [renderModal app modalState, mainUI]
-    ZoomModalState {} -> [renderZoomModal app modalState, mainUI]
-    LogModalState {} -> [renderLogModal app modalState, mainUI]
+    CommentModalState {} -> [renderModal app modalState, ui]
+    ZoomModalState {} -> [renderZoomModal app modalState, ui]
+    LogModalState {} -> [renderLogModal app modalState, ui]
   where
+    ui = if _appSplitLogs app then splitUI else mainUI
+
     mainUI = vBox [
       topBox app
       , borderWithCounts app
@@ -83,9 +86,15 @@ drawUI app = case _appModal app of
       , clickable InfoBar $ bottomBar app
       ]
 
+    splitUI = hBox [
+      hLimitPercent 50 mainUI,
+      vBorder,
+      padRight Max $ renderLogPanel app LogSplitContent
+      ]
+
 main :: IO ()
 main = do
-  CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode} <- parseCliArgs
+  CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitLogs} <- parseCliArgs
 
   eventChan <- newBChan 10
   baseContext@(BaseContext {requestSemaphore}) <- buildBaseContext eventChan
@@ -135,6 +144,7 @@ main = do
 
           , _appCliColorMode = Nothing
           , _appActualColorMode = V.FullColor
+          , _appSplitLogs = cliSplitLogs
 
           , _appLogs = mempty
 
