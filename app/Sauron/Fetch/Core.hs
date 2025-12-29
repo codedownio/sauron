@@ -6,19 +6,14 @@ module Sauron.Fetch.Core (
 
   , makeEmptyElem
 
-  , logToModal
-  , withLogToModal
 ) where
 
-import Brick.BChan (writeBChan)
 import Control.Exception.Safe (bracketOnError_)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
-import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.Aeson
 import qualified Data.List as L
-import Data.Time
 import GitHub
 import Network.HTTP.Client (responseBody)
 import Network.HTTP.Types.URI (QueryItem, parseQuery)
@@ -26,6 +21,7 @@ import qualified Network.URI as NURI
 import Relude
 import Sauron.Actions.Util
 import Sauron.Types
+
 
 -- | Default page size for GitHub API requests
 pageSize :: Int
@@ -96,17 +92,3 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
     , _ident = ident'
 }
 
-logToModal :: MonadIO m => BaseContext -> LogLevel -> Text -> Maybe NominalDiffTime -> m ()
-logToModal bc level msg maybeDuration = do
-  now <- liftIO getCurrentTime
-  let logEntry = LogEntry now level msg maybeDuration
-  liftIO $ writeBChan (eventChan bc) (LogEntryAdded logEntry)
-
-withLogToModal :: MonadIO m => BaseContext -> LogLevel -> Text -> m a -> m a
-withLogToModal bc level msg action = do
-  startTime <- liftIO getCurrentTime
-  result <- action
-  endTime <- liftIO getCurrentTime
-  let duration = diffUTCTime endTime startTime
-  logToModal bc level msg (Just duration)
-  return result

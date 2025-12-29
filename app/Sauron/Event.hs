@@ -115,6 +115,8 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'e') []) -> do
         modify (appLogLevelFilter .~ LevelError)
         vScrollToEnd (viewportScroll LogModalContent)
+      (V.EvKey (V.KChar 's') []) -> do
+        modify (appShowStackTraces %~ not)
       _ -> return () -- No other interactions for LogModal
   _ -> return ()
 

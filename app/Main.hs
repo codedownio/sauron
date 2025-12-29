@@ -149,6 +149,7 @@ main = do
           , _appLogs = mempty
 
           , _appLogLevelFilter = LevelInfo
+          , _appShowStackTraces = True
         }
 
 

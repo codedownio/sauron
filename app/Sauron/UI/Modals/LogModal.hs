@@ -1,7 +1,8 @@
 module Sauron.UI.Modals.LogModal (
   renderLogModal,
   renderLogPanel,
-  filterLogsByLevel
+  filterLogsByLevel,
+  autoScrollLogsToBottom
   ) where
 
 import Brick
@@ -10,11 +11,12 @@ import Brick.Widgets.Center
 import Control.Monad.Logger (LogLevel(..))
 import qualified Data.Sequence as Seq
 import Data.Time
+import GHC.Stack (SrcLoc(..))
 import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude
 import Sauron.Types
-import Sauron.UI.AttrMap (errorLogAttr, warningLogAttr, infoLogAttr, debugLogAttr, normalAttr, hotkeyMessageAttr, boldText)
+import Sauron.UI.AttrMap (errorLogAttr, warningLogAttr, infoLogAttr, debugLogAttr, normalAttr, hotkeyMessageAttr, boldText, hashNumberAttr)
 
 
 renderLogModal :: AppState -> ModalState Fixed -> Widget ClickableName
@@ -39,9 +41,9 @@ renderLogPanel appState viewportName = vBox [
     , hBorder
     -- Simple scrollable viewport with scrollbar - always works
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport viewportName Vertical $
-      vBox (renderLogEntries (appState ^. appNow) filteredLogs)
+      vBox (renderLogEntries (appState ^. appNow) (appState ^. appShowStackTraces) filteredLogs)
     , hBorder
-    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs, [d/i/w/e] to filter levels, [↑↓] to scroll"
+    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs, [d/i/w/e] to filter levels, [s] to toggle stack traces, [↑↓] to scroll"
   ]
   where
     currentFilter = appState ^. appLogLevelFilter
@@ -64,23 +66,30 @@ showColorMode V.ColorMode16 = "16"
 showColorMode V.ColorMode8 = "8"
 showColorMode V.NoColor = "None"
 
-renderLogEntries :: UTCTime -> Seq LogEntry -> [Widget ClickableName]
-renderLogEntries currentTime logs =
+renderLogEntries :: UTCTime -> Bool -> Seq LogEntry -> [Widget ClickableName]
+renderLogEntries currentTime showStackTraces logs =
   if Seq.null logs
     then [hCenter $ withAttr hotkeyMessageAttr $ str "No log entries yet"]
-    else toList $ fmap (renderLogEntry currentTime) logs
+    else toList $ fmap (renderLogEntry currentTime showStackTraces) logs
 
-renderLogEntry :: UTCTime -> LogEntry -> Widget ClickableName
-renderLogEntry _currentTime (LogEntry timestamp level message maybeDuration) =
-  hBox [
-    withAttr timeAttr $ str (formatLogTime timestamp)
-    , str " "
-    , withAttr levelAttr $ str (formatLevel level)
-    , str " "
-    , txtWrap message
-    , case maybeDuration of
-        Nothing -> emptyWidget
-        Just duration -> hBox [str " ", formatDuration duration]
+renderLogEntry :: UTCTime -> Bool -> LogEntry -> Widget ClickableName
+renderLogEntry _currentTime showStackTraces (LogEntry timestamp level message maybeDuration maybeStackTrace) =
+  vBox [
+    hBox [
+      withAttr timeAttr $ str (formatLogTime timestamp)
+      , str " "
+      , withAttr levelAttr $ str (formatLevel level)
+      , str " "
+      , txtWrap message
+      , case maybeDuration of
+          Nothing -> emptyWidget
+          Just duration -> hBox [str " ", formatDuration duration]
+    ]
+    , if showStackTraces
+        then case maybeStackTrace of
+          Nothing -> emptyWidget
+          Just callStack' -> renderStackTrace callStack'
+        else emptyWidget
   ]
   where
     levelAttr = case level of
@@ -102,6 +111,25 @@ renderLogEntry _currentTime (LogEntry timestamp level message maybeDuration) =
             | otherwise          = errorLogAttr      -- Very slow (>5s) - red
           durationText = show durationMs <> "ms"
       in withAttr durationAttr $ str durationText
+
+renderStackTrace :: CallStack -> Widget ClickableName
+renderStackTrace callStack' =
+  vBox [
+    vBox $ map renderStackFrame (getCallStack callStack')
+  ]
+  where
+    renderStackFrame :: (String, SrcLoc) -> Widget ClickableName
+    renderStackFrame (funcName, srcLoc) =
+      hBox [
+        str "    "
+        , withAttr hotkeyMessageAttr $ str funcName
+        , str " @ "
+        , withAttr debugLogAttr $ str (srcLocFile srcLoc)
+        , str ":"
+        , withAttr hashNumberAttr $ str (show (srcLocStartLine srcLoc))
+        , str ":"
+        , withAttr hashNumberAttr $ str (show (srcLocStartCol srcLoc))
+      ]
 
 formatLevel :: LogLevel -> String
 formatLevel LevelError = "[ERROR]"

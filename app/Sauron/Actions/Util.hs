@@ -95,17 +95,17 @@ requestToUrl req = case req of
     formatEscapeItem (QE s) = decodeUtf8 s -- QE is already query-escaped
     formatEscapeItem (QN s) = decodeUtf8 s
 
-githubWithLogging :: (MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error a)
-githubWithLogging request = fmap responseBody <$> githubWithLoggingResponse request
+githubWithLogging :: (HasCallStack, MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error a)
+githubWithLogging request = withFrozenCallStack (fmap responseBody <$> githubWithLoggingResponse request)
 
-githubWithLoggingResponse :: (MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error (Response a))
-githubWithLoggingResponse request = ask >>= flip githubWithLogging'' request
+githubWithLoggingResponse :: (HasCallStack, MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error (Response a))
+githubWithLoggingResponse request = withFrozenCallStack (ask >>= flip githubWithLogging'' request)
 
-githubWithLogging' :: (MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error a)
-githubWithLogging' bc request = fmap responseBody <$> githubWithLogging'' bc request
+githubWithLogging' :: (HasCallStack, MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error a)
+githubWithLogging' bc request = withFrozenCallStack (fmap responseBody <$> githubWithLogging'' bc request)
 
-githubWithLogging'' :: (MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error (Response a))
-githubWithLogging'' (BaseContext {..}) request = do
+githubWithLogging'' :: (HasCallStack, MonadIO m, FromJSON a) => BaseContext -> Request k a -> m (Either Error (Response a))
+githubWithLogging'' (BaseContext {..}) request = withFrozenCallStack $ do
   startTime <- liftIO getCurrentTime
   result <- liftIO $ executeRequestWithMgrAndRes manager auth request
   endTime <- liftIO getCurrentTime
@@ -113,7 +113,7 @@ githubWithLogging'' (BaseContext {..}) request = do
   logResult eventChan request result (Just duration)
   return result
 
-logResult :: (MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Response b) -> Maybe NominalDiffTime -> m ()
+logResult :: (HasCallStack, MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Response b) -> Maybe NominalDiffTime -> m ()
 logResult eventChan request result maybeDuration = do
   now <- liftIO getCurrentTime
   let url = requestToUrl request
@@ -125,7 +125,7 @@ logResult eventChan request result maybeDuration = do
                 Nothing -> "" -- " " <> show (responseHeaders response)
                 Just size -> " (" <> show size <> " bytes)"
           in (url <> sizeInfo)
-  let logEntry = LogEntry now level msg maybeDuration
+  let logEntry = LogEntry now level msg maybeDuration (Just callStack)
   liftIO $ writeBChan eventChan (LogEntryAdded logEntry)
   where
     getResponseSize :: Response a -> Maybe Int

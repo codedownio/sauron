@@ -56,6 +56,7 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
+import Sauron.Logging (logToModal)
 import qualified Sauron.GraphQL as GraphQL
 import Sauron.Types
 import Sauron.UI.BranchWithInfo (formatCommitTimeText, formatPRInfoText, formatCheckStatusWithWidth, formatAheadBehindWithWidth)

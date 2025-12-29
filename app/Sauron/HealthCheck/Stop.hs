@@ -14,7 +14,7 @@ import Data.String.Interpolate
 import Data.Time (NominalDiffTime)
 import GitHub (untagName, jobName, workflowRunName)
 import Relude
-import Sauron.Fetch.Core (logToModal)
+import Sauron.Logging (logToModal)
 import Sauron.Types
 import UnliftIO.Async
 

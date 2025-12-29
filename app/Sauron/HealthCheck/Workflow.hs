@@ -16,7 +16,7 @@ import GitHub
 import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch (fetchWorkflowJobs)
-import Sauron.Fetch.Core (logToModal)
+import Sauron.Logging (logToModal)
 import Sauron.Types
 import Sauron.UI.Statuses
 import UnliftIO.Async

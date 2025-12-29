@@ -47,6 +47,7 @@ executable sauron
       Sauron.HealthCheck.Job
       Sauron.HealthCheck.Stop
       Sauron.HealthCheck.Workflow
+      Sauron.Logging
       Sauron.OAuth
       Sauron.Options
       Sauron.Setup.AllReposForUser

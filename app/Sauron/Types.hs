@@ -447,7 +447,12 @@ data LogEntry = LogEntry {
   , _logEntryLevel :: LogLevel
   , _logEntryMessage :: Text
   , _logEntryDuration :: Maybe NominalDiffTime
-  } deriving (Show, Eq)
+  , _logEntryStackTrace :: Maybe CallStack
+  } deriving (Show)
+
+instance Eq LogEntry where
+  (LogEntry t1 l1 m1 d1 _) == (LogEntry t2 l2 m2 d2 _) =
+    t1 == t2 && l1 == l2 && m1 == m2 && d1 == d2
 
 -- * Overall app state
 
@@ -521,6 +526,7 @@ data AppState = AppState {
   , _appLogs :: Seq LogEntry
 
   , _appLogLevelFilter :: LogLevel
+  , _appShowStackTraces :: Bool
   }
 
 

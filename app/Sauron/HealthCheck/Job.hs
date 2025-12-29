@@ -16,7 +16,7 @@ import GitHub
 import Relude
 import Sauron.Actions.Util (findRepoParent)
 import Sauron.Fetch (fetchJob)
-import Sauron.Fetch.Core (logToModal)
+import Sauron.Logging (logToModal)
 import Sauron.Types
 import Sauron.UI.Statuses
 import UnliftIO.Async
