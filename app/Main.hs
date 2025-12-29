@@ -5,7 +5,7 @@ module Main (main) where
 
 import Brick as B
 import Brick.BChan
-import Brick.Widgets.Border (vBorder)
+import Brick.Widgets.Border (vBorder, border)
 import Brick.Widgets.Center
 import Brick.Widgets.List
 import qualified Brick.Widgets.List as L
@@ -21,7 +21,7 @@ import qualified Data.Vector as V
 import GitHub
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.CrossPlatform as V
-import Lens.Micro
+import Lens.Micro ((^.))
 import Network.HTTP.Client (newManager)
 import Relude hiding (Down)
 import Sauron.Actions
@@ -44,6 +44,7 @@ import Sauron.UI.BottomBar
 import Sauron.UI.Modals.CommentModal (renderModal)
 import Sauron.UI.Modals.LogModal (renderLogModal, renderLogPanel)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
+import Sauron.UI.TimelineBorder (borderWithAttr)
 import Sauron.UI.TopBox (topBox)
 import System.IO.Error (userError)
 import UnliftIO.Async
@@ -87,9 +88,17 @@ drawUI app = case _appModal app of
       ]
 
     splitUI = hBox [
-      hLimitPercent 50 mainUI,
+      clickable MainPane $
+        (if _appFocusedPane app == MainPaneFocus
+         then borderWithAttr (attrName "focusedPaneBorder") Nothing
+         else border) $
+        hLimitPercent 50 mainUI,
       vBorder,
-      padRight Max $ renderLogPanel app LogSplitContent
+      clickable LogPane $
+        (if _appFocusedPane app == LogPaneFocus
+         then borderWithAttr (attrName "focusedPaneBorder") Nothing
+         else border) $
+        padRight Max $ renderLogPanel app LogSplitContent
       ]
 
 main :: IO ()
@@ -145,6 +154,7 @@ main = do
           , _appCliColorMode = Nothing
           , _appActualColorMode = V.FullColor
           , _appSplitLogs = cliSplitLogs
+          , _appFocusedPane = MainPaneFocus
 
           , _appLogs = mempty
 

@@ -132,6 +132,33 @@ appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
 
 appEvent s (VtyEvent e) = case e of
+  -- Focus switching hotkeys (work regardless of current focus)
+  V.EvKey V.KLeft [V.MCtrl] -> when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
+  V.EvKey V.KRight [V.MCtrl] -> when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+
+  -- Handle events based on focused pane when split logs is enabled
+  _ | _appSplitLogs s && _appFocusedPane s == LogPaneFocus -> handleLogPaneEvents s e
+  _ -> handleMainPaneEvents s e
+
+-- Mouse events for main pane
+appEvent _s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
+  vScrollBy (viewportScroll MainList) (-1)
+appEvent _s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
+  vScrollBy (viewportScroll MainList) 1
+appEvent _s (MouseDown (ListRow n) V.BLeft _ _) = do
+  modify (appMainList %~ listMoveTo n)
+
+-- Pane focus switching
+appEvent s (MouseDown MainPane V.BLeft _ _) = do
+  when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
+appEvent s (MouseDown LogPane V.BLeft _ _) = do
+  when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+
+-- Catch-all
+appEvent _ _ = return ()
+
+handleMainPaneEvents :: AppState -> V.Event -> EventM ClickableName AppState ()
+handleMainPaneEvents s e = case e of
   -- Column 1
   V.EvKey c [] | c == nextKey -> modify (appMainList %~ (listMoveBy 1))
   V.EvKey c [] | c == previousKey -> modify (appMainList %~ (listMoveBy (-1)))
@@ -150,11 +177,6 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey (V.KChar 'v') [V.MCtrl] -> withScroll s $ \vp -> vScrollPage vp Down
   V.EvKey V.KHome [V.MCtrl] -> withScroll s $ \vp -> vScrollToBeginning vp
   V.EvKey V.KEnd [V.MCtrl] -> withScroll s $ \vp -> vScrollToEnd vp
-
-  -- V.EvKey (V.KChar 'k') [V.MCtrl] -> vScrollPage (viewportScroll (InnerViewport "viewport_debugging")) Up
-  -- V.EvKey (V.KChar 'l') [V.MCtrl] -> vScrollPage (viewportScroll (InnerViewport "viewport_debugging")) Down
-  -- V.EvKey (V.KChar 'p') [V.MCtrl] -> vScrollBy (viewportScroll (InnerViewport "viewport_debugging")) 1
-  -- V.EvKey (V.KChar 'o') [V.MCtrl] -> vScrollBy (viewportScroll (InnerViewport "viewport_debugging")) (-1)
 
   -- Column 2
   V.EvKey c [] | c == browserToHomeKey ->
@@ -217,15 +239,37 @@ appEvent s (VtyEvent e) = case e of
 
   ev -> zoom appMainList $ handleListEvent ev
 
--- Mouse events
-appEvent _s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
-  vScrollBy (viewportScroll MainList) (-1)
-appEvent _s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
-  vScrollBy (viewportScroll MainList) 1
-appEvent _s (MouseDown (ListRow n) V.BLeft _ _) = do
-  modify (appMainList %~ listMoveTo n)
-
-appEvent _ _ = return ()
+handleLogPaneEvents :: AppState -> V.Event -> EventM ClickableName AppState ()
+handleLogPaneEvents _s e = case e of
+  V.EvKey (V.KChar 'c') [] -> do
+    modify (appLogs .~ Seq.empty)
+  V.EvKey (V.KChar 'v') [V.MCtrl] -> vScrollPage (viewportScroll LogSplitContent) Down
+  V.EvKey (V.KChar 'v') [V.MMeta] -> vScrollPage (viewportScroll LogSplitContent) Up
+  V.EvKey (V.KChar 'n') [V.MCtrl] -> vScrollBy (viewportScroll LogSplitContent) 1
+  V.EvKey (V.KChar 'p') [V.MCtrl] -> vScrollBy (viewportScroll LogSplitContent) (-1)
+  V.EvKey V.KUp [] -> vScrollBy (viewportScroll LogSplitContent) (-1)
+  V.EvKey V.KDown [] -> vScrollBy (viewportScroll LogSplitContent) 1
+  V.EvKey V.KPageUp [] -> vScrollPage (viewportScroll LogSplitContent) Up
+  V.EvKey V.KPageDown [] -> vScrollPage (viewportScroll LogSplitContent) Down
+  V.EvKey V.KHome [] -> vScrollToBeginning (viewportScroll LogSplitContent)
+  V.EvKey V.KEnd [] -> vScrollToEnd (viewportScroll LogSplitContent)
+  V.EvKey (V.KChar 'd') [] -> do
+    modify (appLogLevelFilter .~ LevelDebug)
+    vScrollToEnd (viewportScroll LogSplitContent)
+  V.EvKey (V.KChar 'i') [] -> do
+    modify (appLogLevelFilter .~ LevelInfo)
+    vScrollToEnd (viewportScroll LogSplitContent)
+  V.EvKey (V.KChar 'w') [] -> do
+    modify (appLogLevelFilter .~ LevelWarn)
+    vScrollToEnd (viewportScroll LogSplitContent)
+  V.EvKey (V.KChar 'e') [] -> do
+    modify (appLogLevelFilter .~ LevelError)
+    vScrollToEnd (viewportScroll LogSplitContent)
+  V.EvKey (V.KChar 's') [] -> do
+    modify (appShowStackTraces %~ not)
+  -- Exit key still works from log pane
+  V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> halt
+  _ -> return ()
 
 handleLeftArrow :: AppState -> EventM ClickableName AppState ()
 handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do

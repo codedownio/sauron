@@ -374,6 +374,8 @@ data ClickableName =
   | ZoomModalContent
   | LogModalContent
   | LogSplitContent
+  | MainPane
+  | LogPane
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -454,6 +456,13 @@ instance Eq LogEntry where
   (LogEntry t1 l1 m1 d1 _) == (LogEntry t2 l2 m2 d2 _) =
     t1 == t2 && l1 == l2 && m1 == m2 && d1 == d2
 
+-- * Focused pane
+
+data FocusedPane =
+  MainPaneFocus
+  | LogPaneFocus
+  deriving (Show, Eq)
+
 -- * Overall app state
 
 data AppEvent =
@@ -522,6 +531,7 @@ data AppState = AppState {
   , _appCliColorMode :: Maybe V.ColorMode
   , _appActualColorMode :: V.ColorMode
   , _appSplitLogs :: Bool
+  , _appFocusedPane :: FocusedPane
 
   , _appLogs :: Seq LogEntry
 

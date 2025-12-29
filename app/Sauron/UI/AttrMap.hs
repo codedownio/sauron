@@ -48,6 +48,9 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   , (unreadNotificationAttr, bg (select unreadNotificationBg))
   , (blueDotAttr, fg V.blue)
 
+  -- Focus styles
+  , (mkAttrName "focusedPaneBorder", fg V.cyan & flip V.withStyle V.bold)
+
   -- Progress bar
   , (progressCompleteAttr, bg (select (V.Color240 235, V.Color240 235, V.brightBlack, V.black, V.black)))
   , (progressIncompleteAttr, bg (select (V.Color240 225, V.Color240 225, V.black, V.black, V.black)))

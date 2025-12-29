@@ -1,8 +1,10 @@
 module Sauron.UI.TimelineBorder (
-  firstTimelineBorder,
-  middleTimelineBorder,
-  lastTimelineBorder,
-  standaloneTimelineBorder
+  firstTimelineBorder
+  , middleTimelineBorder
+  , lastTimelineBorder
+  , standaloneTimelineBorder
+
+  , borderWithAttr
 ) where
 
 import Brick
@@ -112,7 +114,10 @@ lastTimelineBorder label content =
              $ total
 
 standaloneTimelineBorder :: Widget n -> Widget n -> Widget n
-standaloneTimelineBorder label content =
+standaloneTimelineBorder label content = borderWithAttr timelineBorderAttr (Just label) content
+
+borderWithAttr :: AttrName -> Maybe (Widget n) -> Widget n -> Widget n
+borderWithAttr attr label content =
     Widget (hSize content) (vSize content) $ do
       c <- getContext
 
@@ -120,19 +125,22 @@ standaloneTimelineBorder label content =
                              $ vLimit (c^.availHeightL - 2)
                              $ content
 
-      let topBorder = hBox [
-            withAttr timelineBorderAttr $ str "┌─── "
-            , label
-            , str " "
-            , timelineHBorder
-            , withAttr timelineBorderAttr $ str "┐"
+      let topBorder = hBox ([
+            withAttr attr $ str ("┌───" <> (case label of Nothing -> ""; Just _ -> " "))
             ]
+            <> (case label of
+                  Just l -> [l, str " "]
+                  Nothing -> [])
+            <> [
+                  timelineHBorder
+                  , withAttr attr $ str "┐"
+               ])
           bottomBorder = hBox [
-            withAttr timelineBorderAttr $ str "└───"
+            withAttr attr $ str "└───"
             , timelineHBorder
-            , withAttr timelineBorderAttr $ str "┘"
+            , withAttr attr $ str "┘"
             ]
-          middle = vBorderAttr timelineBorderAttr <+> (Widget Fixed Fixed $ return middleResult) <+> vBorderAttr timelineBorderAttr
+          middle = vBorderAttr attr <+> (Widget Fixed Fixed $ return middleResult) <+> vBorderAttr attr
           total = topBorder <=> middle <=> bottomBorder
 
       render $ hLimit (middleResult^.imageL.to imageWidth + 2)
