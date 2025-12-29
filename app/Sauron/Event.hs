@@ -27,6 +27,7 @@ import Sauron.Event.Paging
 import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForNodeAndChildren)
 import Sauron.Types
 import Sauron.UI.Keys
+import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
 import Sauron.UI.TopBox (isSearchable')
 
 
@@ -46,6 +47,7 @@ appEvent _s (AppEvent (TimeUpdated newTime)) = do
 appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
   -- Add log entry to the logs sequence
   modify (appLogs %~ (Seq.|> logEntry))
+  autoScrollLogsToBottom
 
 
 

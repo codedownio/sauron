@@ -122,3 +122,16 @@ filterLogsByLevel filterLevel = Seq.filter (\logEntry -> logLevelPriority (_logE
     logLevelPriority LevelInfo = 2
     logLevelPriority LevelDebug = 1
     logLevelPriority (LevelOther _) = 0
+
+autoScrollLogsToBottom :: EventM ClickableName AppState ()
+autoScrollLogsToBottom = do
+  autoScrollViewportIfAtBottom LogModalContent
+  autoScrollViewportIfAtBottom LogSplitContent
+
+autoScrollViewportIfAtBottom :: ClickableName -> EventM ClickableName AppState ()
+autoScrollViewportIfAtBottom viewportName = do
+  lookupViewport viewportName >>= \case
+    Just viewportInfo -> do
+      let isAtBottom = _vpTop viewportInfo + _vpSize viewportInfo ^. _2 >= _vpContentSize viewportInfo ^. _2
+      when isAtBottom $ vScrollToEnd (viewportScroll viewportName)
+    Nothing -> return ()
