@@ -30,26 +30,24 @@ newHealthCheckThread :: (
   -> TVar (Fetchable HealthCheckResult)
   -> PeriodSpec
   -> IO (Async ())
-newHealthCheckThread baseContext (owner, name) repoVar healthCheckVar (PeriodSpec period) = do
-  logToModal baseContext LevelInfo [i|Starting health check thread for repo: #{owner}/#{name} (period: #{period}us)|] Nothing
-  async $
-    handleAny (\e -> putStrLn [i|Health check thread crashed: #{e}|]) $
-    forever $ do
-      -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?
-      defaultBranch <- atomically $ do
-        readTVar repoVar >>= \case
-          Fetched (Repo {repoDefaultBranch=(Just branch)}) -> pure branch
-          _ -> retry
+newHealthCheckThread baseContext (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $ do
+  logToModal baseContext LevelInfo [i|Starting health check thread for repo: #{untagName owner}/#{untagName name} (period: #{period}us)|] Nothing
+  handleAny (\e -> putStrLn [i|Health check thread crashed: #{e}|]) $ forever $ do
+    -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?
+    defaultBranch <- atomically $ do
+      readTVar repoVar >>= \case
+        Fetched (Repo {repoDefaultBranch=(Just branch)}) -> pure branch
+        _ -> retry
 
-      liftIO $ flip runReaderT baseContext $ do
-        bracketOnError_ (atomically $ markFetching healthCheckVar)
-                        (atomically $ writeTVar healthCheckVar (Errored "Health check fetch failed with exception.")) $ do
-          let search' = optionsWorkflowRunBranch defaultBranch
-          withGithubApiSemaphore (githubWithLogging (workflowRunsR owner name search' (FetchAtLeast 1))) >>= \case
-            Left err -> atomically $ writeTVar healthCheckVar (Errored (show err))
-            Right (WithTotalCount {withTotalCountItems=(V.toList -> ((WorkflowRun {..}):_))}) -> do
-              let result = HealthCheckWorkflowResult (chooseWorkflowStatus (fromMaybe workflowRunStatus workflowRunConclusion))
-              atomically $ writeTVar healthCheckVar (Fetched result)
-            Right _ -> atomically $ writeTVar healthCheckVar (Fetched HealthCheckNoData)
+    liftIO $ flip runReaderT baseContext $ do
+      bracketOnError_ (atomically $ markFetching healthCheckVar)
+                      (atomically $ writeTVar healthCheckVar (Errored "Health check fetch failed with exception.")) $ do
+        let search' = optionsWorkflowRunBranch defaultBranch
+        withGithubApiSemaphore (githubWithLogging (workflowRunsR owner name search' (FetchAtLeast 1))) >>= \case
+          Left err -> atomically $ writeTVar healthCheckVar (Errored (show err))
+          Right (WithTotalCount {withTotalCountItems=(V.toList -> ((WorkflowRun {..}):_))}) -> do
+            let result = HealthCheckWorkflowResult (chooseWorkflowStatus (fromMaybe workflowRunStatus workflowRunConclusion))
+            atomically $ writeTVar healthCheckVar (Fetched result)
+          Right _ -> atomically $ writeTVar healthCheckVar (Fetched HealthCheckNoData)
 
-      threadDelay period
+    threadDelay period
