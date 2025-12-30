@@ -24,12 +24,12 @@ import Sauron.UI.Statuses (getQuarterCircleSpinner)
 
 instance ListDrawable Fixed 'PaginatedReposT where
   drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched (SearchResult totalCount repos) -> paginatedHeading ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount}|])
+    Fetched (SearchResult totalCount repos) -> paginatedHeadingColored ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount}|])
     Fetching maybeRepos -> case maybeRepos of
-      Just (SearchResult totalCount repos) -> paginatedHeading ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount} |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Repositories" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Repositories" (str [i|(error fetching: #{err})|])
+      Just (SearchResult totalCount repos) -> paginatedHeadingColored ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount} |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeadingColored ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeadingColored ed appState "Repositories" (str [i|(not fetched)|])
+    Errored err -> paginatedHeadingColored ed appState "Repositories" (str [i|(error fetching: #{err})|])
 
   drawInner _ _ = Nothing
 
@@ -121,19 +121,19 @@ instance ListDrawable Fixed 'PaginatedStaleBranchesT where
 
 instance ListDrawable Fixed 'PaginatedNotificationsT where
   drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched notifications -> paginatedHeading ed appState "Notifications" (countWidget _pageInfo notifications)
+    Fetched notifications -> paginatedHeadingColored ed appState "Notifications" (countWidget _pageInfo notifications)
     Fetching maybeNotifications -> case maybeNotifications of
-      Just notifications -> paginatedHeading ed appState "Notifications" (countWidget _pageInfo notifications <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "Notifications" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Notifications" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Notifications" (str [i|(error fetching: #{err})|])
+      Just notifications -> paginatedHeadingColored ed appState "Notifications" (countWidget _pageInfo notifications <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+      Nothing -> paginatedHeadingColored ed appState "Notifications" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+    NotFetched -> paginatedHeadingColored ed appState "Notifications" (str [i|(not fetched)|])
+    Errored err -> paginatedHeadingColored ed appState "Notifications" (str [i|(error fetching: #{err})|])
 
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'HeadingT where
   drawLine _appState (EntityData {_static=label, ..}) = hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-    , Just (hBox [str (toString label)])
+    , Just (hBox [withAttr (mkAttrName "headingText") $ str (toString label)])
     , Just (padLeft Max (str " "))
     ]
 
@@ -142,15 +142,25 @@ instance ListDrawable Fixed 'HeadingT where
 
 -- Helper functions
 
-paginatedHeading ::
+type PaginatedHeadingFn a =
   EntityData Fixed a
   -> AppState
   -> String
   -> Widget ClickableName
   -> Widget ClickableName
-paginatedHeading (EntityData {..}) appState l countInParens = hBox $ catMaybes [
+
+paginatedHeading :: PaginatedHeadingFn a
+paginatedHeading = paginatedHeading' id
+
+paginatedHeadingColored :: PaginatedHeadingFn a
+paginatedHeadingColored = paginatedHeading' (withAttr (mkAttrName "headingText"))
+
+paginatedHeading' ::
+  (Widget ClickableName -> Widget ClickableName)
+  -> PaginatedHeadingFn a
+paginatedHeading' modifyLabel (EntityData {..}) appState l countInParens = hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-  , Just $ padRight (Pad 1) $ str l
+  , Just $ padRight (Pad 1) $ modifyLabel $ str l
   , Just $ countInParens
   , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
   ]

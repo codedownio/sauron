@@ -49,13 +49,15 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   , (blueDotAttr, fg V.blue)
 
   -- Focus styles
-  , (mkAttrName "focusedPaneBorder", fg V.cyan & flip V.withStyle V.bold)
+  , (focusedPaneBorderAttr, fg V.cyan & flip V.withStyle V.bold)
+  , (normalPaneBorderAttr, fg V.white)
 
   -- Progress bar
   , (progressCompleteAttr, bg (select (V.Color240 235, V.Color240 235, V.brightBlack, V.black, V.black)))
   , (progressIncompleteAttr, bg (select (V.Color240 225, V.Color240 225, V.black, V.black, V.black)))
 
   -- Main list
+  , (headingTextAttr, fg V.cyan & flip V.withStyle V.bold)
   , (toggleMarkerAttr, fg (select midGray))
   , (openMarkerAttr, fg (select midGray))
 
@@ -143,9 +145,6 @@ notFetchedAttr = mkAttrName "not_fetched"
 fetchingAttr = mkAttrName "fetching"
 erroredAttr = mkAttrName "errored"
 
-toggleMarkerAttr = mkAttrName "toggleMarker"
-openMarkerAttr = mkAttrName "openMarker"
-
 hotkeyAttr = mkAttrName "hotkey"
 disabledHotkeyAttr = mkAttrName "disableHotkey"
 hotkeyMessageAttr = mkAttrName "hotkeyMessage"
@@ -185,6 +184,17 @@ usernameAttr = mkAttrName "username"
 
 unreadNotificationAttr = mkAttrName "unreadNotification"
 blueDotAttr = mkAttrName "blueDot"
+
+-- * Focus styles
+
+focusedPaneBorderAttr = mkAttrName "focusedPaneBorder"
+normalPaneBorderAttr = mkAttrName "normalPaneBorder"
+
+-- * Main list
+
+headingTextAttr = mkAttrName "headingText"
+toggleMarkerAttr = mkAttrName "toggleMarker"
+openMarkerAttr = mkAttrName "openMarker"
 
 -- * Text
 
