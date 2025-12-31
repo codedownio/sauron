@@ -141,11 +141,14 @@ appEvent s (VtyEvent e) = case e of
   _ -> handleMainPaneEvents s e
 
 -- Mouse events for main pane
-appEvent _s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
+appEvent s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
+  when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
   vScrollBy (viewportScroll MainList) (-1)
-appEvent _s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
+appEvent s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
+  when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
   vScrollBy (viewportScroll MainList) 1
-appEvent _s (MouseDown (ListRow n) V.BLeft _ _) = do
+appEvent s (MouseDown (ListRow n) V.BLeft _ _) = do
+  when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
   modify (appMainList %~ listMoveTo n)
 
 -- Pane focus switching
