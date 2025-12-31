@@ -60,13 +60,13 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
           case Map.lookup jobId existingJobsMap of
             Just existingNode@(SingleJobNode existingEntityData) -> do
               -- Update existing node's job data while preserving toggle state
-              let EntityData {_state = jobState} = existingEntityData
+              let EntityData {_state=jobState} = existingEntityData
               writeTVar jobState (Fetched job)
               return existingNode
             Nothing -> do
               -- Create new node for new jobs
-              entityData <- makeEmptyElem bc () "" (_depth + 1)
-              let EntityData {_state = jobState, _children = jobChildren} = entityData
+              entityData <- makeEmptyElem bc jobId "" (_depth + 1)
+              let EntityData {_state=jobState, _children=jobChildren} = entityData
               writeTVar jobState (Fetched job)
 
               -- Create dummy child for log fetching

@@ -84,13 +84,9 @@ refresh bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) parents@
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
     fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item
     liftIO $ void $ startWorkflowHealthCheckIfNeeded bc item parents
-refresh bc item@(SingleJobNode (EntityData {_state})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
+refresh bc item@(SingleJobNode (EntityData {_state, _static=jobId})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
-    currentState <- readTVarIO _state
-    case currentState of
-      Fetched job -> fetchJob owner name (jobId job) item
-      Fetching (Just job) -> fetchJob owner name (jobId job) item
-      _ -> return ()
+    fetchJob owner name jobId item
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 refresh bc (JobLogGroupNode (EntityData {_state})) parents = do
   case findJobParent (toList parents) of

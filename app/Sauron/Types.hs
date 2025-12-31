@@ -167,7 +167,7 @@ type family NodeStatic a where
   NodeStatic SingleIssueT = Issue
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun
-  NodeStatic SingleJobT = ()
+  NodeStatic SingleJobT = Id Job
   NodeStatic SingleBranchT = Branch
   NodeStatic SingleBranchWithInfoT = (BranchWithInfo, ColumnWidths)
   NodeStatic SingleCommitT = Commit

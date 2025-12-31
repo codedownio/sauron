@@ -39,20 +39,16 @@ startJobHealthCheckIfNeeded ::
   -> Node Variable 'SingleJobT
   -> NonEmpty (SomeNode Variable)
   -> IO (Maybe (Async ()))
-startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state, ..})) parents = do
+startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state, _static=jobId, ..})) parents = do
   case findRepoParent parents of
-    Just (RepoNode (EntityData {_static=(owner, name)})) -> do
-      currentState <- readTVarIO _state
-      case currentState of
-        Fetched job | hasRunningJob job -> do
-          readTVarIO _healthCheckThread >>= \case
-            Nothing -> do
-              logToModal baseContext LevelInfo [i|Starting health check thread for job: #{untagName (jobName job)} (period: #{jobHealthCheckPeriodUs}us)|] Nothing
-              newThread <- async $ runJobHealthCheckLoop baseContext owner name node parents
-              atomically $ writeTVar _healthCheckThread (Just (newThread, jobHealthCheckPeriodUs))
-              return (Just newThread)
-            Just (thread, _) -> return (Just thread)
-        _ -> return Nothing
+    Just (RepoNode (EntityData {_static=(owner, name)})) ->
+      readTVarIO _healthCheckThread >>= \case
+        Nothing -> do
+          logToModal baseContext LevelInfo [i|Starting health check thread for job: #{jobId} (period: #{jobHealthCheckPeriodUs}us)|] Nothing
+          newThread <- async $ runJobHealthCheckLoop baseContext owner name node parents
+          atomically $ writeTVar _healthCheckThread (Just (newThread, jobHealthCheckPeriodUs))
+          return (Just newThread)
+        Just (thread, _) -> return (Just thread)
     _ -> return Nothing
   where
     runJobHealthCheckLoop :: BaseContext -> Name Owner -> Name Repo -> Node Variable 'SingleJobT -> NonEmpty (SomeNode Variable) -> IO ()
@@ -64,7 +60,7 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
           Fetched currentJob | hasRunningJob currentJob -> do
             -- Fetch just this individual job to update its status
             liftIO $ flip runReaderT bc $
-              fetchJob owner name (jobId currentJob) jobNode
+              fetchJob owner name jobId jobNode
             threadDelay jobHealthCheckPeriodUs
           _ -> do
             -- Job is completed, clear the thread reference and stop
