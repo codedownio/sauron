@@ -29,7 +29,7 @@ import Sauron.Actions.Util (githubWithLogging', withGithubApiSemaphore')
 import Sauron.Auth
 import Sauron.Event
 import Sauron.Expanding
-import Sauron.Fetch (makeEmptyElem)
+import Sauron.Fetch.Core (makeEmptyElem)
 import Sauron.Fix
 import Sauron.OAuth (authenticateWithGitHub, loadSavedToken)
 import Sauron.Options

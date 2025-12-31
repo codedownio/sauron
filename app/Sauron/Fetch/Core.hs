@@ -5,7 +5,6 @@ module Sauron.Fetch.Core (
   , pageSize
 
   , makeEmptyElem
-
 ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -28,7 +27,7 @@ pageSize :: Int
 pageSize = 10
 
 fetchPaginated'' :: (
-  MonadReader BaseContext m, MonadIO m, MonadMask m, FromJSON res
+  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m, FromJSON res
   )
   => (FetchCount -> Request k res)
   -> TVar PageInfo
@@ -91,4 +90,3 @@ makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
     , _depth = depth'
     , _ident = ident'
 }
-

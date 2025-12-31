@@ -36,9 +36,15 @@ executable sauron
       Sauron.Event.Open
       Sauron.Event.Paging
       Sauron.Expanding
-      Sauron.Fetch
+      Sauron.Fetch.Branch
       Sauron.Fetch.Core
+      Sauron.Fetch.Issue
+      Sauron.Fetch.Job
+      Sauron.Fetch.Notification
       Sauron.Fetch.ParseJobLogs
+      Sauron.Fetch.Pull
+      Sauron.Fetch.Repo
+      Sauron.Fetch.Workflow
       Sauron.Filter
       Sauron.Fix
       Sauron.GraphQL

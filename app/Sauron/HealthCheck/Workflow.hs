@@ -15,7 +15,7 @@ import Data.String.Interpolate
 import GitHub
 import Relude
 import Sauron.Actions.Util
-import Sauron.Fetch (fetchWorkflowJobs)
+import Sauron.Fetch.Job (fetchWorkflowJobs)
 import Sauron.Logging (logToModal)
 import Sauron.Types
 import Sauron.UI.Statuses

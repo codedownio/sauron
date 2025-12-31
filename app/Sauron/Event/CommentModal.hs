@@ -21,7 +21,7 @@ import GitHub
 import Lens.Micro
 import Relude
 import Sauron.Actions.Util
-import Sauron.Fetch (fetchIssueCommentsAndEvents)
+import Sauron.Fetch.Issue (fetchIssueCommentsAndEvents)
 import Sauron.Types
 import UnliftIO.Async
 

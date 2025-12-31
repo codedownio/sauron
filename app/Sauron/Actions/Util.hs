@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Sauron.Actions.Util (
   withGithubApiSemaphore
@@ -56,12 +57,12 @@ openBrowserToUrl url =
   void $ readCreateProcessWithExitCode (proc "xdg-open" [url]) ""
 #endif
 
-withGithubApiSemaphore :: (MonadReader BaseContext m, MonadIO m, MonadMask m) => m a -> m a
+withGithubApiSemaphore :: (HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m) => (HasCallStack => m a) -> m a
 withGithubApiSemaphore action = do
   sem <- asks requestSemaphore
   withGithubApiSemaphore' sem action
 
-withGithubApiSemaphore' :: (MonadIO m, MonadMask m) => QSem -> m a -> m a
+withGithubApiSemaphore' :: (HasCallStack, MonadIO m, MonadMask m) => QSem -> (HasCallStack => m a) -> m a
 withGithubApiSemaphore' sem = bracket_ (liftIO $ waitQSem sem) (liftIO $ signalQSem sem)
 
 findRepoParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable RepoT)

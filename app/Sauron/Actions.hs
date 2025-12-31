@@ -22,7 +22,13 @@ import GitHub
 import Lens.Micro
 import Relude
 import Sauron.Actions.Util (findRepoParent, findJobParent, openBrowserToUrl)
-import Sauron.Fetch
+import Sauron.Fetch.Branch
+import Sauron.Fetch.Issue
+import Sauron.Fetch.Job
+import Sauron.Fetch.Notification
+import Sauron.Fetch.Pull
+import Sauron.Fetch.Repo
+import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
 import Sauron.Types
@@ -50,7 +56,7 @@ refresh bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (En
 refresh bc item@(PaginatedBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranches owner name item) bc
 refresh bc item@(OverallBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchOverallBranches owner name item) bc
+  liftIO $ void $ async $ liftIO $ runReaderT (getOverallBranches owner name item) bc
 refresh bc item@(PaginatedYourBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
   readTVarIO _state >>= \case
     Fetched (Repo {..}) -> liftIO $ void $ async $ liftIO $ runReaderT (fetchYourBranches owner name repoDefaultBranch item) bc
@@ -100,7 +106,7 @@ refresh bc (JobLogGroupNode (EntityData {_state})) parents = do
               Fetched job -> do
                 -- Find the repo parent for owner/name
                 case findRepoParent parents of
-                  Just (RepoNode (EntityData {_static=(owner, name)})) -> 
+                  Just (RepoNode (EntityData {_static=(owner, name)})) ->
                     fetchJobLogsAndReplaceChildren owner name job jobNode
                   _ -> return ()
               _ -> return ()

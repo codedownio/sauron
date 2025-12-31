@@ -78,5 +78,5 @@ healthCheckIndicatorWidget healthCheckThreadData =
   case healthCheckThreadData of
     Just (_, periodMicroseconds) ->
       let diffTime = fromIntegral periodMicroseconds / 1_000_000 :: NominalDiffTime
-      in str (" ⟳[" <> show diffTime <> "]")
+      in str (" ↻[" <> show diffTime <> "]")
     Nothing -> str ""
