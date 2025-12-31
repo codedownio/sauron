@@ -7,16 +7,16 @@ module Sauron.Event.Open (
 
 import Control.Monad
 import Control.Monad.IO.Unlift
+import Data.Char (isDigit)
 import Data.Function
 import GitHub
+import Network.URI (parseURI, uriPath)
 import Relude hiding (Down, pi)
 import Sauron.Actions
 import Sauron.Types
 
 
 openNode :: (MonadIO m) => BaseContext -> NonEmpty (SomeNode Variable) -> Node Fixed a -> m ()
-openNode baseContext _elems (SingleNotificationNode (EntityData {_static=notification})) =
-  liftIO $ fetchNotificationHtmlUrl baseContext notification
 openNode _baseContext elems (JobLogGroupNode _) = case findParentJobNode (toList elems) of
   Just (SingleJobNode (EntityData {_state})) -> do
     jobState <- readTVarIO _state
@@ -38,6 +38,7 @@ getNodeUrl (PaginatedYourBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) =
 getNodeUrl (PaginatedActiveBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches/active")
 getNodeUrl (PaginatedStaleBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches/stale")
 getNodeUrl (PaginatedNotificationsNode _) _ = Just "https://github.com/notifications"
+getNodeUrl (SingleNotificationNode (EntityData {_static=notification})) _ = Just (getNotificationUrl notification)
 getNodeUrl (SingleIssueNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SinglePullNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) _ = Just (toString $ getUrl $ workflowRunHtmlUrl workflowRun)
@@ -59,9 +60,45 @@ findParentJobNode [] = Nothing
 findParentJobNode (SomeNode (SingleJobNode ed) : _) = Just (SingleJobNode ed)
 findParentJobNode (_ : rest) = findParentJobNode rest
 
--- | Open notification using GitHub's notification URL
-fetchNotificationHtmlUrl :: BaseContext -> Notification -> IO ()
-fetchNotificationHtmlUrl _baseContext notification = do
-  -- Simply use GitHub's notification URL - this is what GitHub web UI does
-  -- and it will redirect to the appropriate issue/PR/comment automatically
-  openBrowserToUrl (toString $ getUrl $ notificationUrl notification)
+getNotificationUrl :: Notification -> String
+getNotificationUrl notification = case (subjectLatestCommentURL, subjectURL, subjectType) of
+  -- If there's a latest comment URL, try to convert it to a web URL with anchor
+  (Just commentUrl, Just subUrl, "Issue") ->
+    case (extractIdFromApiUrl (toString $ getUrl commentUrl), extractIdFromApiUrl (toString $ getUrl subUrl)) of
+      (Just commentId, Just issueId) -> "https://github.com/" <> toString ownerName <> "/" <> toString repoName <> "/issues/" <> issueId <> "#issuecomment-" <> commentId
+      _ -> toString $ getUrl commentUrl
+  (Just commentUrl, Just subUrl, "PullRequest") ->
+    case (extractIdFromApiUrl (toString $ getUrl commentUrl), extractIdFromApiUrl (toString $ getUrl subUrl)) of
+      (Just commentId, Just prId) -> "https://github.com/" <> toString ownerName <> "/" <> toString repoName <> "/pull/" <> prId <> "#issuecomment-" <> commentId
+      _ -> toString $ getUrl commentUrl
+  -- Fallback to subject URL if no latest comment
+  (Nothing, Just subUrl, "Issue") ->
+    case extractIdFromApiUrl (toString $ getUrl subUrl) of
+      Just issueId -> "https://github.com/" <> toString ownerName <> "/" <> toString repoName <> "/issues/" <> issueId
+      Nothing -> toString $ getUrl subUrl
+  (Nothing, Just subUrl, "PullRequest") ->
+    case extractIdFromApiUrl (toString $ getUrl subUrl) of
+      Just prId -> "https://github.com/" <> toString ownerName <> "/" <> toString repoName <> "/pull/" <> prId
+      Nothing -> toString $ getUrl subUrl
+  (_, Just subUrl, _) -> toString $ getUrl subUrl  -- Fallback to API URL for other types
+  (_, Nothing, _) -> toString $ getUrl $ notificationUrl notification
+  where
+    Subject {..} = notificationSubject notification
+    RepoRef {..} = notificationRepo notification
+    SimpleOwner {..} = repoRefOwner
+    repoName = untagName repoRefRepo
+    ownerName = untagName simpleOwnerLogin
+
+    extractIdFromApiUrl :: String -> Maybe String
+    extractIdFromApiUrl url = do
+      uri <- parseURI url
+      let pathSegments = filter (not . null) $ splitOn '/' (uriPath uri)
+      case reverse pathSegments of
+        (idStr:_) -> if all isDigit idStr then Just idStr else Nothing
+        _ -> Nothing
+
+    splitOn :: Char -> String -> [String]
+    splitOn c s = case dropWhile (== c) s of
+      "" -> []
+      s' -> w : splitOn c s''
+        where (w, s'') = break (== c) s'
