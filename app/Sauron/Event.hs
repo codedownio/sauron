@@ -151,6 +151,16 @@ appEvent s (MouseDown (ListRow n) V.BLeft _ _) = do
   when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
   modify (appMainList %~ listMoveTo n)
 
+-- Log pane viewport events
+appEvent s (MouseDown LogSplitContent V.BScrollUp _ _) = do
+  when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+  vScrollBy (viewportScroll LogSplitContent) (-1)
+appEvent s (MouseDown LogSplitContent V.BScrollDown _ _) = do
+  when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+  vScrollBy (viewportScroll LogSplitContent) 1
+appEvent s (MouseDown LogSplitContent V.BLeft _ _) = do
+  when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+
 -- Pane focus switching
 appEvent s (MouseDown MainPane V.BLeft _ _) = do
   when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
