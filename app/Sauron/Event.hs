@@ -291,7 +291,7 @@ handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
     False -> case toList parents of
       _:(SomeNode parent):_ -> do
         expandedList <- gets (^. appMainList)
-        forM_ (Vec.findIndex (\(SomeNode el) -> (_ident (getEntityData parent) == _ident (getEntityData el))) (listElements expandedList)) $ \index ->
+        forM_ (Vec.findIndex (\(SomeNode el) -> _ident (getEntityData parent) == _ident (getEntityData el)) (listElements expandedList)) $ \index ->
           modify (appMainList %~ listMoveTo index)
       _ -> return ()
 
@@ -305,7 +305,7 @@ modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode it
   -- Node opened: refresh visible nodes
   when (not wasOpen && isOpen) $ do
     atomically (getExistentialChildrenWrapped item)
-      >>= refreshVisibleNodes (_appBaseContext s) (someNode : (toList parents))
+      >>= refreshVisibleNodes (_appBaseContext s) (someNode : toList parents)
 
   -- Node closed: stop healthcheck threads recursively
   when (wasOpen && not isOpen) $

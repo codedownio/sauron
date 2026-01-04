@@ -84,9 +84,10 @@ fetchIssueCommentsAndEvents baseContext owner name issueNumber = do
     (_, Left err) -> return $ Left err
   where
     mergeCommentsAndEvents :: V.Vector IssueComment -> V.Vector IssueEvent -> V.Vector (Either IssueEvent IssueComment)
-    mergeCommentsAndEvents comments events =
-      let commentEntries = fmap (\c -> (issueCommentCreatedAt c, Right c)) comments
-          eventEntries = fmap (\e -> (issueEventCreatedAt e, Left e)) events
-          allEntries = V.toList commentEntries <> V.toList eventEntries
-          sortedEntries = sortOn fst allEntries -- Sort by timestamp, newest first
-      in V.fromList (fmap snd sortedEntries)
+    mergeCommentsAndEvents comments events = V.toList commentEntries <> V.toList eventEntries
+                                           & sortOn fst -- Sort by timestamp, newest first
+                                           & fmap snd
+                                           & V.fromList
+      where
+        commentEntries = fmap (\c -> (issueCommentCreatedAt c, Right c)) comments
+        eventEntries = fmap (\e -> (issueEventCreatedAt e, Left e)) events
