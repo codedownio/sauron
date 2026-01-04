@@ -12,7 +12,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Data.String.Interpolate
 import Data.Time (NominalDiffTime)
-import GitHub (untagName, jobName, workflowRunName)
+import GitHub
 import Relude
 import Sauron.Logging (logToModal)
 import Sauron.Types
@@ -24,7 +24,7 @@ stopHealthCheckThreadsForNodeAndChildren bc someNode = do
   threads <- liftIO $ atomically $ gatherAndClearAllHealthCheckThreads someNode
   let threadCount = length threads
   when (threadCount > 0) $
-    logToModal bc LevelInfo [i|Stopped #{threadCount} health check threads|] Nothing
+    logToModal bc LevelInfo [i|Stopped #{threadCount} health check threads: #{fmap fst threads}|] Nothing
   liftIO $ mapM_ (cancel . snd) threads
 
 stopHealthCheckThreadIfRunning :: MonadIO m => BaseContext -> SomeNode Variable -> m ()
@@ -63,7 +63,7 @@ gatherAndClearHealthCheckThread someNode@(SomeNode node) = do
           Fetching (Just job) -> return [i|Job #{untagName (jobName job)}|]
           _ -> return "Job (unknown)"
       SingleWorkflowNode (EntityData {_static=workflowRun}) ->
-        return [i|Workflow #{workflowRunName workflowRun}|]
+        return [i|Workflow #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun}|]
       RepoNode (EntityData {_static=(owner, name)}) ->
         return [i|Repo #{untagName owner}/#{untagName name}|]
       PaginatedIssuesNode _ -> return "Issues"

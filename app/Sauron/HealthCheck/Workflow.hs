@@ -42,7 +42,7 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
     Just (RepoNode (EntityData {_static=(owner, name)})) | hasRunningWorkflow workflowRun -> do
       readTVarIO _healthCheckThread >>= \case
         Nothing -> do
-          logToModal baseContext LevelInfo [i|Starting health check thread for workflow: #{workflowRunName workflowRun} (period: #{workflowHealthCheckPeriodUs}us)|] Nothing
+          logToModal baseContext LevelInfo [i|Starting health check thread for workflow: #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun} (period: #{workflowHealthCheckPeriodUs}us)|] Nothing
           newThread <- async $ runWorkflowHealthCheckLoop baseContext owner name node
           atomically $ writeTVar _healthCheckThread (Just (newThread, workflowHealthCheckPeriodUs))
           return (Just newThread)

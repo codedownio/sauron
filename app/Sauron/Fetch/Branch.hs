@@ -16,7 +16,6 @@ module Sauron.Fetch.Branch (
 import Control.Exception.Safe (bracketOnError_)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
-import Control.Monad.Logger (LogLevel(..))
 import qualified Data.List as List
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime, getCurrentTime)
@@ -26,9 +25,10 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import qualified Sauron.GraphQL as GraphQL
-import Sauron.Logging (logToModal)
+import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.BranchWithInfo (formatCommitTimeText, formatPRInfoText, formatCheckStatusWithWidth, formatAheadBehindWithWidth)
+
 
 fetchBranches :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -70,7 +70,6 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
         atomically $ writeTVar stateVar (Errored "No auth token available for GraphQL query")
       Just authToken -> do
         liftIO $ do
-          logToModal bc LevelInfo (logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name) Nothing
           -- Read current page info to determine pagination
           currentPageInfo <- readTVarIO pageInfoVar
           let currentPage = pageInfoCurrentPage currentPageInfo
@@ -80,7 +79,8 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
           let branchesToFetch = max 100 (currentPage * pageSize * 3)  -- Fetch at least 100, or enough for 3 pages worth
 
           -- Fetch branches with commit info using GraphQL
-          result <- GraphQL.queryBranchesWithInfos (\msg -> logToModal bc LevelDebug msg Nothing) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
+          result <- withLogToModal bc LevelInfo (logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name) $
+            GraphQL.queryBranchesWithInfos (\msg -> logToModal bc LevelDebug msg Nothing) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
           case result of
             Left err -> atomically $ do
               writeTVar stateVar (Errored $ toText err)
@@ -113,9 +113,6 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
                 writeTVar stateVar (Fetched (V.fromList currentPageBranches))
                 (writeTVar childrenVar =<<) $ forM currentPageBranches $ \branchInfo ->
                   SingleBranchWithInfoNode <$> makeEmptyElem bc (branchInfo, columnWidths) ("/tree/" <> branchWithInfoBranchName branchInfo) (depth' + 1)
-          logToModal bc LevelInfo (logPrefix <> ": Processing complete, found " <> show (case result of
-            Left _ -> 0
-            Right branchesWithCommits -> length $ filterFn branchesWithCommits) <> " " <> logSuffix) Nothing
   where
     getAuthToken :: BaseContext -> Maybe Text
     getAuthToken bc = case auth bc of
