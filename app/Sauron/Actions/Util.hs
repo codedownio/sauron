@@ -27,6 +27,8 @@ import Control.Monad.Logger (LogLevel(..))
 import Control.Monad.Reader
 import Data.Aeson (FromJSON)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
+import Data.ByteString.Builder (intDec, toLazyByteString)
 import qualified Data.List as L
 import qualified Data.Text as T
 import Data.Time
@@ -74,7 +76,7 @@ findJobParent elems = viaNonEmpty head [x | SomeNode x@(SingleJobNode _) <- toLi
 requestToUrl :: Request k a -> Text
 requestToUrl req = case req of
   Query paths queryString -> pathsToUrl paths <> formatQueryString queryString
-  PagedQuery paths queryString _fetchCount -> pathsToUrl paths <> formatQueryString queryString
+  PagedQuery paths queryString fetchCount -> pathsToUrl paths <> formatQueryString (queryString <> extraQueryItems fetchCount)
   Command _method paths _body -> pathsToUrl paths
   where
     pathsToUrl :: [Text] -> Text
@@ -95,6 +97,13 @@ requestToUrl req = case req of
     formatEscapeItem :: EscapeItem -> Text
     formatEscapeItem (QE s) = decodeUtf8 s -- QE is already query-escaped
     formatEscapeItem (QN s) = decodeUtf8 s
+
+    extraQueryItems :: FetchCount -> [(BS.ByteString, [EscapeItem])]
+    extraQueryItems (FetchPage pp) = catMaybes [
+        (\page -> ("page", [QE (LBS.toStrict $ toLazyByteString $ intDec page)])) <$> pageParamsPage pp
+        , (\perPage -> ("per_page", [QE (LBS.toStrict $ toLazyByteString $ intDec perPage)])) <$> pageParamsPerPage pp
+        ]
+    extraQueryItems _ = []
 
 githubWithLogging :: (HasCallStack, MonadReader BaseContext m, MonadIO m, FromJSON a) => Request k a -> m (Either Error a)
 githubWithLogging request = withFrozenCallStack (fmap responseBody <$> githubWithLoggingResponse request)
