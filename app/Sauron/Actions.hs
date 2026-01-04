@@ -44,7 +44,6 @@ withScroll s action = do
 refresh :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
 refresh _bc _item@(HeadingNode (EntityData {_children})) _parents = do
   return ()
-  -- readTVarIO _children >>= mapM_ (\(SomeNode child) -> refresh bc child ((SomeNode item) :| toList _parents))
 refresh bc (RepoNode (EntityData {_static=(owner, name), _state})) _parents = do
   liftIO $ void $ async $ flip runReaderT bc $ fetchRepo owner name _state
 refresh bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
