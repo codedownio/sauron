@@ -35,6 +35,7 @@ executable sauron
       Sauron.Event.Helpers
       Sauron.Event.Open
       Sauron.Event.Paging
+      Sauron.Event.Search
       Sauron.Expanding
       Sauron.Fetch.Branch
       Sauron.Fetch.Core

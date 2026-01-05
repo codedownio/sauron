@@ -34,11 +34,9 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           Nothing -> pure (0, Nothing)
           Just l -> do
             toggledVar <- newTVarIO True
-            statusVar <- newTVarIO NotFetched
-            searchVar <- newTVarIO SearchNone
-            pageInfoVar <- newTVarIO emptyPageInfo
+            statusVar <- newTVarIO ()
             identifier <- liftIO $ getIdentifier baseContext
-            pure (1, Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l))
+            pure (1, Just (toggledVar, statusVar, identifier, l))
 
         repoNodes <- forM sectionRepos $ \r -> do
           let nsName = case r of
@@ -60,7 +58,7 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
 
         case maybeHeadingNode of
           Nothing -> tell (fmap SomeNode repoNodes)
-          Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l) -> do
+          Just (toggledVar, statusVar, identifier, l) -> do
             childrenVar <- newTVarIO (fmap SomeNode repoNodes)
             headingHealthCheckVar <- newTVarIO NotFetched
             headingHealthCheckThreadVar <- newTVarIO Nothing
@@ -70,8 +68,6 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
                   , _urlSuffix = ""
                   , _toggled = toggledVar
                   , _children = childrenVar
-                  , _search = searchVar
-                  , _pageInfo = pageInfoVar
                   , _healthCheck = headingHealthCheckVar
                   , _healthCheckThread = headingHealthCheckThreadVar
                   , _depth = 0

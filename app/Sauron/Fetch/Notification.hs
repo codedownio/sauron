@@ -18,12 +18,13 @@ fetchNotifications :: (
   ) => Node Variable PaginatedNotificationsT -> m ()
 fetchNotifications (PaginatedNotificationsNode (EntityData {..})) = do
   bc <- ask
-  fetchPaginated'' (getNotificationsR optionsAll) _pageInfo _state $ \case
+  fetchPaginatedWithState (getNotificationsR optionsAll) _state $ \case
     Left err -> do
-      writeTVar _state (Errored (show err))
+      (s, p, _) <- readTVar _state
+      writeTVar _state (s, p, Errored err)
       writeTVar _children []
     Right (notifications, newPageInfo) -> do
-      writeTVar _pageInfo newPageInfo
-      writeTVar _state (Fetched notifications)
+      (s, _, _) <- readTVar _state
+      writeTVar _state (s, newPageInfo, Fetched (V.length notifications))
       (writeTVar _children =<<) $ forM (V.toList notifications) $ \notification ->
-        SingleNotificationNode <$> makeEmptyElem bc notification "" (_depth + 1)
+        SingleNotificationNode <$> makeEmptyElemWithState bc notification (Fetched ()) "" (_depth + 1)

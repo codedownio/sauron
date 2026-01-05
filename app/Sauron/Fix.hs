@@ -78,8 +78,6 @@ fixEntityData :: [NodeChildType Fixed a] -> EntityData Variable a -> STM (Entity
 fixEntityData childrenFixed (EntityData {..}) = do
   stateFixed <- readTVar _state
   toggledFixed <- readTVar _toggled
-  searchFixed <- readTVar _search
-  pageInfoFixed <- readTVar _pageInfo
   healthCheckFixed <- readTVar _healthCheck
   healthCheckThreadFixed <- readTVar _healthCheckThread
 
@@ -90,9 +88,6 @@ fixEntityData childrenFixed (EntityData {..}) = do
     , _urlSuffix = _urlSuffix
     , _toggled = toggledFixed
     , _children = childrenFixed
-
-    , _search = searchFixed
-    , _pageInfo = pageInfoFixed
 
     , _healthCheck = healthCheckFixed
     , _healthCheckThread = healthCheckThreadFixed

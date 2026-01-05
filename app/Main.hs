@@ -29,7 +29,7 @@ import Sauron.Actions.Util (githubWithLogging', withGithubApiSemaphore')
 import Sauron.Auth
 import Sauron.Event
 import Sauron.Expanding
-import Sauron.Fetch.Core (makeEmptyElem)
+import Sauron.Fetch.Core (makeEmptyElemWithState)
 import Sauron.Fix
 import Sauron.OAuth (authenticateWithGitHub, loadSavedToken)
 import Sauron.Options
@@ -121,7 +121,7 @@ main = do
         Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   -- Prepend a PaginatedNotificationsNode
-  listElems <- flip V.cons listElems' <$> atomically (SomeNode . PaginatedNotificationsNode <$> makeEmptyElem baseContext () "" 0)
+  listElems <- flip V.cons listElems' <$> atomically (SomeNode . PaginatedNotificationsNode <$> makeEmptyElemWithState baseContext () (SearchNone, emptyPageInfo, NotFetched) "" 0)
 
   -- Kick off initial fetches
   runReaderT (refreshAll listElems) baseContext

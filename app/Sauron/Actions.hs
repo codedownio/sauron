@@ -126,16 +126,9 @@ refreshAll elems = do
 refreshVisibleNodes :: MonadIO m => BaseContext -> [SomeNode Variable] -> [SomeNode Variable] -> m ()
 refreshVisibleNodes baseContext parents nodes = do
   forM_ nodes $ \someNode@(SomeNode node) -> do
-    stateValue <- readTVarIO (_state (getEntityData node))
-    unless (isFetchingOrFetched stateValue) $
-      refresh baseContext node (someNode :| parents)
+    -- TODO: we used to check if the state is NotFetched before doing this refresh
+    refresh baseContext node (someNode :| parents)
 
     whenM (readTVarIO (_toggled (getEntityData node))) $
       atomically (getExistentialChildrenWrapped node)
         >>= refreshVisibleNodes baseContext (someNode : parents)
-
-  where
-    isFetchingOrFetched :: Fetchable a -> Bool
-    isFetchingOrFetched (Fetched {}) = True
-    isFetchingOrFetched (Fetching {}) = True
-    isFetchingOrFetched _ = False

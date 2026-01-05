@@ -24,6 +24,7 @@ import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
+import Sauron.Event.Search (getCurrentSearch, updateSearchForNode)
 import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForNodeAndChildren)
 import Sauron.Types
 import Sauron.UI.Keys
@@ -123,10 +124,8 @@ appEvent s@(_appModal -> Just modalState) e = case e of
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
-    withFixedElemAndParents s $ \_fixedEl (SomeNode el@(getEntityData -> (EntityData {..}))) parents -> do
-      atomically $ do
-        writeTVar _search $ SearchText (formState form)
-        writeTVar _pageInfo $ PageInfo 1 Nothing Nothing Nothing Nothing
+    withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents -> do
+      atomically $ updateSearchForNode el (formState form)
       refresh (s ^. appBaseContext) el parents
     modify (appForm .~ Nothing)
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
@@ -218,9 +217,9 @@ handleMainPaneEvents s e = case e of
   V.EvKey c [] | c == lastPageKey -> tryNavigatePage s goLastPage
 
   V.EvKey c [] | c == editSearchKey -> do
-    withNthChildAndPaginationParent s $ \_fixedEl _el (sn@(SomeNode (getEntityData -> (EntityData {_ident, _search}))), _) _parents -> do
+    withNthChildAndPaginationParent s $ \_fixedEl _el (sn@(SomeNode node@(getEntityData -> (EntityData {_ident}))), _, _) _parents -> do
       when (isSearchable' sn) $ do
-        search' <- readTVarIO _search
+        search' <- liftIO $ atomically $ getCurrentSearch node
         modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
 
   V.EvKey c [] | c == commentKey -> do
@@ -233,9 +232,9 @@ handleMainPaneEvents s e = case e of
         _ -> return ()
 
   V.EvKey c [] | c == zoomModalKey -> do
-    withFixedElemAndParents s $ \(SomeNode el) (SomeNode variableEl) parents -> do
-      when (_state (getEntityData el) == NotFetched) $
-        refresh (s ^. appBaseContext) variableEl parents
+    withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
+      -- TODO: we used to check if the state is NotFetched before doing this refresh
+      refresh (s ^. appBaseContext) variableEl parents
       liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
 
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do

@@ -15,11 +15,9 @@ import Sauron.Types
 allReposForUser :: BaseContext -> PeriodSpec -> Name User -> IO (Node Variable PaginatedReposT)
 allReposForUser baseContext _defaultHealthCheckPeriodUs userLogin = do
   let BaseContext {..} = baseContext
-  reposStateVar <- newTVarIO NotFetched
+  reposStateVar <- newTVarIO (SearchText ("user:" <> untagName userLogin), emptyPageInfo, NotFetched)
   toggledVar <- newTVarIO True
   childrenVar <- newTVarIO mempty
-  searchVar <- newTVarIO (SearchText ("user:" <> untagName userLogin))
-  pageInfoVar <- newTVarIO emptyPageInfo
   healthCheckVar <- newTVarIO NotFetched
   healthCheckThreadVar <- newTVarIO Nothing
   identifier <- getIdentifier
@@ -30,8 +28,6 @@ allReposForUser baseContext _defaultHealthCheckPeriodUs userLogin = do
     , _urlSuffix = ""
     , _toggled = toggledVar
     , _children = childrenVar
-    , _search = searchVar
-    , _pageInfo = pageInfoVar
     , _healthCheck = healthCheckVar
     , _healthCheckThread = healthCheckThreadVar
     , _depth = 0

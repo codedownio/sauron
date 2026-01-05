@@ -66,7 +66,7 @@ workflowLine animationCounter currentTime toggled' (WorkflowRun {..}) fetchableS
       , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
       ] <> (if workflowRunAttempt > 1 then [str [i| • Attempt #{workflowRunAttempt}|]] else [])
 
-workflowInner :: WorkflowRun -> Fetchable (NodeState SingleWorkflowT) -> Widget n
+workflowInner :: WorkflowRun -> NodeState SingleWorkflowT -> Widget n
 workflowInner (WorkflowRun {..}) _jobsFetchable = vBox $ workflowDetails
   where
     workflowDetails = [

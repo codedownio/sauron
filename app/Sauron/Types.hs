@@ -131,15 +131,12 @@ instance Show (Node f a) where
 
 data EntityData f a = EntityData {
   _static :: NodeStatic a
-  , _state :: Switchable f (Fetchable (NodeState a))
+  , _state :: Switchable f (NodeState a)
 
   , _urlSuffix :: Text
 
   , _toggled :: Switchable f Bool
   , _children :: Switchable f [NodeChildType f a]
-
-  , _search :: Switchable f Search
-  , _pageInfo :: Switchable f PageInfo
 
   -- Health check fields (currently used only for repos)
   , _healthCheck :: Switchable f (Fetchable HealthCheckResult)
@@ -176,28 +173,30 @@ type family NodeStatic a where
   NodeStatic HeadingT = Text
   NodeStatic RepoT = (Name Owner, Name Repo)
 
+type TotalCount = Int
+
 type family NodeState a where
-  NodeState PaginatedIssuesT = SearchResult Issue
-  NodeState PaginatedPullsT = SearchResult Issue
-  NodeState PaginatedWorkflowsT = WithTotalCount WorkflowRun
-  NodeState PaginatedReposT = SearchResult Repo
-  NodeState PaginatedBranchesT = V.Vector Branch
+  NodeState PaginatedIssuesT = (Search, PageInfo, Fetchable TotalCount)
+  NodeState PaginatedPullsT = (Search, PageInfo, Fetchable TotalCount)
+  NodeState PaginatedWorkflowsT = (Search, PageInfo, Fetchable TotalCount)
+  NodeState PaginatedReposT = (Search, PageInfo, Fetchable TotalCount)
+  NodeState PaginatedBranchesT = (Search, PageInfo, Fetchable TotalCount)
   NodeState OverallBranchesT = ()
-  NodeState PaginatedYourBranchesT = V.Vector BranchWithInfo
-  NodeState PaginatedActiveBranchesT = V.Vector BranchWithInfo
-  NodeState PaginatedStaleBranchesT = V.Vector BranchWithInfo
-  NodeState PaginatedNotificationsT = V.Vector Notification
-  NodeState SingleIssueT = V.Vector (Either IssueEvent IssueComment)
-  NodeState SinglePullT = V.Vector (Either IssueEvent IssueComment)
-  NodeState SingleWorkflowT = WithTotalCount Job
-  NodeState SingleJobT = Job
-  NodeState SingleBranchT = V.Vector Commit
-  NodeState SingleBranchWithInfoT = V.Vector Commit
-  NodeState SingleCommitT = Commit
-  NodeState SingleNotificationT = ()
-  NodeState JobLogGroupT = JobLogGroup
+  NodeState PaginatedYourBranchesT = (Search, PageInfo, Fetchable TotalCount)
+  NodeState PaginatedActiveBranchesT = (Search, PageInfo, Fetchable TotalCount)
+  NodeState PaginatedStaleBranchesT = (Search, PageInfo, Fetchable TotalCount)
+  NodeState PaginatedNotificationsT = (Search, PageInfo, Fetchable TotalCount)
+  NodeState SingleIssueT = Fetchable (V.Vector (Either IssueEvent IssueComment))
+  NodeState SinglePullT = Fetchable (V.Vector (Either IssueEvent IssueComment))
+  NodeState SingleWorkflowT = Fetchable (WithTotalCount Job)
+  NodeState SingleJobT = Fetchable Job
+  NodeState SingleBranchT = Fetchable (V.Vector Commit)
+  NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)
+  NodeState SingleCommitT = Fetchable Commit
+  NodeState SingleNotificationT = Fetchable ()
+  NodeState JobLogGroupT = Fetchable JobLogGroup
   NodeState HeadingT = ()
-  NodeState RepoT = Repo
+  NodeState RepoT = Fetchable Repo
 
 type family NodeChildType f a where
   NodeChildType f PaginatedIssuesT = Node f SingleIssueT

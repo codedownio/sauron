@@ -6,7 +6,6 @@ module Sauron.Fetch.Job (
   , fetchJobLogs
   , fetchJobLogsAndReplaceChildren
   , fetchJob
-  , makeEmptyElem
   ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -66,12 +65,12 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
               return existingNode
             Nothing -> do
               -- Create new node for new jobs
-              entityData <- makeEmptyElem bc jobId "" (_depth + 1)
+              entityData <- makeEmptyElemWithState bc jobId NotFetched "" (_depth + 1)
               let EntityData {_state=jobState, _children=jobChildren} = entityData
               writeTVar jobState (Fetched job)
 
               -- Create dummy child for log fetching
-              dummyLogEntityData <- makeEmptyElem bc () "" (_depth + 2)
+              dummyLogEntityData <- makeEmptyElemWithState bc () NotFetched "" (_depth + 2)
               let EntityData {_state = dummyState} = dummyLogEntityData
               writeTVar dummyState NotFetched
               writeTVar jobChildren [JobLogGroupNode dummyLogEntityData]
@@ -166,8 +165,6 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
   stateVar <- newTVar (Fetched jobLogGroup)
   ident' <- getIdentifierSTM bc
   toggledVar <- newTVar False
-  searchVar <- newTVar SearchNone
-  pageInfoVar <- newTVar emptyPageInfo
 
   childrenVar <- case jobLogGroup of
     JobLogLines _ _ -> newTVar []
@@ -184,8 +181,6 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
     , _urlSuffix = ""
     , _toggled = toggledVar
     , _children = childrenVar
-    , _search = searchVar
-    , _pageInfo = pageInfoVar
     , _healthCheck = healthCheckVar2
     , _healthCheckThread = healthCheckThreadVar2
     , _depth = depth'

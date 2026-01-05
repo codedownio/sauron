@@ -12,14 +12,17 @@ import Relude hiding (Down, pi)
 import Sauron.Actions
 import Sauron.Event.Helpers
 import Sauron.Types
-import UnliftIO.STM (stateTVar)
 
 
 tryNavigatePage :: AppState -> (PageInfo -> PageInfo) -> EventM ClickableName AppState ()
 tryNavigatePage s cb =
-  withNthChildAndPaginationParent s $ \_fixedEl _el (SomeNode paginationEl, pageInfo') parents -> do
-    didChange <- atomically $ stateTVar pageInfo' $ \pi ->
-      let pi' = cb pi in (pi' /= pi, pi')
+  withNthChildAndPaginationParent s $ \_fixedEl _el (SomeNode paginationEl, readPageInfo, writePageInfo) parents -> do
+    didChange <- liftIO $ atomically $ do
+      currentPageInfo <- readPageInfo
+      let newPageInfo = cb currentPageInfo
+      let hasChanged = newPageInfo /= currentPageInfo
+      when hasChanged $ writePageInfo newPageInfo
+      return hasChanged
     when didChange $ do
       -- Mark the pagination node selected
       expandedList <- gets (^. appMainList)

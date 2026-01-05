@@ -7,73 +7,45 @@ module Sauron.UI.Pagination (
   ) where
 
 import Brick
-import Brick.Widgets.Center
+import Brick.Widgets.Center (hCenter)
 import Control.Monad
 import qualified Data.List as L
 import Data.Maybe
 import Data.String.Interpolate
-import qualified Data.Vector as V
-import GitHub hiding (Status)
 import Relude
-import Sauron.Fetch.Core (pageSize)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Search
+import Sauron.UI.Search (searchInfo)
 import Sauron.UI.Statuses (getQuarterCircleSpinner)
 
 
 instance ListDrawable Fixed 'PaginatedReposT where
-  drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched (SearchResult totalCount repos) -> paginatedHeadingColored ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount}|])
-    Fetching maybeRepos -> case maybeRepos of
-      Just (SearchResult totalCount repos) -> paginatedHeadingColored ed appState "Repositories" (str [i|(#{V.length repos}) of #{totalCount} |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeadingColored ed appState "Repositories" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeadingColored ed appState "Repositories" (str [i|(not fetched)|])
-    Errored err -> paginatedHeadingColored ed appState "Repositories" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "Repositories" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedIssuesT where
-  drawLine appState x@(EntityData {_state}) = case _state of
-    Fetched (SearchResult totalCount _xs) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount})|])
-    Fetching maybeIssues -> case maybeIssues of
-      Just (SearchResult totalCount _xs) -> paginatedHeading x appState "Issues" (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading x appState "Issues" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading x appState "Issues" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading x appState "Issues" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "Issues" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedPullsT where
-  drawLine appState ed@(EntityData {_state}) = case _state of
-    Fetched (SearchResult totalCount _xs) -> paginatedHeading ed appState "Pulls" (str [i|(#{totalCount})|])
-    Fetching maybePulls -> case maybePulls of
-      Just (SearchResult totalCount _xs) -> paginatedHeading ed appState "Pulls" (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "Pulls" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Pulls" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Pulls" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "Pulls" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedWorkflowsT where
-  drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched (WithTotalCount _xs totalCount) -> paginatedHeading ed appState "Actions" (str [i|(#{totalCount})|])
-    Fetching maybeWorkflows -> case maybeWorkflows of
-      Just (WithTotalCount _xs totalCount) -> paginatedHeading ed appState "Actions" (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "Actions" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Actions" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Actions" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "Actions" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedBranchesT where
-  drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched branches -> paginatedHeading ed appState "All Branches" (countWidget _pageInfo branches)
-    Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "All Branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "All Branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "All Branches" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "All Branches" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "All Branches" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
@@ -87,46 +59,26 @@ instance ListDrawable Fixed 'OverallBranchesT where
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedYourBranchesT where
-  drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched branches -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches)
-    Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "Your branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "Your branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Your branches" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Your branches" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "Your branches" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedActiveBranchesT where
-  drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched branches -> paginatedHeading ed appState "Active branches" (countWidget _pageInfo branches)
-    Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "Active branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "Active branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Active branches" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Active branches" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "Active branches" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedStaleBranchesT where
-  drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched branches -> paginatedHeading ed appState "Stale branches" (countWidget _pageInfo branches)
-    Fetching maybeBranches -> case maybeBranches of
-      Just branches -> paginatedHeading ed appState "Stale branches" (countWidget _pageInfo branches <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeading ed appState "Stale branches" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeading ed appState "Stale branches" (str [i|(not fetched)|])
-    Errored err -> paginatedHeading ed appState "Stale branches" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "Stale branches" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedNotificationsT where
-  drawLine appState ed@(EntityData {..}) = case _state of
-    Fetched notifications -> paginatedHeadingColored ed appState "Notifications" (countWidget _pageInfo notifications)
-    Fetching maybeNotifications -> case maybeNotifications of
-      Just notifications -> paginatedHeadingColored ed appState "Notifications" (countWidget _pageInfo notifications <+> str " " <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-      Nothing -> paginatedHeadingColored ed appState "Notifications" (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-    NotFetched -> paginatedHeadingColored ed appState "Notifications" (str [i|(not fetched)|])
-    Errored err -> paginatedHeadingColored ed appState "Notifications" (str [i|(error fetching: #{err})|])
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine "Notifications" appState ed search pageInfo fetchable
 
   drawInner _ _ = Nothing
 
@@ -142,15 +94,24 @@ instance ListDrawable Fixed 'HeadingT where
 
 -- Helper functions
 
+drawPaginatedLine :: String -> AppState -> EntityData Fixed a -> Search -> PageInfo -> Fetchable Int -> Widget ClickableName
+drawPaginatedLine label appState ed search pageInfo fetchable = case fetchable of
+  Fetched totalCount -> headingWithMessage (str [i|(#{totalCount})|])
+  Fetching (Just totalCount) -> headingWithMessage (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
+  Fetching Nothing -> headingWithMessage (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
+  NotFetched -> headingWithMessage (str [i|(not fetched)|])
+  Errored err -> headingWithMessage (str [i|(error fetching: #{err})|])
+  where
+    headingWithMessage msg = paginatedHeadingColored ed appState label msg search pageInfo
+
 type PaginatedHeadingFn a =
   EntityData Fixed a
   -> AppState
   -> String
   -> Widget ClickableName
+  -> Search
+  -> PageInfo
   -> Widget ClickableName
-
-paginatedHeading :: PaginatedHeadingFn a
-paginatedHeading = paginatedHeading' id
 
 paginatedHeadingColored :: PaginatedHeadingFn a
 paginatedHeadingColored = paginatedHeading' (withAttr (mkAttrName "headingText"))
@@ -158,18 +119,12 @@ paginatedHeadingColored = paginatedHeading' (withAttr (mkAttrName "headingText")
 paginatedHeading' ::
   (Widget ClickableName -> Widget ClickableName)
   -> PaginatedHeadingFn a
-paginatedHeading' modifyLabel (EntityData {..}) appState l countInParens = hBox $ catMaybes [
+paginatedHeading' modifyLabel (EntityData {..}) appState l countInParens _search _pageInfo = hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
   , Just $ padRight (Pad 1) $ modifyLabel $ str l
   , Just $ countInParens
   , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
   ]
-
-countWidget :: PageInfo -> V.Vector a -> Widget n
-countWidget pageInfo' items = case pageInfoLastPage pageInfo' of
-  Just lastPage -> str [i|(~#{lastPage * pageSize})|]
-  Nothing -> str [i|(#{V.length items})|]
-
 
 paginationInfo :: PageInfo -> Widget n
 paginationInfo (PageInfo {..}) =
