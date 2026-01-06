@@ -351,6 +351,7 @@ data BaseContext = BaseContext {
   , getIdentifier :: IO Int
   , getIdentifierSTM :: STM Int
   , eventChan :: BChan AppEvent
+  , currentUser :: Maybe User
   }
 
 data ClickableName =

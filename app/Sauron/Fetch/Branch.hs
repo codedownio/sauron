@@ -137,24 +137,16 @@ fetchYourBranches :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedYourBranchesT -> m ()
 fetchYourBranches owner name repoDefaultBranch (PaginatedYourBranchesNode (EntityData {..})) = do
-  bc <- ask
-  liftIO (getUserName bc) >>= \case
+  bc@(BaseContext {currentUser}) <- ask
+  case currentUser of
     Nothing -> liftIO $ do
       logError' bc "fetchYourBranches: Could not get current user name"
       atomically $ do
         (s, p, _) <- readTVar _state
         writeTVar _state (s, p, Errored "Could not get current user name")
-    Just userName ->
+    Just (User {userLogin}) ->
       fetchBranchesWithFilter owner name repoDefaultBranch _state _children _depth "fetchYourBranches"
-        (GraphQL.filterBranchesByAuthor userName) "your branches"
-  where
-    getUserName :: BaseContext -> IO (Maybe Text)
-    getUserName bc = do
-      -- Get the current authenticated user's name from GitHub API
-      result <- runReaderT (withGithubApiSemaphore (githubWithLogging userInfoCurrentR)) bc
-      case result of
-        Left _err -> return Nothing
-        Right user -> return $ Just $ toPathPart $ userLogin user
+        (GraphQL.filterBranchesByAuthor (untagName userLogin)) "your branches"
 
 fetchActiveBranches :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m

@@ -106,18 +106,20 @@ main = do
   CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitLogs} <- parseCliArgs
 
   eventChan <- newBChan 10
-  baseContext@(BaseContext {requestSemaphore}) <- buildBaseContext eventChan
+  baseContext'@(BaseContext {requestSemaphore}) <- buildBaseContext eventChan
 
-  currentUser@(User {userLogin}) <- withGithubApiSemaphore' requestSemaphore (githubWithLogging' baseContext userInfoCurrentR) >>= \case
+  currentUser@(User {userLogin}) <- withGithubApiSemaphore' requestSemaphore (githubWithLogging' baseContext' userInfoCurrentR) >>= \case
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
     Right x -> pure x
+
+  let baseContext = baseContext' { currentUser = Just currentUser }
 
   listElems' :: V.Vector (SomeNode Variable) <- case cliShowAllRepos of
     True -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
     False -> case cliConfigFile of
       Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
       Nothing -> isContainedInGitRepo >>= \case
-        Just (namespace, name) -> (fmap SomeNode) <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
+        Just (namespace, name) -> fmap SomeNode <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
         Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   -- Prepend a PaginatedNotificationsNode
@@ -267,4 +269,5 @@ buildBaseContext eventChan = do
     , getIdentifier = getIdentifier
     , getIdentifierSTM = getIdentifierSTM
     , eventChan = eventChan
+    , currentUser = Nothing
     }
