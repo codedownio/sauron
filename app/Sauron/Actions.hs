@@ -123,9 +123,12 @@ refreshVisibleLines elems = do
 
 refreshVisibleLines' :: MonadIO m => BaseContext -> [SomeNode Variable] -> [SomeNode Variable] -> m ()
 refreshVisibleLines' baseContext parents nodes = do
+  -- Be careful not to log from the calling thread of this function, because
+  -- this function is called in Main.hs, before the event loop starts. Logging
+  -- writes to the Brick event chan, and it is bounded, so if we fill it up
+  -- before starting the event loop, we can crash with an STM deadlock.
+
   forM_ nodes $ \someNode@(SomeNode node) -> do
-    info' baseContext [i|refreshVisibleLines': looking at #{node}|]
-    -- TODO: we used to check if the state is NotFetched before doing this refresh
     parentAsy <- refreshLine baseContext node (someNode :| parents)
 
     whenM (readTVarIO (_toggled (getEntityData node))) $ void $ liftIO $ async $ do
