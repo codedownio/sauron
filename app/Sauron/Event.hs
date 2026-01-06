@@ -25,6 +25,7 @@ import Sauron.Event.Helpers
 import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
 import Sauron.Event.Search (getCurrentSearch, updateSearchForNode)
+import Sauron.Event.Util
 import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForNodeAndChildren)
 import Sauron.Types
 import Sauron.UI.Keys

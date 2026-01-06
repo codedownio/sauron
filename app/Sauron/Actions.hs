@@ -6,8 +6,6 @@
 module Sauron.Actions (
   openBrowserToUrl
 
-  , withScroll
-
   , refreshVisibleLines
   , refreshLine
   , refreshSelected
@@ -15,13 +13,9 @@ module Sauron.Actions (
   , onOpen
   ) where
 
-import Brick as B
-import Brick.Widgets.List
 import Control.Monad.IO.Class
-import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
-import Lens.Micro
 import Relude
 import Sauron.Actions.Util (findRepoParent, findJobParent, openBrowserToUrl)
 import Sauron.Fetch.Branch
@@ -36,12 +30,6 @@ import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
 import Sauron.Types
 import UnliftIO.Async
 
-
-withScroll :: AppState -> (forall s. ViewportScroll ClickableName -> EventM n s ()) -> EventM n AppState ()
-withScroll s action = do
-  case listSelectedElement (s ^. appMainList) of
-    Just (_, _el@(SomeNode (getEntityData -> EntityData {..}))) -> action $ viewportScroll (InnerViewport [i|viewport_#{_ident}|])
-    _ -> return ()
 
 refreshSelected :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
 refreshSelected _ _ _ = return ()
