@@ -14,6 +14,7 @@ module Sauron.Actions (
   ) where
 
 import Control.Monad.IO.Class
+import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import Relude
@@ -27,6 +28,7 @@ import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
+import Sauron.Logging
 import Sauron.Types
 import UnliftIO.Async
 
@@ -37,24 +39,24 @@ refreshSelected _ _ _ = return ()
 refreshOnZoom :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
 refreshOnZoom _ _ _ = return ()
 
-refreshLine :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
+refreshLine :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
 refreshLine bc (RepoNode (EntityData {_static=(owner, name), _state})) _parents =
-  liftIO $ void $ async $ flip runReaderT bc $ fetchRepo owner name _state
+  liftIO $ async $ flip runReaderT bc $ fetchRepo owner name _state
 refreshLine bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
+  liftIO $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
 refreshLine bc item@(PaginatedPullsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchPulls owner name item) bc
+  liftIO $ async $ liftIO $ runReaderT (fetchPulls owner name item) bc
 refreshLine bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflows owner name item) bc
+  liftIO $ async $ liftIO $ runReaderT (fetchWorkflows owner name item) bc
 refreshLine bc item@(PaginatedBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
-  liftIO $ void $ async $ liftIO $ runReaderT (fetchBranches owner name item) bc
-refreshLine bc item@(PaginatedYourBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
-  withRepoDefaultBranch _state $ \defaultBranch -> liftIO $ void $ async $ runReaderT (fetchYourBranches owner name defaultBranch item) bc
+  liftIO $ async $ liftIO $ runReaderT (fetchBranches owner name item) bc
+refreshLine bc item@(PaginatedYourBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) = do
+  liftIO $ async $ withRepoDefaultBranch _state $ \defaultBranch -> runReaderT (fetchYourBranches owner name defaultBranch item) bc
 refreshLine bc item@(PaginatedActiveBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
-  withRepoDefaultBranch _state $ \defaultBranch -> liftIO $ void $ async $ runReaderT (fetchActiveBranches owner name defaultBranch item) bc
+  liftIO $ async $ withRepoDefaultBranch _state $ \defaultBranch -> runReaderT (fetchActiveBranches owner name defaultBranch item) bc
 refreshLine bc item@(PaginatedStaleBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
-  withRepoDefaultBranch _state $ \defaultBranch -> liftIO $ void $ async $ runReaderT (fetchStaleBranches owner name defaultBranch item) bc
-refreshLine _ _ _ = return ()
+  liftIO $ async $ withRepoDefaultBranch _state $ \defaultBranch -> runReaderT (fetchStaleBranches owner name defaultBranch item) bc
+refreshLine _ _ _ = liftIO $ async $ return ()
 
 -- refreshLine bc (SingleIssueNode (EntityData {_static=issue, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
 --   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name (issueNumber issue) _state) bc
@@ -122,10 +124,12 @@ refreshVisibleLines elems = do
 refreshVisibleLines' :: MonadIO m => BaseContext -> [SomeNode Variable] -> [SomeNode Variable] -> m ()
 refreshVisibleLines' baseContext parents nodes = do
   forM_ nodes $ \someNode@(SomeNode node) -> do
+    info' baseContext [i|refreshVisibleLines': looking at #{node}|]
     -- TODO: we used to check if the state is NotFetched before doing this refresh
-    refreshLine baseContext node (someNode :| parents)
+    parentAsy <- refreshLine baseContext node (someNode :| parents)
 
-    whenM (readTVarIO (_toggled (getEntityData node))) $
+    whenM (readTVarIO (_toggled (getEntityData node))) $ void $ liftIO $ async $ do
+      wait parentAsy
       atomically (getExistentialChildrenWrapped node)
         >>= refreshVisibleLines' baseContext (someNode : parents)
 

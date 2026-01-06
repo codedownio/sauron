@@ -29,7 +29,7 @@ tryNavigatePage s cb =
       forM_ (Vec.findIndex (\(SomeNode el) -> (_ident (getEntityData paginationEl) == _ident (getEntityData el))) (listElements expandedList)) $ \index ->
         modify (appMainList %~ listMoveTo index)
 
-      refreshLine (s ^. appBaseContext) paginationEl parents
+      void $ refreshLine (s ^. appBaseContext) paginationEl parents
 
 goNextPage :: PageInfo -> PageInfo
 goNextPage pi@(PageInfo {..}) = pi {

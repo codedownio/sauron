@@ -127,7 +127,7 @@ appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEnter []) -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents -> do
       atomically $ updateSearchForNode el (formState form)
-      refreshLine (s ^. appBaseContext) el parents
+      void $ refreshLine (s ^. appBaseContext) el parents
     modify (appForm .~ Nothing)
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
 
