@@ -49,7 +49,6 @@ instance ListDrawable Fixed 'PaginatedBranchesT where
 
   drawInner _ _ = Nothing
 
-
 instance ListDrawable Fixed 'PaginatedYourBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Your branches" appState ed search pageInfo fetchable
@@ -114,14 +113,14 @@ paginatedHeading' ::
 paginatedHeading' modifyLabel (EntityData {..}) appState l countInParens _search _pageInfo = hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
   , Just $ padRight (Pad 1) $ modifyLabel $ str l
-  , Just $ countInParens
+  , Just countInParens
   , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
   ]
 
 paginationInfo :: PageInfo -> Widget n
 paginationInfo (PageInfo {..}) =
   fmap renderSegment pageNumbers
-  & ((str "Page:") :)
+  & (str "Page:" :)
   & L.intersperse (str " ")
   & hBox
   where
