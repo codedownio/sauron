@@ -304,7 +304,7 @@ modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode it
 
   -- Node opened
   when (not wasOpen && isOpen) $
-    onOpen (_appBaseContext s) item (someNode :| toList parents)
+    fetchOnOpenIfNecessary (_appBaseContext s) item (someNode :| toList parents)
 
   -- Node closed: stop healthcheck threads recursively
   when (wasOpen && not isOpen) $

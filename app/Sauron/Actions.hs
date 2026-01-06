@@ -10,11 +10,11 @@ module Sauron.Actions (
   , refreshLine
   , refreshSelected
   , refreshOnZoom
-  , onOpen
+  , fetchOnOpen
+  , fetchOnOpenIfNecessary
   ) where
 
 import Control.Monad.IO.Class
-import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import Relude
@@ -28,8 +28,8 @@ import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
-import Sauron.Logging
 import Sauron.Types
+import Sauron.UI.Util (isFetchingOrFetched)
 import UnliftIO.Async
 
 
@@ -56,6 +56,8 @@ refreshLine bc item@(PaginatedActiveBranchesNode _) (findRepoParent -> Just (Rep
   liftIO $ async $ withRepoDefaultBranch _state $ \defaultBranch -> runReaderT (fetchActiveBranches owner name defaultBranch item) bc
 refreshLine bc item@(PaginatedStaleBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
   liftIO $ async $ withRepoDefaultBranch _state $ \defaultBranch -> runReaderT (fetchStaleBranches owner name defaultBranch item) bc
+refreshLine bc item@(PaginatedNotificationsNode _) _ =
+  liftIO $ async $ liftIO $ runReaderT (fetchNotifications item) bc
 refreshLine _ _ _ = liftIO $ async $ return ()
 
 -- refreshLine bc (SingleIssueNode (EntityData {_static=issue, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
@@ -136,62 +138,66 @@ refreshVisibleLines' baseContext parents nodes = do
       atomically (getExistentialChildrenWrapped node)
         >>= refreshVisibleLines' baseContext (someNode : parents)
 
-onOpen :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
+fetchOnOpenIfNecessary :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
+fetchOnOpenIfNecessary bc node parents =
+  unlessM (shouldFetchOnExpand node) $
+    fetchOnOpen bc node parents
+
+fetchOnOpen :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
 -- Container nodes that just organize other nodes - do nothing
-onOpen _bc (HeadingNode _) _parents = return ()
-onOpen bc item@(RepoNode (EntityData {_children})) parents = do
+fetchOnOpen _bc (HeadingNode _) _parents = return ()
+fetchOnOpen bc item@(RepoNode (EntityData {_children})) parents = do
   readTVarIO _children >>= mapM_ (\(SomeNode x) -> refreshLine bc x (SomeNode item :| toList parents))
 
 -- Paginated nodes - fetch their lists when opened
-onOpen bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssues owner name item) bc
-onOpen bc item@(PaginatedPullsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc item@(PaginatedPullsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchPulls owner name item) bc
-onOpen bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchWorkflows owner name item) bc
-onOpen bc item@(PaginatedBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc item@(PaginatedBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranches owner name item) bc
-onOpen bc item@(PaginatedYourBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
+fetchOnOpen bc item@(PaginatedYourBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
   withRepoDefaultBranch _state $ \defaultBranch -> liftIO $ void $ async $ runReaderT (fetchYourBranches owner name defaultBranch item) bc
-onOpen bc item@(PaginatedActiveBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
+fetchOnOpen bc item@(PaginatedActiveBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
   withRepoDefaultBranch _state $ \defaultBranch -> liftIO $ void $ async $ runReaderT (fetchActiveBranches owner name defaultBranch item) bc
-onOpen bc item@(PaginatedStaleBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
+fetchOnOpen bc item@(PaginatedStaleBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
   withRepoDefaultBranch _state $ \defaultBranch -> liftIO $ void $ async $ runReaderT (fetchStaleBranches owner name defaultBranch item) bc
-onOpen bc item@(PaginatedNotificationsNode _) _parents =
+fetchOnOpen bc item@(PaginatedNotificationsNode _) _parents =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchNotifications item) bc
-onOpen bc item@(PaginatedReposNode _) _parents =
+fetchOnOpen bc item@(PaginatedReposNode _) _parents =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchRepos item) bc
 
 -- Nodes that fetch their children when opened
-onOpen bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
+fetchOnOpen bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
     fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item
     liftIO $ void $ startWorkflowHealthCheckIfNeeded bc item parents
-onOpen bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc
-onOpen bc item@(SingleBranchWithInfoNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc item@(SingleBranchWithInfoNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranchWithInfoCommits owner name item) bc
 
 -- Content nodes that fetch their details when explicitly opened
-onOpen bc (SingleIssueNode (EntityData {_static=issue, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc (SingleIssueNode (EntityData {_static=issue, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchIssueComments owner name (issueNumber issue) _state) bc
-onOpen bc (SinglePullNode (EntityData {_static=pull, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc (SinglePullNode (EntityData {_static=pull, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchPullComments owner name (issueNumber pull) _state) bc
-onOpen bc (SingleCommitNode (EntityData {_static=commit, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
+fetchOnOpen bc (SingleCommitNode (EntityData {_static=commit, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchCommitDetails owner name (commitSha commit) _state) bc
 
 -- Job-related nodes that handle their own complex opening logic
-onOpen bc item@(SingleJobNode (EntityData {_state, _static=jobId})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
+fetchOnOpen bc item@(SingleJobNode (EntityData {_state, _static=jobId})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
     fetchJob owner name jobId item
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
-onOpen bc (JobLogGroupNode (EntityData {_state})) parents = do
+fetchOnOpen bc (JobLogGroupNode (EntityData {_state})) parents = do
   case findJobParent (toList parents) of
     Just jobNode@(SingleJobNode (EntityData {_state=jobState})) ->
-      liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
+      liftIO $ void $ async $ liftIO $ flip runReaderT bc $
         readTVarIO _state >>= \case
           NotFetched -> do
-            -- Transition to Fetching state before starting fetch
             atomically $ writeTVar _state (Fetching Nothing)
             readTVarIO jobState >>= \case
               Fetched job -> do
@@ -205,10 +211,10 @@ onOpen bc (JobLogGroupNode (EntityData {_state})) parents = do
     Nothing -> return ()
 
 -- Truly lazy nodes
-onOpen _bc (SingleNotificationNode _) _parents = return ()
+fetchOnOpen _bc (SingleNotificationNode _) _parents = return ()
 
 -- Fallback
-onOpen _ _ _ = return ()
+fetchOnOpen _ _ _ = return ()
 
 
 withRepoDefaultBranch :: MonadIO m => TVar (Fetchable Repo) -> (Maybe Text -> m ()) -> m ()
@@ -216,3 +222,31 @@ withRepoDefaultBranch fetchableVar action = readTVarIO fetchableVar >>= \case
   Fetched (Repo {..}) -> action repoDefaultBranch
   Fetching (Just (Repo {..})) -> action repoDefaultBranch
   _ -> return ()
+
+
+-- | This should be synced up with how fetchOnOpen works
+shouldFetchOnExpand :: MonadIO m => Node Variable a -> m Bool
+shouldFetchOnExpand (HeadingNode (EntityData {_state})) = return False
+shouldFetchOnExpand (RepoNode (EntityData {_state, _children})) =
+  readTVarIO _children >>= anyM (\(SomeNode n) -> shouldFetchOnExpand n)
+shouldFetchOnExpand (PaginatedIssuesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedPullsNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedWorkflowsNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedReposNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedBranchesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedYourBranchesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedActiveBranchesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedStaleBranchesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedNotificationsNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (SingleIssueNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SinglePullNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleWorkflowNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleBranchNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleBranchWithInfoNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleCommitNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleNotificationNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (JobLogGroupNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+
+thd :: (a, b, c) -> c
+thd (_, _, z) = z
