@@ -146,7 +146,6 @@ onOpen :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Va
 onOpen _bc (HeadingNode _) _parents = return ()
 onOpen bc item@(RepoNode (EntityData {_children})) parents = do
   readTVarIO _children >>= mapM_ (\(SomeNode x) -> refreshLine bc x (SomeNode item :| toList parents))
-onOpen _bc (OverallBranchesNode _) _parents = return ()
 
 -- Paginated nodes - fetch their lists when opened
 onOpen bc item@(PaginatedIssuesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =

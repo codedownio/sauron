@@ -33,7 +33,6 @@ getNodeUrl (PaginatedIssuesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just 
 getNodeUrl (PaginatedPullsNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/pulls")
 getNodeUrl (PaginatedWorkflowsNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/actions")
 getNodeUrl (PaginatedBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches")
-getNodeUrl (OverallBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches")
 getNodeUrl (PaginatedYourBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches/yours")
 getNodeUrl (PaginatedActiveBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches/active")
 getNodeUrl (PaginatedStaleBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches/stale")

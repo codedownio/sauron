@@ -49,14 +49,6 @@ instance ListDrawable Fixed 'PaginatedBranchesT where
 
   drawInner _ _ = Nothing
 
-instance ListDrawable Fixed 'OverallBranchesT where
-  drawLine _appState (EntityData {_static=(), _toggled}) = hBox $ catMaybes [
-    Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-    , Just (hBox [str "GitHub-style Branches"])
-    , Just (padLeft Max (str " "))
-    ]
-
-  drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedYourBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =

@@ -70,8 +70,6 @@ generateModalTitle (SomeNode inner) =
       "Workflow Runs"
     PaginatedBranchesNode _ ->
       "Branches"
-    OverallBranchesNode _ ->
-      "Branches"
     PaginatedYourBranchesNode _ ->
       "Your Branches"
     PaginatedActiveBranchesNode _ ->

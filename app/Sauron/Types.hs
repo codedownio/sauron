@@ -59,7 +59,6 @@ data Node f (a :: NodeTyp) where
   PaginatedWorkflowsNode :: EntityData f 'PaginatedWorkflowsT -> Node f 'PaginatedWorkflowsT
   PaginatedReposNode :: EntityData f 'PaginatedReposT -> Node f 'PaginatedReposT
   PaginatedBranchesNode :: EntityData f 'PaginatedBranchesT -> Node f 'PaginatedBranchesT
-  OverallBranchesNode :: EntityData f 'OverallBranchesT -> Node f 'OverallBranchesT
   PaginatedYourBranchesNode :: EntityData f 'PaginatedYourBranchesT -> Node f 'PaginatedYourBranchesT
   PaginatedActiveBranchesNode :: EntityData f 'PaginatedActiveBranchesT -> Node f 'PaginatedActiveBranchesT
   PaginatedStaleBranchesNode :: EntityData f 'PaginatedStaleBranchesT -> Node f 'PaginatedStaleBranchesT
@@ -84,7 +83,6 @@ data NodeTyp =
   | PaginatedWorkflowsT
   | PaginatedReposT
   | PaginatedBranchesT
-  | OverallBranchesT
   | PaginatedYourBranchesT
   | PaginatedActiveBranchesT
   | PaginatedStaleBranchesT
@@ -111,7 +109,6 @@ instance Show (Node f a) where
   show (PaginatedWorkflowsNode (EntityData {..})) = [i|PaginatedWorkflowsNode<#{_ident}>|]
   show (PaginatedReposNode (EntityData {..})) = [i|PaginatedReposNode<#{_ident}>|]
   show (PaginatedBranchesNode (EntityData {..})) = [i|PaginatedBranchesNode<#{_ident}>|]
-  show (OverallBranchesNode (EntityData {..})) = [i|OverallBranchesNode<#{_ident}>|]
   show (PaginatedYourBranchesNode (EntityData {..})) = [i|PaginatedYourBranchesNode<#{_ident}>|]
   show (PaginatedActiveBranchesNode (EntityData {..})) = [i|PaginatedActiveBranchesNode<#{_ident}>|]
   show (PaginatedStaleBranchesNode (EntityData {..})) = [i|PaginatedStaleBranchesNode<#{_ident}>|]
@@ -156,7 +153,6 @@ type family NodeStatic a where
   NodeStatic PaginatedWorkflowsT = ()
   NodeStatic PaginatedReposT = Name User
   NodeStatic PaginatedBranchesT = ()
-  NodeStatic OverallBranchesT = ()
   NodeStatic PaginatedYourBranchesT = ()
   NodeStatic PaginatedActiveBranchesT = ()
   NodeStatic PaginatedStaleBranchesT = ()
@@ -181,7 +177,6 @@ type family NodeState a where
   NodeState PaginatedWorkflowsT = (Search, PageInfo, Fetchable TotalCount)
   NodeState PaginatedReposT = (Search, PageInfo, Fetchable TotalCount)
   NodeState PaginatedBranchesT = (Search, PageInfo, Fetchable TotalCount)
-  NodeState OverallBranchesT = ()
   NodeState PaginatedYourBranchesT = (Search, PageInfo, Fetchable TotalCount)
   NodeState PaginatedActiveBranchesT = (Search, PageInfo, Fetchable TotalCount)
   NodeState PaginatedStaleBranchesT = (Search, PageInfo, Fetchable TotalCount)
@@ -204,7 +199,6 @@ type family NodeChildType f a where
   NodeChildType f PaginatedWorkflowsT = Node f SingleWorkflowT
   NodeChildType f PaginatedReposT = Node f RepoT
   NodeChildType f PaginatedBranchesT = Node f SingleBranchT
-  NodeChildType f OverallBranchesT = SomeNode f
   NodeChildType f PaginatedYourBranchesT = Node f SingleBranchWithInfoT
   NodeChildType f PaginatedActiveBranchesT = Node f SingleBranchWithInfoT
   NodeChildType f PaginatedStaleBranchesT = Node f SingleBranchWithInfoT
@@ -249,7 +243,6 @@ getExistentialChildrenWrapped node = case node of
   -- These types have SomeNode children
   HeadingNode ed -> readTVar (_children ed)
   RepoNode ed -> readTVar (_children ed)
-  OverallBranchesNode ed -> readTVar (_children ed)
 
   -- These types have specific GADT constructor children, so wrap them
   PaginatedIssuesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
@@ -285,7 +278,6 @@ entityDataL f (PaginatedPullsNode ed) = PaginatedPullsNode <$> f ed
 entityDataL f (PaginatedWorkflowsNode ed) = PaginatedWorkflowsNode <$> f ed
 entityDataL f (PaginatedReposNode ed) = PaginatedReposNode <$> f ed
 entityDataL f (PaginatedBranchesNode ed) = PaginatedBranchesNode <$> f ed
-entityDataL f (OverallBranchesNode ed) = OverallBranchesNode <$> f ed
 entityDataL f (PaginatedYourBranchesNode ed) = PaginatedYourBranchesNode <$> f ed
 entityDataL f (PaginatedActiveBranchesNode ed) = PaginatedActiveBranchesNode <$> f ed
 entityDataL f (PaginatedStaleBranchesNode ed) = PaginatedStaleBranchesNode <$> f ed

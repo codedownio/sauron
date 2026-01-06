@@ -9,8 +9,6 @@ module Sauron.Fetch.Branch (
   , fetchBranchCommits
   , fetchBranchWithInfoCommits
   , fetchCommitDetails
-
-  , getOverallBranches
   ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -172,25 +170,6 @@ fetchStaleBranches owner name repoDefaultBranch (PaginatedStaleBranchesNode (Ent
   fetchBranchesWithFilter owner name repoDefaultBranch _state _children _depth "fetchStaleBranches"
     (GraphQL.filterBranchesByInactivity 90) "stale branches"
 
-getOverallBranches :: (
-  MonadReader BaseContext m, MonadIO m
-  ) => Name Owner -> Name Repo -> Node Variable OverallBranchesT -> m ()
-getOverallBranches _owner _name (OverallBranchesNode (EntityData {..})) = do
-  bc <- ask
-  -- Create categorized branch sections similar to GitHub's interface
-  categorizedChildren <- atomically $ do
-    yourBranchesEd <- makeEmptyElemWithState bc () (SearchNone, emptyPageInfo, NotFetched) "your-branches" (_depth + 1)
-    activeBranchesEd <- makeEmptyElemWithState bc () (SearchNone, emptyPageInfo, NotFetched) "active-branches" (_depth + 1)
-    staleBranchesEd <- makeEmptyElemWithState bc () (SearchNone, emptyPageInfo, NotFetched) "stale-branches" (_depth + 1)
-    return [
-      SomeNode (PaginatedYourBranchesNode yourBranchesEd)
-      , SomeNode (PaginatedActiveBranchesNode activeBranchesEd)
-      , SomeNode (PaginatedStaleBranchesNode staleBranchesEd)
-      ]
-
-  atomically $ do
-    writeTVar _state ()
-    writeTVar _children categorizedChildren
 
 fetchBranchCommits :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m

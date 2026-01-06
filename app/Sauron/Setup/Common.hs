@@ -79,49 +79,68 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
         , _ident = workflowsIdentifier
         } :: Node Variable PaginatedWorkflowsT
 
-  -- Traditional flat branches list
-  branchesVar <- newTVarIO (SearchNone, emptyPageInfo, NotFetched)
-  branchesToggledVar <- newTVarIO False
-  branchesChildrenVar <- newTVarIO []
-  branchesHealthCheckVar <- newTVarIO NotFetched
-  branchesHealthCheckThreadVar <- newTVarIO Nothing
-  branchesIdentifier <- liftIO getIdentifier
-  let branchesChild = PaginatedBranchesNode $ EntityData {
+  -- Your branches
+  yourBranchesVar <- newTVarIO (SearchNone, emptyPageInfo, NotFetched)
+  yourBranchesToggledVar <- newTVarIO False
+  yourBranchesChildrenVar <- newTVarIO []
+  yourBranchesHealthCheckVar <- newTVarIO NotFetched
+  yourBranchesHealthCheckThreadVar <- newTVarIO Nothing
+  yourBranchesIdentifier <- liftIO getIdentifier
+  let yourBranchesChild = PaginatedYourBranchesNode $ EntityData {
         _static = ()
-        , _state = branchesVar
-        , _urlSuffix = "branches"
-        , _toggled = branchesToggledVar
-        , _children = branchesChildrenVar
-        , _healthCheck = branchesHealthCheckVar
-        , _healthCheckThread = branchesHealthCheckThreadVar
+        , _state = yourBranchesVar
+        , _urlSuffix = "your-branches"
+        , _toggled = yourBranchesToggledVar
+        , _children = yourBranchesChildrenVar
+        , _healthCheck = yourBranchesHealthCheckVar
+        , _healthCheckThread = yourBranchesHealthCheckThreadVar
         , _depth = repoDepth + 1
-        , _ident = branchesIdentifier
-        } :: Node Variable PaginatedBranchesT
+        , _ident = yourBranchesIdentifier
+        } :: Node Variable PaginatedYourBranchesT
 
-  -- New GitHub-style categorized branches
-  categorizedBranchesStateVar <- newTVarIO ()
-  categorizedBranchesToggledVar <- newTVarIO False
-  categorizedBranchesChildrenVar <- newTVarIO []
-  categorizedBranchesHealthCheckVar <- newTVarIO NotFetched
-  categorizedBranchesHealthCheckThreadVar <- newTVarIO Nothing
-  categorizedBranchesIdentifier <- liftIO getIdentifier
-  let categorizedBranchesChild = OverallBranchesNode $ EntityData {
+  -- Active branches
+  activeBranchesVar <- newTVarIO (SearchNone, emptyPageInfo, NotFetched)
+  activeBranchesToggledVar <- newTVarIO False
+  activeBranchesChildrenVar <- newTVarIO []
+  activeBranchesHealthCheckVar <- newTVarIO NotFetched
+  activeBranchesHealthCheckThreadVar <- newTVarIO Nothing
+  activeBranchesIdentifier <- liftIO getIdentifier
+  let activeBranchesChild = PaginatedActiveBranchesNode $ EntityData {
         _static = ()
-        , _state = categorizedBranchesStateVar
-        , _urlSuffix = "branches/categorized"
-        , _toggled = categorizedBranchesToggledVar
-        , _children = categorizedBranchesChildrenVar
-        , _healthCheck = categorizedBranchesHealthCheckVar
-        , _healthCheckThread = categorizedBranchesHealthCheckThreadVar
+        , _state = activeBranchesVar
+        , _urlSuffix = "active-branches"
+        , _toggled = activeBranchesToggledVar
+        , _children = activeBranchesChildrenVar
+        , _healthCheck = activeBranchesHealthCheckVar
+        , _healthCheckThread = activeBranchesHealthCheckThreadVar
         , _depth = repoDepth + 1
-        , _ident = categorizedBranchesIdentifier
-        } :: Node Variable OverallBranchesT
+        , _ident = activeBranchesIdentifier
+        } :: Node Variable PaginatedActiveBranchesT
+
+  -- Stale branches
+  staleBranchesVar <- newTVarIO (SearchNone, emptyPageInfo, NotFetched)
+  staleBranchesToggledVar <- newTVarIO False
+  staleBranchesChildrenVar <- newTVarIO []
+  staleBranchesHealthCheckVar <- newTVarIO NotFetched
+  staleBranchesHealthCheckThreadVar <- newTVarIO Nothing
+  staleBranchesIdentifier <- liftIO getIdentifier
+  let staleBranchesChild = PaginatedStaleBranchesNode $ EntityData {
+        _static = ()
+        , _state = staleBranchesVar
+        , _urlSuffix = "stale-branches"
+        , _toggled = staleBranchesToggledVar
+        , _children = staleBranchesChildrenVar
+        , _healthCheck = staleBranchesHealthCheckVar
+        , _healthCheckThread = staleBranchesHealthCheckThreadVar
+        , _depth = repoDepth + 1
+        , _ident = staleBranchesIdentifier
+        } :: Node Variable PaginatedStaleBranchesT
 
   repoIdentifier <- liftIO getIdentifier
-  childrenVar <- newTVarIO [SomeNode issuesChild, SomeNode pullsChild, SomeNode workflowsChild, SomeNode branchesChild, SomeNode categorizedBranchesChild]
+  childrenVar <- newTVarIO [SomeNode issuesChild, SomeNode pullsChild, SomeNode workflowsChild, SomeNode yourBranchesChild, SomeNode activeBranchesChild, SomeNode staleBranchesChild]
   repoHealthCheckThreadVar <- newTVarIO hcThread
   return $ RepoNode $ EntityData {
-    _static = (fst nsName, snd nsName)
+    _static = nsName
     , _state = repoVar
     , _urlSuffix = ""
     , _toggled = toggledVar

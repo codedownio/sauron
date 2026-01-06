@@ -40,7 +40,6 @@ fixNode item@(PaginatedPullsNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedWorkflowsNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedReposNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedBranchesNode ed) = fixTypedNode item ed
-fixNode item@(OverallBranchesNode ed) = fixWrappedNode item ed
 fixNode item@(PaginatedYourBranchesNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedActiveBranchesNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedStaleBranchesNode ed) = fixTypedNode item ed
