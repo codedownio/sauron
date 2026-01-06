@@ -13,7 +13,7 @@ import qualified Data.Vector as V
 import GitHub
 import Relude
 import Sauron.Actions.Util (withGithubApiSemaphore, githubWithLogging)
-import Sauron.Logging (logToModal, LogLevel(..))
+import Sauron.Logging (log, LogLevel(..))
 import Sauron.Options
 import Sauron.Types
 import Sauron.UI.Statuses
@@ -31,7 +31,7 @@ newHealthCheckThread :: (
   -> PeriodSpec
   -> IO (Async ())
 newHealthCheckThread baseContext (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $ do
-  logToModal baseContext LevelInfo [i|Starting health check thread for repo: #{untagName owner}/#{untagName name} (period: #{period}us)|] Nothing
+  log baseContext LevelInfo [i|Starting health check thread for repo: #{untagName owner}/#{untagName name} (period: #{period}us)|] Nothing
   handleAny (\e -> putStrLn [i|Health check thread crashed: #{e}|]) $ forever $ do
     -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?
     defaultBranch <- atomically $ do

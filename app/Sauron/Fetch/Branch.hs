@@ -68,7 +68,7 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar depth'
                     writeTVar stateVar (s, p, Errored $ logPrefix <> " fetch failed with exception.")) $ do
     case getAuthToken bc of
       Nothing -> liftIO $ do
-        logToModal bc LevelError (logPrefix <> ": No auth token available") Nothing
+        logError' bc (logPrefix <> ": No auth token available")
         atomically $ do
           (s, p, _) <- readTVar stateVar
           writeTVar stateVar (s, p, Errored "No auth token available for GraphQL query")
@@ -84,7 +84,7 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar depth'
 
           -- Fetch branches with commit info using GraphQL
           result <- withLogToModal bc LevelInfo (logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name) $
-            GraphQL.queryBranchesWithInfos (\msg -> logToModal bc LevelDebug msg Nothing) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
+            GraphQL.queryBranchesWithInfos (debug' bc) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
           case result of
             Left err -> atomically $ do
               (s, p, _) <- readTVar stateVar
@@ -140,7 +140,7 @@ fetchYourBranches owner name repoDefaultBranch (PaginatedYourBranchesNode (Entit
   bc <- ask
   liftIO (getUserName bc) >>= \case
     Nothing -> liftIO $ do
-      logToModal bc LevelError "fetchYourBranches: Could not get current user name" Nothing
+      logError' bc "fetchYourBranches: Could not get current user name"
       atomically $ do
         (s, p, _) <- readTVar _state
         writeTVar _state (s, p, Errored "Could not get current user name")

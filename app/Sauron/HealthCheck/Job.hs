@@ -16,7 +16,7 @@ import GitHub
 import Relude
 import Sauron.Actions.Util (findRepoParent)
 import Sauron.Fetch.Job (fetchJob)
-import Sauron.Logging (logToModal)
+import Sauron.Logging (log)
 import Sauron.Types
 import Sauron.UI.Statuses
 import UnliftIO.Async
@@ -44,7 +44,7 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
     Just (RepoNode (EntityData {_static=(owner, name)})) ->
       readTVarIO _healthCheckThread >>= \case
         Nothing -> do
-          logToModal baseContext LevelInfo [i|Starting health check thread for job: #{jobId} (period: #{jobHealthCheckPeriodUs}us)|] Nothing
+          log baseContext LevelInfo [i|Starting health check thread for job: #{jobId} (period: #{jobHealthCheckPeriodUs}us)|] Nothing
           newThread <- async $ runJobHealthCheckLoop baseContext owner name node parents
           atomically $ writeTVar _healthCheckThread (Just (newThread, jobHealthCheckPeriodUs))
           return (Just newThread)

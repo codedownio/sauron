@@ -9,12 +9,11 @@ module Sauron.HealthCheck.Stop (
 
 import Brick
 import Control.Monad.IO.Class
-import Control.Monad.Logger
 import Data.String.Interpolate
 import Data.Time (NominalDiffTime)
 import GitHub
 import Relude
-import Sauron.Logging (logToModal)
+import Sauron.Logging
 import Sauron.Types
 import UnliftIO.Async
 
@@ -24,7 +23,7 @@ stopHealthCheckThreadsForNodeAndChildren bc someNode = do
   threads <- liftIO $ atomically $ gatherAndClearAllHealthCheckThreads someNode
   let threadCount = length threads
   when (threadCount > 0) $
-    logToModal bc LevelInfo [i|Stopped #{threadCount} health check threads: #{fmap fst threads}|] Nothing
+    info' bc [i|Stopped #{threadCount} health check threads: #{fmap fst threads}|]
   liftIO $ mapM_ (cancel . snd) threads
 
 stopHealthCheckThreadIfRunning :: MonadIO m => BaseContext -> SomeNode Variable -> m ()
@@ -32,7 +31,7 @@ stopHealthCheckThreadIfRunning bc someNode = do
   threads <- liftIO $ atomically $ gatherAndClearHealthCheckThread someNode
   forM_ threads $ \(identifier, thread) -> do
     liftIO $ cancel thread
-    logToModal bc LevelInfo [i|(#{identifier}) Stopped health check thread|] Nothing
+    info' bc [i|(#{identifier}) Stopped health check thread|]
 
 gatherAndClearAllHealthCheckThreads :: SomeNode Variable -> STM [(Text, Async ())]
 gatherAndClearAllHealthCheckThreads someNode@(SomeNode node) = do
