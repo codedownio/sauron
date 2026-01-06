@@ -124,7 +124,7 @@ main = do
   listElems <- flip V.cons listElems' <$> atomically (SomeNode . PaginatedNotificationsNode <$> makeEmptyElemWithState baseContext () (SearchNone, emptyPageInfo, NotFetched) "" 0)
 
   -- Kick off initial fetches
-  runReaderT (refreshAll listElems) baseContext
+  runReaderT (refreshVisibleLines listElems) baseContext
 
   listElemsFixed :: V.Vector (SomeNode Fixed) <- atomically $ mapM fixSomeNode listElems
 

@@ -126,7 +126,7 @@ appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEnter []) -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents -> do
       atomically $ updateSearchForNode el (formState form)
-      refresh (s ^. appBaseContext) el parents
+      refreshLine (s ^. appBaseContext) el parents
     modify (appForm .~ Nothing)
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
 
@@ -202,9 +202,9 @@ handleMainPaneEvents s e = case e of
 
   V.EvKey c [] | c == refreshSelectedKey -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents ->
-      refresh (s ^. appBaseContext) el parents
+      refreshSelected (s ^. appBaseContext) el parents
   V.EvKey c [] | c == refreshAllKey -> do
-    liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
+    liftIO $ runReaderT (refreshVisibleLines (s ^. appMainListVariable)) (s ^. appBaseContext)
 
   V.EvKey c [] | c == openSelectedKey -> do
     withFixedElemAndParents s $ \(SomeNode el) _variableEl elems -> do
@@ -234,7 +234,7 @@ handleMainPaneEvents s e = case e of
   V.EvKey c [] | c == zoomModalKey -> do
     withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
       -- TODO: we used to check if the state is NotFetched before doing this refresh
-      refresh (s ^. appBaseContext) variableEl parents
+      refreshOnZoom (s ^. appBaseContext) variableEl parents
       liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
 
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do
@@ -301,10 +301,9 @@ modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode it
     modifyTVar' (_toggled mle) cb
     readTVar (_toggled mle)
 
-  -- Node opened: refresh visible nodes
-  when (not wasOpen && isOpen) $ do
-    atomically (getExistentialChildrenWrapped item)
-      >>= refreshVisibleNodes (_appBaseContext s) (someNode : toList parents)
+  -- Node opened
+  when (not wasOpen && isOpen) $
+    onOpen (_appBaseContext s) item (someNode :| toList parents)
 
   -- Node closed: stop healthcheck threads recursively
   when (wasOpen && not isOpen) $
