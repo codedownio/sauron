@@ -1,8 +1,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Sauron.HealthCheck (
-  newHealthCheckThread
+module Sauron.HealthCheck.Repo (
+  newRepoHealthCheckThread
   ) where
 
 import Control.Concurrent.STM (retry)
@@ -21,7 +21,7 @@ import UnliftIO.Async
 import UnliftIO.Concurrent
 
 
-newHealthCheckThread :: (
+newRepoHealthCheckThread :: (
   HasCallStack
   )
   => BaseContext
@@ -30,7 +30,7 @@ newHealthCheckThread :: (
   -> TVar (Fetchable HealthCheckResult)
   -> PeriodSpec
   -> IO (Async ())
-newHealthCheckThread baseContext (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $ do
+newRepoHealthCheckThread baseContext (owner, name) repoVar healthCheckVar (PeriodSpec period) = async $ do
   log baseContext LevelInfo [i|Starting health check thread for repo: #{untagName owner}/#{untagName name} (period: #{period}us)|] Nothing
   handleAny (\e -> putStrLn [i|Health check thread crashed: #{e}|]) $ forever $ do
     -- TODO: how to not get "thread blocked indefinitely in an STM transaction"?

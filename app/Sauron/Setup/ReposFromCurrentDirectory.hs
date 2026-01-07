@@ -22,7 +22,7 @@ import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
 import Relude hiding (Down)
-import Sauron.HealthCheck
+import Sauron.HealthCheck.Repo
 import Sauron.Options
 import Sauron.Setup.Common (newRepoNode)
 import Sauron.Types
@@ -86,7 +86,7 @@ reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
   repoVar <- newTVarIO NotFetched
   healthCheckVar <- newTVarIO NotFetched
   let ps@(PeriodSpec period) = defaultHealthCheckPeriodUs
-  hcThread <- newHealthCheckThread baseContext nsName repoVar healthCheckVar ps
+  hcThread <- newRepoHealthCheckThread baseContext nsName repoVar healthCheckVar ps
   node@(RepoNode (EntityData {..})) <- newRepoNode nsName repoVar healthCheckVar (Just (hcThread, period)) 0 (getIdentifier baseContext)
 
   atomically $ writeTVar _toggled True

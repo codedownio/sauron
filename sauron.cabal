@@ -50,9 +50,9 @@ executable sauron
       Sauron.Filter
       Sauron.Fix
       Sauron.GraphQL
-      Sauron.HealthCheck
       Sauron.HealthCheck.Common
       Sauron.HealthCheck.Job
+      Sauron.HealthCheck.Repo
       Sauron.HealthCheck.Stop
       Sauron.HealthCheck.Workflow
       Sauron.Logging

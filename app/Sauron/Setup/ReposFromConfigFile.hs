@@ -13,7 +13,7 @@ import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import GitHub
 import Relude hiding (Down)
-import Sauron.HealthCheck
+import Sauron.HealthCheck.Repo
 import Sauron.Options
 import Sauron.Setup.Common (newRepoNode)
 import Sauron.Types
@@ -47,11 +47,11 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           hcThread <- case r of
             ConfigRepoSingle _ _ (HasSettings (RepoSettings {repoSettingsCheckPeriod=localPeriod})) -> do
               let ps@(PeriodSpec period) = fromMaybe defaultHealthCheckPeriodUs (localPeriod <|> join (repoSettingsCheckPeriod <$> configSettings))
-              thread <- lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
+              thread <- lift (newRepoHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
               pure (Just (thread, period))
             ConfigRepoSingle _ _ _ -> do
               let ps@(PeriodSpec period) = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
-              thread <- lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
+              thread <- lift (newRepoHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
               pure (Just (thread, period))
             ConfigRepoWildcard {} -> pure Nothing
           newRepoNode nsName repoVar healthCheckVar hcThread repoDepth (getIdentifier baseContext)
