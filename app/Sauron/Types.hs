@@ -46,7 +46,7 @@ class ListDrawable f a where
   -- | Draw the inner content when the node is toggled open
   -- This should return Nothing if the node doesn't support inner content
   drawInner :: AppState -> EntityData f a -> Maybe (Widget ClickableName)
-
+  drawInner _ _ = Nothing
 
 -- * Main list elem
 

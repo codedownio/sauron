@@ -23,55 +23,37 @@ instance ListDrawable Fixed 'PaginatedReposT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Repositories" appState ed search pageInfo fetchable
 
-  drawInner _ _ = Nothing
-
 instance ListDrawable Fixed 'PaginatedIssuesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Issues" appState ed search pageInfo fetchable
-
-  drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedPullsT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Pulls" appState ed search pageInfo fetchable
 
-  drawInner _ _ = Nothing
-
 instance ListDrawable Fixed 'PaginatedWorkflowsT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Actions" appState ed search pageInfo fetchable
-
-  drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "All Branches" appState ed search pageInfo fetchable
 
-  drawInner _ _ = Nothing
-
 instance ListDrawable Fixed 'PaginatedYourBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Your branches" appState ed search pageInfo fetchable
-
-  drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'PaginatedActiveBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Active branches" appState ed search pageInfo fetchable
 
-  drawInner _ _ = Nothing
-
 instance ListDrawable Fixed 'PaginatedStaleBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Stale branches" appState ed search pageInfo fetchable
 
-  drawInner _ _ = Nothing
-
 instance ListDrawable Fixed 'PaginatedNotificationsT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Notifications" appState ed search pageInfo fetchable
-
-  drawInner _ _ = Nothing
 
 instance ListDrawable Fixed 'HeadingT where
   drawLine _appState (EntityData {_static=label, ..}) = hBox $ catMaybes [
@@ -79,9 +61,6 @@ instance ListDrawable Fixed 'HeadingT where
     , Just (hBox [withAttr (mkAttrName "headingText") $ str (toString label)])
     , Just (padLeft Max (str " "))
     ]
-
-  drawInner _ _ = Nothing
-
 
 -- Helper functions
 
@@ -93,23 +72,17 @@ drawPaginatedLine label appState ed search pageInfo fetchable = case fetchable o
   NotFetched -> headingWithMessage (str [i|(not fetched)|])
   Errored err -> headingWithMessage (str [i|(error fetching: #{err})|])
   where
-    headingWithMessage msg = paginatedHeadingColored ed appState label msg search pageInfo
+    headingWithMessage msg = paginatedHeading' (withAttr (mkAttrName "headingText")) ed appState label msg search pageInfo
 
-type PaginatedHeadingFn a =
-  EntityData Fixed a
+paginatedHeading' ::
+  (Widget ClickableName -> Widget ClickableName)
+  -> EntityData Fixed a
   -> AppState
   -> String
   -> Widget ClickableName
   -> Search
   -> PageInfo
   -> Widget ClickableName
-
-paginatedHeadingColored :: PaginatedHeadingFn a
-paginatedHeadingColored = paginatedHeading' (withAttr (mkAttrName "headingText"))
-
-paginatedHeading' ::
-  (Widget ClickableName -> Widget ClickableName)
-  -> PaginatedHeadingFn a
 paginatedHeading' modifyLabel (EntityData {..}) appState l countInParens _search _pageInfo = hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
   , Just $ padRight (Pad 1) $ modifyLabel $ str l
