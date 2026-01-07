@@ -91,8 +91,17 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar depth'
               writeTVar stateVar (s, p, Errored $ toText err)
               writeTVar childrenVar []
             Right branchesWithCommits -> do
+              -- Read search state to apply search text filtering
+              (searchState, _, _) <- readTVarIO stateVar
+              -- Apply search text filtering if provided
+              let searchFilteredBranches = case searchState of
+                    SearchNone -> branchesWithCommits
+                    SearchText searchText ->
+                      if T.null searchText
+                        then branchesWithCommits
+                        else filter (\branch -> T.toLower searchText `T.isInfixOf` T.toLower (branchWithInfoBranchName branch)) branchesWithCommits
               -- Apply the provided filter function and sort by date
-              let allFilteredBranches = GraphQL.sortBranchesByDate $ filterFn branchesWithCommits
+              let allFilteredBranches = GraphQL.sortBranchesByDate $ filterFn searchFilteredBranches
               let totalBranches = length allFilteredBranches
               let totalPages = max 1 $ (totalBranches + pageSize - 1) `div` pageSize  -- Ceiling division, at least 1 page
 
