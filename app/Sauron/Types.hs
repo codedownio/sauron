@@ -183,7 +183,7 @@ type family NodeState a where
   NodeState PaginatedNotificationsT = (Search, PageInfo, Fetchable TotalCount)
   NodeState SingleIssueT = Fetchable (V.Vector (Either IssueEvent IssueComment))
   NodeState SinglePullT = Fetchable (V.Vector (Either IssueEvent IssueComment))
-  NodeState SingleWorkflowT = Fetchable (WithTotalCount Job)
+  NodeState SingleWorkflowT = Fetchable TotalCount
   NodeState SingleJobT = Fetchable Job
   NodeState SingleBranchT = Fetchable (V.Vector Commit)
   NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)

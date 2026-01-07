@@ -41,8 +41,8 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
       Left err -> do
         -- traceM [i|Error fetching workflow jobs: #{err}|]
         atomically $ writeTVar _state (Errored (show err))
-      Right wtc@(WithTotalCount results _totalCount) -> atomically $ do
-        writeTVar _state (Fetched wtc)
+      Right (WithTotalCount results totalCount) -> atomically $ do
+        writeTVar _state (Fetched totalCount)
 
         -- Preserve existing job nodes and their toggle state
         existingChildren <- readTVar _children
