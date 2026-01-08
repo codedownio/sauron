@@ -3,9 +3,8 @@
 
 module Sauron.Fetch.Job (
   fetchWorkflowJobs
-  , fetchJobLogs
-  , fetchJobLogsAndReplaceChildren
   , fetchJob
+  , fetchJobLogs
   ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -24,6 +23,7 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
+import Sauron.Logging
 import Sauron.Types
 
 
@@ -65,17 +65,25 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
               return existingNode
             Nothing -> do
               -- Create new node for new jobs
-              entityData <- makeEmptyElemWithState bc jobId NotFetched "" (_depth + 1)
+              entityData <- makeEmptyElemWithState bc job NotFetched "" (_depth + 1)
               let EntityData {_state=jobState, _children=jobChildren} = entityData
               writeTVar jobState (Fetched job)
 
               -- Create dummy child for log fetching
-              dummyLogEntityData <- makeEmptyElemWithState bc () NotFetched "" (_depth + 2)
-              let EntityData {_state = dummyState} = dummyLogEntityData
-              writeTVar dummyState NotFetched
+              let dummyLogGroup = JobLogLines (UTCTime (fromGregorian 1970 1 1) 0) ["Loading job logs..."]
+              dummyLogEntityData <- makeEmptyElemWithState bc dummyLogGroup () "" (_depth + 2)
               writeTVar jobChildren [JobLogGroupNode dummyLogEntityData]
 
               return $ SingleJobNode entityData
+
+fetchJob :: (
+  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> Id Job -> Node Variable SingleJobT -> m ()
+fetchJob owner name jobId (SingleJobNode (EntityData {_state})) = do
+  withGithubApiSemaphore (githubWithLoggingResponse (jobR owner name jobId)) >>= \case
+    Left _err -> return () -- Silently fail for health checks
+    Right (responseBody -> updatedJob) ->
+      atomically $ writeTVar _state (Fetched updatedJob)
 
 fetchJobLogs :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -93,44 +101,7 @@ fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})
         children' <- liftIO $ atomically $ do
           mapM (createJobStepNode bc (_depth + 1) parsedLogs) (V.toList jobSteps)
 
-        atomically $ do
-          currentState <- readTVar _state
-          case currentState of
-            Fetched job -> writeTVar _state (Fetched job)
-            Fetching (Just job) -> writeTVar _state (Fetched job)
-            Fetching Nothing -> writeTVar _state (Errored "No job data available")
-            _ -> writeTVar _state (Errored "Invalid job state")
-          writeTVar _children children'
-
-fetchJobLogsAndReplaceChildren :: (
-  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
-fetchJobLogsAndReplaceChildren owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {_children, _depth})) = do
-  bc@(BaseContext {auth, manager}) <- ask
-  withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
-    Left _ -> return () -- Silently fail for now
-    Right response -> do
-      logs <- simpleHttp (URI.uriToString id (responseBody response) "")
-
-      let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
-      children' <- liftIO $ atomically $ do
-        mapM (createJobStepNode bc (_depth + 1) parsedLogs) (V.toList jobSteps)
-
-      -- Replace the job's children with the actual log nodes
-      atomically $ writeTVar _children children'
-
-fetchJob :: (
-  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Id Job -> Node Variable SingleJobT -> m ()
-fetchJob owner name jobId (SingleJobNode (EntityData {_state})) = do
-  withGithubApiSemaphore (githubWithLoggingResponse (jobR owner name jobId)) >>= \case
-    Left _err -> return () -- Silently fail for health checks
-    Right (responseBody -> updatedJob) -> liftIO $ atomically $
-      readTVar _state >>= \case
-        Fetched _ -> writeTVar _state (Fetched updatedJob)
-        Fetching (Just _) -> writeTVar _state (Fetching (Just updatedJob))
-        Fetching Nothing -> writeTVar _state (Fetching (Just updatedJob))
-        _ -> writeTVar _state (Fetched updatedJob)
+        atomically $ writeTVar _children children'
 
 -- * Util
 
@@ -162,7 +133,7 @@ createJobStepNode bc depth' allLogs jobStep = do
 
 createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
-  stateVar <- newTVar (Fetched jobLogGroup)
+  stateVar <- newTVar ()
   ident' <- getIdentifierSTM bc
   toggledVar <- newTVar False
 
@@ -173,16 +144,16 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
       childElems <- mapM (createJobLogGroupChildren bc (depth' + 1)) children'
       newTVar childElems
 
-  healthCheckVar2 <- newTVar NotFetched
-  healthCheckThreadVar2 <- newTVar Nothing
+  healthCheckVar <- newTVar NotFetched
+  healthCheckThreadVar <- newTVar Nothing
   return $ JobLogGroupNode $ EntityData {
-    _static = ()
+    _static = jobLogGroup
     , _state = stateVar
     , _urlSuffix = ""
     , _toggled = toggledVar
     , _children = childrenVar
-    , _healthCheck = healthCheckVar2
-    , _healthCheckThread = healthCheckThreadVar2
+    , _healthCheck = healthCheckVar
+    , _healthCheckThread = healthCheckThreadVar
     , _depth = depth'
     , _ident = ident'
   }

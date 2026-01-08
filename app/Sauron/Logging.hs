@@ -18,14 +18,19 @@ module Sauron.Logging (
 
   -- * Re-exported from Control.Monad.Logger for convenience
   , HasCallStack
+
+  -- * Re-exported from string-interpolate
+  , i
 ) where
 
 import Brick.BChan (writeBChan)
 import Control.Monad.Logger (LogLevel(..))
+import Data.String.Interpolate
 import Data.Time (getCurrentTime, diffUTCTime, NominalDiffTime)
 import GHC.Stack (HasCallStack)
 import Relude hiding (HasCallStack)
 import Sauron.Types (AppEvent(LogEntryAdded), BaseContext(..), LogEntry(..))
+
 
 log :: (MonadIO m, HasCallStack) => BaseContext -> LogLevel -> Text -> Maybe NominalDiffTime -> m ()
 log bc level msg maybeDuration = do

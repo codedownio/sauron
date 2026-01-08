@@ -15,10 +15,11 @@ module Sauron.Actions (
   ) where
 
 import Control.Monad.IO.Class
+import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import Relude
-import Sauron.Actions.Util (findRepoParent, findJobParent, openBrowserToUrl)
+import Sauron.Actions.Util (findRepoParent, openBrowserToUrl)
 import Sauron.Fetch.Branch
 import Sauron.Fetch.Issue
 import Sauron.Fetch.Job
@@ -28,6 +29,7 @@ import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
+import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.Util (isFetchingOrFetched)
 import UnliftIO.Async
@@ -139,8 +141,8 @@ refreshVisibleLines' baseContext parents nodes = do
         >>= refreshVisibleLines' baseContext (someNode : parents)
 
 fetchOnOpenIfNecessary :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
-fetchOnOpenIfNecessary bc node parents =
-  unlessM (shouldFetchOnExpand node) $
+fetchOnOpenIfNecessary bc node parents = do
+  whenM (shouldFetchOnExpand node) $
     fetchOnOpen bc node parents
 
 fetchOnOpen :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
@@ -187,33 +189,12 @@ fetchOnOpen bc (SinglePullNode (EntityData {_static=pull, _state})) (findRepoPar
 fetchOnOpen bc (SingleCommitNode (EntityData {_static=commit, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchCommitDetails owner name (commitSha commit) _state) bc
 
--- Job-related nodes that handle their own complex opening logic
-fetchOnOpen bc item@(SingleJobNode (EntityData {_state, _static=jobId})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
+fetchOnOpen bc item@(SingleJobNode (EntityData {_state, _static=job@(Job {jobId})})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
-    fetchJob owner name jobId item
-    liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
-fetchOnOpen bc (JobLogGroupNode (EntityData {_state})) parents = do
-  case findJobParent (toList parents) of
-    Just jobNode@(SingleJobNode (EntityData {_state=jobState})) ->
-      liftIO $ void $ async $ liftIO $ flip runReaderT bc $
-        readTVarIO _state >>= \case
-          NotFetched -> do
-            atomically $ writeTVar _state (Fetching Nothing)
-            readTVarIO jobState >>= \case
-              Fetched job -> do
-                -- Find the repo parent for owner/name
-                case findRepoParent parents of
-                  Just (RepoNode (EntityData {_static=(owner, name)})) ->
-                    fetchJobLogsAndReplaceChildren owner name job jobNode
-                  _ -> return ()
-              _ -> return ()
-          _ -> return ()
-    Nothing -> return ()
+    concurrently (fetchJob owner name jobId item)
+                 (fetchJobLogs owner name job item)
+    -- liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 
--- Truly lazy nodes
-fetchOnOpen _bc (SingleNotificationNode _) _parents = return ()
-
--- Fallback
 fetchOnOpen _ _ _ = return ()
 
 
@@ -227,26 +208,31 @@ withRepoDefaultBranch fetchableVar action = readTVarIO fetchableVar >>= \case
 -- | This should be synced up with how fetchOnOpen works
 shouldFetchOnExpand :: MonadIO m => Node Variable a -> m Bool
 shouldFetchOnExpand (HeadingNode (EntityData {_state})) = return False
-shouldFetchOnExpand (RepoNode (EntityData {_state, _children})) =
-  readTVarIO _children >>= anyM (\(SomeNode n) -> shouldFetchOnExpand n)
-shouldFetchOnExpand (PaginatedIssuesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (PaginatedPullsNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (PaginatedWorkflowsNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (PaginatedReposNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (PaginatedBranchesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (PaginatedYourBranchesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (PaginatedActiveBranchesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (PaginatedStaleBranchesNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (PaginatedNotificationsNode (EntityData {_state})) = isFetchingOrFetched . thd <$> readTVarIO _state
-shouldFetchOnExpand (SingleIssueNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SinglePullNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleWorkflowNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleBranchNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleBranchWithInfoNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleCommitNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleNotificationNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (JobLogGroupNode (EntityData {_state})) = isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (RepoNode (EntityData {_children})) =
+  -- Just check if the paginated issues node is fetched or not
+  readTVarIO _children >>= anyM
+    (\case
+        (SomeNode (PaginatedIssuesNode child)) -> (not . isFetchingOrFetched . thd) <$> readTVarIO (_state child)
+        _ -> return False
+    )
+shouldFetchOnExpand (PaginatedIssuesNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedPullsNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedWorkflowsNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedReposNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedBranchesNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedYourBranchesNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedActiveBranchesNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedStaleBranchesNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (PaginatedNotificationsNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
+shouldFetchOnExpand (SingleIssueNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SinglePullNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleWorkflowNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleBranchNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleBranchWithInfoNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleCommitNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleNotificationNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (JobLogGroupNode (EntityData {})) = return True
 
 thd :: (a, b, c) -> c
 thd (_, _, z) = z

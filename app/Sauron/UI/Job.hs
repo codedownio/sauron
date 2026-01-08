@@ -40,23 +40,15 @@ instance ListDrawable Fixed 'SingleJobT where
       return $ jobInner (_appAnimationCounter appState) job Nothing
 
 instance ListDrawable Fixed 'JobLogGroupT where
-  drawLine appState (EntityData {_state, ..}) = case _state of
-    Fetched jobLogGroup -> jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
-    Fetching (Just jobLogGroup) -> jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
-    Fetching Nothing -> str [i|Loading job logs...|]
-    NotFetched -> padRight Max $ hBox [
-      withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
-      , withAttr normalAttr $ str "Job logs"
-      ]
-    Errored e -> str [i|Log group fetch errored: #{e}|]
+  drawLine appState (EntityData {_static=jobLogGroup, ..}) = 
+    jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
 
-  drawInner _appState (EntityData {_state, ..}) = do
+  drawInner _appState (EntityData {_static=jobLogGroup, ..}) = do
     guard _toggled
-    guardFetchedOrHasPrevious _state $ \jobLogGroup ->
-      case jobLogGroup of
-        JobLogGroup _timestamp _title (Just _status) children' ->
-          return $ jobLogGroupInner children'
-        _ -> Nothing
+    case jobLogGroup of
+      JobLogGroup _timestamp _title (Just _status) children' ->
+        return $ jobLogGroupInner children'
+      _ -> Nothing
 
 jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
 jobLogGroupLine _animationCounter _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> padRight Max $ hBox $

@@ -39,7 +39,7 @@ startJobHealthCheckIfNeeded ::
   -> Node Variable 'SingleJobT
   -> NonEmpty (SomeNode Variable)
   -> IO (Maybe (Async ()))
-startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state, _static=jobId, ..})) parents = do
+startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state, _static=(Job {jobId}), ..})) parents = do
   case findRepoParent parents of
     Just (RepoNode (EntityData {_static=(owner, name)})) ->
       readTVarIO _healthCheckThread >>= \case

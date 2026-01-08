@@ -160,12 +160,12 @@ type family NodeStatic a where
   NodeStatic SingleIssueT = Issue
   NodeStatic SinglePullT = Issue
   NodeStatic SingleWorkflowT = WorkflowRun
-  NodeStatic SingleJobT = Id Job
+  NodeStatic SingleJobT = Job
   NodeStatic SingleBranchT = Branch
   NodeStatic SingleBranchWithInfoT = (BranchWithInfo, ColumnWidths)
   NodeStatic SingleCommitT = Commit
   NodeStatic SingleNotificationT = Notification
-  NodeStatic JobLogGroupT = ()
+  NodeStatic JobLogGroupT = JobLogGroup
   NodeStatic HeadingT = Text
   NodeStatic RepoT = (Name Owner, Name Repo)
 
@@ -189,7 +189,7 @@ type family NodeState a where
   NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)
   NodeState SingleCommitT = Fetchable Commit
   NodeState SingleNotificationT = Fetchable ()
-  NodeState JobLogGroupT = Fetchable JobLogGroup
+  NodeState JobLogGroupT = ()
   NodeState HeadingT = ()
   NodeState RepoT = Fetchable Repo
 

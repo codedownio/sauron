@@ -97,9 +97,7 @@ generateModalTitle (SomeNode inner) =
       "Commit: " <> T.unpack (T.take 50 gitCommitMessage) <> if T.length gitCommitMessage > 50 then "..." else ""
     SingleNotificationNode (EntityData {_static = Notification {notificationSubject = Subject {subjectTitle}}}) ->
       "Notification: " <> T.unpack subjectTitle
-    JobLogGroupNode (EntityData {_state}) ->
-      case _state of
-        Fetched (JobLogGroup _ title _ _) -> "Log Group: " <> T.unpack title
-        Fetched (JobLogLines _ _) -> "Job log lines"
-        NotFetched -> "Job logs not fetched"
-        _ -> "Log Group"
+    JobLogGroupNode (EntityData {_static=jobLogGroup}) ->
+      case jobLogGroup of
+        JobLogGroup _ title _ _ -> "Log Group: " <> T.unpack title
+        JobLogLines _ _ -> "Job log lines"
