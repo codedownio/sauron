@@ -55,8 +55,8 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
     runJobHealthCheckLoop bc owner name jobNode@(SingleJobNode (EntityData {_state, ..})) _pars =
       handleAny (\e -> putStrLn [i|Job health check thread crashed: #{e}|]) $
       forever $ do
-        currentState <- readTVarIO _state
-        case currentState of
+        (jobFetchable, _) <- readTVarIO _state
+        case jobFetchable of
           Fetched currentJob | hasRunningJob currentJob -> do
             -- Fetch just this individual job to update its status
             liftIO $ flip runReaderT bc $

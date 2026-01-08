@@ -15,7 +15,6 @@ module Sauron.Actions (
   ) where
 
 import Control.Monad.IO.Class
-import Data.String.Interpolate
 import qualified Data.Vector as V
 import GitHub
 import Relude
@@ -27,12 +26,12 @@ import Sauron.Fetch.Notification
 import Sauron.Fetch.Pull
 import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
-import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
-import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.Util (isFetchingOrFetched)
 import UnliftIO.Async
+
+-- import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 
 
 refreshSelected :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
@@ -227,7 +226,9 @@ shouldFetchOnExpand (PaginatedNotificationsNode (EntityData {_state})) = not . i
 shouldFetchOnExpand (SingleIssueNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SinglePullNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SingleWorkflowNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = do
+  (jobFetchable, logsFetchable) <- readTVarIO _state
+  return $ not (isFetchingOrFetched jobFetchable) || not (isFetchingOrFetched logsFetchable)
 shouldFetchOnExpand (SingleBranchNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SingleBranchWithInfoNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SingleCommitNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state

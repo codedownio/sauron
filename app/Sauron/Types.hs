@@ -184,7 +184,7 @@ type family NodeState a where
   NodeState SingleIssueT = Fetchable (V.Vector (Either IssueEvent IssueComment))
   NodeState SinglePullT = Fetchable (V.Vector (Either IssueEvent IssueComment))
   NodeState SingleWorkflowT = Fetchable TotalCount
-  NodeState SingleJobT = Fetchable Job
+  NodeState SingleJobT = (Fetchable Job, Fetchable [JobLogGroup])
   NodeState SingleBranchT = Fetchable (V.Vector Commit)
   NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)
   NodeState SingleCommitT = Fetchable Commit

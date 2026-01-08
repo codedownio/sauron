@@ -28,15 +28,16 @@ import UnliftIO.Async (Async)
 
 instance ListDrawable Fixed 'SingleJobT where
   drawLine appState (EntityData {..}) = case _state of
-    Fetched job -> jobLine (_appAnimationCounter appState) _toggled job _state _healthCheckThread
-    Fetching (Just job) -> jobLine (_appAnimationCounter appState) _toggled job _state _healthCheckThread
-    Fetching Nothing -> str [i|Loading job...|]
-    NotFetched -> str [i|Job not fetched|]
-    Errored e -> str [i|Job fetch errored: #{e}|]
+    (Fetched job, logsFetchable) -> jobLine (_appAnimationCounter appState) _toggled job logsFetchable _healthCheckThread
+    (Fetching (Just job), logsFetchable) -> jobLine (_appAnimationCounter appState) _toggled job logsFetchable _healthCheckThread
+    (Fetching Nothing, _) -> str [i|Loading job...|]
+    (NotFetched, _) -> str [i|Job not fetched|]
+    (Errored e, _) -> str [i|Job fetch errored: #{e}|]
 
   drawInner appState (EntityData {_state, _ident, ..}) = do
     guard _toggled
-    guardFetchedOrHasPrevious _state $ \job ->
+    let (jobFetchable, _) = _state
+    guardFetchedOrHasPrevious jobFetchable $ \job ->
       return $ jobInner (_appAnimationCounter appState) job Nothing
 
 instance ListDrawable Fixed 'JobLogGroupT where

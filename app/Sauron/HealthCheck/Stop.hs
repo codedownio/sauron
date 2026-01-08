@@ -56,11 +56,8 @@ gatherAndClearHealthCheckThread someNode@(SomeNode node) = do
   where
     nodeIdentifier :: SomeNode Variable -> STM Text
     nodeIdentifier (SomeNode node') = case node' of
-      SingleJobNode (EntityData {_state}) -> do
-        readTVar _state >>= \case
-          Fetched job -> return [i|Job #{untagName (jobName job)}|]
-          Fetching (Just job) -> return [i|Job #{untagName (jobName job)}|]
-          _ -> return "Job (unknown)"
+      SingleJobNode (EntityData {_static=job}) ->
+        return [i|Job #{untagName (jobName job)}|]
       SingleWorkflowNode (EntityData {_static=workflowRun}) ->
         return [i|Workflow #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun}|]
       RepoNode (EntityData {_static=(owner, name)}) ->

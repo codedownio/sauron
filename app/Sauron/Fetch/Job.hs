@@ -23,7 +23,6 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
-import Sauron.Logging
 import Sauron.Types
 
 
@@ -50,7 +49,8 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
         -- Build a map of existing jobs by their IDs
         existingJobsMap <- foldM (\acc node -> case node of
           SingleJobNode (EntityData {_state=jobState}) -> do
-            readTVar jobState >>= \case
+            (jobFetchable, _) <- readTVar jobState
+            case jobFetchable of
               Fetched existingJob -> return $ Map.insert (jobId existingJob) node acc
               Fetching (Just existingJob) -> return $ Map.insert (jobId existingJob) node acc
               _ -> return acc
@@ -61,13 +61,14 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
             Just existingNode@(SingleJobNode existingEntityData) -> do
               -- Update existing node's job data while preserving toggle state
               let EntityData {_state=jobState} = existingEntityData
-              writeTVar jobState (Fetched job)
+              (_, logsFetchable) <- readTVar jobState
+              writeTVar jobState (Fetched job, logsFetchable)
               return existingNode
             Nothing -> do
               -- Create new node for new jobs
-              entityData <- makeEmptyElemWithState bc job NotFetched "" (_depth + 1)
+              entityData <- makeEmptyElemWithState bc job (NotFetched, NotFetched) "" (_depth + 1)
               let EntityData {_state=jobState, _children=jobChildren} = entityData
-              writeTVar jobState (Fetched job)
+              writeTVar jobState (Fetched job, NotFetched)
 
               -- Create dummy child for log fetching
               let dummyLogGroup = JobLogLines (UTCTime (fromGregorian 1970 1 1) 0) ["Loading job logs..."]
@@ -82,18 +83,25 @@ fetchJob :: (
 fetchJob owner name jobId (SingleJobNode (EntityData {_state})) = do
   withGithubApiSemaphore (githubWithLoggingResponse (jobR owner name jobId)) >>= \case
     Left _err -> return () -- Silently fail for health checks
-    Right (responseBody -> updatedJob) ->
-      atomically $ writeTVar _state (Fetched updatedJob)
+    Right (responseBody -> updatedJob) -> atomically $ do
+      (_, logsFetchable) <- readTVar _state
+      writeTVar _state (Fetched updatedJob, logsFetchable)
 
 fetchJobLogs :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
 fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})) = do
   bc@(BaseContext {auth, manager}) <- ask
-  bracketOnError_ (atomically $ markFetching _state)
-                  (atomically $ writeTVar _state (Errored "Job logs fetch failed with exception.")) $ do
+  bracketOnError_ (atomically $ do
+                     (jobFetchable, _) <- readTVar _state
+                     writeTVar _state (jobFetchable, Fetching Nothing))
+                  (atomically $ do
+                     (jobFetchable, _) <- readTVar _state
+                     writeTVar _state (jobFetchable, Errored "Job logs fetch failed with exception.")) $ do
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
-      Left err -> atomically $ writeTVar _state (Errored (show err))
+      Left err -> atomically $ do
+        (jobFetchable, _) <- readTVar _state
+        writeTVar _state (jobFetchable, Errored (show err))
       Right response -> do
         logs <- simpleHttp (URI.uriToString id (responseBody response) "")
 
@@ -101,7 +109,10 @@ fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})
         children' <- liftIO $ atomically $ do
           mapM (createJobStepNode bc (_depth + 1) parsedLogs) (V.toList jobSteps)
 
-        atomically $ writeTVar _children children'
+        atomically $ do
+          writeTVar _children children'
+          (jobFetchable, _) <- readTVar _state
+          writeTVar _state (jobFetchable, Fetched parsedLogs)
 
 -- * Util
 
