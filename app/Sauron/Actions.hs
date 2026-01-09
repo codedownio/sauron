@@ -26,6 +26,7 @@ import Sauron.Fetch.Notification
 import Sauron.Fetch.Pull
 import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
+import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
 import Sauron.Types
 import Sauron.UI.Util (isFetchingOrFetched)
@@ -59,6 +60,9 @@ refreshLine bc item@(PaginatedStaleBranchesNode _) (findRepoParent -> Just (Repo
   liftIO $ async $ withRepoDefaultBranch _state $ \defaultBranch -> runReaderT (fetchStaleBranches owner name defaultBranch item) bc
 refreshLine bc item@(PaginatedNotificationsNode _) _ =
   liftIO $ async $ liftIO $ runReaderT (fetchNotifications item) bc
+refreshLine bc item@(SingleJobNode _) parents = do
+  liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
+  liftIO $ async $ return ()
 refreshLine _ _ _ = liftIO $ async $ return ()
 
 -- refreshLine bc (SingleIssueNode (EntityData {_static=issue, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
@@ -173,7 +177,7 @@ fetchOnOpen bc item@(PaginatedReposNode _) _parents =
 -- Nodes that fetch their children when opened
 fetchOnOpen bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
-    fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item
+    void $ fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item
     liftIO $ void $ startWorkflowHealthCheckIfNeeded bc item parents
 fetchOnOpen bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc
@@ -188,11 +192,11 @@ fetchOnOpen bc (SinglePullNode (EntityData {_static=pull, _state})) (findRepoPar
 fetchOnOpen bc (SingleCommitNode (EntityData {_static=commit, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ void $ async $ liftIO $ runReaderT (fetchCommitDetails owner name (commitSha commit) _state) bc
 
-fetchOnOpen bc item@(SingleJobNode (EntityData {_state, _static=job@(Job {jobId})})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
+fetchOnOpen bc item@(SingleJobNode (EntityData {_state, _static=job@(Job {jobId})})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ void $ async $ liftIO $ flip runReaderT bc $ do
     concurrently (fetchJob owner name jobId item)
                  (fetchJobLogs owner name job item)
-    -- liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
+  liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 
 fetchOnOpen _ _ _ = return ()
 

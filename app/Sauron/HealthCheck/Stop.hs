@@ -2,9 +2,9 @@
 {-# LANGUAGE GADTs #-}
 
 module Sauron.HealthCheck.Stop (
-  stopHealthCheckThreadIfRunning,
-  stopHealthCheckThreadsForNodeAndChildren,
-  healthCheckIndicatorWidget
+  stopHealthCheckThreadIfRunning
+  , stopHealthCheckThreadsForChildren
+  , healthCheckIndicatorWidget
   ) where
 
 import Brick
@@ -18,12 +18,12 @@ import Sauron.Types
 import UnliftIO.Async
 
 
-stopHealthCheckThreadsForNodeAndChildren :: MonadIO m => BaseContext -> SomeNode Variable -> m ()
-stopHealthCheckThreadsForNodeAndChildren bc someNode = do
-  threads <- liftIO $ atomically $ gatherAndClearAllHealthCheckThreads someNode
+stopHealthCheckThreadsForChildren :: MonadIO m => BaseContext -> SomeNode Variable -> m ()
+stopHealthCheckThreadsForChildren bc someNode = do
+  threads <- liftIO $ atomically $ gatherAndClearChildrenHealthCheckThreads someNode
   let threadCount = length threads
   when (threadCount > 0) $
-    info' bc [i|Stopped #{threadCount} health check threads: #{fmap fst threads}|]
+    info' bc [i|Stopped #{threadCount} child health check threads: #{fmap fst threads}|]
   liftIO $ mapM_ (cancel . snd) threads
 
 stopHealthCheckThreadIfRunning :: MonadIO m => BaseContext -> SomeNode Variable -> m ()
@@ -43,6 +43,12 @@ gatherAndClearAllHealthCheckThreads someNode@(SomeNode node) = do
   childThreads <- concat <$> mapM gatherAndClearAllHealthCheckThreads childNodes
 
   return (nodeThreads ++ childThreads)
+
+gatherAndClearChildrenHealthCheckThreads :: SomeNode Variable -> STM [(Text, Async ())]
+gatherAndClearChildrenHealthCheckThreads (SomeNode node) = do
+  -- Only gather threads from children, not from this node itself
+  childNodes <- getExistentialChildrenWrapped node
+  concat <$> mapM gatherAndClearAllHealthCheckThreads childNodes
 
 gatherAndClearHealthCheckThread :: SomeNode Variable -> STM [(Text, Async ())]
 gatherAndClearHealthCheckThread someNode@(SomeNode node) = do

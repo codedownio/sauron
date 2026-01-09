@@ -4,8 +4,9 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Sauron.HealthCheck.Job (
-  startJobHealthCheckIfNeeded,
-  jobHealthCheckPeriodUs
+  startJobHealthCheckIfNeeded
+  , jobHealthCheckPeriodUs
+  , isJobCompleted
   ) where
 
 import Control.Exception.Safe (handleAny)
@@ -15,7 +16,7 @@ import Data.String.Interpolate
 import GitHub
 import Relude
 import Sauron.Actions.Util (findRepoParent)
-import Sauron.Fetch.Job (fetchJob)
+import Sauron.Fetch.Job (fetchJobLogs)
 import Sauron.Logging (log)
 import Sauron.Types
 import Sauron.UI.Statuses
@@ -23,8 +24,11 @@ import UnliftIO.Async
 import UnliftIO.Concurrent
 
 
-isJobCompleted :: Text -> Bool
-isJobCompleted status = case chooseWorkflowStatus status of
+isJobCompleted :: Job -> Bool
+isJobCompleted j = isJobCompleted' (fromMaybe (jobStatus j) (jobConclusion j))
+
+isJobCompleted' :: Text -> Bool
+isJobCompleted' status = case chooseWorkflowStatus status of
   WorkflowSuccess -> True
   WorkflowFailed -> True
   WorkflowCancelled -> True
@@ -52,15 +56,15 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
     _ -> return Nothing
   where
     runJobHealthCheckLoop :: BaseContext -> Name Owner -> Name Repo -> Node Variable 'SingleJobT -> NonEmpty (SomeNode Variable) -> IO ()
-    runJobHealthCheckLoop bc owner name jobNode@(SingleJobNode (EntityData {_state, ..})) _pars =
+    runJobHealthCheckLoop bc owner name jobNode@(SingleJobNode (EntityData {_state, _static=job, ..})) _pars =
       handleAny (\e -> putStrLn [i|Job health check thread crashed: #{e}|]) $
       forever $ do
         (jobFetchable, _) <- readTVarIO _state
         case jobFetchable of
           Fetched currentJob | hasRunningJob currentJob -> do
-            -- Fetch just this individual job to update its status
+            -- Fetch job logs to keep them updated
             liftIO $ flip runReaderT bc $
-              fetchJob owner name jobId jobNode
+              fetchJobLogs owner name job jobNode
             threadDelay jobHealthCheckPeriodUs
           _ -> do
             -- Job is completed, clear the thread reference and stop
@@ -68,4 +72,4 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
             return ()
 
     hasRunningJob :: Job -> Bool
-    hasRunningJob j = not $ isJobCompleted (fromMaybe (jobStatus j) (jobConclusion j))
+    hasRunningJob j = not $ isJobCompleted j

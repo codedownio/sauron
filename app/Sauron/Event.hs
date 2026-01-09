@@ -25,7 +25,7 @@ import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
 import Sauron.Event.Search
 import Sauron.Event.Util
-import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForNodeAndChildren)
+import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForChildren)
 import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.Keys
@@ -248,9 +248,9 @@ modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode it
   when (not wasOpen && isOpen) $
     fetchOnOpenIfNecessary (_appBaseContext s) item (someNode :| toList parents)
 
-  -- Node closed: stop healthcheck threads recursively
+  -- Node closed: stop healthcheck threads for children only
   when (wasOpen && not isOpen) $
-    liftIO $ stopHealthCheckThreadsForNodeAndChildren (_appBaseContext s) someNode
+    liftIO $ stopHealthCheckThreadsForChildren (_appBaseContext s) someNode
 
 closeModal :: AppState -> EventM ClickableName AppState ()
 closeModal s = do

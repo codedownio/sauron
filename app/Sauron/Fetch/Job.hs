@@ -28,7 +28,7 @@ import Sauron.Types
 
 fetchWorkflowJobs :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Id WorkflowRun -> Node Variable SingleWorkflowT -> m ()
+  ) => Name Owner -> Name Repo -> Id WorkflowRun -> Node Variable SingleWorkflowT -> m (Either Error (V.Vector Job))
 fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})) = do
   bc <- ask
   bracketOnError_ (atomically $ markFetching _state)
@@ -40,6 +40,7 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
       Left err -> do
         -- traceM [i|Error fetching workflow jobs: #{err}|]
         atomically $ writeTVar _state (Errored (show err))
+        return $ Left err
       Right (WithTotalCount results totalCount) -> atomically $ do
         writeTVar _state (Fetched totalCount)
 
@@ -76,6 +77,8 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
               writeTVar jobChildren [JobLogGroupNode dummyLogEntityData]
 
               return $ SingleJobNode entityData
+
+        return $ Right results
 
 fetchJob :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
