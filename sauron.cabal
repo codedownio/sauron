@@ -35,6 +35,8 @@ executable sauron
       Sauron.Event.Helpers
       Sauron.Event.Open
       Sauron.Event.Paging
+      Sauron.Event.Search
+      Sauron.Event.Util
       Sauron.Expanding
       Sauron.Fetch.Branch
       Sauron.Fetch.Core
@@ -48,9 +50,9 @@ executable sauron
       Sauron.Filter
       Sauron.Fix
       Sauron.GraphQL
-      Sauron.HealthCheck
       Sauron.HealthCheck.Common
       Sauron.HealthCheck.Job
+      Sauron.HealthCheck.Repo
       Sauron.HealthCheck.Stop
       Sauron.HealthCheck.Workflow
       Sauron.Logging

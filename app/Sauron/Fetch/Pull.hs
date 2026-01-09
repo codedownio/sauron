@@ -22,22 +22,24 @@ fetchPulls :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Node Variable PaginatedPullsT -> m ()
 fetchPulls owner name (PaginatedPullsNode (EntityData {..})) = do
-  extraTerms <- readTVarIO _search >>= \case
+  (search, _pageInfo, _fetchable) <- readTVarIO _state
+  extraTerms <- case search of
     SearchNone -> pure []
     SearchText t -> pure $ T.words t
   let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
 
   bc <- ask
 
-  fetchPaginated'' (searchIssuesR fullQuery) _pageInfo _state $ \case
+  fetchPaginatedWithState (searchIssuesR fullQuery) _state $ \case
     Left err -> do
-      writeTVar _state (Errored (show err))
+      (s, p, _) <- readTVar _state
+      writeTVar _state (s, p, Errored err)
       writeTVar _children []
-    Right (sr@(SearchResult _totalCount results), newPageInfo) -> do
-      writeTVar _pageInfo newPageInfo
-      writeTVar _state (Fetched sr)
+    Right (SearchResult totalCount results, newPageInfo) -> do
+      (s, _, _) <- readTVar _state
+      writeTVar _state (s, newPageInfo, Fetched totalCount)
       (writeTVar _children =<<) $ forM (V.toList results) $ \issue@(Issue {..}) ->
-        SinglePullNode <$> makeEmptyElem bc issue ("/pull/" <> show issueNumber) (_depth + 1)
+        SinglePullNode <$> makeEmptyElemWithState bc issue NotFetched ("/pull/" <> show issueNumber) (_depth + 1)
 
 fetchPullComments :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m

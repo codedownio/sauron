@@ -18,12 +18,13 @@ fetchWorkflows :: (
   ) => Name Owner -> Name Repo -> Node Variable PaginatedWorkflowsT -> m ()
 fetchWorkflows owner name (PaginatedWorkflowsNode (EntityData {..})) = do
   bc <- ask
-  fetchPaginated'' (workflowRunsR owner name mempty) _pageInfo _state $ \case
+  fetchPaginatedWithState (workflowRunsR owner name mempty) _state $ \case
     Left err -> do
-      writeTVar _state (Errored (show err))
+      (s, p, _) <- readTVar _state
+      writeTVar _state (s, p, Errored err)
       writeTVar _children []
-    Right (wtc@(WithTotalCount results _totalCount), newPageInfo) -> do
-      writeTVar _pageInfo newPageInfo
-      writeTVar _state (Fetched wtc)
+    Right (WithTotalCount results totalCount, newPageInfo) -> do
+      (s, _, _) <- readTVar _state
+      writeTVar _state (s, newPageInfo, Fetched totalCount)
       (writeTVar _children =<<) $ forM (V.toList results) $ \workflow@(WorkflowRun {}) ->
-        SingleWorkflowNode <$> makeEmptyElem bc workflow "" (_depth + 1)
+        SingleWorkflowNode <$> makeEmptyElemWithState bc workflow NotFetched "" (_depth + 1)

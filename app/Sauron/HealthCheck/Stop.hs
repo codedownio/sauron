@@ -2,29 +2,28 @@
 {-# LANGUAGE GADTs #-}
 
 module Sauron.HealthCheck.Stop (
-  stopHealthCheckThreadIfRunning,
-  stopHealthCheckThreadsForNodeAndChildren,
-  healthCheckIndicatorWidget
+  stopHealthCheckThreadIfRunning
+  , stopHealthCheckThreadsForChildren
+  , healthCheckIndicatorWidget
   ) where
 
 import Brick
 import Control.Monad.IO.Class
-import Control.Monad.Logger
 import Data.String.Interpolate
 import Data.Time (NominalDiffTime)
 import GitHub
 import Relude
-import Sauron.Logging (logToModal)
+import Sauron.Logging
 import Sauron.Types
 import UnliftIO.Async
 
 
-stopHealthCheckThreadsForNodeAndChildren :: MonadIO m => BaseContext -> SomeNode Variable -> m ()
-stopHealthCheckThreadsForNodeAndChildren bc someNode = do
-  threads <- liftIO $ atomically $ gatherAndClearAllHealthCheckThreads someNode
+stopHealthCheckThreadsForChildren :: MonadIO m => BaseContext -> SomeNode Variable -> m ()
+stopHealthCheckThreadsForChildren bc someNode = do
+  threads <- liftIO $ atomically $ gatherAndClearChildrenHealthCheckThreads someNode
   let threadCount = length threads
   when (threadCount > 0) $
-    logToModal bc LevelInfo [i|Stopped #{threadCount} health check threads: #{fmap fst threads}|] Nothing
+    info' bc [i|Stopped #{threadCount} child health check threads: #{fmap fst threads}|]
   liftIO $ mapM_ (cancel . snd) threads
 
 stopHealthCheckThreadIfRunning :: MonadIO m => BaseContext -> SomeNode Variable -> m ()
@@ -32,7 +31,7 @@ stopHealthCheckThreadIfRunning bc someNode = do
   threads <- liftIO $ atomically $ gatherAndClearHealthCheckThread someNode
   forM_ threads $ \(identifier, thread) -> do
     liftIO $ cancel thread
-    logToModal bc LevelInfo [i|(#{identifier}) Stopped health check thread|] Nothing
+    info' bc [i|(#{identifier}) Stopped health check thread|]
 
 gatherAndClearAllHealthCheckThreads :: SomeNode Variable -> STM [(Text, Async ())]
 gatherAndClearAllHealthCheckThreads someNode@(SomeNode node) = do
@@ -44,6 +43,12 @@ gatherAndClearAllHealthCheckThreads someNode@(SomeNode node) = do
   childThreads <- concat <$> mapM gatherAndClearAllHealthCheckThreads childNodes
 
   return (nodeThreads ++ childThreads)
+
+gatherAndClearChildrenHealthCheckThreads :: SomeNode Variable -> STM [(Text, Async ())]
+gatherAndClearChildrenHealthCheckThreads (SomeNode node) = do
+  -- Only gather threads from children, not from this node itself
+  childNodes <- getExistentialChildrenWrapped node
+  concat <$> mapM gatherAndClearAllHealthCheckThreads childNodes
 
 gatherAndClearHealthCheckThread :: SomeNode Variable -> STM [(Text, Async ())]
 gatherAndClearHealthCheckThread someNode@(SomeNode node) = do
@@ -57,11 +62,8 @@ gatherAndClearHealthCheckThread someNode@(SomeNode node) = do
   where
     nodeIdentifier :: SomeNode Variable -> STM Text
     nodeIdentifier (SomeNode node') = case node' of
-      SingleJobNode (EntityData {_state}) -> do
-        readTVar _state >>= \case
-          Fetched job -> return [i|Job #{untagName (jobName job)}|]
-          Fetching (Just job) -> return [i|Job #{untagName (jobName job)}|]
-          _ -> return "Job (unknown)"
+      SingleJobNode (EntityData {_static=job}) ->
+        return [i|Job #{untagName (jobName job)}|]
       SingleWorkflowNode (EntityData {_static=workflowRun}) ->
         return [i|Workflow #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun}|]
       RepoNode (EntityData {_static=(owner, name)}) ->

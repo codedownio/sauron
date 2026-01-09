@@ -40,7 +40,6 @@ fixNode item@(PaginatedPullsNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedWorkflowsNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedReposNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedBranchesNode ed) = fixTypedNode item ed
-fixNode item@(OverallBranchesNode ed) = fixWrappedNode item ed
 fixNode item@(PaginatedYourBranchesNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedActiveBranchesNode ed) = fixTypedNode item ed
 fixNode item@(PaginatedStaleBranchesNode ed) = fixTypedNode item ed
@@ -78,8 +77,6 @@ fixEntityData :: [NodeChildType Fixed a] -> EntityData Variable a -> STM (Entity
 fixEntityData childrenFixed (EntityData {..}) = do
   stateFixed <- readTVar _state
   toggledFixed <- readTVar _toggled
-  searchFixed <- readTVar _search
-  pageInfoFixed <- readTVar _pageInfo
   healthCheckFixed <- readTVar _healthCheck
   healthCheckThreadFixed <- readTVar _healthCheckThread
 
@@ -90,9 +87,6 @@ fixEntityData childrenFixed (EntityData {..}) = do
     , _urlSuffix = _urlSuffix
     , _toggled = toggledFixed
     , _children = childrenFixed
-
-    , _search = searchFixed
-    , _pageInfo = pageInfoFixed
 
     , _healthCheck = healthCheckFixed
     , _healthCheckThread = healthCheckThreadFixed

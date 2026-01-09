@@ -31,21 +31,23 @@ fetchRepos :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Node Variable PaginatedReposT -> m ()
 fetchRepos (PaginatedReposNode (EntityData {..})) = do
-  terms <- readTVarIO _search >>= \case
+  (search, _pageInfo, _fetchable) <- readTVarIO _state
+  terms <- case search of
     SearchNone -> pure []
     SearchText t -> pure $ T.words t
   let fullQuery = T.intercalate "+" terms
 
   bc <- ask
-  fetchPaginated'' (searchReposR fullQuery) _pageInfo _state $ \case
+  fetchPaginatedWithState (searchReposR fullQuery) _state $ \case
     Left err -> do
-      writeTVar _state (Errored (show err))
+      (s, p, _) <- readTVar _state
+      writeTVar _state (s, p, Errored err)
       writeTVar _children []
-    Right (sr@(SearchResult _totalCount results), newPageInfo) -> do
-      writeTVar _pageInfo newPageInfo
-      writeTVar _state (Fetched sr)
+    Right (SearchResult totalCount results, newPageInfo) -> do
+      (s, _, _) <- readTVar _state
+      writeTVar _state (s, newPageInfo, Fetched totalCount)
       (writeTVar _children =<<) $ forM (V.toList results) $ \r -> do
         let nsName = (simpleOwnerLogin $ repoOwner r, repoName r)
-        entityData@(EntityData {_state=innerState}) <- makeEmptyElem bc nsName "" (_depth + 1)
+        entityData@(EntityData {_state=innerState}) <- makeEmptyElemWithState bc nsName NotFetched "" (_depth + 1)
         writeTVar innerState (Fetched r)
         return $ RepoNode entityData

@@ -70,8 +70,6 @@ generateModalTitle (SomeNode inner) =
       "Workflow Runs"
     PaginatedBranchesNode _ ->
       "Branches"
-    OverallBranchesNode _ ->
-      "Branches"
     PaginatedYourBranchesNode _ ->
       "Your Branches"
     PaginatedActiveBranchesNode _ ->
@@ -88,8 +86,8 @@ generateModalTitle (SomeNode inner) =
       "Workflow: " <> T.unpack (untagName workflowRunName)
     SingleJobNode (EntityData {_state}) ->
       case _state of
-        Fetched job -> "Job: " <> T.unpack (untagName (jobName job))
-        Fetching (Just job) -> "Job: " <> T.unpack (untagName (jobName job))
+        (Fetched job, _) -> "Job: " <> T.unpack (untagName (jobName job))
+        (Fetching (Just job), _) -> "Job: " <> T.unpack (untagName (jobName job))
         _ -> "Job"
     SingleBranchNode (EntityData {_static = Branch {branchName}}) ->
       "Branch: " <> T.unpack branchName
@@ -99,9 +97,7 @@ generateModalTitle (SomeNode inner) =
       "Commit: " <> T.unpack (T.take 50 gitCommitMessage) <> if T.length gitCommitMessage > 50 then "..." else ""
     SingleNotificationNode (EntityData {_static = Notification {notificationSubject = Subject {subjectTitle}}}) ->
       "Notification: " <> T.unpack subjectTitle
-    JobLogGroupNode (EntityData {_state}) ->
-      case _state of
-        Fetched (JobLogGroup _ title _ _) -> "Log Group: " <> T.unpack title
-        Fetched (JobLogLines _ _) -> "Job log lines"
-        NotFetched -> "Job logs not fetched"
-        _ -> "Log Group"
+    JobLogGroupNode (EntityData {_static=jobLogGroup}) ->
+      case jobLogGroup of
+        JobLogGroup _ title _ _ -> "Log Group: " <> T.unpack title
+        JobLogLines _ _ -> "Job log lines"

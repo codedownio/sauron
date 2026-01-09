@@ -12,12 +12,13 @@ import Brick
 import Control.Monad
 import Data.String.Interpolate
 import Data.Time
+import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (renderTimelineItem, issueInner)
+import Sauron.UI.Issue (issueInner, renderTimelineItem)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
@@ -49,7 +50,7 @@ pullLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCo
       , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
-pullInner :: UTCTime -> Issue -> Text -> Fetchable (NodeState 'SinglePullT) -> Widget n
+pullInner :: UTCTime -> Issue -> Text -> NodeState 'SinglePullT -> Widget n
 pullInner now (Issue {..}) body inner =
   allItems
   & zip [0..]
@@ -60,9 +61,9 @@ pullInner now (Issue {..}) body inner =
     SimpleUser {simpleUserLogin=(N openerUsername)} = issueUser
 
     (commentsAndEvents, statusMessages) = case inner of
-      Fetched cs -> (toList cs, [])
+      Fetched cs -> (V.toList cs, [])
       Fetching maybeCs -> case maybeCs of
-        Just cs -> (toList cs, [strWrap [i|Refreshing comments...|]])
+        Just cs -> (V.toList cs, [strWrap [i|Refreshing comments...|]])
         Nothing -> ([], [strWrap [i|Fetching comments...|]])
       Errored err -> ([], [strWrap [i|Failed to fetch comments: #{err}|]])
       NotFetched -> ([], [strWrap [i|Comments not fetched.|]])

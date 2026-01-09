@@ -9,8 +9,6 @@ module Sauron.Fetch.Branch (
   , fetchBranchCommits
   , fetchBranchWithInfoCommits
   , fetchCommitDetails
-
-  , getOverallBranches
   ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -35,15 +33,16 @@ fetchBranches :: (
   ) => Name Owner -> Name Repo -> Node Variable PaginatedBranchesT -> m ()
 fetchBranches owner name (PaginatedBranchesNode (EntityData {..})) = do
   bc <- ask
-  fetchPaginated'' (branchesForR owner name) _pageInfo _state $ \case
+  fetchPaginatedWithState (branchesForR owner name) _state $ \case
     Left err -> do
-      writeTVar _state (Errored (show err))
+      (s, p, _) <- readTVar _state
+      writeTVar _state (s, p, Errored (show err))
       writeTVar _children []
     Right (branches, newPageInfo) -> do
-      writeTVar _pageInfo newPageInfo
-      writeTVar _state (Fetched branches)
+      (s, _, _) <- readTVar _state
+      writeTVar _state (s, newPageInfo, Fetched (V.length branches))
       (writeTVar _children =<<) $ forM (V.toList branches) $ \branch@(Branch {..}) ->
-        SingleBranchNode <$> makeEmptyElem bc branch ("/tree/" <> branchName) (_depth + 1)
+        SingleBranchNode <$> makeEmptyElemWithState bc branch NotFetched ("/tree/" <> branchName) (_depth + 1)
 
 fetchBranchesWithFilter :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -51,27 +50,32 @@ fetchBranchesWithFilter :: (
   => Name Owner
   -> Name Repo
   -> Maybe Text
-  -> TVar (Fetchable (V.Vector BranchWithInfo))
+  -> TVar (Search, PageInfo, Fetchable TotalCount)
   -> TVar [Node Variable SingleBranchWithInfoT]
-  -> TVar PageInfo
   -> Int
   -> Text
   -> ([BranchWithInfo] -> [BranchWithInfo])
   -> Text
   -> m ()
-fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageInfoVar depth' logPrefix filterFn logSuffix = do
+fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar depth' logPrefix filterFn _logSuffix = do
   bc <- ask
 
-  bracketOnError_ (atomically $ markFetching stateVar)
-                  (atomically $ writeTVar stateVar (Errored $ logPrefix <> " fetch failed with exception.")) $ do
+  bracketOnError_ (atomically $ do
+                    (s, p, f) <- readTVar stateVar
+                    writeTVar stateVar (s, p, Fetching (fetchableCurrent f)))
+                  (atomically $ do
+                    (s, p, _) <- readTVar stateVar
+                    writeTVar stateVar (s, p, Errored $ logPrefix <> " fetch failed with exception.")) $ do
     case getAuthToken bc of
       Nothing -> liftIO $ do
-        logToModal bc LevelError (logPrefix <> ": No auth token available") Nothing
-        atomically $ writeTVar stateVar (Errored "No auth token available for GraphQL query")
+        logError' bc (logPrefix <> ": No auth token available")
+        atomically $ do
+          (s, p, _) <- readTVar stateVar
+          writeTVar stateVar (s, p, Errored "No auth token available for GraphQL query")
       Just authToken -> do
         liftIO $ do
           -- Read current page info to determine pagination
-          currentPageInfo <- readTVarIO pageInfoVar
+          (_, currentPageInfo, _) <- readTVarIO stateVar
           let currentPage = pageInfoCurrentPage currentPageInfo
 
           -- Fetch a substantial number of branches to enable client-side filtering and pagination
@@ -80,14 +84,24 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
 
           -- Fetch branches with commit info using GraphQL
           result <- withLogToModal bc LevelInfo (logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name) $
-            GraphQL.queryBranchesWithInfos (\msg -> logToModal bc LevelDebug msg Nothing) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
+            GraphQL.queryBranchesWithInfos (debug' bc) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
           case result of
             Left err -> atomically $ do
-              writeTVar stateVar (Errored $ toText err)
+              (s, p, _) <- readTVar stateVar
+              writeTVar stateVar (s, p, Errored $ toText err)
               writeTVar childrenVar []
             Right branchesWithCommits -> do
+              -- Read search state to apply search text filtering
+              (searchState, _, _) <- readTVarIO stateVar
+              -- Apply search text filtering if provided
+              let searchFilteredBranches = case searchState of
+                    SearchNone -> branchesWithCommits
+                    SearchText searchText ->
+                      if T.null searchText
+                        then branchesWithCommits
+                        else filter (\branch -> T.toLower searchText `T.isInfixOf` T.toLower (branchWithInfoBranchName branch)) branchesWithCommits
               -- Apply the provided filter function and sort by date
-              let allFilteredBranches = GraphQL.sortBranchesByDate $ filterFn branchesWithCommits
+              let allFilteredBranches = GraphQL.sortBranchesByDate $ filterFn searchFilteredBranches
               let totalBranches = length allFilteredBranches
               let totalPages = max 1 $ (totalBranches + pageSize - 1) `div` pageSize  -- Ceiling division, at least 1 page
 
@@ -109,10 +123,10 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar pageIn
 
               -- Store only the current page's branches in the node state
               atomically $ do
-                writeTVar pageInfoVar newPageInfo
-                writeTVar stateVar (Fetched (V.fromList currentPageBranches))
+                (s, _, _) <- readTVar stateVar
+                writeTVar stateVar (s, newPageInfo, Fetched totalBranches)
                 (writeTVar childrenVar =<<) $ forM currentPageBranches $ \branchInfo ->
-                  SingleBranchWithInfoNode <$> makeEmptyElem bc (branchInfo, columnWidths) ("/tree/" <> branchWithInfoBranchName branchInfo) (depth' + 1)
+                  SingleBranchWithInfoNode <$> makeEmptyElemWithState bc (branchInfo, columnWidths) NotFetched ("/tree/" <> branchWithInfoBranchName branchInfo) (depth' + 1)
   where
     getAuthToken :: BaseContext -> Maybe Text
     getAuthToken bc = case auth bc of
@@ -132,56 +146,31 @@ fetchYourBranches :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedYourBranchesT -> m ()
 fetchYourBranches owner name repoDefaultBranch (PaginatedYourBranchesNode (EntityData {..})) = do
-  bc <- ask
-  liftIO (getUserName bc) >>= \case
+  bc@(BaseContext {currentUser}) <- ask
+  case currentUser of
     Nothing -> liftIO $ do
-      logToModal bc LevelError "fetchYourBranches: Could not get current user name" Nothing
-      atomically $ writeTVar _state (Errored "Could not get current user name")
-    Just userName ->
-      fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchYourBranches"
-        (GraphQL.filterBranchesByAuthor userName) "your branches"
-  where
-    getUserName :: BaseContext -> IO (Maybe Text)
-    getUserName bc = do
-      -- Get the current authenticated user's name from GitHub API
-      result <- runReaderT (withGithubApiSemaphore (githubWithLogging userInfoCurrentR)) bc
-      case result of
-        Left _err -> return Nothing
-        Right user -> return $ Just $ toPathPart $ userLogin user
+      logError' bc "fetchYourBranches: Could not get current user name"
+      atomically $ do
+        (s, p, _) <- readTVar _state
+        writeTVar _state (s, p, Errored "Could not get current user name")
+    Just (User {userLogin}) ->
+      fetchBranchesWithFilter owner name repoDefaultBranch _state _children _depth "fetchYourBranches"
+        (GraphQL.filterBranchesByAuthor (untagName userLogin)) "your branches"
 
 fetchActiveBranches :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedActiveBranchesT -> m ()
 fetchActiveBranches owner name repoDefaultBranch (PaginatedActiveBranchesNode (EntityData {..})) =
-  fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchActiveBranches"
+  fetchBranchesWithFilter owner name repoDefaultBranch _state _children _depth "fetchActiveBranches"
     (GraphQL.filterBranchesByActivity 90) "active branches"
 
 fetchStaleBranches :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Name Owner -> Name Repo -> Maybe Text -> Node Variable PaginatedStaleBranchesT -> m ()
 fetchStaleBranches owner name repoDefaultBranch (PaginatedStaleBranchesNode (EntityData {..})) =
-  fetchBranchesWithFilter owner name repoDefaultBranch _state _children _pageInfo _depth "fetchStaleBranches"
+  fetchBranchesWithFilter owner name repoDefaultBranch _state _children _depth "fetchStaleBranches"
     (GraphQL.filterBranchesByInactivity 90) "stale branches"
 
-getOverallBranches :: (
-  MonadReader BaseContext m, MonadIO m
-  ) => Name Owner -> Name Repo -> Node Variable OverallBranchesT -> m ()
-getOverallBranches _owner _name (OverallBranchesNode (EntityData {..})) = do
-  bc <- ask
-  -- Create categorized branch sections similar to GitHub's interface
-  categorizedChildren <- atomically $ do
-    yourBranchesEd <- makeEmptyElem bc () "your-branches" (_depth + 1)
-    activeBranchesEd <- makeEmptyElem bc () "active-branches" (_depth + 1)
-    staleBranchesEd <- makeEmptyElem bc () "stale-branches" (_depth + 1)
-    return [
-      SomeNode (PaginatedYourBranchesNode yourBranchesEd)
-      , SomeNode (PaginatedActiveBranchesNode activeBranchesEd)
-      , SomeNode (PaginatedStaleBranchesNode staleBranchesEd)
-      ]
-
-  atomically $ do
-    writeTVar _state (Fetched ())
-    writeTVar _children categorizedChildren
 
 fetchBranchCommits :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -198,7 +187,7 @@ fetchBranchCommits owner name (SingleBranchNode (EntityData {_static=branch, ..}
       Right commits -> atomically $ do
         writeTVar _state (Fetched commits)
         (writeTVar _children =<<) $ forM (V.toList commits) $ \commit@(Commit {..}) ->
-          SingleCommitNode <$> makeEmptyElem bc commit ("/commit/" <> T.pack (toString (untagName commitSha))) (_depth + 1)
+          SingleCommitNode <$> makeEmptyElemWithState bc commit NotFetched ("/commit/" <> T.pack (toString (untagName commitSha))) (_depth + 1)
 
 fetchBranchWithInfoCommits :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -217,7 +206,7 @@ fetchBranchWithInfoCommits owner name (SingleBranchWithInfoNode (EntityData {_st
           Right commits -> atomically $ do
             writeTVar _state (Fetched commits)
             (writeTVar _children =<<) $ forM (V.toList commits) $ \commit@(Commit {..}) ->
-              SingleCommitNode <$> makeEmptyElem bc commit ("/commit/" <> T.pack (toString (untagName commitSha))) (_depth + 1)
+              SingleCommitNode <$> makeEmptyElemWithState bc commit NotFetched ("/commit/" <> T.pack (toString (untagName commitSha))) (_depth + 1)
 
 fetchCommitDetails :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m

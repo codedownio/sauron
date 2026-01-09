@@ -35,12 +35,12 @@ withFixedElemAndParents s cb =
 
 withNthChildAndPaginationParent :: (
   MonadIO m
-  ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> (SomeNode Variable, TVar PageInfo) -> NonEmpty (SomeNode Variable) -> m ()) -> m ()
+  ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> (SomeNode Variable, STM PageInfo, PageInfo -> STM ()) -> NonEmpty (SomeNode Variable) -> m ()) -> m ()
 withNthChildAndPaginationParent s cb =
   withFixedElemAndParents s $ \fixedEl variableEl parents ->
     case L.dropWhile (not . isPaginationNode) (toList parents) of
-      (el@(getPaginationInfo -> Just pageInfo'):rest) ->
-        cb fixedEl variableEl (el, pageInfo') (el :| rest)
+      (el@(getPaginationInfo -> Just (readPageInfo, writePageInfo)):rest) ->
+        cb fixedEl variableEl (el, readPageInfo, writePageInfo) (el :| rest)
       _ -> return ()
 
 withNthChildAndRepoParent :: MonadIO m => AppState -> (SomeNode Fixed -> SomeNode Variable -> Node Variable RepoT -> m ()) -> m ()
@@ -61,17 +61,29 @@ withRepoParent s cb = do
 isPaginationNode :: SomeNode Variable -> Bool
 isPaginationNode = isJust . getPaginationInfo
 
-getPaginationInfo :: SomeNode Variable -> Maybe (TVar PageInfo)
-getPaginationInfo (SomeNode (PaginatedIssuesNode (EntityData {..}))) = Just _pageInfo
-getPaginationInfo (SomeNode (PaginatedPullsNode (EntityData {..}))) = Just _pageInfo
-getPaginationInfo (SomeNode (PaginatedWorkflowsNode (EntityData {..}))) = Just _pageInfo
-getPaginationInfo (SomeNode (PaginatedReposNode (EntityData {..}))) = Just _pageInfo
-getPaginationInfo (SomeNode (PaginatedBranchesNode (EntityData {..}))) = Just _pageInfo
-getPaginationInfo (SomeNode (PaginatedYourBranchesNode (EntityData {..}))) = Just _pageInfo
-getPaginationInfo (SomeNode (PaginatedActiveBranchesNode (EntityData {..}))) = Just _pageInfo
-getPaginationInfo (SomeNode (PaginatedStaleBranchesNode (EntityData {..}))) = Just _pageInfo
-getPaginationInfo (SomeNode (PaginatedNotificationsNode (EntityData {..}))) = Just _pageInfo
+getPaginationInfo :: SomeNode Variable -> Maybe (STM PageInfo, PageInfo -> STM ())
+getPaginationInfo (SomeNode (PaginatedIssuesNode (EntityData {_state}))) = Just (makePaginationActions _state)
+getPaginationInfo (SomeNode (PaginatedPullsNode (EntityData {_state}))) = Just (makePaginationActions _state)
+getPaginationInfo (SomeNode (PaginatedWorkflowsNode (EntityData {_state}))) = Just (makePaginationActions _state)
+getPaginationInfo (SomeNode (PaginatedReposNode (EntityData {_state}))) = Just (makePaginationActions _state)
+getPaginationInfo (SomeNode (PaginatedYourBranchesNode (EntityData {_state}))) = Just (makePaginationActions _state)
+getPaginationInfo (SomeNode (PaginatedActiveBranchesNode (EntityData {_state}))) = Just (makePaginationActions _state)
+getPaginationInfo (SomeNode (PaginatedStaleBranchesNode (EntityData {_state}))) = Just (makePaginationActions _state)
+getPaginationInfo (SomeNode (PaginatedNotificationsNode (EntityData {_state}))) = Just (makePaginationActions _state)
+getPaginationInfo (SomeNode (PaginatedBranchesNode (EntityData {_state}))) = Just (makePaginationActions _state)
 getPaginationInfo _ = Nothing
+
+makePaginationActions :: TVar (Search, PageInfo, Fetchable Int) -> (STM PageInfo, PageInfo -> STM ())
+makePaginationActions stateVar = (readPageInfo, writePageInfo)
+  where
+    readPageInfo = snd3 <$> readTVar stateVar
+
+    writePageInfo newPageInfo = do
+      (search, _, fetchable) <- readTVar stateVar
+      writeTVar stateVar (search, newPageInfo, fetchable)
+
+    snd3 :: (a, b, c) -> b
+    snd3 (_, b, _) = b
 
 -- * Computing nth child in the presence of expanding
 

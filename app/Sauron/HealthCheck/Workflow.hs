@@ -14,11 +14,14 @@ import Data.String.Interpolate
 import GitHub
 import Relude
 import Sauron.Actions.Util
+import Sauron.Fetch.Job
+import Sauron.HealthCheck.Job (isJobCompleted)
 import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.Statuses
 import UnliftIO.Async
 import UnliftIO.Concurrent
+
 
 isWorkflowCompleted :: Text -> Bool
 isWorkflowCompleted status = case chooseWorkflowStatus status of
@@ -42,7 +45,7 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
     Just (RepoNode (EntityData {_static=(owner, name)})) | hasRunningWorkflow workflowRun -> do
       readTVarIO _healthCheckThread >>= \case
         Nothing -> do
-          logToModal baseContext LevelInfo [i|Starting health check thread for workflow: #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun} (period: #{workflowHealthCheckPeriodUs}us)|] Nothing
+          log baseContext LevelInfo [i|Starting health check thread for workflow: #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun} (period: #{workflowHealthCheckPeriodUs}us)|] Nothing
           newThread <- async $ runWorkflowHealthCheckLoop baseContext owner name node
           atomically $ writeTVar _healthCheckThread (Just (newThread, workflowHealthCheckPeriodUs))
           return (Just newThread)
@@ -50,21 +53,31 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
     _ -> return Nothing
   where
     runWorkflowHealthCheckLoop :: BaseContext -> Name Owner -> Name Repo -> Node Variable 'SingleWorkflowT -> IO ()
-    runWorkflowHealthCheckLoop bc owner name (SingleWorkflowNode (EntityData {_static=staticWorkflowRun, ..})) =
+    runWorkflowHealthCheckLoop bc owner name (SingleWorkflowNode (EntityData {_static=staticWorkflowRun})) =
       flip runReaderT bc $
       handleAny (\e -> putStrLn [i|Workflow health check thread crashed: #{e}|]) $
-      fix $ \loop ->
-        withGithubApiSemaphore (githubWithLogging (workflowRunR owner name (workflowRunWorkflowRunId staticWorkflowRun))) >>= \case
-          Left err -> logToModal bc LevelWarn [i|(#{untagName owner}/#{untagName name}) Couldn't fetch workflow run #{workflowRunWorkflowRunId staticWorkflowRun}: #{err}|] Nothing
-          Right response ->
-            case hasRunningWorkflow response of
-              True -> do
+      fix $ \loop -> do
+        fetchWorkflowJobs owner name (workflowRunWorkflowRunId staticWorkflowRun) node >>= \case
+          Left _err -> checkWorkflowForDoneness bc owner name (workflowRunWorkflowRunId staticWorkflowRun) loop
+          Right jobs
+            | all isJobCompleted jobs -> checkWorkflowForDoneness bc owner name (workflowRunWorkflowRunId staticWorkflowRun) loop
+            | otherwise -> do
+                -- Save an API call by not checking the workflow for doneness. Just sleep and loop.
                 threadDelay workflowHealthCheckPeriodUs
                 loop
-              False -> do
-                -- Stop ourselves by clearing the thread reference and returning
-                atomically $ writeTVar _healthCheckThread Nothing
-                return ()
+
+    checkWorkflowForDoneness bc owner name workflowRunId loop =
+      withGithubApiSemaphore (githubWithLogging (workflowRunR owner name workflowRunId)) >>= \case
+        Left err -> warn' bc [i|(#{untagName owner}/#{untagName name}) Couldn't fetch workflow run #{workflowRunId}: #{err}|]
+        Right response ->
+          case hasRunningWorkflow response of
+            True -> do
+              threadDelay workflowHealthCheckPeriodUs
+              loop
+            False -> do
+              -- Stop ourselves by clearing the thread reference and returning
+              atomically $ writeTVar _healthCheckThread Nothing
+              return ()
 
     hasRunningWorkflow :: WorkflowRun -> Bool
     hasRunningWorkflow wr = not $ isWorkflowCompleted $ fromMaybe (workflowRunStatus wr) (workflowRunConclusion wr)

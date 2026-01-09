@@ -10,7 +10,6 @@ import Brick.Widgets.Edit (handleEditorEvent)
 import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
-import Control.Monad.Logger (LogLevel(..))
 import Data.Function
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as Vec
@@ -24,7 +23,10 @@ import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
-import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForNodeAndChildren)
+import Sauron.Event.Search
+import Sauron.Event.Util
+import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForChildren)
+import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.Keys
 import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
@@ -49,92 +51,56 @@ appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
   modify (appLogs %~ (Seq.|> logEntry))
   autoScrollLogsToBottom
 
-
-
--- Handle modal events
+-- Modal events
 appEvent s@(_appModal -> Just modalState) e = case e of
   VtyEvent ev -> case modalState of
     CommentModalState {} -> case ev of
-      (V.EvKey V.KEsc []) -> do
-        modify (appModal .~ Nothing)
-        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> do
-        modify (appModal .~ Nothing)
-        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+      (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey V.KEnter [V.MMeta]) -> do
         modify (appModal . _Just . submissionState .~ SubmittingComment)
         liftIO $ submitComment s modalState
       (V.EvKey V.KEnter [V.MMeta, V.MShift]) -> do
         modify (appModal . _Just . submissionState .~ SubmittingCloseWithComment)
         liftIO $ closeWithComment s modalState
-      (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll CommentModalContent) Down
-      (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll CommentModalContent) Up
-      (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll CommentModalContent) 1
-      (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll CommentModalContent) (-1)
-      _ -> zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
+      _ -> do
+        handleModalScrolling CommentModalContent ev
+        case ev of
+          (V.EvKey (V.KChar 'v') _) -> return () -- Already handled by scrolling
+          (V.EvKey (V.KChar 'n') _) -> return () -- Already handled by scrolling
+          (V.EvKey (V.KChar 'p') _) -> return () -- Already handled by scrolling
+          _ -> zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
     ZoomModalState {} -> case ev of
-      (V.EvKey V.KEsc []) -> do
-        modify (appModal .~ Nothing)
-        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> do
-        modify (appModal .~ Nothing)
-        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
-      (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll ZoomModalContent) Down
-      (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll ZoomModalContent) Up
-      (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll ZoomModalContent) 1
-      (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll ZoomModalContent) (-1)
-      _ -> return () -- No other interactions for ZoomModal
+      (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+      _ -> handleModalScrolling ZoomModalContent ev
     (LogModalState _) -> case ev of
-      (V.EvKey V.KEsc []) -> do
-        modify (appModal .~ Nothing)
-        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> do
-        modify (appModal .~ Nothing)
-        liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
-      (V.EvKey (V.KChar 'c') []) -> do
-        modify (appLogs .~ Seq.empty)
-      (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll LogModalContent) Down
-      (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll LogModalContent) Up
-      (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) 1
-      (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll LogModalContent) (-1)
-      (V.EvKey V.KUp []) -> vScrollBy (viewportScroll LogModalContent) (-1)
-      (V.EvKey V.KDown []) -> vScrollBy (viewportScroll LogModalContent) 1
-      (V.EvKey V.KPageUp []) -> vScrollPage (viewportScroll LogModalContent) Up
-      (V.EvKey V.KPageDown []) -> vScrollPage (viewportScroll LogModalContent) Down
-      (V.EvKey V.KHome []) -> vScrollToBeginning (viewportScroll LogModalContent)
-      (V.EvKey V.KEnd []) -> vScrollToEnd (viewportScroll LogModalContent)
-      (V.EvKey (V.KChar 'd') []) -> do
-        modify (appLogLevelFilter .~ LevelDebug)
-        vScrollToEnd (viewportScroll LogModalContent)
-      (V.EvKey (V.KChar 'i') []) -> do
-        modify (appLogLevelFilter .~ LevelInfo)
-        vScrollToEnd (viewportScroll LogModalContent)
-      (V.EvKey (V.KChar 'w') []) -> do
-        modify (appLogLevelFilter .~ LevelWarn)
-        vScrollToEnd (viewportScroll LogModalContent)
-      (V.EvKey (V.KChar 'e') []) -> do
-        modify (appLogLevelFilter .~ LevelError)
-        vScrollToEnd (viewportScroll LogModalContent)
-      (V.EvKey (V.KChar 's') []) -> do
-        modify (appShowStackTraces %~ not)
-      _ -> return () -- No other interactions for LogModal
+      (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+      (V.EvKey (V.KChar 'c') []) -> modify (appLogs .~ Seq.empty)
+      (V.EvKey (V.KChar 's') []) -> modify (appShowStackTraces %~ not)
+      _ -> do
+        handleModalScrolling LogModalContent ev
+        handleViewportScrolling LogModalContent ev
+        handleLogLevelFiltering ev
   _ -> return ()
 
+-- Form events
 appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
-    withFixedElemAndParents s $ \_fixedEl (SomeNode el@(getEntityData -> (EntityData {..}))) parents -> do
-      atomically $ do
-        writeTVar _search $ SearchText (formState form)
-        writeTVar _pageInfo $ PageInfo 1 Nothing Nothing Nothing Nothing
-      refresh (s ^. appBaseContext) el parents
+    withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents -> do
+      atomically $ updateSearchForNode el $ case formState form of
+        "" -> SearchNone
+        t -> SearchText t
+      void $ refreshLine (s ^. appBaseContext) el parents
     modify (appForm .~ Nothing)
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
 
 appEvent s (VtyEvent e) = case e of
   -- Focus switching hotkeys (work regardless of current focus)
-  V.EvKey V.KLeft [V.MCtrl] -> when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
-  V.EvKey V.KRight [V.MCtrl] -> when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+  V.EvKey V.KLeft [V.MCtrl] -> switchToMainPane s
+  V.EvKey V.KRight [V.MCtrl] -> switchToLogPane s
 
   -- Handle events based on focused pane when split logs is enabled
   _ | _appSplitLogs s && _appFocusedPane s == LogPaneFocus -> handleLogPaneEvents s e
@@ -142,33 +108,31 @@ appEvent s (VtyEvent e) = case e of
 
 -- Mouse events for main pane
 appEvent s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
-  when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
+  switchToMainPane s
   vScrollBy (viewportScroll MainList) (-1)
 appEvent s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
-  when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
+  switchToMainPane s
   vScrollBy (viewportScroll MainList) 1
 appEvent s (MouseDown (ListRow n) V.BLeft _ _) = do
-  when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
+  switchToMainPane s
   modify (appMainList %~ listMoveTo n)
 
 -- Log pane viewport events
 appEvent s (MouseDown LogSplitContent V.BScrollUp _ _) = do
-  when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+  switchToLogPane s
   vScrollBy (viewportScroll LogSplitContent) (-1)
 appEvent s (MouseDown LogSplitContent V.BScrollDown _ _) = do
-  when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+  switchToLogPane s
   vScrollBy (viewportScroll LogSplitContent) 1
-appEvent s (MouseDown LogSplitContent V.BLeft _ _) = do
-  when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+appEvent s (MouseDown LogSplitContent V.BLeft _ _) = switchToLogPane s
 
 -- Pane focus switching
-appEvent s (MouseDown MainPane V.BLeft _ _) = do
-  when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
-appEvent s (MouseDown LogPane V.BLeft _ _) = do
-  when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+appEvent s (MouseDown MainPane V.BLeft _ _) = switchToMainPane s
+appEvent s (MouseDown LogPane V.BLeft _ _) = switchToLogPane s
 
 -- Catch-all
 appEvent _ _ = return ()
+
 
 handleMainPaneEvents :: AppState -> V.Event -> EventM ClickableName AppState ()
 handleMainPaneEvents s e = case e of
@@ -203,9 +167,9 @@ handleMainPaneEvents s e = case e of
 
   V.EvKey c [] | c == refreshSelectedKey -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents ->
-      refresh (s ^. appBaseContext) el parents
+      refreshSelected (s ^. appBaseContext) el parents
   V.EvKey c [] | c == refreshAllKey -> do
-    liftIO $ runReaderT (refreshAll (s ^. appMainListVariable)) (s ^. appBaseContext)
+    liftIO $ runReaderT (refreshVisibleLines (s ^. appMainListVariable)) (s ^. appBaseContext)
 
   V.EvKey c [] | c == openSelectedKey -> do
     withFixedElemAndParents s $ \(SomeNode el) _variableEl elems -> do
@@ -218,10 +182,10 @@ handleMainPaneEvents s e = case e of
   V.EvKey c [] | c == lastPageKey -> tryNavigatePage s goLastPage
 
   V.EvKey c [] | c == editSearchKey -> do
-    withNthChildAndPaginationParent s $ \_fixedEl _el (sn@(SomeNode (getEntityData -> (EntityData {_ident, _search}))), _) _parents -> do
+    withNthChildAndPaginationParent s $ \_fixedEl _el (sn@(SomeNode node@(getEntityData -> (EntityData {_ident}))), _, _) _parents -> do
       when (isSearchable' sn) $ do
-        search' <- readTVarIO _search
-        modify (appForm .~ (Just (newForm [ editTextField id TextForm (Just 1) ] (case search' of SearchText t -> t; SearchNone -> ""), _ident)))
+        searchText <- liftIO $ atomically $ ensureNonEmptySearch node
+        modify (appForm ?~ (newForm [editTextField id TextForm (Just 1)] searchText, _ident))
 
   V.EvKey c [] | c == commentKey -> do
     withFixedElemAndParents s $ \(SomeNode el) _variableEl parents -> do
@@ -233,9 +197,9 @@ handleMainPaneEvents s e = case e of
         _ -> return ()
 
   V.EvKey c [] | c == zoomModalKey -> do
-    withFixedElemAndParents s $ \(SomeNode el) (SomeNode variableEl) parents -> do
-      when (_state (getEntityData el) == NotFetched) $
-        refresh (s ^. appBaseContext) variableEl parents
+    withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
+      -- TODO: we used to check if the state is NotFetched before doing this refresh
+      refreshOnZoom (s ^. appBaseContext) variableEl parents
       liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
 
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do
@@ -254,35 +218,13 @@ handleMainPaneEvents s e = case e of
 
 handleLogPaneEvents :: AppState -> V.Event -> EventM ClickableName AppState ()
 handleLogPaneEvents _s e = case e of
-  V.EvKey (V.KChar 'c') [] -> do
-    modify (appLogs .~ Seq.empty)
-  V.EvKey (V.KChar 'v') [V.MCtrl] -> vScrollPage (viewportScroll LogSplitContent) Down
-  V.EvKey (V.KChar 'v') [V.MMeta] -> vScrollPage (viewportScroll LogSplitContent) Up
-  V.EvKey (V.KChar 'n') [V.MCtrl] -> vScrollBy (viewportScroll LogSplitContent) 1
-  V.EvKey (V.KChar 'p') [V.MCtrl] -> vScrollBy (viewportScroll LogSplitContent) (-1)
-  V.EvKey V.KUp [] -> vScrollBy (viewportScroll LogSplitContent) (-1)
-  V.EvKey V.KDown [] -> vScrollBy (viewportScroll LogSplitContent) 1
-  V.EvKey V.KPageUp [] -> vScrollPage (viewportScroll LogSplitContent) Up
-  V.EvKey V.KPageDown [] -> vScrollPage (viewportScroll LogSplitContent) Down
-  V.EvKey V.KHome [] -> vScrollToBeginning (viewportScroll LogSplitContent)
-  V.EvKey V.KEnd [] -> vScrollToEnd (viewportScroll LogSplitContent)
-  V.EvKey (V.KChar 'd') [] -> do
-    modify (appLogLevelFilter .~ LevelDebug)
-    vScrollToEnd (viewportScroll LogSplitContent)
-  V.EvKey (V.KChar 'i') [] -> do
-    modify (appLogLevelFilter .~ LevelInfo)
-    vScrollToEnd (viewportScroll LogSplitContent)
-  V.EvKey (V.KChar 'w') [] -> do
-    modify (appLogLevelFilter .~ LevelWarn)
-    vScrollToEnd (viewportScroll LogSplitContent)
-  V.EvKey (V.KChar 'e') [] -> do
-    modify (appLogLevelFilter .~ LevelError)
-    vScrollToEnd (viewportScroll LogSplitContent)
-  V.EvKey (V.KChar 's') [] -> do
-    modify (appShowStackTraces %~ not)
-  -- Exit key still works from log pane
+  V.EvKey (V.KChar 'c') [] -> modify (appLogs .~ Seq.empty)
+  V.EvKey (V.KChar 's') [] -> modify (appShowStackTraces %~ not)
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> halt
-  _ -> return ()
+  _ -> do
+    handleModalScrolling LogSplitContent e
+    handleViewportScrolling LogSplitContent e
+    handleLogLevelFilteringForSplit e LogSplitContent
 
 handleLeftArrow :: AppState -> EventM ClickableName AppState ()
 handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
@@ -302,11 +244,71 @@ modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode it
     modifyTVar' (_toggled mle) cb
     readTVar (_toggled mle)
 
-  -- Node opened: refresh visible nodes
-  when (not wasOpen && isOpen) $ do
-    atomically (getExistentialChildrenWrapped item)
-      >>= refreshVisibleNodes (_appBaseContext s) (someNode : toList parents)
+  -- Node opened
+  when (not wasOpen && isOpen) $
+    fetchOnOpenIfNecessary (_appBaseContext s) item (someNode :| toList parents)
 
-  -- Node closed: stop healthcheck threads recursively
+  -- Node closed: stop healthcheck threads for children only
   when (wasOpen && not isOpen) $
-    liftIO $ stopHealthCheckThreadsForNodeAndChildren (_appBaseContext s) someNode
+    liftIO $ stopHealthCheckThreadsForChildren (_appBaseContext s) someNode
+
+closeModal :: AppState -> EventM ClickableName AppState ()
+closeModal s = do
+  modify (appModal .~ Nothing)
+  liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+
+handleModalScrolling :: ClickableName -> V.Event -> EventM ClickableName AppState ()
+handleModalScrolling viewportName ev = case ev of
+  (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll viewportName) Down
+  (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll viewportName) Up
+  (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll viewportName) 1
+  (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll viewportName) (-1)
+  _ -> return ()
+
+handleLogLevelFiltering :: V.Event -> EventM ClickableName AppState ()
+handleLogLevelFiltering ev = case ev of
+  (V.EvKey (V.KChar 'd') []) -> do
+    modify (appLogLevelFilter .~ LevelDebug)
+    vScrollToEnd (viewportScroll LogModalContent)
+  (V.EvKey (V.KChar 'i') []) -> do
+    modify (appLogLevelFilter .~ LevelInfo)
+    vScrollToEnd (viewportScroll LogModalContent)
+  (V.EvKey (V.KChar 'w') []) -> do
+    modify (appLogLevelFilter .~ LevelWarn)
+    vScrollToEnd (viewportScroll LogModalContent)
+  (V.EvKey (V.KChar 'e') []) -> do
+    modify (appLogLevelFilter .~ LevelError)
+    vScrollToEnd (viewportScroll LogModalContent)
+  _ -> return ()
+
+handleLogLevelFilteringForSplit :: V.Event -> ClickableName -> EventM ClickableName AppState ()
+handleLogLevelFilteringForSplit ev viewportName = case ev of
+  (V.EvKey (V.KChar 'd') []) -> do
+    modify (appLogLevelFilter .~ LevelDebug)
+    vScrollToEnd (viewportScroll viewportName)
+  (V.EvKey (V.KChar 'i') []) -> do
+    modify (appLogLevelFilter .~ LevelInfo)
+    vScrollToEnd (viewportScroll viewportName)
+  (V.EvKey (V.KChar 'w') []) -> do
+    modify (appLogLevelFilter .~ LevelWarn)
+    vScrollToEnd (viewportScroll viewportName)
+  (V.EvKey (V.KChar 'e') []) -> do
+    modify (appLogLevelFilter .~ LevelError)
+    vScrollToEnd (viewportScroll viewportName)
+  _ -> return ()
+
+handleViewportScrolling :: ClickableName -> V.Event -> EventM ClickableName AppState ()
+handleViewportScrolling viewportName ev = case ev of
+  (V.EvKey V.KUp []) -> vScrollBy (viewportScroll viewportName) (-1)
+  (V.EvKey V.KDown []) -> vScrollBy (viewportScroll viewportName) 1
+  (V.EvKey V.KPageUp []) -> vScrollPage (viewportScroll viewportName) Up
+  (V.EvKey V.KPageDown []) -> vScrollPage (viewportScroll viewportName) Down
+  (V.EvKey V.KHome []) -> vScrollToBeginning (viewportScroll viewportName)
+  (V.EvKey V.KEnd []) -> vScrollToEnd (viewportScroll viewportName)
+  _ -> return ()
+
+switchToMainPane :: AppState -> EventM ClickableName AppState ()
+switchToMainPane s = when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
+
+switchToLogPane :: AppState -> EventM ClickableName AppState ()
+switchToLogPane s = when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)

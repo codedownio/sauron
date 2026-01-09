@@ -13,7 +13,7 @@ import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import GitHub
 import Relude hiding (Down)
-import Sauron.HealthCheck
+import Sauron.HealthCheck.Repo
 import Sauron.Options
 import Sauron.Setup.Common (newRepoNode)
 import Sauron.Types
@@ -34,11 +34,9 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           Nothing -> pure (0, Nothing)
           Just l -> do
             toggledVar <- newTVarIO True
-            statusVar <- newTVarIO NotFetched
-            searchVar <- newTVarIO SearchNone
-            pageInfoVar <- newTVarIO emptyPageInfo
+            statusVar <- newTVarIO ()
             identifier <- liftIO $ getIdentifier baseContext
-            pure (1, Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l))
+            pure (1, Just (toggledVar, statusVar, identifier, l))
 
         repoNodes <- forM sectionRepos $ \r -> do
           let nsName = case r of
@@ -49,18 +47,18 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
           hcThread <- case r of
             ConfigRepoSingle _ _ (HasSettings (RepoSettings {repoSettingsCheckPeriod=localPeriod})) -> do
               let ps@(PeriodSpec period) = fromMaybe defaultHealthCheckPeriodUs (localPeriod <|> join (repoSettingsCheckPeriod <$> configSettings))
-              thread <- lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
+              thread <- lift (newRepoHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
               pure (Just (thread, period))
             ConfigRepoSingle _ _ _ -> do
               let ps@(PeriodSpec period) = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
-              thread <- lift (newHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
+              thread <- lift (newRepoHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
               pure (Just (thread, period))
             ConfigRepoWildcard {} -> pure Nothing
           newRepoNode nsName repoVar healthCheckVar hcThread repoDepth (getIdentifier baseContext)
 
         case maybeHeadingNode of
           Nothing -> tell (fmap SomeNode repoNodes)
-          Just (toggledVar, statusVar, searchVar, pageInfoVar, identifier, l) -> do
+          Just (toggledVar, statusVar, identifier, l) -> do
             childrenVar <- newTVarIO (fmap SomeNode repoNodes)
             headingHealthCheckVar <- newTVarIO NotFetched
             headingHealthCheckThreadVar <- newTVarIO Nothing
@@ -70,8 +68,6 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
                   , _urlSuffix = ""
                   , _toggled = toggledVar
                   , _children = childrenVar
-                  , _search = searchVar
-                  , _pageInfo = pageInfoVar
                   , _healthCheck = headingHealthCheckVar
                   , _healthCheckThread = headingHealthCheckThreadVar
                   , _depth = 0

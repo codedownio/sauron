@@ -5,7 +5,6 @@ module Sauron.Event.Open (
   openNode
   ) where
 
-import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.Char (isDigit)
 import Data.Function
@@ -13,27 +12,20 @@ import GitHub
 import Network.URI (parseURI, uriPath)
 import Relude hiding (Down, pi)
 import Sauron.Actions
+import Sauron.Logging
 import Sauron.Types
 
 
 openNode :: (MonadIO m) => BaseContext -> NonEmpty (SomeNode Variable) -> Node Fixed a -> m ()
-openNode _baseContext elems (JobLogGroupNode _) = case findParentJobNode (toList elems) of
-  Just (SingleJobNode (EntityData {_state})) -> do
-    jobState <- readTVarIO _state
-    case fetchableCurrent jobState of
-      Just job -> openBrowserToUrl (toString $ getUrl $ jobHtmlUrl job)
-      Nothing -> return ()
-  _ -> return ()
-openNode _baseContext elems el = case getNodeUrl el (toList elems) of
+openNode bc elems el = case getNodeUrl el (toList elems) of
   Just url -> openBrowserToUrl url
-  Nothing -> return ()
+  Nothing -> warn' bc [i|(#{el}) Couldn't find URL to open node|]
 
 getNodeUrl :: Node Fixed a -> [SomeNode Variable] -> Maybe String
 getNodeUrl (PaginatedIssuesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/issues")
 getNodeUrl (PaginatedPullsNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/pulls")
 getNodeUrl (PaginatedWorkflowsNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/actions")
 getNodeUrl (PaginatedBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches")
-getNodeUrl (OverallBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches")
 getNodeUrl (PaginatedYourBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches/yours")
 getNodeUrl (PaginatedActiveBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches/active")
 getNodeUrl (PaginatedStaleBranchesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/branches/stale")
@@ -42,7 +34,7 @@ getNodeUrl (SingleNotificationNode (EntityData {_static=notification})) _ = Just
 getNodeUrl (SingleIssueNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SinglePullNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) _ = Just (toString $ getUrl $ workflowRunHtmlUrl workflowRun)
-getNodeUrl (SingleJobNode (EntityData {_state=(fetchableCurrent -> Just job)})) _ = Just (toString $ getUrl $ jobHtmlUrl job)
+getNodeUrl (SingleJobNode (EntityData {_static=job})) _ = Just (toString $ getUrl $ jobHtmlUrl job)
 getNodeUrl (SingleBranchNode (EntityData {_static=branch})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchName branch))
 getNodeUrl (SingleBranchWithInfoNode (EntityData {_static=(branchInfo, _columnWidths)})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchWithInfoBranchName branchInfo))
 getNodeUrl (SingleCommitNode (EntityData {_static=commit})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit)))
@@ -54,11 +46,6 @@ findRepoBaseUrl [] = Nothing
 findRepoBaseUrl (SomeNode (RepoNode (EntityData {_static=(owner, name)})) : _) =
   Just ("https://github.com/" <> toString (untagName owner) <> "/" <> toString (untagName name))
 findRepoBaseUrl (_ : rest) = findRepoBaseUrl rest
-
-findParentJobNode :: [SomeNode Variable] -> Maybe (Node Variable SingleJobT)
-findParentJobNode [] = Nothing
-findParentJobNode (SomeNode (SingleJobNode ed) : _) = Just (SingleJobNode ed)
-findParentJobNode (_ : rest) = findParentJobNode rest
 
 getNotificationUrl :: Notification -> String
 getNotificationUrl notification = case (subjectLatestCommentURL, subjectURL, subjectType) of

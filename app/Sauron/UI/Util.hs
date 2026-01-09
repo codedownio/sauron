@@ -65,3 +65,8 @@ isFetched _ = False
 
 isFetchedOrHasPrevious :: Fetchable a -> Bool
 isFetchedOrHasPrevious = isJust . fetchableCurrent
+
+isFetchingOrFetched :: Fetchable a -> Bool
+isFetchingOrFetched (Fetched _) = True
+isFetchingOrFetched (Fetching _) = True
+isFetchingOrFetched _ = False

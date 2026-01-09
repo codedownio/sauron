@@ -1,10 +1,10 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Sauron.Fetch.Core (
-  fetchPaginated''
+  fetchPaginatedWithState
   , pageSize
 
-  , makeEmptyElem
+  , makeEmptyElemWithState
 ) where
 
 import Control.Exception.Safe (bracketOnError_)
@@ -26,21 +26,53 @@ import Sauron.Types
 pageSize :: Int
 pageSize = 10
 
-fetchPaginated'' :: (
+
+-- | Create an empty element with a specific initial state
+makeEmptyElemWithState :: BaseContext -> NodeStatic a -> NodeState a -> Text -> Int -> STM (EntityData Variable a)
+makeEmptyElemWithState (BaseContext {getIdentifierSTM}) typ' initialState urlSuffix' depth' = do
+  stateVar <- newTVar initialState
+  ident' <- getIdentifierSTM
+  toggledVar <- newTVar False
+  childrenVar <- newTVar []
+  healthCheckVar <- newTVar NotFetched
+  healthCheckThreadVar <- newTVar Nothing
+  return $ EntityData {
+    _static = typ'
+    , _state = stateVar
+
+    , _urlSuffix = urlSuffix'
+
+    , _toggled = toggledVar
+    , _children = childrenVar
+
+    , _healthCheck = healthCheckVar
+    , _healthCheckThread = healthCheckThreadVar
+
+    , _depth = depth'
+    , _ident = ident'
+}
+
+-- | Updated fetchPaginated function that works with the new state structure (Search, PageInfo, Fetchable TotalCount)
+fetchPaginatedWithState :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m, FromJSON res
   )
   => (FetchCount -> Request k res)
-  -> TVar PageInfo
-  -> TVar (Fetchable a)
+  -> TVar (Search, PageInfo, Fetchable a)
   -> (Either Text (res, PageInfo) -> STM ())
   -> m ()
-fetchPaginated'' mkReq pageInfoVar stateVar cb = do
-  PageInfo {pageInfoCurrentPage} <- readTVarIO pageInfoVar
+fetchPaginatedWithState mkReq stateVar cb = do
+  (_, PageInfo {pageInfoCurrentPage}, _) <- readTVarIO stateVar
 
-  bracketOnError_ (atomically $ markFetching stateVar)
-                  (atomically $ writeTVar stateVar (Errored "Fetch failed with exception.")) $
+  bracketOnError_ (atomically $ do
+                    (s, p, f) <- readTVar stateVar
+                    writeTVar stateVar (s, p, Fetching (fetchableCurrent f)))
+                  (atomically $ do
+                    (s, p, _) <- readTVar stateVar
+                    writeTVar stateVar (s, p, Errored "Fetch failed with exception.")) $
     withGithubApiSemaphore (githubWithLoggingResponse (mkReq (FetchPage (PageParams (Just pageSize) (Just pageInfoCurrentPage))))) >>= \case
       Left err -> atomically $ do
+        (s, p, _) <- readTVar stateVar
+        writeTVar stateVar (s, p, Errored (show err))
         cb $ Left (show err)
 
       Right x -> do
@@ -60,33 +92,6 @@ fetchPaginated'' mkReq pageInfoVar stateVar cb = do
                 , pageInfoLastPage = pageLinksLast >>= parsePageFromUri
                 }
 
+          (s, _, _) <- readTVar stateVar
+          writeTVar stateVar (s, pgInfo, NotFetched) -- We'll update the fetchable in the callback
           cb $ Right (responseBody x, pgInfo)
-
-makeEmptyElem :: BaseContext -> NodeStatic a -> Text -> Int -> STM (EntityData Variable a)
-makeEmptyElem (BaseContext {getIdentifierSTM}) typ' urlSuffix' depth' = do
-  stateVar <- newTVar NotFetched
-  ident' <- getIdentifierSTM
-  toggledVar <- newTVar False
-  childrenVar <- newTVar []
-  searchVar <- newTVar $ SearchNone
-  pageInfoVar <- newTVar emptyPageInfo
-  healthCheckVar <- newTVar NotFetched
-  healthCheckThreadVar <- newTVar Nothing
-  return $ EntityData {
-    _static = typ'
-    , _state = stateVar
-
-    , _urlSuffix = urlSuffix'
-
-    , _toggled = toggledVar
-    , _children = childrenVar
-
-    , _search = searchVar
-    , _pageInfo = pageInfoVar
-
-    , _healthCheck = healthCheckVar
-    , _healthCheckThread = healthCheckThreadVar
-
-    , _depth = depth'
-    , _ident = ident'
-}
