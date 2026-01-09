@@ -59,16 +59,7 @@ withRepoParent s cb = do
 -- * Util
 
 isPaginationNode :: SomeNode Variable -> Bool
-isPaginationNode (SomeNode (PaginatedIssuesNode _)) = True
-isPaginationNode (SomeNode (PaginatedPullsNode _)) = True
-isPaginationNode (SomeNode (PaginatedWorkflowsNode _)) = True
-isPaginationNode (SomeNode (PaginatedReposNode _)) = True
-isPaginationNode (SomeNode (PaginatedYourBranchesNode _)) = True
-isPaginationNode (SomeNode (PaginatedActiveBranchesNode _)) = True
-isPaginationNode (SomeNode (PaginatedStaleBranchesNode _)) = True
-isPaginationNode (SomeNode (PaginatedNotificationsNode _)) = True
-isPaginationNode (SomeNode (PaginatedBranchesNode _)) = True
-isPaginationNode _ = False
+isPaginationNode = isJust . getPaginationInfo
 
 getPaginationInfo :: SomeNode Variable -> Maybe (STM PageInfo, PageInfo -> STM ())
 getPaginationInfo (SomeNode (PaginatedIssuesNode (EntityData {_state}))) = Just (makePaginationActions _state)
