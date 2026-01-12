@@ -36,7 +36,7 @@ import UnliftIO.Async
 
 
 refreshSelected :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
-refreshSelected _ _ _ = return ()
+refreshSelected = fetchOnOpen
 
 refreshOnZoom :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
 refreshOnZoom _ _ _ = return ()
