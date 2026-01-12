@@ -103,6 +103,8 @@
             darwin-static = flakeDarwinStatic.packages."sauron:exe:sauron";
             windows = flakeWindows.packages."sauron:exe:sauron";
 
+            default = static;
+
             githubArtifacts = let
               binary = if pkgs.stdenv.hostPlatform.isDarwin then darwin-static
                        else if pkgs.stdenv.hostPlatform.isWindows then windows
