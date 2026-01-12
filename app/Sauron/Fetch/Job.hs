@@ -14,7 +14,7 @@ import Control.Monad.IO.Class
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import Data.Time.Calendar (fromGregorian)
-import Data.Time.Clock (UTCTime(..))
+import Data.Time.Clock (UTCTime(..), getCurrentTime)
 import qualified Data.Vector as V
 import GitHub
 import Network.HTTP.Conduit hiding (Proxy)
@@ -23,6 +23,7 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
+import Sauron.Logging
 import Sauron.Types
 
 
@@ -102,10 +103,16 @@ fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})
                      (jobFetchable, _) <- readTVar _state
                      writeTVar _state (jobFetchable, Errored "Job logs fetch failed with exception.")) $ do
     withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
-      Left err -> atomically $ do
-        (jobFetchable, _) <- readTVar _state
-        writeTVar _state (jobFetchable, Errored (show err))
+      Left err -> do
+        logError' bc [i|fetchJobLogs: downloadJobLogsR failed: #{err}|]
+        now <- liftIO getCurrentTime
+        atomically $ do
+          (jobFetchable, _) <- readTVar _state
+          writeTVar _state (jobFetchable, Errored (show err))
+          childNode <- createJobLogLinesNode bc 0 (JobLogLines now [[i|Error: #{err}|]])
+          writeTVar _children [childNode]
       Right response -> do
+        debug' bc [i|fetchJobLogs: got logs download URL: #{responseBody response}|]
         logs <- simpleHttp (URI.uriToString id (responseBody response) "")
 
         let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
@@ -171,3 +178,24 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
     , _depth = depth'
     , _ident = ident'
   }
+
+createJobLogLinesNode :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
+createJobLogLinesNode bc depth' jobLogGroup = do
+  stateVar <- newTVar ()
+  ident' <- getIdentifierSTM bc
+  toggledVar <- newTVar False
+  childrenVar <- newTVar []
+
+  healthCheckVar <- newTVar NotFetched
+  healthCheckThreadVar <- newTVar Nothing
+  return $ JobLogGroupNode $ EntityData {
+    _static = jobLogGroup
+    , _state = stateVar
+    , _urlSuffix = ""
+    , _toggled = toggledVar
+    , _children = childrenVar
+    , _healthCheck = healthCheckVar
+    , _healthCheckThread = healthCheckThreadVar
+    , _depth = depth'
+    , _ident = ident'
+    }
