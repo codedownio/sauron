@@ -31,6 +31,7 @@ import Sauron.Event
 import Sauron.Expanding
 import Sauron.Fetch.Core (makeEmptyElemWithState)
 import Sauron.Fix
+import Sauron.HealthCheck.Notification (newNotificationHealthCheckThread)
 import Sauron.OAuth (authenticateWithGitHub, loadSavedToken)
 import Sauron.Options
 import Sauron.Setup.AllReposForUser
@@ -122,8 +123,14 @@ main = do
         Just (namespace, name) -> fmap SomeNode <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
         Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
-  -- Prepend a PaginatedNotificationsNode
-  listElems <- flip V.cons listElems' <$> atomically (SomeNode . PaginatedNotificationsNode <$> makeEmptyElemWithState baseContext () (SearchNone, emptyPageInfo, NotFetched) "" 0)
+  -- Prepend a PaginatedNotificationsNode with health check
+  notificationNode <- atomically (PaginatedNotificationsNode <$> makeEmptyElemWithState baseContext () (SearchNone, emptyPageInfo, NotFetched) "" 0)
+  -- Start health check thread for notifications
+  let notificationEntityData = getEntityData notificationNode
+  let PeriodSpec period = defaultHealthCheckPeriodUs
+  notificationsHealthCheckThread <- newNotificationHealthCheckThread baseContext (_state notificationEntityData)
+  atomically $ writeTVar (_healthCheckThread notificationEntityData) (Just (notificationsHealthCheckThread, period))
+  let listElems = V.cons (SomeNode notificationNode) listElems'
 
   -- Kick off initial fetches
   runReaderT (refreshVisibleLines listElems) baseContext

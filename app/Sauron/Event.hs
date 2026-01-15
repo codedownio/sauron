@@ -19,6 +19,7 @@ import Lens.Micro
 import Relude hiding (Down, pi)
 import Sauron.Actions
 import Sauron.Actions.Util (findRepoParent)
+import Sauron.Mutations.Notification (markNotificationAsDone)
 import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.Open (openNode)
@@ -31,6 +32,7 @@ import Sauron.Types
 import Sauron.UI.Keys
 import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
 import Sauron.UI.TopBox (isSearchable')
+import UnliftIO.Async
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
@@ -194,6 +196,16 @@ handleMainPaneEvents s e = case e of
           fetchCommentsAndOpenModal (s ^. appBaseContext) issue False owner name
         (SinglePullNode (EntityData {_static=issue, _state}), Just (RepoNode (EntityData {_static=(owner, name)}))) -> do
           fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
+        _ -> return ()
+
+  V.EvKey c [] | c == markNotificationDoneKey -> do
+    withFixedElemAndParents s $ \(SomeNode el) _variableEl _parents -> do
+      case el of
+        SingleNotificationNode (EntityData {_static=notification}) -> do
+          liftIO $ void $ async $ runReaderT (markNotificationAsDone notification) (s ^. appBaseContext)
+          -- Refresh the notification to update its read status
+          withFixedElemAndParents s $ \_fixedEl (SomeNode variableEl') parents' ->
+            refreshSelected (s ^. appBaseContext) variableEl' parents'
         _ -> return ()
 
   V.EvKey c [] | c == zoomModalKey -> do

@@ -16,10 +16,10 @@ toggleKeys = [V.KEnter, V.KChar '\t']
 refreshAllKey = V.KChar 'R'
 refreshSelectedKey = V.KChar 'r'
 
-browserToHomeKey = V.KChar 'h'
-browserToIssuesKey = V.KChar 'i'
-browserToPullsKey = V.KChar 'p'
-browserToActionsKey = V.KChar 'a'
+browserToHomeKey = V.KChar 'H'
+browserToIssuesKey = V.KChar 'I'
+browserToPullsKey = V.KChar 'P'
+browserToActionsKey = V.KChar 'A'
 
 openSelectedKey = V.KChar 'o'
 
@@ -32,6 +32,7 @@ lastPageKey = V.KChar 'L'
 editSearchKey = V.KChar 's'
 commentKey = V.KChar 'c'
 zoomModalKey = V.KChar 'z'
+markNotificationDoneKey = V.KChar 'd'
 
 exitKey = V.KChar 'q'
 

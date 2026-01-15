@@ -20,6 +20,7 @@ sections:
   - codedownio/resource-map
 - display_name: "Languages ecosystem"
   repos:
+  - codedownio/cpp-notebook-language-server
   - codedownio/haskell-notebook-language-server
   - codedownio/markdown-spellcheck-lsp
   - codedownio/rust-notebook-language-server

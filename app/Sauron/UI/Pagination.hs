@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -12,6 +13,7 @@ import Control.Monad
 import qualified Data.List as L
 import Data.Maybe
 import Data.String.Interpolate
+import GitHub
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -52,8 +54,8 @@ instance ListDrawable Fixed 'PaginatedStaleBranchesT where
     drawPaginatedLine "Stale branches" appState ed search pageInfo fetchable
 
 instance ListDrawable Fixed 'PaginatedNotificationsT where
-  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "Notifications" appState ed search pageInfo fetchable
+  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable), _children}) =
+    drawNotificationsLine appState ed search pageInfo fetchable _children
 
 instance ListDrawable Fixed 'HeadingT where
   drawLine _appState (EntityData {_static=label, ..}) = hBox $ catMaybes [
@@ -118,3 +120,24 @@ paginationInfo (PageInfo {..}) =
 data PageSegment =
   PageSegmentNumber Int
   | PageSegmentEllipses
+
+-- Special function for drawing notifications line with unread indicator
+drawNotificationsLine :: AppState -> EntityData Fixed PaginatedNotificationsT -> Search -> PageInfo -> Fetchable Int -> [Node Fixed SingleNotificationT] -> Widget ClickableName
+drawNotificationsLine appState ed search pageInfo fetchable children' = case fetchable of
+  Fetched totalCount -> headingWithMessage (str [i|(#{totalCount})|] <+> unreadIndicator)
+  Fetching (Just totalCount) -> headingWithMessage (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> unreadIndicator)
+  Fetching Nothing -> headingWithMessage (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")" <+> unreadIndicator)
+  NotFetched -> headingWithMessage (str [i|(not fetched)|])
+  Errored err -> headingWithMessage (str [i|(error fetching: #{err})|])
+  where
+    headingWithMessage msg = paginatedHeading' (withAttr (mkAttrName "headingText")) ed appState "Notifications" msg search pageInfo
+
+    unreadIndicator = case hasUnreadNotifications children' of
+      True -> withAttr blueDotAttr $ str " ●"
+      False -> emptyWidget
+
+    hasUnreadNotifications :: [Node Fixed SingleNotificationT] -> Bool
+    hasUnreadNotifications = any checkNotification
+      where
+        checkNotification :: Node Fixed SingleNotificationT -> Bool
+        checkNotification (SingleNotificationNode (EntityData {_static=notification})) = notificationUnread notification

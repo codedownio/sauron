@@ -20,7 +20,7 @@ import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude
-import Sauron.Actions.Util
+import qualified Sauron.Mutations.Issue as Issue
 import Sauron.Fetch.Issue (fetchIssueCommentsAndEvents)
 import Sauron.Types
 import UnliftIO.Async
@@ -72,37 +72,24 @@ submitComment s (CommentModalState editor issue _comments _isPR owner name _subm
     let baseContext = s ^. appBaseContext
     let issueNum = case issueNumber issue of IssueNumber n -> n
     void $ async $ do
-      result <- submitCommentAsync baseContext owner name issueNum commentText
+      result <- Issue.submitComment baseContext owner name (IssueNumber issueNum) commentText
       now <- getCurrentTime
       writeBChan (eventChan baseContext) (CommentModalEvent (CommentSubmitted result))
       writeBChan (eventChan baseContext) (TimeUpdated now)
 submitComment _ _ = return () -- ZoomModalState doesn't support comments
 
 closeWithComment :: AppState -> ModalState Fixed -> IO ()
-closeWithComment s (CommentModalState editor issue _comments isPR owner name _submissionState) = do
+closeWithComment s (CommentModalState editor issue _comments _isPR owner name _submissionState) = do
   let commentText = T.unlines $ getEditContents editor
   let baseContext = s ^. appBaseContext
   let issueNum = case issueNumber issue of IssueNumber n -> n
   void $ async $ do
-    result <- closeWithCommentAsync baseContext owner name issueNum isPR commentText
+    result <- Issue.closeIssueWithComment baseContext owner name (IssueNumber issueNum) commentText
     now <- getCurrentTime
     writeBChan (eventChan baseContext) (CommentModalEvent (IssueClosedWithComment result))
     writeBChan (eventChan baseContext) (TimeUpdated now)
 closeWithComment _ _ = return () -- ZoomModalState doesn't support comments
 
-submitCommentAsync :: BaseContext -> Name Owner -> Name Repo -> Int -> Text -> IO (Either Error Comment)
-submitCommentAsync baseContext@(BaseContext {requestSemaphore}) owner name issueNumber commentBody = do
-  withGithubApiSemaphore' requestSemaphore $ githubWithLogging' baseContext (createCommentR owner name (IssueNumber issueNumber) commentBody)
-
-closeWithCommentAsync :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> Text -> IO (Either Error Issue)
-closeWithCommentAsync baseContext@(BaseContext {requestSemaphore}) owner name issueNumber _isPR commentBody = do
-  -- First submit comment if there is one
-  unless (T.null $ T.strip commentBody) $ do
-    void $ withGithubApiSemaphore' requestSemaphore (githubWithLogging' baseContext (createCommentR owner name (IssueNumber issueNumber) commentBody))
-
-  -- Then close the issue/PR
-  let editIssue = EditIssue Nothing Nothing Nothing (Just StateClosed) Nothing Nothing
-  withGithubApiSemaphore' requestSemaphore (githubWithLogging' baseContext (editIssueR owner name (IssueNumber issueNumber) editIssue))
 
 refreshIssueComments :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> EventM ClickableName AppState ()
 refreshIssueComments baseContext owner name issueNumber _isPR = do

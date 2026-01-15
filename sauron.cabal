@@ -52,10 +52,13 @@ executable sauron
       Sauron.GraphQL
       Sauron.HealthCheck.Common
       Sauron.HealthCheck.Job
+      Sauron.HealthCheck.Notification
       Sauron.HealthCheck.Repo
       Sauron.HealthCheck.Stop
       Sauron.HealthCheck.Workflow
       Sauron.Logging
+      Sauron.Mutations.Issue
+      Sauron.Mutations.Notification
       Sauron.OAuth
       Sauron.Options
       Sauron.Setup.AllReposForUser

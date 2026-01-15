@@ -7,6 +7,9 @@ module Sauron.Event.Helpers (
   , withNthChildAndPaginationParent
   , withRepoParent
   , withNthChildAndRepoParent
+
+  , hasPaginationParent
+  , hasRepoParent
   ) where
 
 import Brick.Widgets.List
@@ -22,16 +25,24 @@ import Relude hiding (Down, pred)
 import Sauron.Types
 
 
+getFixedElemAndParents :: (
+  MonadIO m
+  ) => AppState -> m (Maybe (SomeNode Fixed, SomeNode Variable, NonEmpty (SomeNode Variable)))
+getFixedElemAndParents s =
+  case listSelectedElement (s ^. appMainList) of
+    Nothing -> return Nothing
+    Just (n, fixedElem) ->
+      atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
+        Nothing -> return Nothing
+        Just elems -> return $ Just (fixedElem, (head elems), elems)
+
 withFixedElemAndParents :: (
   MonadIO m
   ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> NonEmpty (SomeNode Variable) -> m ()) -> m ()
 withFixedElemAndParents s cb =
-  case listSelectedElement (s ^. appMainList) of
+  getFixedElemAndParents s >>= \case
     Nothing -> return ()
-    Just (n, fixedElem) ->
-      atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
-        Nothing -> return ()
-        Just elems -> cb fixedElem (head elems) elems
+    Just (x, y, z) -> cb x y z
 
 withNthChildAndPaginationParent :: (
   MonadIO m
@@ -43,12 +54,31 @@ withNthChildAndPaginationParent s cb =
         cb fixedEl variableEl (el, readPageInfo, writePageInfo) (el :| rest)
       _ -> return ()
 
+hasPaginationParent :: (
+  MonadIO m
+  ) => AppState -> m Bool
+hasPaginationParent s =
+  getFixedElemAndParents s >>= \case
+    Nothing -> return False
+    Just (_, _, parents) -> return $ any isPaginationNode $ toList parents
+
 withNthChildAndRepoParent :: MonadIO m => AppState -> (SomeNode Fixed -> SomeNode Variable -> Node Variable RepoT -> m ()) -> m ()
 withNthChildAndRepoParent s cb =
   withFixedElemAndParents s $ \fixedEl _variableEl elems ->
     case viaNonEmpty head [x | (SomeNode x@(RepoNode {})) <- toList elems] of
       Nothing -> return ()
       Just repoNode -> cb fixedEl (head elems) repoNode
+
+hasRepoParent :: (
+  MonadIO m
+  ) => AppState -> m Bool
+hasRepoParent s =
+  getFixedElemAndParents s >>= \case
+    Nothing -> return False
+    Just (_, _, parents) ->
+      case viaNonEmpty head [x | (SomeNode x@(RepoNode {})) <- toList parents] of
+        Nothing -> return False
+        Just _repoNode -> return True
 
 withRepoParent :: MonadIO m => AppState -> (Repo -> m ()) -> m ()
 withRepoParent s cb = do
