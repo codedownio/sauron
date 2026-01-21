@@ -231,12 +231,6 @@ handleMainPaneEvents' s e = case e of
           fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
         _ -> return ()
 
-  V.EvKey c [] | c == zoomModalKey -> do
-    withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
-      -- TODO: we used to check if the state is NotFetched before doing this refresh
-      refreshOnZoom (s ^. appBaseContext) variableEl parents
-      liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
-
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do
     let modalState = LogModalState (list LogModalContent (Vec.fromList []) 1)
     modify (appModal ?~ modalState)

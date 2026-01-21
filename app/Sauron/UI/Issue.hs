@@ -18,6 +18,7 @@ module Sauron.UI.Issue (
   ) where
 
 import Brick
+import Control.Lens
 import Control.Monad
 import Data.String.Interpolate
 import Data.Time
@@ -25,12 +26,16 @@ import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
 import Relude
+import Sauron.Actions
+import Sauron.Event.Helpers
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
+import Sauron.UI.Keys
 import Sauron.UI.Markdown
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.TimelineBorder
+import Sauron.UI.TopBox
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 
@@ -43,6 +48,24 @@ instance ListDrawable Fixed 'SingleIssueT where
     guard _toggled
     guardFetchedOrHasPrevious _state $ \comments ->
       return $ issueInner (_appNow appState) issue comments
+
+  getExtraTopBoxWidgets app (EntityData {}) =
+    [hBox [str "["
+          , highlightKeyIfPredicate isSearchable app (str $ showKey zoomModalKey)
+          , str "] "
+          , highlightMessageIfPredicate isSearchable app (str "Zoom")
+          ]
+    ]
+
+  handleHotkey s key (EntityData {})
+    | key == zoomModalKey = do
+        withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
+          -- TODO: we used to check if the state is NotFetched before doing this refresh
+          refreshOnZoom (s ^. appBaseContext) variableEl parents
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
+        return True
+
+  handleHotkey _ _ _ = return False
 
 maxCommentWidth :: Int
 maxCommentWidth = 120

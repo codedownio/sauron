@@ -5,6 +5,10 @@
 module Sauron.UI.TopBox (
   topBox
 
+  , highlightKeyIfPredicate
+  , highlightMessageIfPredicate
+
+  , isSearchable
   , isSearchable'
   ) where
 
@@ -92,11 +96,6 @@ topBox app = hBox [columnPadding column1
                                              , str "] "
                                              , withAttr hotkeyMessageAttr $ str actionName
                                              ]
-      , hBox [str "["
-             , highlightKeyIfPredicate isSearchable app (str $ showKey zoomModalKey)
-             , str "] "
-             , highlightMessageIfPredicate isSearchable app (str "Zoom")
-             ]
       ] ++ getExtraTopBoxWidgetsForSelected app
 
 getExtraTopBoxWidgetsForSelected :: AppState -> [Widget ClickableName]
