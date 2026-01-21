@@ -64,23 +64,19 @@ appEvent s@(_appModal -> Just modalState) e = case e of
         modify (appModal . _Just . submissionState .~ SubmittingCloseWithComment)
         liftIO $ closeWithComment s modalState
       _ -> do
-        handleModalScrolling CommentModalContent ev
-        case ev of
-          (V.EvKey (V.KChar 'v') _) -> return () -- Already handled by scrolling
-          (V.EvKey (V.KChar 'n') _) -> return () -- Already handled by scrolling
-          (V.EvKey (V.KChar 'p') _) -> return () -- Already handled by scrolling
-          _ -> zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
+        unlessM (handleModalScrolling CommentModalContent ev) $
+          zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
     ZoomModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
-      _ -> handleModalScrolling ZoomModalContent ev
+      _ -> void $ handleModalScrolling ZoomModalContent ev
     (LogModalState _) -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey (V.KChar 'c') []) -> modify (appLogs .~ Seq.empty)
       (V.EvKey (V.KChar 's') []) -> modify (appShowStackTraces %~ not)
       _ -> do
-        handleModalScrolling LogModalContent ev
+        void $ handleModalScrolling LogModalContent ev
         handleViewportScrolling LogModalContent ev
         handleLogLevelFiltering ev
   _ -> return ()
@@ -234,7 +230,7 @@ handleLogPaneEvents _s e = case e of
   V.EvKey (V.KChar 's') [] -> modify (appShowStackTraces %~ not)
   V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> halt
   _ -> do
-    handleModalScrolling LogSplitContent e
+    void $ handleModalScrolling LogSplitContent e
     handleViewportScrolling LogSplitContent e
     handleLogLevelFilteringForSplit e LogSplitContent
 
@@ -269,13 +265,13 @@ closeModal s = do
   modify (appModal .~ Nothing)
   liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
 
-handleModalScrolling :: ClickableName -> V.Event -> EventM ClickableName AppState ()
+handleModalScrolling :: ClickableName -> V.Event -> EventM ClickableName AppState Bool
 handleModalScrolling viewportName ev = case ev of
-  (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll viewportName) Down
-  (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll viewportName) Up
-  (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll viewportName) 1
-  (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll viewportName) (-1)
-  _ -> return ()
+  (V.EvKey (V.KChar 'v') [V.MCtrl]) -> vScrollPage (viewportScroll viewportName) Down >> return True
+  (V.EvKey (V.KChar 'v') [V.MMeta]) -> vScrollPage (viewportScroll viewportName) Up >> return True
+  (V.EvKey (V.KChar 'n') [V.MCtrl]) -> vScrollBy (viewportScroll viewportName) 1 >> return True
+  (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll viewportName) (-1) >> return True
+  _ -> return False
 
 handleLogLevelFiltering :: V.Event -> EventM ClickableName AppState ()
 handleLogLevelFiltering = flip handleLogLevelFilteringForSplit LogModalContent
