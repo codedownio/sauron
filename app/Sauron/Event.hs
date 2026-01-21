@@ -278,20 +278,7 @@ handleModalScrolling viewportName ev = case ev of
   _ -> return ()
 
 handleLogLevelFiltering :: V.Event -> EventM ClickableName AppState ()
-handleLogLevelFiltering ev = case ev of
-  (V.EvKey (V.KChar 'd') []) -> do
-    modify (appLogLevelFilter .~ LevelDebug)
-    vScrollToEnd (viewportScroll LogModalContent)
-  (V.EvKey (V.KChar 'i') []) -> do
-    modify (appLogLevelFilter .~ LevelInfo)
-    vScrollToEnd (viewportScroll LogModalContent)
-  (V.EvKey (V.KChar 'w') []) -> do
-    modify (appLogLevelFilter .~ LevelWarn)
-    vScrollToEnd (viewportScroll LogModalContent)
-  (V.EvKey (V.KChar 'e') []) -> do
-    modify (appLogLevelFilter .~ LevelError)
-    vScrollToEnd (viewportScroll LogModalContent)
-  _ -> return ()
+handleLogLevelFiltering = flip handleLogLevelFilteringForSplit LogModalContent
 
 handleLogLevelFilteringForSplit :: V.Event -> ClickableName -> EventM ClickableName AppState ()
 handleLogLevelFilteringForSplit ev viewportName = case ev of
