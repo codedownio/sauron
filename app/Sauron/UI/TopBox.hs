@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
@@ -15,6 +16,7 @@ import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Keys
+import Sauron.UI.Notification () -- Import for ListDrawable instance
 
 
 topBox app = hBox [columnPadding column1
@@ -82,7 +84,7 @@ topBox app = hBox [columnPadding column1
                                    ]
                             ]
 
-    column3 = keybindingBox [
+    column3 = keybindingBox $ [
       case getContextAction app of
         Nothing -> emptyWidget
         Just (_, actionName, keyStr) -> hBox [str "["
@@ -95,10 +97,24 @@ topBox app = hBox [columnPadding column1
              , str "] "
              , highlightMessageIfPredicate isSearchable app (str "Zoom")
              ]
-      ]
+      ] ++ getExtraTopBoxWidgetsForSelected app
+
+getExtraTopBoxWidgetsForSelected :: AppState -> [Widget ClickableName]
+getExtraTopBoxWidgetsForSelected s = case snd <$> listSelectedElement (s ^. appMainList) of
+  Nothing -> []
+  Just sn -> getExtraTopBoxWidgetsForSomeNode s sn
+
+getExtraTopBoxWidgetsForSomeNode :: AppState -> SomeNode Fixed -> [Widget ClickableName]
+getExtraTopBoxWidgetsForSomeNode s (SomeNode node) = case node of
+  SingleNotificationNode ed -> notificationGetExtraTopBoxWidgets s ed
+  _ -> []
+
+-- Helper for notification widgets with explicit constraint
+notificationGetExtraTopBoxWidgets :: AppState -> EntityData Fixed 'SingleNotificationT -> [Widget ClickableName]
+notificationGetExtraTopBoxWidgets = getExtraTopBoxWidgets
 
 hasNextPageKey :: AppState -> Bool
-hasNextPageKey (AppState {..}) = True -- TODO
+hasNextPageKey (AppState {}) = True -- TODO
 hasPrevPageKey = const True -- TODO
 hasFirstPageKey = const True -- TODO
 hasLastPageKey = const True -- TODO

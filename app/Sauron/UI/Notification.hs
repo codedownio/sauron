@@ -12,11 +12,17 @@ import Control.Monad
 import Data.String.Interpolate
 import Data.Time
 import GitHub
+import Lens.Micro
 import Relude
+import Sauron.Actions (refreshSelected)
+import Sauron.Event.Helpers (withFixedElemAndParents)
+import Sauron.Mutations.Notification (markNotificationAsDone)
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Keys (markNotificationDoneKey, showKey)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
+import UnliftIO.Async (async)
 
 
 instance ListDrawable Fixed 'SingleNotificationT where
@@ -26,6 +32,23 @@ instance ListDrawable Fixed 'SingleNotificationT where
   drawInner appState (EntityData {_static=notification, _ident, ..}) = do
     guard _toggled
     return $ notificationInner (_appNow appState) notification
+
+  getExtraTopBoxWidgets _appState (EntityData {_static=notification}) =
+    if notificationUnread notification
+      then [hBox [str "["
+                , withAttr hotkeyAttr $ str $ showKey markNotificationDoneKey
+                , str "] "
+                , withAttr hotkeyMessageAttr $ str "Mark done"
+                ]]
+      else []
+
+  handleHotkey appState key (EntityData {_static=notification})
+    | key == markNotificationDoneKey && notificationUnread notification = do
+        liftIO $ void $ async $ runReaderT (markNotificationAsDone notification) (appState ^. appBaseContext)
+        withFixedElemAndParents appState $ \_fixedEl (SomeNode variableEl) parents ->
+          refreshSelected (appState ^. appBaseContext) variableEl parents
+        return True
+  handleHotkey _ _ _ = return False
 
 notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable a -> Widget n
 notificationLine now toggled' (Notification {..}) animationCounter fetchableState =

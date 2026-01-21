@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
@@ -47,6 +48,17 @@ class ListDrawable f a where
   -- This should return Nothing if the node doesn't support inner content
   drawInner :: AppState -> EntityData f a -> Maybe (Widget ClickableName)
   drawInner _ _ = Nothing
+
+  -- | Get extra widgets to display in the top box for this node type
+  -- These widgets will be appended to column3 in TopBox.hs
+  getExtraTopBoxWidgets :: AppState -> EntityData f a -> [Widget ClickableName]
+  getExtraTopBoxWidgets _ _ = []
+
+  -- | Handle a hotkey press for this node type
+  -- Returns True if the hotkey was handled, False otherwise
+  -- If True is returned, no further hotkey matching will occur
+  handleHotkey :: AppState -> V.Key -> EntityData f a -> EventM ClickableName AppState Bool
+  handleHotkey _ _ _ = return False
 
 -- * Main list elem
 

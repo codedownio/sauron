@@ -19,7 +19,6 @@ import Lens.Micro
 import Relude hiding (Down, pi)
 import Sauron.Actions
 import Sauron.Actions.Util (findRepoParent)
-import Sauron.Mutations.Notification (markNotificationAsDone)
 import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.Open (openNode)
@@ -29,10 +28,11 @@ import Sauron.Event.Util
 import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForChildren)
 import Sauron.Logging
 import Sauron.Types
+import Sauron.UI ()
 import Sauron.UI.Keys
 import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
+import Sauron.UI.Notification () -- Import for ListDrawable instance
 import Sauron.UI.TopBox (isSearchable')
-import UnliftIO.Async
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
@@ -135,9 +135,42 @@ appEvent s (MouseDown LogPane V.BLeft _ _) = switchToLogPane s
 -- Catch-all
 appEvent _ _ = return ()
 
+-- Try to handle a hotkey with the selected node's custom handler
+tryHandleHotkeyWithSelected :: AppState -> V.Key -> EventM ClickableName AppState Bool
+tryHandleHotkeyWithSelected s key = case snd <$> listSelectedElement (s ^. appMainList) of
+  Nothing -> return False
+  Just (SomeNode node@(HeadingNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(RepoNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedIssuesNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedPullsNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedWorkflowsNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedReposNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedBranchesNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedYourBranchesNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedActiveBranchesNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedStaleBranchesNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(PaginatedNotificationsNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(SingleIssueNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(SinglePullNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(SingleWorkflowNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(SingleJobNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(SingleBranchNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(SingleBranchWithInfoNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(SingleCommitNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(SingleNotificationNode {})) -> handleHotkey s key (getEntityData node)
+  Just (SomeNode node@(JobLogGroupNode {})) -> handleHotkey s key (getEntityData node)
 
 handleMainPaneEvents :: AppState -> V.Event -> EventM ClickableName AppState ()
-handleMainPaneEvents s e = case e of
+handleMainPaneEvents s e = do
+  -- First, try to handle the hotkey with the selected node's custom handler
+  handled <- case e of
+    V.EvKey key [] -> tryHandleHotkeyWithSelected s key
+    _ -> return False
+  unless handled $
+    handleMainPaneEvents' s e
+
+handleMainPaneEvents' :: AppState -> V.Event -> EventM ClickableName AppState ()
+handleMainPaneEvents' s e = case e of
   -- Column 1
   V.EvKey c [] | c == nextKey -> modify (appMainList %~ (listMoveBy 1))
   V.EvKey c [] | c == previousKey -> modify (appMainList %~ (listMoveBy (-1)))
@@ -196,16 +229,6 @@ handleMainPaneEvents s e = case e of
           fetchCommentsAndOpenModal (s ^. appBaseContext) issue False owner name
         (SinglePullNode (EntityData {_static=issue, _state}), Just (RepoNode (EntityData {_static=(owner, name)}))) -> do
           fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
-        _ -> return ()
-
-  V.EvKey c [] | c == markNotificationDoneKey -> do
-    withFixedElemAndParents s $ \(SomeNode el) _variableEl _parents -> do
-      case el of
-        SingleNotificationNode (EntityData {_static=notification}) -> do
-          liftIO $ void $ async $ runReaderT (markNotificationAsDone notification) (s ^. appBaseContext)
-          -- Refresh the notification to update its read status
-          withFixedElemAndParents s $ \_fixedEl (SomeNode variableEl') parents' ->
-            refreshSelected (s ^. appBaseContext) variableEl' parents'
         _ -> return ()
 
   V.EvKey c [] | c == zoomModalKey -> do
