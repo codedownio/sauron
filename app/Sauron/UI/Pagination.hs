@@ -8,54 +8,77 @@ module Sauron.UI.Pagination (
   ) where
 
 import Brick
+import Brick.Forms
 import Brick.Widgets.Center (hCenter)
 import Control.Monad
 import qualified Data.List as L
 import Data.Maybe
 import Data.String.Interpolate
 import GitHub
+import qualified Graphics.Vty as V
+import Lens.Micro
 import Relude
+import Sauron.Event.Helpers (withFixedElemAndParents)
+import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Types
-import Sauron.UI.AttrMap
 import Sauron.UI.Search (searchInfo)
+import Sauron.UI.AttrMap
+import Sauron.UI.Keys
 import Sauron.UI.Statuses (getQuarterCircleSpinner)
 
 
 instance ListDrawable Fixed 'PaginatedReposT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Repositories" appState ed search pageInfo fetchable
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
+  handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedIssuesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Issues" appState ed search pageInfo fetchable
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
+  handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedPullsT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Pulls" appState ed search pageInfo fetchable
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
+  handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedWorkflowsT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Actions" appState ed search pageInfo fetchable
+  -- Workflows are not searchable
 
 instance ListDrawable Fixed 'PaginatedBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "All Branches" appState ed search pageInfo fetchable
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
+  handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedYourBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Your branches" appState ed search pageInfo fetchable
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
+  handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedActiveBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Active branches" appState ed search pageInfo fetchable
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
+  handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedStaleBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Stale branches" appState ed search pageInfo fetchable
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
+  handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedNotificationsT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable), _children}) =
     drawNotificationsLine appState ed search pageInfo fetchable _children
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
+  handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'HeadingT where
   drawLine _appState (EntityData {_static=label, ..}) = hBox $ catMaybes [
@@ -141,3 +164,23 @@ drawNotificationsLine appState ed search pageInfo fetchable children' = case fet
       where
         checkNotification :: Node Fixed SingleNotificationT -> Bool
         checkNotification (SingleNotificationNode (EntityData {_static=notification})) = notificationUnread notification
+
+-- * Search functionality helpers for paginated nodes
+
+searchableExtraWidgets :: [Widget ClickableName]
+searchableExtraWidgets =
+  [hBox [str "["
+        , withAttr hotkeyAttr $ str $ showKey editSearchKey
+        , str "] "
+        , withAttr hotkeyMessageAttr $ str "Search"
+        ]
+  ]
+
+searchableHandleHotkey :: AppState -> V.Key -> EntityData Fixed a -> EventM ClickableName AppState Bool
+searchableHandleHotkey s key (EntityData {_ident})
+  | key == editSearchKey = do
+      withFixedElemAndParents s $ \_ (SomeNode variableEl) _ -> do
+        searchText <- liftIO $ atomically $ ensureNonEmptySearch variableEl
+        modify (appForm ?~ (newForm [editTextField id TextForm (Just 1)] searchText, _ident))
+      return True
+searchableHandleHotkey _ _ _ = return False

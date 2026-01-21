@@ -19,8 +19,17 @@ import Lens.Micro
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Branch ()
+import Sauron.UI.BranchWithInfo ()
+import Sauron.UI.Commit ()
+import Sauron.UI.Issue ()
+import Sauron.UI.Job ()
 import Sauron.UI.Keys
-import Sauron.UI.Notification () -- Import for ListDrawable instance
+import Sauron.UI.Notification ()
+import Sauron.UI.Pagination ()
+import Sauron.UI.Pull ()
+import Sauron.UI.Repo ()
+import Sauron.UI.Workflow ()
 
 
 topBox app = hBox [columnPadding column1
@@ -88,15 +97,7 @@ topBox app = hBox [columnPadding column1
                                    ]
                             ]
 
-    column3 = keybindingBox $ [
-      case getContextAction app of
-        Nothing -> emptyWidget
-        Just (_, actionName, keyStr) -> hBox [str "["
-                                             , withAttr hotkeyAttr $ str keyStr
-                                             , str "] "
-                                             , withAttr hotkeyMessageAttr $ str actionName
-                                             ]
-      ] ++ getExtraTopBoxWidgetsForSelected app
+    column3 = keybindingBox $ getExtraTopBoxWidgetsForSelected app
 
 getExtraTopBoxWidgetsForSelected :: AppState -> [Widget ClickableName]
 getExtraTopBoxWidgetsForSelected s = case snd <$> listSelectedElement (s ^. appMainList) of
@@ -105,12 +106,26 @@ getExtraTopBoxWidgetsForSelected s = case snd <$> listSelectedElement (s ^. appM
 
 getExtraTopBoxWidgetsForSomeNode :: AppState -> SomeNode Fixed -> [Widget ClickableName]
 getExtraTopBoxWidgetsForSomeNode s (SomeNode node) = case node of
-  SingleNotificationNode ed -> notificationGetExtraTopBoxWidgets s ed
-  _ -> []
-
--- Helper for notification widgets with explicit constraint
-notificationGetExtraTopBoxWidgets :: AppState -> EntityData Fixed 'SingleNotificationT -> [Widget ClickableName]
-notificationGetExtraTopBoxWidgets = getExtraTopBoxWidgets
+  HeadingNode ed -> getExtraTopBoxWidgets s ed
+  RepoNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedIssuesNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedPullsNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedWorkflowsNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedReposNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedBranchesNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedYourBranchesNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedActiveBranchesNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedStaleBranchesNode ed -> getExtraTopBoxWidgets s ed
+  PaginatedNotificationsNode ed -> getExtraTopBoxWidgets s ed
+  SingleIssueNode ed -> getExtraTopBoxWidgets s ed
+  SinglePullNode ed -> getExtraTopBoxWidgets s ed
+  SingleWorkflowNode ed -> getExtraTopBoxWidgets s ed
+  SingleJobNode ed -> getExtraTopBoxWidgets s ed
+  SingleBranchNode ed -> getExtraTopBoxWidgets s ed
+  SingleBranchWithInfoNode ed -> getExtraTopBoxWidgets s ed
+  SingleCommitNode ed -> getExtraTopBoxWidgets s ed
+  SingleNotificationNode ed -> getExtraTopBoxWidgets s ed
+  JobLogGroupNode ed -> getExtraTopBoxWidgets s ed
 
 hasNextPageKey :: AppState -> Bool
 hasNextPageKey (AppState {}) = True -- TODO
@@ -131,7 +146,7 @@ isSearchable' (SomeNode (PaginatedBranchesNode {})) = True
 isSearchable' (SomeNode (PaginatedYourBranchesNode {})) = True
 isSearchable' (SomeNode (PaginatedActiveBranchesNode {})) = True
 isSearchable' (SomeNode (PaginatedStaleBranchesNode {})) = True
-isSearchable' (SomeNode (PaginatedNotificationsNode {})) = False
+isSearchable' (SomeNode (PaginatedNotificationsNode {})) = True
 isSearchable' _ = False
 
 columnPadding = padLeft (Pad 1) . padRight (Pad 3) -- . padTop (Pad 1)
@@ -159,34 +174,6 @@ keyIndicatorContextual app p key msg = case p app of
   True -> hBox [str "[", withAttr hotkeyAttr $ str key, str "] ", withAttr hotkeyMessageAttr $ str msg]
   False -> hBox [str "[", withAttr disabledHotkeyAttr $ str key, str "] ", withAttr disabledHotkeyMessageAttr $ str msg]
 
-
--- * Context-specific action helpers
-
-isNotification :: AppState -> Bool
-isNotification s = case snd <$> listSelectedElement (s ^. appMainList) of
-  Nothing -> False
-  Just (SomeNode (SingleNotificationNode _)) -> True
-  Just _ -> False
-
-isIssue :: AppState -> Bool
-isIssue s = case snd <$> listSelectedElement (s ^. appMainList) of
-  Nothing -> False
-  Just (SomeNode (SingleIssueNode _)) -> True
-  Just _ -> False
-
-isPullRequest :: AppState -> Bool
-isPullRequest s = case snd <$> listSelectedElement (s ^. appMainList) of
-  Nothing -> False
-  Just (SomeNode (SinglePullNode _)) -> True
-  Just _ -> False
-
--- | Get the appropriate context action for the currently selected item
-getContextAction :: AppState -> Maybe (String, String, String)
-getContextAction s
-  | isNotification s = Just ("d", "Mark done", showKey markNotificationDoneKey)
-  | isIssue s || isPullRequest s = Just ("c", "Comment", showKey commentKey)
-  | isSearchable s = Just ("s", "Search", showKey editSearchKey)
-  | otherwise = Nothing
 
 -- * Predicates
 

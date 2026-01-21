@@ -33,6 +33,7 @@ editSearchKey = V.KChar 's'
 commentKey = V.KChar 'c'
 zoomModalKey = V.KChar 'z'
 markNotificationDoneKey = V.KChar 'd'
+markNotificationReadKey = V.KChar 'R'
 
 exitKey = V.KChar 'q'
 

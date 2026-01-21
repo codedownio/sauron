@@ -18,7 +18,6 @@ import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude hiding (Down, pi)
 import Sauron.Actions
-import Sauron.Actions.Util (findRepoParent)
 import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.Open (openNode)
@@ -32,7 +31,6 @@ import Sauron.UI ()
 import Sauron.UI.Keys
 import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
 import Sauron.UI.Notification () -- Import for ListDrawable instance
-import Sauron.UI.TopBox (isSearchable')
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
@@ -215,21 +213,6 @@ handleMainPaneEvents' s e = case e of
   V.EvKey c [] | c == prevPageKey -> tryNavigatePage s goPrevPage
   V.EvKey c [] | c == firstPageKey -> tryNavigatePage s goFirstPage
   V.EvKey c [] | c == lastPageKey -> tryNavigatePage s goLastPage
-
-  V.EvKey c [] | c == editSearchKey -> do
-    withNthChildAndPaginationParent s $ \_fixedEl _el (sn@(SomeNode node@(getEntityData -> (EntityData {_ident}))), _, _) _parents -> do
-      when (isSearchable' sn) $ do
-        searchText <- liftIO $ atomically $ ensureNonEmptySearch node
-        modify (appForm ?~ (newForm [editTextField id TextForm (Just 1)] searchText, _ident))
-
-  V.EvKey c [] | c == commentKey -> do
-    withFixedElemAndParents s $ \(SomeNode el) _variableEl parents -> do
-      case (el, findRepoParent parents) of
-        (SingleIssueNode (EntityData {_static=issue, _state}), Just (RepoNode (EntityData {_static=(owner, name)}))) -> do
-          fetchCommentsAndOpenModal (s ^. appBaseContext) issue False owner name
-        (SinglePullNode (EntityData {_static=issue, _state}), Just (RepoNode (EntityData {_static=(owner, name)}))) -> do
-          fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
-        _ -> return ()
 
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do
     let modalState = LogModalState (list LogModalContent (Vec.fromList []) 1)

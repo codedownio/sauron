@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -15,10 +16,16 @@ import Data.Time
 import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
+import Lens.Micro
 import Relude
+import Sauron.Actions (refreshOnZoom)
+import Sauron.Actions.Util (findRepoParent)
+import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
+import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (issueInner, renderTimelineItem)
+import Sauron.UI.Keys
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
@@ -32,6 +39,35 @@ instance ListDrawable Fixed 'SinglePullT where
     guard _toggled
     guardFetchedOrHasPrevious _state $ \comments ->
       return $ issueInner (_appNow appState) issue comments
+
+  getExtraTopBoxWidgets _app (EntityData {}) =
+    [hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey zoomModalKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Zoom"
+          ]
+    , hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey commentKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Comment"
+          ]
+    ]
+
+  handleHotkey s key (EntityData {_static=issue})
+    | key == zoomModalKey = do
+        withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
+          refreshOnZoom (s ^. appBaseContext) variableEl parents
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
+        return True
+    | key == commentKey = do
+        withFixedElemAndParents s $ \_ _ parents -> do
+          case findRepoParent parents of
+            Just (RepoNode (EntityData {_static=(owner, name)})) ->
+              fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
+            _ -> return ()
+        return True
+
+  handleHotkey _ _ _ = return False
 
 pullLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable a -> Widget n
 pullLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]

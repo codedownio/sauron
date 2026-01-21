@@ -16,10 +16,10 @@ import Lens.Micro
 import Relude
 import Sauron.Actions (refreshSelected)
 import Sauron.Event.Helpers (withFixedElemAndParents)
-import Sauron.Mutations.Notification (markNotificationAsDone)
+import Sauron.Mutations.Notification (markNotificationAsDone, markNotificationAsRead)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Keys (markNotificationDoneKey, showKey)
+import Sauron.UI.Keys (markNotificationDoneKey, markNotificationReadKey, showKey)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
 import UnliftIO.Async (async)
@@ -34,13 +34,22 @@ instance ListDrawable Fixed 'SingleNotificationT where
     return $ notificationInner (_appNow appState) notification
 
   getExtraTopBoxWidgets _appState (EntityData {_static=notification}) =
-    if notificationUnread notification
-      then [hBox [str "["
+    [hBox [str "["
                 , withAttr hotkeyAttr $ str $ showKey markNotificationDoneKey
                 , str "] "
                 , withAttr hotkeyMessageAttr $ str "Mark done"
-                ]]
-      else []
+                ]
+    ]
+    ++ (
+      if notificationUnread notification
+        then [hBox [str "["
+                   , withAttr hotkeyAttr $ str $ showKey markNotificationReadKey
+                   , str "] "
+                   , withAttr hotkeyMessageAttr $ str "Mark read"
+                   ]
+             ]
+        else []
+    )
 
   handleHotkey appState key (EntityData {_static=notification})
     | key == markNotificationDoneKey && notificationUnread notification = do
@@ -48,14 +57,15 @@ instance ListDrawable Fixed 'SingleNotificationT where
         withFixedElemAndParents appState $ \_fixedEl (SomeNode variableEl) parents ->
           refreshSelected (appState ^. appBaseContext) variableEl parents
         return True
+    | key == markNotificationReadKey && notificationUnread notification = do
+        liftIO $ void $ async $ runReaderT (markNotificationAsRead notification) (appState ^. appBaseContext)
+        withFixedElemAndParents appState $ \_fixedEl (SomeNode variableEl) parents ->
+          refreshSelected (appState ^. appBaseContext) variableEl parents
+        return True
   handleHotkey _ _ _ = return False
 
 notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable a -> Widget n
-notificationLine now toggled' (Notification {..}) animationCounter fetchableState =
-  if notificationUnread
-    -- then withAttr unreadNotificationAttr $ vBox [line1, line2]
-    then vBox [line1, line2]
-    else vBox [line1, line2]
+notificationLine now toggled' (Notification {..}) animationCounter fetchableState = vBox [line1, line2]
   where
     Subject {..} = notificationSubject
     RepoRef {repoRefOwner=(SimpleOwner {..}), ..} = notificationRepo

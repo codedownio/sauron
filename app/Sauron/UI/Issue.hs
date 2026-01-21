@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -27,6 +28,8 @@ import GitHub
 import GitHub.Data.Name
 import Relude
 import Sauron.Actions
+import Sauron.Actions.Util (findRepoParent)
+import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -35,7 +38,6 @@ import Sauron.UI.Keys
 import Sauron.UI.Markdown
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.TimelineBorder
-import Sauron.UI.TopBox
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 
@@ -49,20 +51,32 @@ instance ListDrawable Fixed 'SingleIssueT where
     guardFetchedOrHasPrevious _state $ \comments ->
       return $ issueInner (_appNow appState) issue comments
 
-  getExtraTopBoxWidgets app (EntityData {}) =
+  getExtraTopBoxWidgets _app (EntityData {}) =
     [hBox [str "["
-          , highlightKeyIfPredicate isSearchable app (str $ showKey zoomModalKey)
+          , withAttr hotkeyAttr $ str $ showKey zoomModalKey
           , str "] "
-          , highlightMessageIfPredicate isSearchable app (str "Zoom")
+          , withAttr hotkeyMessageAttr $ str "Zoom"
+          ]
+    , hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey commentKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Comment"
           ]
     ]
 
-  handleHotkey s key (EntityData {})
+  handleHotkey s key (EntityData {_static=issue})
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
           -- TODO: we used to check if the state is NotFetched before doing this refresh
           refreshOnZoom (s ^. appBaseContext) variableEl parents
           liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
+        return True
+    | key == commentKey = do
+        withFixedElemAndParents s $ \_ _ parents -> do
+          case findRepoParent parents of
+            Just (RepoNode (EntityData {_static=(owner, name)})) ->
+              fetchCommentsAndOpenModal (s ^. appBaseContext) issue False owner name
+            _ -> return ()
         return True
 
   handleHotkey _ _ _ = return False
