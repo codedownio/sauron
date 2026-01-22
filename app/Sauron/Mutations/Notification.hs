@@ -10,22 +10,22 @@ import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import GitHub
 import Relude
-import Sauron.Actions.Util (withGithubApiSemaphore)
+import Sauron.Actions.Util
 import Sauron.Logging
 import Sauron.Types
 
 markNotificationAsRead :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Notification -> m ()
-markNotificationAsRead notification = do
-  bc@(BaseContext {auth, manager}) <- ask
-
-  withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (markNotificationAsReadR (notificationId notification))) >>= \case
-    Left err -> logError' bc $ "Failed to mark notification as read: " <> show err
+markNotificationAsRead notification =
+  withGithubApiSemaphore (githubWithLoggingUnit (markNotificationAsReadR (notificationId notification))) >>= \case
+    Left err -> logError $ "Failed to mark notification as read: " <> show err
     Right _ -> return ()
 
 markNotificationAsDone :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
   ) => Notification -> m ()
-markNotificationAsDone notification = do
-  markNotificationAsRead notification
+markNotificationAsDone notification =
+  withGithubApiSemaphore (githubWithLoggingUnit (markNotificationAsDoneR (notificationId notification))) >>= \case
+    Left err -> logError $ "Failed to mark notification as done: " <> show err
+    Right _ -> return ()

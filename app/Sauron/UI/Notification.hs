@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -14,7 +15,8 @@ import Data.Time
 import GitHub
 import Lens.Micro
 import Relude
-import Sauron.Actions (refreshSelected)
+import Sauron.Actions (refreshLine)
+import Sauron.Actions.Util (findNotificationsParent)
 import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Mutations.Notification (markNotificationAsDone, markNotificationAsRead)
 import Sauron.Types
@@ -29,7 +31,7 @@ instance ListDrawable Fixed 'SingleNotificationT where
   drawLine appState (EntityData {_static=notification, ..}) =
     notificationLine (_appNow appState) _toggled notification (_appAnimationCounter appState) _state
 
-  drawInner appState (EntityData {_static=notification, _ident, ..}) = do
+  drawInner appState (EntityData {_static=notification, ..}) = do
     guard _toggled
     return $ notificationInner (_appNow appState) notification
 
@@ -40,8 +42,7 @@ instance ListDrawable Fixed 'SingleNotificationT where
                 , withAttr hotkeyMessageAttr $ str "Mark done"
                 ]
     ]
-    ++ (
-      if notificationUnread notification
+    ++ (if notificationUnread notification
         then [hBox [str "["
                    , withAttr hotkeyAttr $ str $ showKey markNotificationReadKey
                    , str "] "
@@ -49,20 +50,26 @@ instance ListDrawable Fixed 'SingleNotificationT where
                    ]
              ]
         else []
-    )
+       )
 
   handleHotkey appState key (EntityData {_static=notification})
-    | key == markNotificationDoneKey && notificationUnread notification = do
-        liftIO $ void $ async $ runReaderT (markNotificationAsDone notification) (appState ^. appBaseContext)
-        withFixedElemAndParents appState $ \_fixedEl (SomeNode variableEl) parents ->
-          refreshSelected (appState ^. appBaseContext) variableEl parents
+    | key == markNotificationDoneKey = do
+        liftIO $ void $ async $ do
+          runReaderT (markNotificationAsDone notification) (appState ^. appBaseContext)
+          refreshParentNotifications appState
         return True
     | key == markNotificationReadKey && notificationUnread notification = do
-        liftIO $ void $ async $ runReaderT (markNotificationAsRead notification) (appState ^. appBaseContext)
-        withFixedElemAndParents appState $ \_fixedEl (SomeNode variableEl) parents ->
-          refreshSelected (appState ^. appBaseContext) variableEl parents
+        liftIO $ void $ async $ do
+          runReaderT (markNotificationAsRead notification) (appState ^. appBaseContext)
+          refreshParentNotifications appState
         return True
   handleHotkey _ _ _ = return False
+
+refreshParentNotifications :: MonadIO m => AppState -> m ()
+refreshParentNotifications appState =
+  withFixedElemAndParents appState $ \_ _ parents ->
+    whenJust (findNotificationsParent parents) $ \notificationsNode ->
+      liftIO $ void $ refreshLine (appState ^. appBaseContext) notificationsNode parents
 
 notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable a -> Widget n
 notificationLine now toggled' (Notification {..}) animationCounter fetchableState = vBox [line1, line2]

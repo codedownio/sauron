@@ -11,11 +11,13 @@ module Sauron.Actions.Util (
   , githubWithLoggingResponse
   , githubWithLogging'
   , githubWithLogging''
+  , githubWithLoggingUnit
 
   , openBrowserToUrl
 
   , findRepoParent
   , findJobParent
+  , findNotificationsParent
 ) where
 
 import Brick.BChan
@@ -23,13 +25,13 @@ import Control.Concurrent.QSem
 import Control.Exception.Safe (bracket_)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
-import Control.Monad.Logger (LogLevel(..))
 import Control.Monad.Reader
 import Data.Aeson (FromJSON)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
 import Data.ByteString.Builder (intDec, toLazyByteString)
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.List as L
+import Data.String.Interpolate
 import qualified Data.Text as T
 import Data.Time
 import GitHub
@@ -37,6 +39,7 @@ import Network.HTTP.Client (Response, responseBody, responseHeaders)
 import Network.HTTP.Types (EscapeItem(..))
 import Network.HTTP.Types.Header (hContentLength)
 import Relude
+import Sauron.Logging
 import Sauron.Types
 import UnliftIO.Process
 
@@ -73,11 +76,14 @@ findRepoParent elems = viaNonEmpty head [x | SomeNode x@(RepoNode _) <- toList e
 findJobParent :: [SomeNode Variable] -> Maybe (Node Variable SingleJobT)
 findJobParent elems = viaNonEmpty head [x | SomeNode x@(SingleJobNode _) <- toList elems]
 
-requestToUrl :: Request k a -> Text
+findNotificationsParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable PaginatedNotificationsT)
+findNotificationsParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedNotificationsNode _) <- toList elems]
+
+requestToUrl :: GenRequest mt k a -> Text
 requestToUrl req = case req of
   Query paths queryString -> pathsToUrl paths <> formatQueryString queryString
   PagedQuery paths queryString fetchCount -> pathsToUrl paths <> formatQueryString (queryString <> extraQueryItems fetchCount)
-  Command _method paths _body -> pathsToUrl paths
+  Command method paths _body -> show method <> " " <> pathsToUrl paths
   where
     pathsToUrl :: [Text] -> Text
     pathsToUrl = ("/" <>) . T.intercalate "/"
@@ -123,7 +129,18 @@ githubWithLogging'' (BaseContext {..}) request = withFrozenCallStack $ do
   logResult eventChan request result (Just duration)
   return result
 
-logResult :: (HasCallStack, MonadIO m) => BChan AppEvent -> Request k a -> Either Error (Response b) -> Maybe NominalDiffTime -> m ()
+githubWithLoggingUnit :: (HasCallStack, MonadReader BaseContext m, MonadIO m) => GenRequest 'MtUnit rw () -> m (Either Error ())
+githubWithLoggingUnit request = withFrozenCallStack $ do
+  BaseContext {..} <- ask
+  startTime <- liftIO getCurrentTime
+  result <- liftIO $ executeRequestWithMgrAndRes manager auth request
+  endTime <- liftIO getCurrentTime
+  let duration = diffUTCTime endTime startTime
+  logResult eventChan request result (Just duration)
+  info [i|result: #{result}|]
+  return (fmap responseBody result)
+
+logResult :: (HasCallStack, MonadIO m) => BChan AppEvent -> GenRequest mt k a -> Either Error (Response b) -> Maybe NominalDiffTime -> m ()
 logResult eventChan request result maybeDuration = do
   now <- liftIO getCurrentTime
   let url = requestToUrl request

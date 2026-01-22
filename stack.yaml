@@ -24,7 +24,9 @@ extra-deps:
   # - Repo: add subscribers_count
   # - Fix getNotificationsR
   # - EventType: add more constructors + a catchall called Unknown
-  commit: 73099ec89571b1819ecf6283d2b3957bd0dff31d
+  # - Fix markNotificationAsReadR
+  # - Add markNotificationAsDoneR
+  commit: 23294bf9e64c358f2c907d12bd88e89696c34818
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
