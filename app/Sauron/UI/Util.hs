@@ -28,6 +28,7 @@ fixedHeightOrViewportPercent vpName maxHeightPercent w =
       -- Otherwise put the contents (pre-rendered) in a viewport
       -- and limit the height to the maximum allowable height.
       else render (vLimit maxHeight $
+                   withVScrollBars OnRight $ withVScrollBarHandles $
                    viewport vpName Vertical $
                    Widget Fixed Fixed $ return result)
 
