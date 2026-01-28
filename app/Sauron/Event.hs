@@ -196,7 +196,7 @@ handleMainPaneEvents' s e = case e of
 
   V.EvKey c [] | c == refreshSelectedKey -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents ->
-      refreshSelected (s ^. appBaseContext) el parents
+      void $ refreshSelected (s ^. appBaseContext) el parents
   V.EvKey c [] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshVisibleLines (s ^. appMainListVariable)) (s ^. appBaseContext)
 
@@ -254,7 +254,7 @@ modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode it
 
   -- Node opened
   when (not wasOpen && isOpen) $
-    fetchOnOpenIfNecessary (_appBaseContext s) item (someNode :| toList parents)
+    void $ fetchOnOpenIfNecessary (_appBaseContext s) item (someNode :| toList parents)
 
   -- Node closed: stop healthcheck threads for children only
   when (wasOpen && not isOpen) $

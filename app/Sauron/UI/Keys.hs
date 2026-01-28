@@ -31,6 +31,8 @@ lastPageKey = V.KChar 'L'
 
 editSearchKey = V.KChar 's'
 commentKey = V.KChar 'c'
+closeReopenKey = V.KChar 'C'
+cancelWorkflowKey = V.KChar 'C'
 zoomModalKey = V.KChar 'z'
 markNotificationDoneKey = V.KChar 'd'
 markNotificationReadKey = V.KChar 'R'

@@ -28,9 +28,11 @@ import GitHub
 import GitHub.Data.Name
 import Relude
 import Sauron.Actions
-import Sauron.Actions.Util (findRepoParent)
+import Sauron.Actions.Util (findRepoParent, findIssuesParent)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers
+import Sauron.Mutations.Issue (closeIssue, reopenIssue)
+import UnliftIO.Async (async)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
@@ -51,7 +53,7 @@ instance ListDrawable Fixed 'SingleIssueT where
     guardFetchedOrHasPrevious _state $ \comments ->
       return $ issueInner (_appNow appState) issue comments
 
-  getExtraTopBoxWidgets _app (EntityData {}) =
+  getExtraTopBoxWidgets _app (EntityData {_static=issue}) =
     [hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey zoomModalKey
           , str "] "
@@ -62,12 +64,16 @@ instance ListDrawable Fixed 'SingleIssueT where
           , str "] "
           , withAttr hotkeyMessageAttr $ str "Comment"
           ]
+    , hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey closeReopenKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str (if issueState issue == StateOpen then "Close" else "Reopen")
+          ]
     ]
 
   handleHotkey s key (EntityData {_static=issue})
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
-          -- TODO: we used to check if the state is NotFetched before doing this refresh
           refreshOnZoom (s ^. appBaseContext) variableEl parents
           liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
         return True
@@ -78,7 +84,17 @@ instance ListDrawable Fixed 'SingleIssueT where
               fetchCommentsAndOpenModal (s ^. appBaseContext) issue False owner name
             _ -> return ()
         return True
-
+    | key == closeReopenKey = do
+        liftIO $ void $ async $ do
+          withFixedElemAndParents s $ \_ _ parents -> do
+            case findRepoParent parents of
+              Just (RepoNode (EntityData {_static=(owner, name)})) -> do
+                let action = if issueState issue == StateOpen then closeIssue else reopenIssue
+                void $ liftIO $ action (s ^. appBaseContext) owner name (issueNumber issue)
+                whenJust (findIssuesParent parents) $ \issuesNode ->
+                  liftIO $ void $ refreshLine (s ^. appBaseContext) issuesNode parents
+              _ -> return ()
+        return True
   handleHotkey _ _ _ = return False
 
 maxCommentWidth :: Int

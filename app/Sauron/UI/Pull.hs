@@ -18,10 +18,12 @@ import GitHub
 import GitHub.Data.Name
 import Lens.Micro
 import Relude
-import Sauron.Actions (refreshOnZoom)
-import Sauron.Actions.Util (findRepoParent)
+import Sauron.Actions (refreshOnZoom, refreshLine)
+import Sauron.Actions.Util (findRepoParent, findPullsParent)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers (withFixedElemAndParents)
+import Sauron.Mutations.Pull (closePull, reopenPull)
+import UnliftIO.Async (async)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (issueInner, renderTimelineItem)
@@ -40,7 +42,7 @@ instance ListDrawable Fixed 'SinglePullT where
     guardFetchedOrHasPrevious _state $ \comments ->
       return $ issueInner (_appNow appState) issue comments
 
-  getExtraTopBoxWidgets _app (EntityData {}) =
+  getExtraTopBoxWidgets _app (EntityData {_static=issue}) =
     [hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey zoomModalKey
           , str "] "
@@ -50,6 +52,11 @@ instance ListDrawable Fixed 'SinglePullT where
           , withAttr hotkeyAttr $ str $ showKey commentKey
           , str "] "
           , withAttr hotkeyMessageAttr $ str "Comment"
+          ]
+    , hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey closeReopenKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str (if issueState issue == StateOpen then "Close" else "Reopen")
           ]
     ]
 
@@ -65,6 +72,17 @@ instance ListDrawable Fixed 'SinglePullT where
             Just (RepoNode (EntityData {_static=(owner, name)})) ->
               fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
             _ -> return ()
+        return True
+    | key == closeReopenKey = do
+        liftIO $ void $ async $ do
+          withFixedElemAndParents s $ \_ _ parents -> do
+            case findRepoParent parents of
+              Just (RepoNode (EntityData {_static=(owner, name)})) -> do
+                let action = if issueState issue == StateOpen then closePull else reopenPull
+                void $ liftIO $ action (s ^. appBaseContext) owner name (issueNumber issue)
+                whenJust (findPullsParent parents) $ \pullsNode ->
+                  liftIO $ void $ refreshLine (s ^. appBaseContext) pullsNode parents
+              _ -> return ()
         return True
 
   handleHotkey _ _ _ = return False

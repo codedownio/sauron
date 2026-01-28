@@ -59,6 +59,8 @@ executable sauron
       Sauron.Logging
       Sauron.Mutations.Issue
       Sauron.Mutations.Notification
+      Sauron.Mutations.Pull
+      Sauron.Mutations.Workflow
       Sauron.OAuth
       Sauron.Options
       Sauron.Setup.AllReposForUser

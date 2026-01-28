@@ -10,14 +10,18 @@ module Sauron.UI.Commit (
 import Brick
 import Brick.Widgets.Border
 import Brick.Widgets.Skylighting (renderRawSource)
+import Control.Lens
 import Control.Monad
 import qualified Data.Text as T
 import Data.Time
 import qualified Data.Vector as V
 import GitHub
 import Relude
+import Sauron.Actions
+import Sauron.Event.Helpers
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Keys
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 import qualified Skylighting as Sky
@@ -33,6 +37,21 @@ instance ListDrawable Fixed 'SingleCommitT where
     guardFetchedOrHasPrevious _state $ \detailedCommit ->
       return $ commitInner detailedCommit
 
+  getExtraTopBoxWidgets _app (EntityData {}) =
+    [hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey zoomModalKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Zoom"
+          ]
+    ]
+
+  handleHotkey s key (EntityData {})
+    | key == zoomModalKey = do
+        withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
+          refreshOnZoom (s ^. appBaseContext) variableEl parents
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
+        return True
+  handleHotkey _ _ _ = return False
 
 commitLine :: UTCTime -> Bool -> Commit -> Widget n
 commitLine now toggled' (Commit {commitSha, commitGitCommit, commitAuthor}) =

@@ -18,6 +18,9 @@ module Sauron.Actions.Util (
   , findRepoParent
   , findJobParent
   , findNotificationsParent
+  , findIssuesParent
+  , findPullsParent
+  , findWorkflowsParent
 ) where
 
 import Brick.BChan
@@ -78,6 +81,15 @@ findJobParent elems = viaNonEmpty head [x | SomeNode x@(SingleJobNode _) <- toLi
 
 findNotificationsParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable PaginatedNotificationsT)
 findNotificationsParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedNotificationsNode _) <- toList elems]
+
+findIssuesParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable PaginatedIssuesT)
+findIssuesParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedIssuesNode _) <- toList elems]
+
+findPullsParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable PaginatedPullsT)
+findPullsParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedPullsNode _) <- toList elems]
+
+findWorkflowsParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable PaginatedWorkflowsT)
+findWorkflowsParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedWorkflowsNode _) <- toList elems]
 
 requestToUrl :: GenRequest mt k a -> Text
 requestToUrl req = case req of

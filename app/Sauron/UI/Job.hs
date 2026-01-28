@@ -9,6 +9,7 @@ module Sauron.UI.Job (
   ) where
 
 import Brick
+import Control.Lens
 import Control.Monad
 import Data.Maybe
 import Data.String.Interpolate
@@ -16,10 +17,13 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import GitHub
 import Relude
+import Sauron.Actions
+import Sauron.Event.Helpers
 import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
 import Sauron.Types
 import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
+import Sauron.UI.Keys
 import Sauron.UI.Statuses (statusToIconAnimated, chooseWorkflowStatus, fetchableQuarterCircleSpinner)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
@@ -41,7 +45,7 @@ instance ListDrawable Fixed 'SingleJobT where
       return $ jobInner (_appAnimationCounter appState) job Nothing
 
 instance ListDrawable Fixed 'JobLogGroupT where
-  drawLine appState (EntityData {_static=jobLogGroup, ..}) = 
+  drawLine appState (EntityData {_static=jobLogGroup, ..}) =
     jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
 
   drawInner _appState (EntityData {_static=jobLogGroup, ..}) = do
@@ -50,6 +54,22 @@ instance ListDrawable Fixed 'JobLogGroupT where
       JobLogGroup _timestamp _title (Just _status) children' ->
         return $ jobLogGroupInner children'
       _ -> Nothing
+
+  getExtraTopBoxWidgets _app (EntityData {}) =
+    [hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey zoomModalKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Zoom"
+          ]
+    ]
+
+  handleHotkey s key (EntityData {})
+    | key == zoomModalKey = do
+        withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
+          refreshOnZoom (s ^. appBaseContext) variableEl parents
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
+        return True
+  handleHotkey _ _ _ = return False
 
 jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
 jobLogGroupLine _animationCounter _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> padRight Max $ hBox $

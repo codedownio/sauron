@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -13,14 +14,20 @@ import Control.Monad
 import Data.String.Interpolate
 import Data.Time.Clock
 import GitHub
+import Lens.Micro
 import Relude
+import Sauron.Actions (refreshLine)
+import Sauron.Actions.Util (findRepoParent, findWorkflowsParent)
+import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
+import Sauron.Mutations.Workflow (cancelWorkflowRun)
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Keys
 import Sauron.UI.Statuses
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
-import UnliftIO.Async (Async)
+import UnliftIO.Async (Async, async)
 
 
 instance ListDrawable Fixed 'SingleWorkflowT where
@@ -31,6 +38,29 @@ instance ListDrawable Fixed 'SingleWorkflowT where
     guard _toggled
     guardFetchedOrHasPrevious _state $ \_ ->
       return $ workflowInner wf _state
+
+  getExtraTopBoxWidgets _app (EntityData {_static=wf}) =
+    if isNothing (workflowRunConclusion wf)
+    then [hBox [str "["
+              , withAttr hotkeyAttr $ str $ showKey cancelWorkflowKey
+              , str "] "
+              , withAttr hotkeyMessageAttr $ str "Cancel"
+              ]
+         ]
+    else []
+
+  handleHotkey s key (EntityData {_static=wf})
+    | key == cancelWorkflowKey && isNothing (workflowRunConclusion wf) = do
+        liftIO $ void $ async $ do
+          withFixedElemAndParents s $ \_ _ parents -> do
+            case findRepoParent parents of
+              Just (RepoNode (EntityData {_static=(owner, name)})) -> do
+                runReaderT (cancelWorkflowRun owner name (workflowRunWorkflowRunId wf)) (s ^. appBaseContext)
+                whenJust (findWorkflowsParent parents) $ \workflowsNode ->
+                  liftIO $ void $ refreshLine (s ^. appBaseContext) workflowsNode parents
+              _ -> return ()
+        return True
+  handleHotkey _ _ _ = return False
 
 -- WorkflowRun {workflowRunWorkflowRunId = Id 7403805672, workflowRunName = N "ci", workflowRunHeadBranch = migrate-debug, workflowRunHeadSha = "1367fa30fc409d198e18afa95bda04d26387925e", workflowRunPath = ".github/workflows/ci.yml", workflowRunDisplayTitle = More database stuff noci, workflowRunRunNumber = 2208, workflowRunEvent = "push", workflowRunStatus = "completed", workflowRunConclusion = Just skipped, workflowRunWorkflowId = 6848152, workflowRunUrl = URL https://api.github.com/repos/codedownio/codedown/actions/runs/7403805672, workflowRunHtmlUrl = URL https://github.com/codedownio/codedown/actions/runs/7403805672, workflowRunCreatedAt = 2024-01-04 00:10:06 UTC, workflowRunUpdatedAt = 2024-01-04 00:10:10 UTC, workflowRunActor = SimpleUser simpleUserId = Id 1634990, simpleUserLogin = N thomasjm, simpleUserAvatarUrl = URL "https://avatars.githubusercontent.com/u/1634990?v=4", simpleUserUrl = URL "https://api.github.com/users/thomasjm", workflowRunAttempt = 1, workflowRunStartedAt = 2024-01-04 00:10:06 UTC}
 
