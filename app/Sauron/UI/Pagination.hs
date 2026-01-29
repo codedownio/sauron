@@ -18,7 +18,9 @@ import GitHub
 import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude
+import Sauron.Actions.Util (findRepoParent)
 import Sauron.Event.Helpers (withFixedElemAndParents)
+import Sauron.Event.NewIssueModal (openNewIssueModal)
 import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Types
 import Sauron.UI.Search (searchInfo)
@@ -36,8 +38,22 @@ instance ListDrawable Fixed 'PaginatedReposT where
 instance ListDrawable Fixed 'PaginatedIssuesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
     drawPaginatedLine "Issues" appState ed search pageInfo fetchable
-  getExtraTopBoxWidgets _ _ = searchableExtraWidgets
-  handleHotkey s key ed = searchableHandleHotkey s key ed
+  getExtraTopBoxWidgets _ _ = searchableExtraWidgets ++
+    [hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey newIssueKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "New issue"
+          ]
+    ]
+  handleHotkey s key ed
+    | key == newIssueKey = do
+        withFixedElemAndParents s $ \_ _ parents ->
+          case findRepoParent parents of
+            Just (RepoNode (EntityData {_static=(owner, name)})) ->
+              openNewIssueModal owner name
+            _ -> return ()
+        return True
+    | otherwise = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedPullsT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =

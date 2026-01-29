@@ -34,6 +34,7 @@ commentKey = V.KChar 'c'
 closeReopenKey = V.KChar 'C'
 cancelWorkflowKey = V.KChar 'C'
 zoomModalKey = V.KChar 'z'
+newIssueKey = V.KChar 'n'
 markNotificationDoneKey = V.KChar 'd'
 markNotificationReadKey = V.KChar 'R'
 

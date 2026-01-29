@@ -20,6 +20,7 @@ import Relude hiding (Down, pi)
 import Sauron.Actions
 import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
+import Sauron.Event.NewIssueModal
 import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
 import Sauron.Event.Search
@@ -41,6 +42,8 @@ appEvent _ (AppEvent (ModalUpdate newModal)) = modify (appModal .~ newModal)
 appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
 
 appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModalEvent s commentModalEvent
+
+appEvent s (AppEvent (NewIssueModalEvent newIssueEvent)) = handleNewIssueModalEvent s newIssueEvent
 
 appEvent _s (AppEvent (TimeUpdated newTime)) = do
   -- Update the current time for accurate timestamps
@@ -66,6 +69,21 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       _ -> do
         unlessM (handleModalScrolling CommentModalContent ev) $
           zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
+    NewIssueModalState {} -> case ev of
+      (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+      (V.EvKey V.KEnter [V.MMeta]) -> do
+        modify (appModal . _Just . newIssueSubmissionState .~ SubmittingNewIssue)
+        liftIO $ submitNewIssue s modalState
+      (V.EvKey (V.KChar '\t') []) ->
+        modify (appModal . _Just . newIssueFocusTitle %~ not)
+      (V.EvKey V.KBackTab []) ->
+        modify (appModal . _Just . newIssueFocusTitle %~ not)
+      _ -> case modalState of
+        NewIssueModalState {_newIssueFocusTitle=True} ->
+          zoom (appModal . _Just . newIssueTitleEditor) $ handleEditorEvent (VtyEvent ev)
+        _ ->
+          zoom (appModal . _Just . newIssueBodyEditor) $ handleEditorEvent (VtyEvent ev)
     ZoomModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s

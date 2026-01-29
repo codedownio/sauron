@@ -380,6 +380,8 @@ data ClickableName =
   | LogSplitContent
   | MainPane
   | LogPane
+  | NewIssueTitleEditor
+  | NewIssueBodyEditor
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -475,6 +477,7 @@ data AppEvent =
   | AnimationTick
   | TimeUpdated UTCTime
   | CommentModalEvent CommentModalEvent
+  | NewIssueModalEvent NewIssueModalEvent
   | LogEntryAdded LogEntry
 
 data CommentModalEvent =
@@ -483,10 +486,14 @@ data CommentModalEvent =
   | CommentsRefreshed (V.Vector (Either IssueEvent IssueComment))
   | OpenCommentModal Issue (V.Vector (Either IssueEvent IssueComment)) Bool (Name Owner) (Name Repo)
 
+data NewIssueModalEvent =
+  NewIssueCreated (Either Error Issue)
+
 data SubmissionState =
   NotSubmitting
   | SubmittingComment
   | SubmittingCloseWithComment
+  | SubmittingNewIssue
   deriving (Show, Eq)
 
 data ModalState f =
@@ -502,6 +509,14 @@ data ModalState f =
   | ZoomModalState {
       _zoomModalSomeNode :: SomeNode f
       }
+  | NewIssueModalState {
+      _newIssueTitleEditor :: Editor Text ClickableName
+      , _newIssueBodyEditor :: Editor Text ClickableName
+      , _newIssueRepoOwner :: Name Owner
+      , _newIssueRepoName :: Name Repo
+      , _newIssueSubmissionState :: SubmissionState
+      , _newIssueFocusTitle :: Bool -- True = title focused, False = body focused
+      }
   | LogModalState {
       _logModalList :: L.GenericList ClickableName V.Vector LogEntry
       }
@@ -512,6 +527,8 @@ instance Eq (ModalState Fixed) where
     issue1 == issue2 && comments1 == comments2 && isPR1 == isPR2 &&
     owner1 == owner2 && name1 == name2 && submission1 == submission2
   (ZoomModalState node1) == (ZoomModalState node2) = node1 == node2
+  (NewIssueModalState _t1 _b1 o1 n1 s1 _f1) == (NewIssueModalState _t2 _b2 o2 n2 s2 _f2) =
+    o1 == o2 && n1 == n2 && s1 == s2
   (LogModalState _list1) == (LogModalState _list2) = True  -- We'll consider all log modal states equal for simplicity
   _ == _ = False
 

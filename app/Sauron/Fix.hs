@@ -26,6 +26,14 @@ fixModal (CommentModalState {..}) = return $ CommentModalState {
   , _commentRepoName = _commentRepoName
   , _submissionState = _submissionState
   }
+fixModal (NewIssueModalState {..}) = return $ NewIssueModalState {
+  _newIssueTitleEditor = _newIssueTitleEditor
+  , _newIssueBodyEditor = _newIssueBodyEditor
+  , _newIssueRepoOwner = _newIssueRepoOwner
+  , _newIssueRepoName = _newIssueRepoName
+  , _newIssueSubmissionState = _newIssueSubmissionState
+  , _newIssueFocusTitle = _newIssueFocusTitle
+  }
 fixModal (ZoomModalState sn) = do
   fixedNode <- fixSomeNode sn
   return $ ZoomModalState fixedNode

@@ -20,8 +20,8 @@ import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
 import Relude
-import qualified Sauron.Mutations.Issue as Issue
 import Sauron.Fetch.Issue (fetchIssueCommentsAndEvents)
+import qualified Sauron.Mutations.Issue as Issue
 import Sauron.Types
 import UnliftIO.Async
 
@@ -38,9 +38,7 @@ handleCommentModalEvent s (CommentSubmitted result) = case result of
         let issueNum = case issueNumber issue of IssueNumber n -> n
         refreshIssueComments (s ^. appBaseContext) owner name issueNum isPR
         vScrollToEnd (viewportScroll CommentModalContent)
-      Nothing -> return ()
-      Just (ZoomModalState _) -> return () -- ZoomModal doesn't support comment operations
-      Just (LogModalState _) -> return () -- LogModal doesn't support comment operations
+      _ -> return ()
   Left _err -> do
     -- Reset submission state on error
     modify (appModal . _Just . submissionState .~ NotSubmitting)

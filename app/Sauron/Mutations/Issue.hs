@@ -6,10 +6,12 @@ module Sauron.Mutations.Issue (
   , closeIssue
   , closeIssueWithComment
   , reopenIssue
+  , createNewIssue
   ) where
 
 import qualified Data.Text as T
 import GitHub
+import GitHub.Endpoints.Issues (newIssue)
 import Relude
 import Sauron.Actions.Util (withGithubApiSemaphore', githubWithLogging')
 import Sauron.Types
@@ -51,3 +53,9 @@ reopenIssue baseContext@(BaseContext {requestSemaphore}) owner name issueNumber 
     githubWithLogging' baseContext $ editIssueR owner name issueNumber $ emptyEditIssue {
       editIssueState = Just StateOpen
       }
+
+createNewIssue :: BaseContext -> Name Owner -> Name Repo -> Text -> Text -> IO (Either Error Issue)
+createNewIssue baseContext@(BaseContext {requestSemaphore}) owner name title body = do
+  let ni = (newIssue title) { newIssueBody = if T.null (T.strip body) then Nothing else Just body }
+  withGithubApiSemaphore' requestSemaphore $
+    githubWithLogging' baseContext (createIssueR owner name ni)

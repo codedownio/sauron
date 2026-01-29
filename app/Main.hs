@@ -44,6 +44,7 @@ import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
 import Sauron.UI.Modals.CommentModal (renderModal)
 import Sauron.UI.Modals.LogModal (renderLogModal, renderLogPanel)
+import Sauron.UI.Modals.NewIssueModal (renderNewIssueModal)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TimelineBorder (borderWithAttr)
 import Sauron.UI.TopBox (topBox)
@@ -74,6 +75,7 @@ drawUI app = case _appModal app of
   Nothing -> [ui]
   Just modalState -> case modalState of
     CommentModalState {} -> [renderModal app modalState, ui]
+    NewIssueModalState {} -> [renderNewIssueModal modalState, ui]
     ZoomModalState {} -> [renderZoomModal app modalState, ui]
     LogModalState {} -> [renderLogModal app modalState, ui]
   where
