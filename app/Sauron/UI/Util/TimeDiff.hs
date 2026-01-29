@@ -8,7 +8,10 @@ import Data.Time
 import Relude
 
 timeFromNow :: NominalDiffTime -> String
-timeFromNow diffTime = show rounded ++ " " ++ unit ++ suffix
+timeFromNow diffTime
+  -- Clock skew?
+  | diffTime < 0 = "just now"
+  | otherwise = show rounded ++ " " ++ unit ++ suffix
   where
     rounded = round value :: Integer
     (value, unit) = timeDiffNumberAndString diffTime
