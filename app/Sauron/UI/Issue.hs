@@ -130,7 +130,7 @@ issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationC
       withAttr hashAttr $ str "#"
       , withAttr hashNumberAttr $ str $ show number
       , str [i| opened #{timeFromNow (diffUTCTime now issueCreatedAt)} by |]
-      , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
+      , withAttr usernameAttr $ str [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
 issueInner :: UTCTime -> Issue -> V.Vector (Either IssueEvent IssueComment) -> Widget n
