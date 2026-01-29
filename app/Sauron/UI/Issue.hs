@@ -123,7 +123,8 @@ issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationC
   where
     markerAttr = if issueState == StateOpen then openStateMarkerAttr else closedStateMarkerAttr
     line1 = hBox [
-      withAttr markerAttr $ str (if toggled' then "[-] " else "[+] ")
+      withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
+      , withAttr markerAttr $ str (if issueState == StateOpen then "⊙  " else "☑  ")
       , withAttr normalAttr $ str $ toString issueTitle
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ str (if issueComments > 0 then [i|🗨  #{issueComments}|] else "")
