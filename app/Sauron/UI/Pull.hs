@@ -19,20 +19,20 @@ import GitHub
 import GitHub.Data.Name
 import Lens.Micro
 import Relude
-import Sauron.Actions (refreshOnZoom, refreshLine)
+import Sauron.Actions (refreshOnZoom)
 import Sauron.Actions.Util (findRepoParent, findPullsParent)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Event.Search (ensureNonEmptySearch)
-import Sauron.Mutations.Pull (closePull, reopenPull)
-import UnliftIO.Async (async)
+import Sauron.Fetch.Pull (fetchPullComments)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (issueInner, renderTimelineItem)
+import Sauron.UI.Issue (issueInner, renderTimelineItem, closeReopenAndRefresh)
 import Sauron.UI.Keys
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
+import UnliftIO.Async (async)
 
 
 instance ListDrawable Fixed 'SinglePullT where
@@ -90,14 +90,13 @@ instance ListDrawable Fixed 'SinglePullT where
         return True
     | key == closeReopenKey = do
         liftIO $ void $ async $ do
-          withFixedElemAndParents s $ \_ _ parents -> do
-            case findRepoParent parents of
-              Just (RepoNode (EntityData {_static=(owner, name)})) -> do
-                let action = if issueState issue == StateOpen then closePull else reopenPull
-                void $ liftIO $ action (s ^. appBaseContext) owner name (issueNumber issue)
-                whenJust (findPullsParent parents) $ \pullsNode ->
-                  liftIO $ void $ refreshLine (s ^. appBaseContext) pullsNode parents
-              _ -> return ()
+          withFixedElemAndParents s $ \_ _ parents ->
+            whenJust (findRepoParent parents) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
+              whenJust (findPullsParent parents) $ \(PaginatedPullsNode ed) ->
+                closeReopenAndRefresh (s ^. appBaseContext) owner name issue (_children ed)
+                  (\(SinglePullNode e) -> (_static e, _state e))
+                  (\(SinglePullNode e) iss -> SinglePullNode (e { _static = iss }))
+                  fetchPullComments
         return True
 
   handleHotkey _ _ _ = return False

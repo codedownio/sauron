@@ -16,6 +16,9 @@ module Sauron.UI.Issue (
   , renderEvent
   , commentTopLabel
   , topLabel
+
+  -- Close/reopen
+  , closeReopenAndRefresh
   ) where
 
 import Brick
@@ -33,6 +36,7 @@ import Sauron.Actions.Util (findRepoParent, findIssuesParent)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers
 import Sauron.Event.Search (ensureNonEmptySearch)
+import Sauron.Fetch.Issue (fetchIssueComments)
 import Sauron.Mutations.Issue (closeIssue, reopenIssue)
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -101,14 +105,13 @@ instance ListDrawable Fixed 'SingleIssueT where
         return True
     | key == closeReopenKey = do
         liftIO $ void $ async $ do
-          withFixedElemAndParents s $ \_ _ parents -> do
-            case findRepoParent parents of
-              Just (RepoNode (EntityData {_static=(owner, name)})) -> do
-                let action = if issueState issue == StateOpen then closeIssue else reopenIssue
-                void $ liftIO $ action (s ^. appBaseContext) owner name (issueNumber issue)
-                whenJust (findIssuesParent parents) $ \issuesNode ->
-                  liftIO $ void $ refreshLine (s ^. appBaseContext) issuesNode parents
-              _ -> return ()
+          withFixedElemAndParents s $ \_ _ parents ->
+            whenJust (findRepoParent parents) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
+              whenJust (findIssuesParent parents) $ \(PaginatedIssuesNode ed) ->
+                closeReopenAndRefresh (s ^. appBaseContext) owner name issue (_children ed)
+                  (\(SingleIssueNode e) -> (_static e, _state e))
+                  (\(SingleIssueNode e) iss -> SingleIssueNode (e { _static = iss }))
+                  fetchIssueComments
         return True
   handleHotkey _ _ _ = return False
 
@@ -212,3 +215,28 @@ commentTopLabel :: Text -> UTCTime -> UTCTime -> Widget n
 commentTopLabel username commentTime now =
   (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|commented #{timeFromNow (diffUTCTime now commentTime)}|])
     & padLeftRight 1
+
+-- * Close/reopen, exported for Pull.hs
+
+closeReopenAndRefresh ::
+  (MonadIO m)
+  => BaseContext -> Name Owner -> Name Repo -> Issue
+  -> TVar [child]
+  -> (child -> (Issue, TVar (Fetchable (V.Vector (Either IssueEvent IssueComment)))))
+  -> (child -> Issue -> child)
+  -> (Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> ReaderT BaseContext IO ())
+  -> m ()
+closeReopenAndRefresh bc owner name issue childrenVar getInfo setIssue fetchComments = do
+  let action = if issueState issue == StateOpen then closeIssue else reopenIssue
+      targetNum = issueNumber issue
+      isTarget c = issueNumber (fst (getInfo c)) == targetNum
+  liftIO (action bc owner name targetNum) >>= \case
+    Right updatedIssue -> do
+      mStateVar <- liftIO $ atomically $ do
+        nodes <- readTVar childrenVar
+        let mState = listToMaybe [snd (getInfo c) | c <- nodes, isTarget c]
+        writeTVar childrenVar [if isTarget c then setIssue c updatedIssue else c | c <- nodes]
+        return mState
+      whenJust mStateVar $ \stateVar ->
+        liftIO $ runReaderT (fetchComments owner name targetNum stateVar) bc
+    Left _err -> return ()
