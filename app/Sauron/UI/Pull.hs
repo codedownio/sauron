@@ -10,6 +10,7 @@ module Sauron.UI.Pull (
   ) where
 
 import Brick
+import Brick.Forms
 import Control.Monad
 import Data.String.Interpolate
 import Data.Time
@@ -22,6 +23,7 @@ import Sauron.Actions (refreshOnZoom, refreshLine)
 import Sauron.Actions.Util (findRepoParent, findPullsParent)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers (withFixedElemAndParents)
+import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Mutations.Pull (closePull, reopenPull)
 import UnliftIO.Async (async)
 import Sauron.Types
@@ -44,6 +46,11 @@ instance ListDrawable Fixed 'SinglePullT where
 
   getExtraTopBoxWidgets _app (EntityData {_static=issue}) =
     [hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey editSearchKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Search"
+          ]
+    , hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey zoomModalKey
           , str "] "
           , withAttr hotkeyMessageAttr $ str "Zoom"
@@ -61,6 +68,14 @@ instance ListDrawable Fixed 'SinglePullT where
     ]
 
   handleHotkey s key (EntityData {_static=issue})
+    | key == editSearchKey = do
+        withFixedElemAndParents s $ \_ _ parents -> do
+          case findPullsParent parents of
+            Just pullsNode@(PaginatedPullsNode ed) -> do
+              searchText <- liftIO $ atomically $ ensureNonEmptySearch pullsNode
+              modify (appForm ?~ (newForm [editTextField id TextForm (Just 1)] searchText, _ident ed))
+            _ -> return ()
+        return True
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (s ^. appBaseContext) variableEl parents
@@ -90,8 +105,9 @@ instance ListDrawable Fixed 'SinglePullT where
 pullLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable a -> Widget n
 pullLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
   where
+    markerAttr = if issueState == StateOpen then openStateMarkerAttr else closedStateMarkerAttr
     line1 = hBox [
-      withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
+      withAttr markerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString issueTitle
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ str "" -- (if pullComments > 0 then [i|🗨  #{pullComments}|] else "")

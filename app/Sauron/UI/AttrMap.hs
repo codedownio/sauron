@@ -60,6 +60,8 @@ buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
   , (headingTextAttr, fg V.cyan & flip V.withStyle V.bold)
   , (toggleMarkerAttr, fg (select midGray))
   , (openMarkerAttr, fg (select midGray))
+  , (openStateMarkerAttr, fg (select solarizedGreen))
+  , (closedStateMarkerAttr, fg (select solarizedViolet))
 
   -- Hotkey stuff
   , (hotkeyAttr, fg V.blue)
@@ -195,6 +197,8 @@ normalPaneBorderAttr = mkAttrName "normalPaneBorder"
 headingTextAttr = mkAttrName "headingText"
 toggleMarkerAttr = mkAttrName "toggleMarker"
 openMarkerAttr = mkAttrName "openMarker"
+openStateMarkerAttr = mkAttrName "openStateMarker"
+closedStateMarkerAttr = mkAttrName "closedStateMarker"
 
 -- * Text
 

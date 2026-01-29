@@ -82,14 +82,27 @@ appEvent s@(_appModal -> Just modalState) e = case e of
   _ -> return ()
 
 -- Form events
-appEvent s@(_appForm -> Just (form, _formIdentifier)) e = case e of
+appEvent s@(_appForm -> Just (form, formIdentifier)) e = case e of
   VtyEvent (V.EvKey V.KEsc []) -> modify (appForm .~ Nothing)
   VtyEvent (V.EvKey V.KEnter []) -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents -> do
-      atomically $ updateSearchForNode el $ case formState form of
-        "" -> SearchNone
-        t -> SearchText t
-      void $ refreshLine (s ^. appBaseContext) el parents
+      -- Find the node that the form was opened for (by ident), which may
+      -- differ from the currently selected node (e.g. search opened from a
+      -- child single issue/PR targets the parent paginated node).
+      let targetNode = fromMaybe (SomeNode el) $
+            find (\(SomeNode n) -> _ident (getEntityData n) == formIdentifier) (toList parents)
+      case targetNode of
+        SomeNode targetEl -> do
+          atomically $ updateSearchForNode targetEl $ case formState form of
+            "" -> SearchNone
+            t -> SearchText t
+          -- Move selection to the target node (relevant when search was
+          -- opened from a child node like a single issue/PR)
+          do
+            expandedList <- gets (^. appMainList)
+            forM_ (Vec.findIndex (\(SomeNode n) -> _ident (getEntityData n) == formIdentifier) (listElements expandedList)) $ \idx ->
+              modify (appMainList %~ listMoveTo idx)
+          void $ refreshLine (s ^. appBaseContext) targetEl parents
     modify (appForm .~ Nothing)
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
 

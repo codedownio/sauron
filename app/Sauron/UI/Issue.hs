@@ -19,6 +19,7 @@ module Sauron.UI.Issue (
   ) where
 
 import Brick
+import Brick.Forms
 import Control.Lens
 import Control.Monad
 import Data.String.Interpolate
@@ -31,8 +32,8 @@ import Sauron.Actions
 import Sauron.Actions.Util (findRepoParent, findIssuesParent)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers
+import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Mutations.Issue (closeIssue, reopenIssue)
-import UnliftIO.Async (async)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
@@ -42,6 +43,7 @@ import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.TimelineBorder
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
+import UnliftIO.Async (async)
 
 
 instance ListDrawable Fixed 'SingleIssueT where
@@ -55,6 +57,11 @@ instance ListDrawable Fixed 'SingleIssueT where
 
   getExtraTopBoxWidgets _app (EntityData {_static=issue}) =
     [hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey editSearchKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Search"
+          ]
+    , hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey zoomModalKey
           , str "] "
           , withAttr hotkeyMessageAttr $ str "Zoom"
@@ -72,6 +79,14 @@ instance ListDrawable Fixed 'SingleIssueT where
     ]
 
   handleHotkey s key (EntityData {_static=issue})
+    | key == editSearchKey = do
+        withFixedElemAndParents s $ \_ _ parents -> do
+          case findIssuesParent parents of
+            Just issuesNode@(PaginatedIssuesNode ed) -> do
+              searchText <- liftIO $ atomically $ ensureNonEmptySearch issuesNode
+              modify (appForm ?~ (newForm [editTextField id TextForm (Just 1)] searchText, _ident ed))
+            _ -> return ()
+        return True
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (s ^. appBaseContext) variableEl parents
@@ -103,8 +118,9 @@ maxCommentWidth = 120
 issueLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable (V.Vector (Either IssueEvent IssueComment)) -> Widget n
 issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
   where
+    markerAttr = if issueState == StateOpen then openStateMarkerAttr else closedStateMarkerAttr
     line1 = hBox [
-      withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
+      withAttr markerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString issueTitle
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ str (if issueComments > 0 then [i|🗨  #{issueComments}|] else "")
