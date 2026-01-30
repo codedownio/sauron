@@ -25,10 +25,9 @@ renderNewIssueModal (NewIssueModalState {..}) =
 
     , hLimit maxCommentWidth $ vBox [
         -- Title
-        withAttr (if _newIssueFocusTitle then boldText else italicText) $ str "Title:"
-        , padAll 1 $
+        withAttr (if _newIssueFocusTitle then boldText else italicText) $ str "Title"
+        , border $
             vLimit 1 $
-            hLimit (maxCommentWidth - 4) $
             withAttr normalAttr $
             renderEditor (str . toString . T.unlines) _newIssueFocusTitle _newIssueTitleEditor
         , str " "
@@ -51,30 +50,29 @@ renderNewIssueModal _ = str "Invalid modal state for NewIssueModal"
 
 renderBodyEditor :: Bool -> Int -> Editor Text ClickableName -> Widget ClickableName
 renderBodyEditor focused editorHeight editor =
-  hBox [
+  vLimit (editorHeight + 3) $ hBox [
     -- Left: Editor
     vBox [
-      withAttr (if focused then boldText else italicText) $ str "Body:"
+      withAttr (if focused then boldText else italicText) $ str "Body"
       , padAll 1 $
           vLimit editorHeight $
-          hLimit 60 $
+          hLimitPercent 50 $
           withAttr normalAttr $
           renderEditor (str . toString . T.unlines) focused editor
     ]
     , vBorder
     -- Right: Preview
     , vBox [
-      withAttr italicText $ str "Preview:"
-      , padAll 1 $
-          hLimit 50 $
+      withAttr (if focused then boldText else italicText) $ str "Preview"
+      , border $
           vLimit editorHeight $
-          if T.null text
-            then withAttr italicText $ str "(preview will appear here)"
-            else markdownToWidgetsWithWidth 48 text
+          case text of
+            "" -> withAttr italicText $ str "(preview will appear here)"
+            t -> markdownToWidgetsWithWidth 48 t
     ]
   ]
   where
-    text = T.unlines $ getEditContents editor
+    text = T.intercalate "\n" $ getEditContents editor
 
 newIssueButtonSection :: Editor Text ClickableName -> SubmissionState -> Widget ClickableName
 newIssueButtonSection titleEditor submissionState' =
