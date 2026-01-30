@@ -247,7 +247,7 @@ handleMainPaneEvents' s e = case e of
     -- Scroll to the bottom to show latest logs
     vScrollToEnd (viewportScroll LogModalContent)
 
-  V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> do
+  V.EvKey c args | (c, args) `elem` [(V.KEsc, []), (exitKey, []), (exitKey, [V.MCtrl])] -> do
     -- Cancel everything and wait for cleanups
     -- liftIO $ mapM_ cancelNode (s ^. appRunTreeBase)
     -- forM_ (s ^. appRunTreeBase) (liftIO . waitForTree)
