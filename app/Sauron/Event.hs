@@ -39,7 +39,11 @@ appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (l
 
 appEvent _ (AppEvent (ModalUpdate newModal)) = modify (appModal .~ newModal)
 
-appEvent _ (AppEvent AnimationTick) = modify (appAnimationCounter %~ (+1))
+appEvent _ (AppEvent AnimationTick) = do
+  modify (appAnimationCounter %~ (+1))
+
+  mainUiExtent <- lookupExtent MainUI
+  modify (appMainUiExtent .~ mainUiExtent)
 
 appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModalEvent s commentModalEvent
 

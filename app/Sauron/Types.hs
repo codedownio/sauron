@@ -367,7 +367,8 @@ data BaseContext = BaseContext {
   }
 
 data ClickableName =
-  ListRow Int
+  MainUI
+  | ListRow Int
   | MainList
   | InnerViewport Text
   | InfoBar
@@ -496,6 +497,7 @@ data SubmissionState =
   | SubmittingNewIssue
   deriving (Show, Eq)
 
+-- TODO: break these into individual types
 data ModalState f =
   CommentModalState {
     _commentEditor :: Editor Text ClickableName
@@ -535,6 +537,8 @@ instance Eq (ModalState Fixed) where
 data AppState = AppState {
   _appUser :: User
   , _appBaseContext :: BaseContext
+
+  , _appMainUiExtent :: Maybe (Extent ClickableName)
 
   , _appModalVariable :: TVar (Maybe (ModalState Variable))
   , _appModal :: Maybe (ModalState Fixed)

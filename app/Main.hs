@@ -75,13 +75,13 @@ drawUI app = case _appModal app of
   Nothing -> [ui]
   Just modalState -> case modalState of
     CommentModalState {} -> [renderModal app modalState, ui]
-    NewIssueModalState {} -> [renderNewIssueModal modalState, ui]
+    NewIssueModalState {} -> [renderNewIssueModal app modalState, ui]
     ZoomModalState {} -> [renderZoomModal app modalState, ui]
     LogModalState {} -> [renderLogModal app modalState, ui]
   where
     ui = if _appSplitLogs app then splitUI else mainUI
 
-    mainUI = vBox [
+    mainUI = reportExtent MainUI $ vBox [
       topBox app
       , borderWithCounts app
       -- , fixedHeightOrViewportPercent (InnerViewport [i|viewport_debugging|]) 50 $
@@ -148,6 +148,8 @@ main = do
         AppState {
           _appUser = currentUser
           , _appBaseContext = baseContext
+
+          , _appMainUiExtent = Nothing
 
           , _appModalVariable = modalVariableTVar
           , _appModal = modalFixed

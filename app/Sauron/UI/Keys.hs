@@ -11,34 +11,33 @@ import Relude
 nextKey = V.KChar 'n'
 previousKey = V.KChar 'p'
 toggleKeys = [V.KEnter, V.KChar '\t']
+exitKey = V.KChar 'q'
 
 -- Column 2
-refreshAllKey = V.KChar 'R'
-refreshSelectedKey = V.KChar 'r'
-
 browserToHomeKey = V.KChar 'H'
 browserToIssuesKey = V.KChar 'I'
 browserToPullsKey = V.KChar 'P'
 browserToActionsKey = V.KChar 'A'
 
-openSelectedKey = V.KChar 'o'
-
--- Column 3
 nextPageKey = V.KChar 'N'
 prevPageKey = V.KChar 'P'
 firstPageKey = V.KChar 'F'
 lastPageKey = V.KChar 'L'
 
+refreshAllKey = V.KChar 'R'
+refreshSelectedKey = V.KChar 'r'
+
+openSelectedKey = V.KChar 'o'
+
+-- Column 3
 editSearchKey = V.KChar 's'
 commentKey = V.KChar 'c'
 closeReopenKey = V.KChar 'C'
 cancelWorkflowKey = V.KChar 'C'
 zoomModalKey = V.KChar 'z'
-newIssueKey = V.KChar 'n'
+newIssueKey = V.KChar 'c'
 markNotificationDoneKey = V.KChar 'd'
 markNotificationReadKey = V.KChar 'R'
-
-exitKey = V.KChar 'q'
 
 -- Other
 

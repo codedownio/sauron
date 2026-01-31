@@ -16,47 +16,51 @@ import Sauron.UI.Issue (maxCommentWidth)
 import Sauron.UI.Markdown (markdownToWidgetsWithWidth)
 
 
-renderNewIssueModal :: ModalState Fixed -> Widget ClickableName
-renderNewIssueModal (NewIssueModalState {..}) =
+renderNewIssueModal :: AppState -> ModalState Fixed -> Widget ClickableName
+renderNewIssueModal app (NewIssueModalState {..}) =
   vBox [
     hCenter $ withAttr boldText $ str [i|New Issue on #{untagName _newIssueRepoOwner}/#{untagName _newIssueRepoName}|]
 
     , hBorder
 
-    , hLimit maxCommentWidth $ vBox [
+    , vBox [
         -- Title
         withAttr (if _newIssueFocusTitle then boldText else italicText) $ str "Title"
         , border $
             vLimit 1 $
             withAttr normalAttr $
-            renderEditor (str . toString . T.unlines) _newIssueFocusTitle _newIssueTitleEditor
+            renderEditor (str . toString . T.intercalate "\n") _newIssueFocusTitle _newIssueTitleEditor
         , str " "
 
         -- Body editor + preview
-        , renderBodyEditor (not _newIssueFocusTitle) editorLines _newIssueBodyEditor
+        , renderBodyEditor app (not _newIssueFocusTitle) modalWidth editorLines _newIssueBodyEditor
       ]
     , hBorder
     , newIssueButtonSection _newIssueTitleEditor _newIssueSubmissionState
   ]
   & border
   & withAttr normalAttr
-  & hLimit (maxCommentWidth + 4)
+  & hLimit modalWidth
   & vLimitPercent 80
   & centerLayer
   where
+    modalWidth = case _appMainUiExtent app of
+      Nothing -> maxCommentWidth + 4
+      Just (Extent {extentSize=(w, _h)}) -> round ((0.8 :: Double) * fromIntegral w)
+
     bodyLineCount = length (getEditContents _newIssueBodyEditor)
     editorLines = max 10 (min bodyLineCount 30)
-renderNewIssueModal _ = str "Invalid modal state for NewIssueModal"
+renderNewIssueModal _ _ = str "Invalid modal state for NewIssueModal"
 
-renderBodyEditor :: Bool -> Int -> Editor Text ClickableName -> Widget ClickableName
-renderBodyEditor focused editorHeight editor =
+renderBodyEditor :: AppState -> Bool -> Int -> Int -> Editor Text ClickableName -> Widget ClickableName
+renderBodyEditor (AppState {}) focused modalWidth editorHeight editor =
   vLimit (editorHeight + 3) $ hBox [
     -- Left: Editor
     vBox [
       withAttr (if focused then boldText else italicText) $ str "Body"
       , padAll 1 $
           vLimit editorHeight $
-          hLimitPercent 50 $
+          hLimit sectionWidth $
           withAttr normalAttr $
           renderEditor (str . toString . T.unlines) focused editor
     ]
@@ -64,14 +68,16 @@ renderBodyEditor focused editorHeight editor =
     -- Right: Preview
     , vBox [
       withAttr (if focused then boldText else italicText) $ str "Preview"
-      , border $
+      , border $ padRight Max $ padBottom Max $
           vLimit editorHeight $
           case text of
-            "" -> withAttr italicText $ str "(preview will appear here)"
-            t -> markdownToWidgetsWithWidth 48 t
+            "" -> withAttr italicText $ strWrap [i|(preview will appear here)|]
+            t -> markdownToWidgetsWithWidth (sectionWidth - 4) t
     ]
   ]
   where
+    sectionWidth = (modalWidth - 4) `div` 2
+
     text = T.intercalate "\n" $ getEditContents editor
 
 newIssueButtonSection :: Editor Text ClickableName -> SubmissionState -> Widget ClickableName
