@@ -39,7 +39,7 @@ import Sauron.Setup.ReposFromConfigFile
 import Sauron.Setup.ReposFromCurrentDirectory
 import Sauron.Types
 import Sauron.UI
-import Sauron.UI.AttrMap (buildAdaptiveAttrMap)
+import Sauron.UI.AttrMap
 import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
 import Sauron.UI.Modals.CommentModal (renderModal)
@@ -74,10 +74,10 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = case _appModal app of
   Nothing -> [ui]
   Just modalState -> case modalState of
-    CommentModalState {} -> [renderModal app modalState, ui]
-    NewIssueModalState {} -> [renderNewIssueModal app modalState, ui]
-    ZoomModalState {} -> [renderZoomModal app modalState, ui]
-    LogModalState {} -> [renderLogModal app modalState, ui]
+    CommentModalState {} -> [renderModal app modalState, forceAttr pageEllipsesAttr ui]
+    NewIssueModalState {} -> [renderNewIssueModal app modalState, forceAttr pageEllipsesAttr ui]
+    ZoomModalState {} -> [renderZoomModal app modalState, forceAttr pageEllipsesAttr ui]
+    LogModalState {} -> [renderLogModal app modalState, forceAttr pageEllipsesAttr ui]
   where
     ui = if _appSplitLogs app then splitUI else mainUI
 
