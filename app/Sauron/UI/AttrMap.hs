@@ -10,6 +10,7 @@ import Brick.Widgets.ProgressBar
 import Brick.Widgets.Skylighting (attrMappingsForStyle)
 import qualified Graphics.Vty as V
 import Relude hiding (on)
+import Sauron.UI.AttrMap.Dim
 import qualified Skylighting.Styles as Sky
 import qualified Skylighting.Types as SkyTypes
 
@@ -18,7 +19,16 @@ mkAttrName :: String -> AttrName
 mkAttrName = attrName
 
 buildAdaptiveAttrMap :: V.ColorMode -> AttrMap
-buildAdaptiveAttrMap colorMode = attrMap V.defAttr ([
+buildAdaptiveAttrMap colorMode = attrMap V.defAttr (attrToColor colorMode)
+
+buildAdaptiveDimmedAttrMap :: V.ColorMode -> DimAmount -> AttrMap
+buildAdaptiveDimmedAttrMap colorMode amount = attrMap dimmedDefault (dimAttrMappings amount (attrToColor colorMode))
+  where
+    dimmedDefault = V.defAttr `V.withForeColor` dimColor amount (V.RGBColor 229 229 229)
+
+
+attrToColor :: V.ColorMode -> [(AttrName, V.Attr)]
+attrToColor colorMode = ([
   -- Statuses
   (iconAttr, fg V.white)
   , (normalAttr, fg V.white)

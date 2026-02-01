@@ -74,11 +74,13 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = case _appModal app of
   Nothing -> [ui]
   Just modalState -> case modalState of
-    CommentModalState {} -> [renderModal app modalState, forceAttr pageEllipsesAttr ui]
-    NewIssueModalState {} -> [renderNewIssueModal app modalState, forceAttr pageEllipsesAttr ui]
-    ZoomModalState {} -> [renderZoomModal app modalState, forceAttr pageEllipsesAttr ui]
-    LogModalState {} -> [renderLogModal app modalState, forceAttr pageEllipsesAttr ui]
+    CommentModalState {} -> [renderModal app modalState, dimmedUi]
+    NewIssueModalState {} -> [renderNewIssueModal app modalState, dimmedUi]
+    ZoomModalState {} -> [renderZoomModal app modalState, dimmedUi]
+    LogModalState {} -> [renderLogModal app modalState, dimmedUi]
   where
+    colorMode = fromMaybe (_appActualColorMode app) (_appCliColorMode app)
+    dimmedUi = updateAttrMap (const (buildAdaptiveDimmedAttrMap colorMode 0.35)) ui
     ui = if _appSplitLogs app then splitUI else mainUI
 
     mainUI = reportExtent MainUI $ vBox [
