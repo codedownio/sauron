@@ -97,6 +97,8 @@ executables:
     - microlens-th
     - optparse-applicative
     - safe-exceptions
+    - WEditor
+    - WEditorBrick
     - yaml
 
 tests:

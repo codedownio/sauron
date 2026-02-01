@@ -35,3 +35,9 @@ extra-deps:
 # https://github.com/input-output-hk/haskell.nix/issues/2312
 - git: https://github.com/thomasjm/vty-crossplatform.git
   commit: 030ceab629d5c888a4a890e2aa7f1e0e6eda0578
+
+- git: https://github.com/codedownio/wrapping-editor.git
+  commit: 17ed0ab4d9321c6a5db123efbbf93bc91f1e8b55
+  subdirs:
+  - cabal/WEditor
+  - cabal/WEditorBrick

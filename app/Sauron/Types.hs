@@ -18,6 +18,7 @@ import Brick
 import Brick.BChan
 import Brick.Forms
 import Brick.Widgets.Edit (Editor)
+import WEditorBrick.WrappingEditor (WrappingEditor)
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Control.Monad.Logger (LogLevel(..))
@@ -513,7 +514,7 @@ data ModalState f =
       }
   | NewIssueModalState {
       _newIssueTitleEditor :: Editor Text ClickableName
-      , _newIssueBodyEditor :: Editor Text ClickableName
+      , _newIssueBodyEditor :: WrappingEditor Char ClickableName
       , _newIssueRepoOwner :: Name Owner
       , _newIssueRepoName :: Name Repo
       , _newIssueSubmissionState :: SubmissionState

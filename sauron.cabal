@@ -119,7 +119,9 @@ executable sauron
       ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N -O2 -W
   build-depends:
-      aeson
+      WEditor
+    , WEditorBrick
+    , aeson
     , ansi-terminal
     , base >=4.7 && <5
     , brick

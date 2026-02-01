@@ -7,6 +7,8 @@ module Sauron.Event.NewIssueModal (
 import Brick as B
 import Brick.BChan
 import Brick.Widgets.Edit (editorText, getEditContents)
+import WEditor.LineWrap (breakWords, lazyHyphen)
+import WEditorBrick.WrappingEditor (dumpEditor, newEditor)
 import Control.Monad
 import qualified Data.Text as T
 import GitHub
@@ -36,7 +38,7 @@ submitNewIssue :: AppState -> ModalState Fixed -> IO ()
 submitNewIssue s (NewIssueModalState {..}) = do
   let titleText = T.strip $ T.unlines $ getEditContents _newIssueTitleEditor
   unless (T.null titleText) $ do
-    let bodyText = T.unlines $ getEditContents _newIssueBodyEditor
+    let bodyText = T.unlines $ map toText $ dumpEditor _newIssueBodyEditor
     let baseContext = s ^. appBaseContext
     void $ async $ do
       result <- Issue.createNewIssue baseContext _newIssueRepoOwner _newIssueRepoName titleText bodyText
@@ -48,4 +50,4 @@ openNewIssueModal owner name =
   modify (appModal ?~ NewIssueModalState titleEditor bodyEditor owner name NotSubmitting True)
    where
      titleEditor = editorText NewIssueTitleEditor (Just 1) ""
-     bodyEditor = editorText NewIssueBodyEditor Nothing ""
+     bodyEditor = newEditor (breakWords lazyHyphen) NewIssueBodyEditor []
