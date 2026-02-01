@@ -6,8 +6,6 @@ import Brick
 import Brick.Widgets.Border
 import Brick.Widgets.Center
 import Brick.Widgets.Edit (Editor, getEditContents, renderEditor)
-import WEditorBrick.WrappingEditor (WrappingEditor, dumpEditor)
-import qualified WEditorBrick.WrappingEditor as WEditorBrick
 import Data.String.Interpolate
 import qualified Data.Text as T
 import GitHub.Data.Name
@@ -16,6 +14,8 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
 import Sauron.UI.Markdown (markdownToWidgetsWithWidth)
+import WEditorBrick.WrappingEditor (WrappingEditor, dumpEditor)
+import qualified WEditorBrick.WrappingEditor as WEditorBrick
 
 
 renderNewIssueModal :: AppState -> ModalState Fixed -> Widget ClickableName
@@ -59,7 +59,7 @@ renderBodyEditor (AppState {}) focused modalWidth editorHeight editor =
   vLimit (editorHeight + 3) $ hBox [
     -- Left: Editor
     vBox [
-      withAttr (if focused then boldText else italicText) $ str "Body"
+      withAttr (if focused then boldText else italicText) $ str "Write"
       , padAll 1 $
           vLimit editorHeight $
           hLimit sectionWidth $

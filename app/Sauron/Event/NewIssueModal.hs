@@ -1,3 +1,5 @@
+{-# LANGUAGE PackageImports #-}
+
 module Sauron.Event.NewIssueModal (
   handleNewIssueModalEvent,
   submitNewIssue,
@@ -7,8 +9,6 @@ module Sauron.Event.NewIssueModal (
 import Brick as B
 import Brick.BChan
 import Brick.Widgets.Edit (editorText, getEditContents)
-import WEditor.LineWrap (breakWords, lazyHyphen)
-import WEditorBrick.WrappingEditor (dumpEditor, newEditor)
 import Control.Monad
 import qualified Data.Text as T
 import GitHub
@@ -19,6 +19,8 @@ import Sauron.Event.Helpers (withFixedElemAndParents)
 import qualified Sauron.Mutations.Issue as Issue
 import Sauron.Types
 import UnliftIO.Async
+import WEditor.LineWrap (breakWords, noHyphen)
+import WEditorBrick.WrappingEditor (dumpEditor, newEditor)
 
 
 handleNewIssueModalEvent :: AppState -> NewIssueModalEvent -> EventM ClickableName AppState ()
@@ -50,4 +52,4 @@ openNewIssueModal owner name =
   modify (appModal ?~ NewIssueModalState titleEditor bodyEditor owner name NotSubmitting True)
    where
      titleEditor = editorText NewIssueTitleEditor (Just 1) ""
-     bodyEditor = newEditor (breakWords lazyHyphen) NewIssueBodyEditor []
+     bodyEditor = newEditor (breakWords noHyphen) NewIssueBodyEditor []
