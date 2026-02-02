@@ -72,8 +72,10 @@ appEvent s@(_appModal -> Just modalState) e = case e of
         modify (appModal . _Just . submissionState .~ SubmittingCloseWithComment)
         liftIO $ closeWithComment s modalState
       _ -> do
-        unlessM (handleModalScrolling CommentModalContent ev) $
-          zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
+        unlessM (handleModalScrolling CommentModalContent ev) $ do
+          let ed = _commentEditor modalState
+          ed' <- WEditorBrick.handleEditor ed ev
+          modify (appModal . _Just . commentEditor .~ ed')
     NewIssueModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s

@@ -501,7 +501,7 @@ data SubmissionState =
 -- TODO: break these into individual types
 data ModalState f =
   CommentModalState {
-    _commentEditor :: Editor Text ClickableName
+    _commentEditor :: WrappingEditor Char ClickableName
     , _commentIssue :: Issue
     , _commentIssueComments :: V.Vector (Either IssueEvent IssueComment)
     , _issueIsPR :: Bool

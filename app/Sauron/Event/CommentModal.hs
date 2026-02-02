@@ -12,7 +12,8 @@ module Sauron.Event.CommentModal (
 
 import Brick as B
 import Brick.BChan
-import Brick.Widgets.Edit (editorText, getEditContents)
+import WEditor.LineWrap (breakWords, noHyphen)
+import WEditorBrick.WrappingEditor (dumpEditor, newEditor)
 import Control.Monad.IO.Unlift
 import qualified Data.Text as T
 import Data.Time
@@ -31,7 +32,7 @@ handleCommentModalEvent s (CommentSubmitted result) = case result of
   Right _comment -> do
     -- Reset submission state and clear editor
     modify (appModal . _Just . submissionState .~ NotSubmitting)
-    modify (appModal . _Just . commentEditor .~ editorText CommentEditor Nothing "")
+    modify (appModal . _Just . commentEditor .~ newEditor (breakWords noHyphen) CommentEditor [])
     -- Refresh issue comments and scroll to bottom
     case s ^. appModal of
       Just (CommentModalState _editor issue _comments isPR owner name _submissionState) -> do
@@ -59,13 +60,13 @@ handleCommentModalEvent _s (CommentsRefreshed comments) = do
 
 handleCommentModalEvent _s (OpenCommentModal issue comments isPR owner name) = do
   -- Open the comment modal with fresh comments and scroll to bottom
-  let editor = editorText CommentEditor Nothing ""
+  let editor = newEditor (breakWords noHyphen) CommentEditor []
   modify (appModal ?~ CommentModalState editor issue comments isPR owner name NotSubmitting)
   vScrollToEnd (viewportScroll CommentModalContent)
 
 submitComment :: AppState -> ModalState Fixed -> IO ()
 submitComment s (CommentModalState editor issue _comments _isPR owner name _submissionState) = do
-  let commentText = T.unlines $ getEditContents editor
+  let commentText = T.intercalate "\n" $ map toText $ dumpEditor editor
   unless (T.null $ T.strip commentText) $ do
     let baseContext = s ^. appBaseContext
     let issueNum = case issueNumber issue of IssueNumber n -> n
@@ -78,7 +79,7 @@ submitComment _ _ = return () -- ZoomModalState doesn't support comments
 
 closeWithComment :: AppState -> ModalState Fixed -> IO ()
 closeWithComment s (CommentModalState editor issue _comments _isPR owner name _submissionState) = do
-  let commentText = T.unlines $ getEditContents editor
+  let commentText = T.intercalate "\n" $ map toText $ dumpEditor editor
   let baseContext = s ^. appBaseContext
   let issueNum = case issueNumber issue of IssueNumber n -> n
   void $ async $ do

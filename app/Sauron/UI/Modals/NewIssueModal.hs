@@ -1,5 +1,6 @@
 module Sauron.UI.Modals.NewIssueModal (
-  renderNewIssueModal,
+  renderNewIssueModal
+  , renderBodyEditor
   ) where
 
 import Brick

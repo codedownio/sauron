@@ -17,8 +17,8 @@ dimAttrMappings :: DimAmount -> [(AttrName, V.Attr)] -> [(AttrName, V.Attr)]
 dimAttrMappings amount = map (second (dimAttr amount))
 
 dimAttr :: DimAmount -> V.Attr -> V.Attr
-dimAttr amount attr = attr
-  { V.attrForeColor = dimMaybeColor amount (V.attrForeColor attr)
+dimAttr amount attr = attr {
+  V.attrForeColor = dimMaybeColor amount (V.attrForeColor attr)
   , V.attrBackColor = dimMaybeColor amount (V.attrBackColor attr)
   }
 
@@ -97,11 +97,11 @@ rgbToColor240 r g b =
       cubeErr = colorDistSq (r, g, b) cubeColor
       -- Nearest grayscale ramp match
       avg = (fromIntegral r + fromIntegral g + fromIntegral b) `div` 3 :: Int
-      grayStep = max 0 (min 23 (round ((fromIntegral avg - 8 :: Double) / 10)))
-      grayLevel = fromIntegral (8 + 10 * grayStep) :: Word8
+      grayStep = max (0 :: Word8) (min 23 (round ((fromIntegral avg - 8 :: Double) / 10)))
+      grayLevel = (8 + 10 * grayStep) :: Word8
       grayErr = colorDistSq (r, g, b) (grayLevel, grayLevel, grayLevel)
   in if grayErr < cubeErr
-     then fromIntegral grayStep + 216
+     then grayStep + 216
      else 36 * ri + 6 * gi + bi
 
 -- | Find the nearest 6x6x6 cube component index (0-5) for a byte value.
