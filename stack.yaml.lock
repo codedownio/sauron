@@ -52,20 +52,20 @@ packages:
     commit: 030ceab629d5c888a4a890e2aa7f1e0e6eda0578
     git: https://github.com/thomasjm/vty-crossplatform.git
 - completed:
-    commit: 17ed0ab4d9321c6a5db123efbbf93bc91f1e8b55
+    commit: 397eaf5a4ad229b3db5aa007d6f7c33d2b906417
     git: https://github.com/codedownio/wrapping-editor.git
     name: WEditor
     pantry-tree:
-      sha256: 43539b764a34fa67fdeabb0b757cb3fac70e7c8a636bce9b66c77304969e1da8
+      sha256: 82052281dffdbf1b78d7306eb566888dd27f166408ab274bf441a90bd1ec6269
       size: 3411
     subdir: cabal/WEditor
     version: 0.2.1.2
   original:
-    commit: 17ed0ab4d9321c6a5db123efbbf93bc91f1e8b55
+    commit: 397eaf5a4ad229b3db5aa007d6f7c33d2b906417
     git: https://github.com/codedownio/wrapping-editor.git
     subdir: cabal/WEditor
 - completed:
-    commit: 17ed0ab4d9321c6a5db123efbbf93bc91f1e8b55
+    commit: 397eaf5a4ad229b3db5aa007d6f7c33d2b906417
     git: https://github.com/codedownio/wrapping-editor.git
     name: WEditorBrick
     pantry-tree:
@@ -74,7 +74,7 @@ packages:
     subdir: cabal/WEditorBrick
     version: 0.2.0.2
   original:
-    commit: 17ed0ab4d9321c6a5db123efbbf93bc91f1e8b55
+    commit: 397eaf5a4ad229b3db5aa007d6f7c33d2b906417
     git: https://github.com/codedownio/wrapping-editor.git
     subdir: cabal/WEditorBrick
 snapshots:

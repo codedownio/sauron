@@ -37,7 +37,7 @@ extra-deps:
   commit: 030ceab629d5c888a4a890e2aa7f1e0e6eda0578
 
 - git: https://github.com/codedownio/wrapping-editor.git
-  commit: 17ed0ab4d9321c6a5db123efbbf93bc91f1e8b55
+  commit: 397eaf5a4ad229b3db5aa007d6f7c33d2b906417
   subdirs:
   - cabal/WEditor
   - cabal/WEditorBrick

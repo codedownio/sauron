@@ -1,5 +1,3 @@
-{-# LANGUAGE PackageImports #-}
-
 module Sauron.Event.NewIssueModal (
   handleNewIssueModalEvent,
   submitNewIssue,
