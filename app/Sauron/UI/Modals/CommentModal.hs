@@ -8,6 +8,7 @@ import Brick.Widgets.Center
 import Data.String.Interpolate
 import qualified Data.Text as T
 import GitHub
+import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude
 import Sauron.Types
@@ -25,19 +26,22 @@ renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber
     , hBorder
 
     -- Scrollable content area with issue and comments
-    , withVScrollBars OnRight $ withVScrollBarHandles $ viewport CommentModalContent Vertical $ vBox [
-        hLimit maxCommentWidth $ issueInner (appState ^. appNow) issue _commentIssueComments
-        , hBorder
-        , str " "
-        , renderBodyEditor appState True modalWidth editorLines _commentEditor
-        ]
+    , withClickableVScrollBars ScrollbarClick $ withVScrollBars OnRight $ withVScrollBarHandles $ fitViewport CommentModalContent
+        issueWidget
+        (2 + editorLines + 3)
+        (vBox [
+          issueWidget
+          , hBorder
+          , str " "
+          , renderBodyEditor appState True modalWidth editorLines _commentEditor
+        ])
     , hBorder
     , buttonSection _commentEditor issue _submissionState
   ]
   & border
   & withAttr normalAttr
   & hLimit modalWidth
-  & vLimitPercent 90
+  & vLimitPercent 80
   & centerLayer
   where
     typ :: Text
@@ -48,6 +52,8 @@ renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber
     modalWidth = case _appMainUiExtent appState of
       Nothing -> maxCommentWidth + 4
       Just (Extent {extentSize=(w, _h)}) -> round ((0.8 :: Double) * fromIntegral w)
+
+    issueWidget = hLimit maxCommentWidth $ issueInner (appState ^. appNow) issue _commentIssueComments
 
     bodyLineCount = length (dumpEditor _commentEditor)
     editorLines = max 10 (min bodyLineCount 30)
@@ -78,3 +84,17 @@ buttonSection editor _issue submissionState' =
     text = T.intercalate "\n" $ map toText $ dumpEditor editor
     hasText = not $ T.null $ T.strip text
     buttonText = if hasText then "Close with comment" else "Close issue"
+
+-- | A viewport that shrinks to fit its content instead of growing greedily.
+-- Takes a measurement widget (must not contain named widgets) and a count of
+-- extra rows for the remaining content, to avoid rendering named widgets twice.
+fitViewport :: (Ord n, Show n) => n -> Widget n -> Int -> Widget n -> Widget n
+fitViewport vpName measureWidget extraRows content = Widget Greedy Greedy $ do
+  c <- getContext
+  let availH = c ^. availHeightL
+      availW = c ^. availWidthL
+  measureResult <- render (hLimit availW measureWidget)
+  let measureH = V.imageHeight (measureResult ^. imageL)
+      contentH = measureH + extraRows
+      targetH = min contentH availH
+  render (vLimit targetH (viewport vpName Vertical content))

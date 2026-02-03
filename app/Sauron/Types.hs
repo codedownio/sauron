@@ -384,6 +384,7 @@ data ClickableName =
   | LogPane
   | NewIssueTitleEditor
   | NewIssueBodyEditor
+  | ScrollbarClick ClickableScrollbarElement ClickableName
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)

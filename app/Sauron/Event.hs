@@ -166,6 +166,17 @@ appEvent s (MouseDown LogSplitContent V.BLeft _ _) = switchToLogPane s
 appEvent s (MouseDown MainPane V.BLeft _ _) = switchToMainPane s
 appEvent s (MouseDown LogPane V.BLeft _ _) = switchToLogPane s
 
+-- Clickable scrollbar events
+appEvent _ (MouseDown (ScrollbarClick SBHandleBefore vpName) V.BLeft _ _) =
+  vScrollBy (viewportScroll vpName) (-1)
+appEvent _ (MouseDown (ScrollbarClick SBHandleAfter vpName) V.BLeft _ _) =
+  vScrollBy (viewportScroll vpName) 1
+appEvent _ (MouseDown (ScrollbarClick SBTroughBefore vpName) V.BLeft _ _) =
+  vScrollPage (viewportScroll vpName) Up
+appEvent _ (MouseDown (ScrollbarClick SBTroughAfter vpName) V.BLeft _ _) =
+  vScrollPage (viewportScroll vpName) Down
+appEvent _ (MouseDown (ScrollbarClick _ _) _ _ _) = return ()
+
 -- Catch-all
 appEvent _ _ = return ()
 
