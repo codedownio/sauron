@@ -18,7 +18,6 @@ import Brick
 import Brick.BChan
 import Brick.Forms
 import Brick.Widgets.Edit (Editor)
-import WEditorBrick.WrappingEditor (WrappingEditor)
 import qualified Brick.Widgets.List as L
 import Control.Concurrent.QSem
 import Control.Monad.Logger (LogLevel(..))
@@ -36,6 +35,7 @@ import Network.HTTP.Client (Manager)
 import Relude
 import qualified Text.Show
 import UnliftIO.Async
+import WEditorBrick.WrappingEditor (WrappingEditor)
 
 
 -- * ListDrawable typeclass
@@ -230,13 +230,15 @@ type family NodeChildType f a where
 
 -- * Existential wrapper
 
+type SomeNodeConstraints f a = (
+  Show (Node f a)
+  , Eq (Node Fixed a)
+  , Eq (NodeState a)
+  , Typeable a
+  )
+
 data SomeNode f where
-  SomeNode :: (
-    Show (Node f a)
-    , Eq (Node Fixed a)
-    , Eq (NodeState a)
-    , Typeable a
-    ) => { unSomeNode :: Node f a } -> SomeNode f
+  SomeNode :: SomeNodeConstraints f a => { unSomeNode :: Node f a } -> SomeNode f
 
 instance Eq (SomeNode Fixed) where
   (SomeNode (x :: a)) == (SomeNode y) = case cast y of

@@ -42,7 +42,8 @@ startWorkflowHealthCheckIfNeeded ::
   -> IO (Maybe (Async ()))
 startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityData {_static=workflowRun, ..})) parents = do
   case findRepoParent parents of
-    Just (RepoNode (EntityData {_static=(owner, name)})) | hasRunningWorkflow workflowRun -> do
+    Just (RepoNode (EntityData {_static=(owner, name)})) | isRunningWorkflow workflowRun -> do
+      info' baseContext [i|Considering whether to start workflow healthcheck thread for run: #{workflowRun}|]
       readTVarIO _healthCheckThread >>= \case
         Nothing -> do
           log baseContext LevelInfo [i|Starting health check thread for workflow: #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun} (period: #{workflowHealthCheckPeriodUs}us)|] Nothing
@@ -69,15 +70,9 @@ startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityDat
     checkWorkflowForDoneness bc owner name workflowRunId loop =
       withGithubApiSemaphore (githubWithLogging (workflowRunR owner name workflowRunId)) >>= \case
         Left err -> warn' bc [i|(#{untagName owner}/#{untagName name}) Couldn't fetch workflow run #{workflowRunId}: #{err}|]
-        Right response ->
-          case hasRunningWorkflow response of
-            True -> do
-              threadDelay workflowHealthCheckPeriodUs
-              loop
-            False -> do
-              -- Stop ourselves by clearing the thread reference and returning
-              atomically $ writeTVar _healthCheckThread Nothing
-              return ()
+        Right workflowRun' ->
+          if | isRunningWorkflow workflowRun' -> threadDelay workflowHealthCheckPeriodUs >> loop
+             | otherwise -> atomically $ writeTVar _healthCheckThread Nothing
 
-    hasRunningWorkflow :: WorkflowRun -> Bool
-    hasRunningWorkflow wr = not $ isWorkflowCompleted $ fromMaybe (workflowRunStatus wr) (workflowRunConclusion wr)
+    isRunningWorkflow :: WorkflowRun -> Bool
+    isRunningWorkflow wr = not $ isWorkflowCompleted $ fromMaybe (workflowRunStatus wr) (workflowRunConclusion wr)
