@@ -7,6 +7,7 @@ module Sauron.Event (appEvent) where
 import Brick as B
 import Brick.Forms
 import Brick.Widgets.Edit (handleEditorEvent)
+import qualified WEditorBrick.WrappingEditor as WEditorBrick
 import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
@@ -71,8 +72,10 @@ appEvent s@(_appModal -> Just modalState) e = case e of
         modify (appModal . _Just . submissionState .~ SubmittingCloseWithComment)
         liftIO $ closeWithComment s modalState
       _ -> do
-        unlessM (handleModalScrolling CommentModalContent ev) $
-          zoom (appModal . _Just . commentEditor) $ handleEditorEvent (VtyEvent ev)
+        unlessM (handleModalScrolling CommentModalContent ev) $ do
+          let ed = _commentEditor modalState
+          ed' <- WEditorBrick.handleEditor ed ev
+          modify (appModal . _Just . commentEditor .~ ed')
     NewIssueModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
@@ -86,8 +89,10 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       _ -> case modalState of
         NewIssueModalState {_newIssueFocusTitle=True} ->
           zoom (appModal . _Just . newIssueTitleEditor) $ handleEditorEvent (VtyEvent ev)
-        _ ->
-          zoom (appModal . _Just . newIssueBodyEditor) $ handleEditorEvent (VtyEvent ev)
+        _ -> do
+          let bodyEd = _newIssueBodyEditor modalState
+          bodyEd' <- WEditorBrick.handleEditor bodyEd ev
+          modify (appModal . _Just . newIssueBodyEditor .~ bodyEd')
     ZoomModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
@@ -160,6 +165,17 @@ appEvent s (MouseDown LogSplitContent V.BLeft _ _) = switchToLogPane s
 -- Pane focus switching
 appEvent s (MouseDown MainPane V.BLeft _ _) = switchToMainPane s
 appEvent s (MouseDown LogPane V.BLeft _ _) = switchToLogPane s
+
+-- Clickable scrollbar events
+appEvent _ (MouseDown (ScrollbarClick SBHandleBefore vpName) V.BLeft _ _) =
+  vScrollBy (viewportScroll vpName) (-1)
+appEvent _ (MouseDown (ScrollbarClick SBHandleAfter vpName) V.BLeft _ _) =
+  vScrollBy (viewportScroll vpName) 1
+appEvent _ (MouseDown (ScrollbarClick SBTroughBefore vpName) V.BLeft _ _) =
+  vScrollPage (viewportScroll vpName) Up
+appEvent _ (MouseDown (ScrollbarClick SBTroughAfter vpName) V.BLeft _ _) =
+  vScrollPage (viewportScroll vpName) Down
+appEvent _ (MouseDown (ScrollbarClick _ _) _ _ _) = return ()
 
 -- Catch-all
 appEvent _ _ = return ()

@@ -1,5 +1,6 @@
 module Sauron.UI.Modals.NewIssueModal (
-  renderNewIssueModal,
+  renderNewIssueModal
+  , renderBodyEditor
   ) where
 
 import Brick
@@ -14,6 +15,8 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
 import Sauron.UI.Markdown (markdownToWidgetsWithWidth)
+import WEditorBrick.WrappingEditor (WrappingEditor, dumpEditor)
+import qualified WEditorBrick.WrappingEditor as WEditorBrick
 
 
 renderNewIssueModal :: AppState -> ModalState Fixed -> Widget ClickableName
@@ -48,21 +51,21 @@ renderNewIssueModal app (NewIssueModalState {..}) =
       Nothing -> maxCommentWidth + 4
       Just (Extent {extentSize=(w, _h)}) -> round ((0.8 :: Double) * fromIntegral w)
 
-    bodyLineCount = length (getEditContents _newIssueBodyEditor)
+    bodyLineCount = length (dumpEditor _newIssueBodyEditor)
     editorLines = max 10 (min bodyLineCount 30)
 renderNewIssueModal _ _ = str "Invalid modal state for NewIssueModal"
 
-renderBodyEditor :: AppState -> Bool -> Int -> Int -> Editor Text ClickableName -> Widget ClickableName
+renderBodyEditor :: AppState -> Bool -> Int -> Int -> WrappingEditor Char ClickableName -> Widget ClickableName
 renderBodyEditor (AppState {}) focused modalWidth editorHeight editor =
   vLimit (editorHeight + 3) $ hBox [
     -- Left: Editor
     vBox [
-      withAttr (if focused then boldText else italicText) $ str "Body"
+      withAttr (if focused then boldText else italicText) $ str "Write"
       , padAll 1 $
           vLimit editorHeight $
           hLimit sectionWidth $
           withAttr normalAttr $
-          renderEditor (str . toString . T.unlines) focused editor
+          WEditorBrick.renderEditor focused editor
     ]
     , vBorder
     -- Right: Preview
@@ -78,7 +81,7 @@ renderBodyEditor (AppState {}) focused modalWidth editorHeight editor =
   where
     sectionWidth = (modalWidth - 4) `div` 2
 
-    text = T.intercalate "\n" $ getEditContents editor
+    text = T.intercalate "\n" $ map toText $ dumpEditor editor
 
 newIssueButtonSection :: Editor Text ClickableName -> SubmissionState -> Widget ClickableName
 newIssueButtonSection titleEditor submissionState' =

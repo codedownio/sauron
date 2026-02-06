@@ -21,6 +21,9 @@ module Sauron.Actions.Util (
   , findIssuesParent
   , findPullsParent
   , findWorkflowsParent
+
+  , withRepoDefaultBranch
+  , withRepoDefaultBranch'
 ) where
 
 import Brick.BChan
@@ -90,6 +93,15 @@ findPullsParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedPullsNode _) 
 
 findWorkflowsParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable PaginatedWorkflowsT)
 findWorkflowsParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedWorkflowsNode _) <- toList elems]
+
+withRepoDefaultBranch :: MonadIO m => TVar (Fetchable Repo) -> (Maybe Text -> m ()) -> m ()
+withRepoDefaultBranch = withRepoDefaultBranch' (return ())
+
+withRepoDefaultBranch' :: MonadIO m => m a -> TVar (Fetchable Repo) -> (Maybe Text -> m a) -> m a
+withRepoDefaultBranch' defaultValue fetchableVar action = readTVarIO fetchableVar >>= \case
+  Fetched (Repo {..}) -> action repoDefaultBranch
+  Fetching (Just (Repo {..})) -> action repoDefaultBranch
+  _ -> defaultValue
 
 requestToUrl :: GenRequest mt k a -> Text
 requestToUrl req = case req of

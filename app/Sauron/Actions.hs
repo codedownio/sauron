@@ -18,7 +18,7 @@ import Control.Monad.IO.Class
 import qualified Data.Vector as V
 import GitHub
 import Relude
-import Sauron.Actions.Util (findRepoParent, openBrowserToUrl)
+import Sauron.Actions.Util
 import Sauron.Fetch.Branch
 import Sauron.Fetch.Issue
 import Sauron.Fetch.Job
@@ -28,20 +28,17 @@ import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
+import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.Util (isFetchingOrFetched)
 import UnliftIO.Async
-
--- import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 
 
 refreshSelected :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
 refreshSelected = fetchOnOpen
 
-refreshOnZoom :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
-refreshOnZoom bc node parents = fetchOnOpenIfNecessary bc node parents >>= \case
-  Nothing -> return ()
-  Just asy -> wait asy
+refreshOnZoom :: (MonadIO m, SomeNodeConstraints Fixed a) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
+refreshOnZoom bc node parents = fetchOnOpenIfNecessary bc node parents >>= wait
 
 refreshLine :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
 refreshLine bc (RepoNode (EntityData {_static=(owner, name), _state})) _parents =
@@ -72,28 +69,43 @@ refreshVisibleLines :: (
   ) => V.Vector (SomeNode Variable) -> m ()
 refreshVisibleLines elems = do
   baseContext <- ask
-  refreshVisibleLines' baseContext [] (V.toList elems)
+  let cb (SomeNode node) parents = liftIO $ refreshLine baseContext node parents
+  forM_ (V.toList elems) $ forEachVisibleNode cb []
 
-refreshVisibleLines' :: MonadIO m => BaseContext -> [SomeNode Variable] -> [SomeNode Variable] -> m ()
-refreshVisibleLines' baseContext parents nodes = do
+forEachVisibleNode :: (MonadIO m) => (SomeNode Variable -> NonEmpty (SomeNode Variable) -> IO (Async ())) -> [SomeNode Variable] -> SomeNode Variable -> m ()
+forEachVisibleNode cb parents someNode@(SomeNode node) = do
   -- Be careful not to log from the calling thread of this function, because
   -- this function is called in Main.hs, before the event loop starts. Logging
   -- writes to the Brick event chan, and it is bounded, so if we fill it up
   -- before starting the event loop, we can crash with an STM deadlock.
 
-  forM_ nodes $ \someNode@(SomeNode node) -> do
-    parentAsy <- refreshLine baseContext node (someNode :| parents)
+  parentAsy <- liftIO $ cb someNode (someNode :| parents)
 
-    whenM (readTVarIO (_toggled (getEntityData node))) $ void $ liftIO $ async $ do
-      wait parentAsy
-      atomically (getExistentialChildrenWrapped node)
-        >>= refreshVisibleLines' baseContext (someNode : parents)
+  whenM (readTVarIO (_toggled (getEntityData node))) $ void $ liftIO $ async $ do
+    wait parentAsy
+    atomically (getExistentialChildrenWrapped node)
+      >>= mapM_ (forEachVisibleNode cb (someNode : parents))
 
-fetchOnOpenIfNecessary :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Maybe (Async ()))
+fetchOnOpenIfNecessary :: (MonadIO m, SomeNodeConstraints Fixed a) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
 fetchOnOpenIfNecessary bc node parents = do
-  shouldFetchOnExpand node >>= \case
+  maybeAsy <- shouldFetchOnExpand node >>= \case
     True -> (Just <$>) $ fetchOnOpen bc node parents
     False -> return Nothing
+
+  liftIO $ async $ do
+    whenJust maybeAsy wait
+
+    let cb (SomeNode node') parents' = liftIO $ onBecameVisible bc node' parents'
+    atomically (getExistentialChildrenWrapped node) >>= \children' ->
+      liftIO $ forConcurrently_ children' (forEachVisibleNode cb (SomeNode node : toList parents))
+
+onBecameVisible :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
+onBecameVisible bc item@(SingleWorkflowNode (EntityData {_children})) parents = do
+  -- After fetching, start health checks for any running workflows
+  liftIO (startWorkflowHealthCheckIfNeeded bc item (SomeNode item :| toList parents)) >>= \case
+    Just x -> pure x
+    Nothing -> liftIO $ async (return ())
+onBecameVisible _ _ _ = liftIO $ async (return ())
 
 fetchOnOpen :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
 -- Container nodes that just organize other nodes - do nothing
@@ -147,16 +159,6 @@ fetchOnOpen bc item@(SingleJobNode (EntityData {_state, _static=job@(Job {jobId}
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 
 fetchOnOpen _ _ _ = liftIO $ async (return ())
-
-
-withRepoDefaultBranch :: MonadIO m => TVar (Fetchable Repo) -> (Maybe Text -> m ()) -> m ()
-withRepoDefaultBranch = withRepoDefaultBranch' (return ())
-
-withRepoDefaultBranch' :: MonadIO m => m a -> TVar (Fetchable Repo) -> (Maybe Text -> m a) -> m a
-withRepoDefaultBranch' defaultValue fetchableVar action = readTVarIO fetchableVar >>= \case
-  Fetched (Repo {..}) -> action repoDefaultBranch
-  Fetching (Just (Repo {..})) -> action repoDefaultBranch
-  _ -> defaultValue
 
 
 -- | This should be synced up with how fetchOnOpen works

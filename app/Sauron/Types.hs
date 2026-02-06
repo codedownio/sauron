@@ -35,6 +35,7 @@ import Network.HTTP.Client (Manager)
 import Relude
 import qualified Text.Show
 import UnliftIO.Async
+import WEditorBrick.WrappingEditor (WrappingEditor)
 
 
 -- * ListDrawable typeclass
@@ -229,13 +230,15 @@ type family NodeChildType f a where
 
 -- * Existential wrapper
 
+type SomeNodeConstraints f a = (
+  Show (Node f a)
+  , Eq (Node Fixed a)
+  , Eq (NodeState a)
+  , Typeable a
+  )
+
 data SomeNode f where
-  SomeNode :: (
-    Show (Node f a)
-    , Eq (Node Fixed a)
-    , Eq (NodeState a)
-    , Typeable a
-    ) => { unSomeNode :: Node f a } -> SomeNode f
+  SomeNode :: SomeNodeConstraints f a => { unSomeNode :: Node f a } -> SomeNode f
 
 instance Eq (SomeNode Fixed) where
   (SomeNode (x :: a)) == (SomeNode y) = case cast y of
@@ -383,6 +386,7 @@ data ClickableName =
   | LogPane
   | NewIssueTitleEditor
   | NewIssueBodyEditor
+  | ScrollbarClick ClickableScrollbarElement ClickableName
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -500,7 +504,7 @@ data SubmissionState =
 -- TODO: break these into individual types
 data ModalState f =
   CommentModalState {
-    _commentEditor :: Editor Text ClickableName
+    _commentEditor :: WrappingEditor Char ClickableName
     , _commentIssue :: Issue
     , _commentIssueComments :: V.Vector (Either IssueEvent IssueComment)
     , _issueIsPR :: Bool
@@ -513,7 +517,7 @@ data ModalState f =
       }
   | NewIssueModalState {
       _newIssueTitleEditor :: Editor Text ClickableName
-      , _newIssueBodyEditor :: Editor Text ClickableName
+      , _newIssueBodyEditor :: WrappingEditor Char ClickableName
       , _newIssueRepoOwner :: Name Owner
       , _newIssueRepoName :: Name Repo
       , _newIssueSubmissionState :: SubmissionState
