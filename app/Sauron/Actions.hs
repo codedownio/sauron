@@ -102,7 +102,6 @@ fetchOnOpenIfNecessary bc node parents = do
 onBecameVisible :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
 onBecameVisible bc item@(SingleWorkflowNode (EntityData {_children})) parents = do
   -- After fetching, start health checks for any running workflows
-  info' bc [i|Single workflow node became visible: #{item}|]
   liftIO (startWorkflowHealthCheckIfNeeded bc item (SomeNode item :| toList parents)) >>= \case
     Just x -> pure x
     Nothing -> liftIO $ async (return ())
