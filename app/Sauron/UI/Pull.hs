@@ -82,10 +82,10 @@ instance ListDrawable Fixed 'SinglePullT where
           liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
         return True
     | key == commentKey = do
-        withFixedElemAndParents s $ \_ _ parents -> do
-          case findRepoParent parents of
-            Just (RepoNode (EntityData {_static=(owner, name)})) ->
-              fetchCommentsAndOpenModal (s ^. appBaseContext) issue True owner name
+        withFixedElemAndParents s $ \_ (SomeNode variableEl) parents -> do
+          case (findRepoParent parents, variableEl) of
+            (Just (RepoNode (EntityData {_static=(owner, name)})), SinglePullNode (EntityData {_state=stateVar})) ->
+              fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar True owner name
             _ -> return ()
         return True
     | key == closeReopenKey = do

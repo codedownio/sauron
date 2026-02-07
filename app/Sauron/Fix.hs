@@ -21,6 +21,7 @@ fixModal (CommentModalState {..}) = return $ CommentModalState {
   _commentEditor = _commentEditor
   , _commentIssue = _commentIssue
   , _commentIssueComments = _commentIssueComments
+  , _commentNodeState = _commentNodeState
   , _issueIsPR = _issueIsPR
   , _commentRepoOwner = _commentRepoOwner
   , _commentRepoName = _commentRepoName

@@ -489,7 +489,7 @@ data CommentModalEvent =
   CommentSubmitted (Either Error Comment)
   | IssueClosedWithComment (Either Error Issue)
   | CommentsRefreshed (V.Vector (Either IssueEvent IssueComment))
-  | OpenCommentModal Issue (V.Vector (Either IssueEvent IssueComment)) Bool (Name Owner) (Name Repo)
+  | OpenCommentModal Issue (V.Vector (Either IssueEvent IssueComment)) (TVar (Fetchable (V.Vector (Either IssueEvent IssueComment)))) Bool (Name Owner) (Name Repo)
 
 data NewIssueModalEvent =
   NewIssueCreated (Either Error Issue)
@@ -507,6 +507,7 @@ data ModalState f =
     _commentEditor :: WrappingEditor Char ClickableName
     , _commentIssue :: Issue
     , _commentIssueComments :: V.Vector (Either IssueEvent IssueComment)
+    , _commentNodeState :: TVar (Fetchable (V.Vector (Either IssueEvent IssueComment)))
     , _issueIsPR :: Bool
     , _commentRepoOwner :: Name Owner
     , _commentRepoName :: Name Repo
@@ -528,8 +529,8 @@ data ModalState f =
       }
 
 instance Eq (ModalState Fixed) where
-  (CommentModalState _editor1 issue1 comments1 isPR1 owner1 name1 submission1) ==
-    (CommentModalState _editor2 issue2 comments2 isPR2 owner2 name2 submission2) =
+  (CommentModalState _editor1 issue1 comments1 _nodeState1 isPR1 owner1 name1 submission1) ==
+    (CommentModalState _editor2 issue2 comments2 _nodeState2 isPR2 owner2 name2 submission2) =
     issue1 == issue2 && comments1 == comments2 && isPR1 == isPR2 &&
     owner1 == owner2 && name1 == name2 && submission1 == submission2
   (ZoomModalState node1) == (ZoomModalState node2) = node1 == node2

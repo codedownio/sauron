@@ -35,7 +35,7 @@ handleCommentModalEvent s (CommentSubmitted result) = case result of
     modify (appModal . _Just . commentEditor .~ newEditor (breakWords noHyphen) CommentEditor [])
     -- Refresh issue comments and scroll to bottom
     case s ^. appModal of
-      Just (CommentModalState _editor issue _comments isPR owner name _submissionState) -> do
+      Just (CommentModalState _editor issue _comments _nodeState isPR owner name _submissionState) -> do
         let issueNum = case issueNumber issue of IssueNumber n -> n
         refreshIssueComments (s ^. appBaseContext) owner name issueNum isPR
         vScrollToEnd (viewportScroll CommentModalContent)
@@ -53,19 +53,26 @@ handleCommentModalEvent _s (IssueClosedWithComment result) = case result of
     -- Reset submission state on error
     modify (appModal . _Just . submissionState .~ NotSubmitting)
 
-handleCommentModalEvent _s (CommentsRefreshed comments) = do
+handleCommentModalEvent s (CommentsRefreshed comments) = do
   -- Update the modal with refreshed comments and scroll to bottom
   modify (appModal . _Just . commentIssueComments .~ comments)
+  -- Also update the node's state so the main UI stays in sync
+  case s ^. appModal of
+    Just (CommentModalState {_commentNodeState=nodeState}) ->
+      liftIO $ atomically $ writeTVar nodeState (Fetched comments)
+    _ -> return ()
   vScrollToEnd (viewportScroll CommentModalContent)
 
-handleCommentModalEvent _s (OpenCommentModal issue comments isPR owner name) = do
+handleCommentModalEvent _s (OpenCommentModal issue comments nodeState isPR owner name) = do
+  -- Update the node's state with the fresh comments
+  liftIO $ atomically $ writeTVar nodeState (Fetched comments)
   -- Open the comment modal with fresh comments and scroll to bottom
   let editor = newEditor (breakWords noHyphen) CommentEditor []
-  modify (appModal ?~ CommentModalState editor issue comments isPR owner name NotSubmitting)
+  modify (appModal ?~ CommentModalState editor issue comments nodeState isPR owner name NotSubmitting)
   vScrollToEnd (viewportScroll CommentModalContent)
 
 submitComment :: AppState -> ModalState Fixed -> IO ()
-submitComment s (CommentModalState editor issue _comments _isPR owner name _submissionState) = do
+submitComment s (CommentModalState editor issue _comments _nodeState _isPR owner name _submissionState) = do
   let commentText = T.intercalate "\n" $ map toText $ dumpEditor editor
   unless (T.null $ T.strip commentText) $ do
     let baseContext = s ^. appBaseContext
@@ -78,7 +85,7 @@ submitComment s (CommentModalState editor issue _comments _isPR owner name _subm
 submitComment _ _ = return () -- ZoomModalState doesn't support comments
 
 closeWithComment :: AppState -> ModalState Fixed -> IO ()
-closeWithComment s (CommentModalState editor issue _comments _isPR owner name _submissionState) = do
+closeWithComment s (CommentModalState editor issue _comments _nodeState _isPR owner name _submissionState) = do
   let commentText = T.intercalate "\n" $ map toText $ dumpEditor editor
   let baseContext = s ^. appBaseContext
   let issueNum = case issueNumber issue of IssueNumber n -> n
@@ -101,15 +108,15 @@ refreshIssueComments baseContext owner name issueNumber _isPR = do
         writeBChan (eventChan baseContext) (TimeUpdated now)
       Left _err -> return ()
 
-fetchCommentsAndOpenModal :: BaseContext -> Issue -> Bool -> Name Owner -> Name Repo -> EventM ClickableName AppState ()
-fetchCommentsAndOpenModal baseContext issue@(Issue {issueNumber=(IssueNumber issueNum)}) isPR owner name = do
+fetchCommentsAndOpenModal :: BaseContext -> Issue -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> Bool -> Name Owner -> Name Repo -> EventM ClickableName AppState ()
+fetchCommentsAndOpenModal baseContext issue@(Issue {issueNumber=(IssueNumber issueNum)}) nodeState isPR owner name = do
   liftIO $ void $ async $ do
     fetchIssueCommentsAndEvents baseContext owner name issueNum >>= \case
       Right merged -> do
         -- Send event to open modal with fresh comments and events
         now <- getCurrentTime
-        writeBChan (eventChan baseContext) (CommentModalEvent (OpenCommentModal issue merged isPR owner name))
+        writeBChan (eventChan baseContext) (CommentModalEvent (OpenCommentModal issue merged nodeState isPR owner name))
         writeBChan (eventChan baseContext) (TimeUpdated now)
       Left _err -> do
         -- On error, open modal with empty comments and events
-        writeBChan (eventChan baseContext) (CommentModalEvent (OpenCommentModal issue V.empty isPR owner name))
+        writeBChan (eventChan baseContext) (CommentModalEvent (OpenCommentModal issue V.empty nodeState isPR owner name))

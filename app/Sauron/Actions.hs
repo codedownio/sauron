@@ -28,7 +28,6 @@ import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
-import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.Util (isFetchingOrFetched)
 import UnliftIO.Async
