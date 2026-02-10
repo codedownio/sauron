@@ -20,7 +20,7 @@ browserToPullsKey = V.KChar 'P'
 browserToActionsKey = V.KChar 'A'
 
 nextPageKey = V.KChar 'N'
-prevPageKey = V.KChar 'P'
+prevPageKey = V.KChar 'B'
 firstPageKey = V.KChar 'F'
 lastPageKey = V.KChar 'L'
 
