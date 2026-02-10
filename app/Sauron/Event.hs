@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -42,7 +43,10 @@ appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (l
 appEvent _ (AppEvent (ModalUpdate newModal)) = modify (appModal .~ newModal)
 
 appEvent _ (AppEvent AnimationTick) = do
-  modify (appAnimationCounter %~ (+1))
+  -- Use strict evaluation to avoid thunk buildup
+  counter <- gets _appAnimationCounter
+  let !counter' = counter + 1
+  modify (appAnimationCounter .~ counter')
 
   mainUiExtent <- lookupExtent MainUI
   modify (appMainUiExtent .~ mainUiExtent)
@@ -56,8 +60,13 @@ appEvent _s (AppEvent (TimeUpdated newTime)) = do
   modify (appNow .~ newTime)
 
 appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
-  -- Add log entry to the logs sequence
-  modify (appLogs %~ (Seq.|> logEntry))
+  -- Add log entry to the logs sequence, limiting to maxLogEntries to prevent unbounded growth
+  let maxLogEntries = 1000
+  modify (appLogs %~ \logs ->
+    let logs' = logs Seq.|> logEntry
+    in if Seq.length logs' > maxLogEntries
+       then Seq.drop (Seq.length logs' - maxLogEntries) logs'
+       else logs')
   autoScrollLogsToBottom
 
 -- Modal events

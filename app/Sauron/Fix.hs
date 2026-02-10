@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
@@ -85,12 +86,13 @@ fixWrappedNode item ed = (`setEntityData` item) <$> (readTVar (_children ed) >>=
 
 fixEntityData :: [NodeChildType Fixed a] -> EntityData Variable a -> STM (EntityData Fixed a)
 fixEntityData childrenFixed (EntityData {..}) = do
-  stateFixed <- readTVar _state
-  toggledFixed <- readTVar _toggled
-  healthCheckFixed <- readTVar _healthCheck
-  healthCheckThreadFixed <- readTVar _healthCheckThread
+  !stateFixed <- readTVar _state
+  !toggledFixed <- readTVar _toggled
+  !healthCheckFixed <- readTVar _healthCheck
+  !healthCheckThreadFixed <- readTVar _healthCheckThread
 
-  return $ EntityData {
+  -- Force evaluation of the EntityData to avoid thunk buildup
+  let !result = EntityData {
     _static = _static
     , _state = stateFixed
 
@@ -104,3 +106,4 @@ fixEntityData childrenFixed (EntityData {..}) = do
     , _depth = _depth
     , _ident = _ident
     }
+  return result
