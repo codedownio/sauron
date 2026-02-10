@@ -35,9 +35,10 @@ fixModal (NewIssueModalState {..}) = return $ NewIssueModalState {
   , _newIssueSubmissionState = _newIssueSubmissionState
   , _newIssueFocusTitle = _newIssueFocusTitle
   }
-fixModal (ZoomModalState sn) = do
+fixModal (ZoomModalState sn parents) = do
   fixedNode <- fixSomeNode sn
-  return $ ZoomModalState fixedNode
+  fixedParents <- mapM fixSomeNode parents
+  return $ ZoomModalState fixedNode fixedParents
 fixModal (LogModalState logsList) = return (LogModalState logsList)
 
 fixSomeNode :: SomeNode Variable -> STM (SomeNode Fixed)

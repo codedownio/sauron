@@ -1,5 +1,8 @@
 module Sauron.UI.Modals.CommentModal (
-  renderModal,
+  renderModal
+
+  , modalWidth
+  , modalHeightPercent
   ) where
 
 import Brick
@@ -30,18 +33,18 @@ renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber
         issueWidget
         (2 + editorLines + 3)
         (vBox [
-          issueWidget
+          hCenter issueWidget
           , hBorder
           , str " "
-          , renderBodyEditor appState True modalWidth editorLines _commentEditor
+          , renderBodyEditor appState True (modalWidth appState) editorLines _commentEditor
         ])
     , hBorder
     , buttonSection _commentEditor issue _submissionState
   ]
   & border
   & withAttr normalAttr
-  & hLimit modalWidth
-  & vLimitPercent 80
+  & hLimit (modalWidth appState)
+  & vLimitPercent modalHeightPercent
   & centerLayer
   where
     typ :: Text
@@ -49,15 +52,21 @@ renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber
 
     modalTitle = [i|Comment on #{typ} \##{num}|]
 
-    modalWidth = case _appMainUiExtent appState of
-      Nothing -> maxCommentWidth + 4
-      Just (Extent {extentSize=(w, _h)}) -> round ((0.8 :: Double) * fromIntegral w)
-
     issueWidget = hLimit maxCommentWidth $ issueInner (appState ^. appNow) issue _commentIssueComments
 
     bodyLineCount = length (dumpEditor _commentEditor)
     editorLines = max 10 (min bodyLineCount 30)
 renderModal _ _ = str "Invalid modal state for CommentModal" -- This should never happen
+
+-- | Calculate modal width: 80% of UI width, or maxCommentWidth + 4 as fallback
+modalWidth :: AppState -> Int
+modalWidth appState = case _appMainUiExtent appState of
+  Nothing -> maxCommentWidth + 4
+  Just (Extent {extentSize=(w, _h)}) -> round ((0.8 :: Double) * fromIntegral w)
+
+-- | Modal height as percentage of screen height
+modalHeightPercent :: Int
+modalHeightPercent = 80
 
 buttonSection :: WrappingEditor Char ClickableName -> Issue -> SubmissionState -> Widget ClickableName
 buttonSection editor _issue submissionState' =

@@ -94,7 +94,7 @@ instance ListDrawable Fixed 'SingleIssueT where
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (s ^. appBaseContext) variableEl parents
-          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl)))
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
         return True
     | key == commentKey = do
         withFixedElemAndParents s $ \_ (SomeNode variableEl) parents -> do

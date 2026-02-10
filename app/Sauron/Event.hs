@@ -19,6 +19,7 @@ import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude hiding (Down, pi)
 import Sauron.Actions
+import Sauron.Actions.Util (findRepoParent)
 import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.NewIssueModal
@@ -96,6 +97,7 @@ appEvent s@(_appModal -> Just modalState) e = case e of
     ZoomModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+      (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
       _ -> void $ handleModalScrolling ZoomModalContent ev
     (LogModalState _) -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
@@ -315,6 +317,28 @@ closeModal :: AppState -> EventM ClickableName AppState ()
 closeModal s = do
   modify (appModal .~ Nothing)
   liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+
+-- | Handle 'c' key press in zoom modal to switch to comment modal for issues/PRs
+handleZoomModalComment :: AppState -> EventM ClickableName AppState ()
+handleZoomModalComment s = do
+  maybeVarModal <- liftIO $ readTVarIO (_appModalVariable s)
+  case maybeVarModal of
+    Just (ZoomModalState (SomeNode (SingleIssueNode (EntityData {_static=issue, _state=stateVar}))) parents) ->
+      case findRepoParent (dummyNonEmpty parents) of
+        Just (RepoNode (EntityData {_static=(owner, name)})) ->
+          fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar False owner name
+        Nothing -> return ()
+    Just (ZoomModalState (SomeNode (SinglePullNode (EntityData {_static=issue, _state=stateVar}))) parents) ->
+      case findRepoParent (dummyNonEmpty parents) of
+        Just (RepoNode (EntityData {_static=(owner, name)})) ->
+          fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar True owner name
+        Nothing -> return ()
+    _ -> return ()
+  where
+    -- findRepoParent expects NonEmpty, but we have a list. Create a dummy NonEmpty.
+    dummyNonEmpty :: [a] -> NonEmpty a
+    dummyNonEmpty [] = error "handleZoomModalComment: empty parents"
+    dummyNonEmpty (x:xs) = x :| xs
 
 handleModalScrolling :: ClickableName -> V.Event -> EventM ClickableName AppState Bool
 handleModalScrolling viewportName ev = case ev of

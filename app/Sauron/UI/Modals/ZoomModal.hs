@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs #-}
 
 module Sauron.UI.Modals.ZoomModal (
-  renderZoomModal,
-  generateModalTitle,
+  renderZoomModal
+  , generateModalTitle
   ) where
 
 import Brick
@@ -16,29 +16,50 @@ import Sauron.Types
 import Sauron.UI
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
+import Sauron.UI.Keys (commentKey, showKey)
+import Sauron.UI.Modals.CommentModal (modalHeightPercent, modalWidth)
 
 
 renderZoomModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode}) =
+renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModalParents=_parents}) =
   vBox [
     hCenter $ withAttr boldText $ str modalTitle
     , hBorder
     -- Scrollable content area with node content
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport ZoomModalContent Vertical $
-      hLimit maxCommentWidth $ vBox [
+      hCenter $ hLimit maxCommentWidth $ vBox [
         renderNodeContent appState someNode
       ]
     , hBorder
-    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] to close"
+    , hCenter $ hBox $ intersperse (str "  ") $ getZoomModalHotkeys someNode
   ]
   & border
   & withAttr normalAttr
-  & hLimit (maxCommentWidth + 4)
-  & vLimitPercent 90
+  & hLimit (modalWidth appState)
+  & vLimitPercent modalHeightPercent
   & centerLayer
   where
     modalTitle = generateModalTitle someNode
 renderZoomModal _ _ = str "Invalid modal state" -- This should never happen
+
+-- | Generate hotkey widgets for the zoom modal footer based on the node type
+getZoomModalHotkeys :: SomeNode Fixed -> [Widget ClickableName]
+getZoomModalHotkeys (SomeNode node) = nodeSpecificHotkeys ++ commonHotkeys
+  where
+    commonHotkeys = [hotkeyWidget "Esc" "Close"]
+
+    nodeSpecificHotkeys = case node of
+      SingleIssueNode {} -> [hotkeyWidget (showKey commentKey) "Comment"]
+      SinglePullNode {} -> [hotkeyWidget (showKey commentKey) "Comment"]
+      _ -> []
+
+    hotkeyWidget :: String -> String -> Widget ClickableName
+    hotkeyWidget key msg = hBox [
+      str "["
+      , withAttr hotkeyAttr $ str key
+      , str "] "
+      , withAttr hotkeyMessageAttr $ str msg
+      ]
 
 renderNodeContent :: AppState -> SomeNode Fixed -> Widget ClickableName
 renderNodeContent appState (SomeNode inner) = vBox $ catMaybes [

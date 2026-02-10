@@ -515,6 +515,7 @@ data ModalState f =
   }
   | ZoomModalState {
       _zoomModalSomeNode :: SomeNode f
+      , _zoomModalParents :: [SomeNode f]
       }
   | NewIssueModalState {
       _newIssueTitleEditor :: Editor Text ClickableName
@@ -533,7 +534,7 @@ instance Eq (ModalState Fixed) where
     (CommentModalState _editor2 issue2 comments2 _nodeState2 isPR2 owner2 name2 submission2) =
     issue1 == issue2 && comments1 == comments2 && isPR1 == isPR2 &&
     owner1 == owner2 && name1 == name2 && submission1 == submission2
-  (ZoomModalState node1) == (ZoomModalState node2) = node1 == node2
+  (ZoomModalState node1 parents1) == (ZoomModalState node2 parents2) = node1 == node2 && parents1 == parents2
   (NewIssueModalState _t1 _b1 o1 n1 s1 _f1) == (NewIssueModalState _t2 _b2 o2 n2 s2 _f2) =
     o1 == o2 && n1 == n2 && s1 == s2
   (LogModalState _list1) == (LogModalState _list2) = True  -- We'll consider all log modal states equal for simplicity
