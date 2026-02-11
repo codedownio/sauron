@@ -16,9 +16,10 @@ module Sauron.UI.TopBox (
 import Brick
 import Brick.Widgets.List
 import qualified Data.List as L
+import qualified Data.Vector as V
 import Lens.Micro
 import Relude
-import Sauron.Event.Helpers (isPaginationNode, getElemAndParents)
+import Sauron.Event.Helpers (isPaginationNode)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Branch ()
@@ -180,9 +181,29 @@ keyIndicatorContextual app p key msg = case p app of
 -- * Predicates
 
 -- | Check if the selected element matches a predicate or has an ancestor that does.
+-- Finds ancestors by walking backwards through the flattened list, collecting
+-- the first node at each decreasing depth level.
+--
+-- Note that we can't use nthChildVector on this, because we want the function to be
+-- pure, and thus we have to work with appMainList. But appMainList is flattened
+-- (whereas appMainListVariable is a tree).
 hasAncestorMatching :: (forall a. Node Fixed a -> Bool) -> AppState -> Bool
-hasAncestorMatching predicate s = maybe [] toList (getElemAndParents s)
-                                & any (\(SomeNode n) -> predicate n)
+hasAncestorMatching predicate s = case listSelectedElement (s ^. appMainList) of
+  Nothing -> False
+  Just (idx, SomeNode selected) ->
+    predicate selected || any (\(SomeNode n) -> predicate n) ancestors
+    where
+      selectedDepth = _depth (getEntityData selected)
+      preceding = V.toList $ V.take idx (listElements (s ^. appMainList))
+      ancestors = findAncestors (selectedDepth - 1) (L.reverse preceding)
+
+      -- Walk backwards through the list, collecting the first node at each depth level
+      findAncestors :: Int -> [SomeNode Fixed] -> [SomeNode Fixed]
+      findAncestors targetDepth _ | targetDepth < 0 = []
+      findAncestors targetDepth nodes =
+        case L.dropWhile (\(SomeNode n) -> _depth (getEntityData n) /= targetDepth) nodes of
+          [] -> []
+          (ancestor : rest) -> ancestor : findAncestors (targetDepth - 1) rest
 
 isRepoNode :: Node f a -> Bool
 isRepoNode (RepoNode {}) = True

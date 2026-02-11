@@ -9,8 +9,6 @@ module Sauron.Event.Helpers (
   , withRepoParent
   , withNthChildAndRepoParent
 
-  , getElemAndParents
-
   , hasPaginationParent
   , hasRepoParent
 
@@ -39,16 +37,7 @@ getFixedElemAndParents s =
     Just (n, fixedElem) ->
       atomically (nthChildVector readTVar getExistentialChildrenWrapped n (s ^. appMainListVariable)) >>= \case
         Nothing -> return Nothing
-        Just elems -> return $ Just (fixedElem, (head elems), elems)
-
-getElemAndParents :: AppState -> Maybe (NonEmpty (SomeNode Fixed))
-getElemAndParents s =
-  case listSelectedElement (s ^. appMainList) of
-    Nothing -> Nothing
-    Just (n, fixedElem) ->
-      case runIdentity (nthChildVector return getExistentialChildrenWrappedIdentity n (listElements (s ^. appMainList))) of
-        Nothing -> Nothing
-        Just elems -> Just (fixedElem :| toList elems)
+        Just elems -> return $ Just (fixedElem, head elems, elems)
 
 withFixedElemAndParents :: (
   MonadIO m
@@ -145,6 +134,10 @@ type GetExistentialChildrenFn f m = forall a. Node f a -> m [SomeNode f]
 
 -- | Returns the node at the head of the list, and then its successive parents
 -- going up to a tree root.
+--
+-- TODO: maybe revert the change to make this run in arbitrary monads, since it
+-- seems not useful to be able to run it in the identiy monad after all, since
+-- appMainList is flattened.
 nthChildVector :: Monad m => (Switchable f Bool -> m Bool) -> GetExistentialChildrenFn f m -> Int -> V.Vector (SomeNode f) -> m (Maybe (NonEmpty (SomeNode f)))
 nthChildVector isToggled gecf n elems = nthChildList isToggled gecf n (V.toList elems) >>= \case
   Left _ -> pure Nothing
