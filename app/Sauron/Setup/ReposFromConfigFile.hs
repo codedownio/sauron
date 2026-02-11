@@ -49,7 +49,7 @@ reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile = do
               let ps@(PeriodSpec period) = fromMaybe defaultHealthCheckPeriodUs (localPeriod <|> join (repoSettingsCheckPeriod <$> configSettings))
               thread <- lift (newRepoHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
               pure (Just (thread, period))
-            ConfigRepoSingle _ _ _ -> do
+            ConfigRepoSingle {} -> do
               let ps@(PeriodSpec period) = fromMaybe defaultHealthCheckPeriodUs (join (repoSettingsCheckPeriod <$> configSettings))
               thread <- lift (newRepoHealthCheckThread baseContext nsName repoVar healthCheckVar ps)
               pure (Just (thread, period))
