@@ -15,6 +15,7 @@ module Sauron.UI.TopBox (
 import Brick
 import Brick.Widgets.List
 import qualified Data.List as L
+import qualified Data.Vector as V
 import Lens.Micro
 import Relude
 import Sauron.Types
@@ -37,8 +38,8 @@ topBox app = hBox [columnPadding column1
                   , columnPadding column3]
   where
     column1 = keybindingBox [keyIndicator (L.intersperse '/' [unKChar nextKey, unKChar previousKey, '↑', '↓']) "Navigate"
-                            , keyIndicatorHasSelected app (showKeys toggleKeys <> "/←/→") "Open/close node"
-                            , keyIndicatorHasSelectedOpen app "Control-v/Meta-v" "Scroll node"
+                            , keyIndicator (showKeys toggleKeys <> "/←/→") "Open/close node"
+                            , keyIndicatorHasSelectedRepoOpen app "Control-v/Meta-v" "Scroll node"
                             , keyIndicator "q" "Exit"
                             ]
 
@@ -166,22 +167,36 @@ keyIndicator key msg = keyIndicator' key (withAttr hotkeyMessageAttr $ str msg)
 
 keyIndicator' key l = hBox [str "[", withAttr hotkeyAttr $ str key, str "] ", l]
 
-keyIndicatorHasSelected app = keyIndicatorContextual app someRepoSelected
-
-keyIndicatorHasSelectedOpen app = keyIndicatorContextual app selectedRepoToggled
+keyIndicatorHasSelectedRepoOpen app = keyIndicatorContextual app selectedRepoToggled
 
 keyIndicatorContextual app p key msg = case p app of
   True -> hBox [str "[", withAttr hotkeyAttr $ str key, str "] ", withAttr hotkeyMessageAttr $ str msg]
   False -> hBox [str "[", withAttr disabledHotkeyAttr $ str key, str "] ", withAttr disabledHotkeyMessageAttr $ str msg]
 
-
 -- * Predicates
 
--- someRepoSelected s = runIdentity $ withNthChildAndRepoParent s $ \_ _ repo ->
---   pure $ isJust maybeRepo
+-- | Check if the selected element has a RepoNode as an ancestor
+-- by looking at preceding elements in the expanded list with lower depth
+someRepoSelected :: AppState -> Bool
 someRepoSelected s = case listSelectedElement (s ^. appMainList) of
   Nothing -> False
-  Just _ -> True
+  Just (idx, SomeNode selected) -> hasRepoAncestor || isRepoNode selected
+    where
+      selectedDepth = _depth (getEntityData selected)
+
+      -- Get all elements before the selected one
+      preceding = V.take idx (listElements (s ^. appMainList))
+
+      -- Find any RepoNode that appears before us with lower depth (i.e., is an ancestor)
+      hasRepoAncestor = V.any isRepoAncestor preceding
+      isRepoAncestor (SomeNode node) = case node of
+        RepoNode ed -> _depth ed < selectedDepth
+        _ -> False
+
+-- | Check if a node is a RepoNode
+isRepoNode :: Node Fixed a -> Bool
+isRepoNode (RepoNode {}) = True
+isRepoNode _ = False
 
 selectedRepoToggled = const False
 

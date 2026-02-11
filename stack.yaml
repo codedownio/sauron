@@ -26,7 +26,8 @@ extra-deps:
   # - EventType: add more constructors + a catchall called Unknown
   # - Fix markNotificationAsReadR
   # - Add markNotificationAsDoneR
-  commit: 23294bf9e64c358f2c907d12bd88e89696c34818
+  # - Add checkRunsForR + supporting data types
+  commit: 55b808f511e707d5c4208a5dcf533543c77eecb8
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
