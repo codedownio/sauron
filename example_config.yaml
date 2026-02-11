@@ -18,12 +18,15 @@ sections:
   - codedownio/matheditable
   - codedownio/ot
   - codedownio/resource-map
-- display_name: "Languages ecosystem"
+- display_name: "Notebook language servers"
   repos:
   - codedownio/cpp-notebook-language-server
+  - codedownio/go-notebook-language-server
   - codedownio/haskell-notebook-language-server
-  - codedownio/markdown-spellcheck-lsp
   - codedownio/rust-notebook-language-server
+- display_name: "Languages ecosystem"
+  repos:
+  - codedownio/markdown-spellcheck-lsp
   - codedownio/General
 - display_name: "Open source"
   repos:
