@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Sauron.Event.Helpers (
   withFixedElemAndParents
@@ -8,8 +9,12 @@ module Sauron.Event.Helpers (
   , withRepoParent
   , withNthChildAndRepoParent
 
+  , getElemAndParents
+
   , hasPaginationParent
   , hasRepoParent
+
+  , isPaginationNode
   ) where
 
 import Brick.Widgets.List
@@ -32,9 +37,18 @@ getFixedElemAndParents s =
   case listSelectedElement (s ^. appMainList) of
     Nothing -> return Nothing
     Just (n, fixedElem) ->
-      atomically (nthChildVector n (s ^. appMainListVariable)) >>= \case
+      atomically (nthChildVector readTVar getExistentialChildrenWrapped n (s ^. appMainListVariable)) >>= \case
         Nothing -> return Nothing
         Just elems -> return $ Just (fixedElem, (head elems), elems)
+
+getElemAndParents :: AppState -> Maybe (NonEmpty (SomeNode Fixed))
+getElemAndParents s =
+  case listSelectedElement (s ^. appMainList) of
+    Nothing -> Nothing
+    Just (n, fixedElem) ->
+      case runIdentity (nthChildVector return getExistentialChildrenWrappedIdentity n (listElements (s ^. appMainList))) of
+        Nothing -> Nothing
+        Just elems -> Just (fixedElem :| toList elems)
 
 withFixedElemAndParents :: (
   MonadIO m
@@ -46,10 +60,13 @@ withFixedElemAndParents s cb =
 
 withNthChildAndPaginationParent :: (
   MonadIO m
-  ) => AppState -> (SomeNode Fixed -> SomeNode Variable -> (SomeNode Variable, STM PageInfo, PageInfo -> STM ()) -> NonEmpty (SomeNode Variable) -> m ()) -> m ()
+  )
+  => AppState
+  -> (SomeNode Fixed -> SomeNode Variable -> (SomeNode Variable, STM PageInfo, PageInfo -> STM ()) -> NonEmpty (SomeNode Variable) -> m ())
+  -> m ()
 withNthChildAndPaginationParent s cb =
   withFixedElemAndParents s $ \fixedEl variableEl parents ->
-    case L.dropWhile (not . isPaginationNode) (toList parents) of
+    case L.dropWhile (not . isSomeNodePagination) (toList parents) of
       (el@(getPaginationInfo -> Just (readPageInfo, writePageInfo)):rest) ->
         cb fixedEl variableEl (el, readPageInfo, writePageInfo) (el :| rest)
       _ -> return ()
@@ -60,7 +77,10 @@ hasPaginationParent :: (
 hasPaginationParent s =
   getFixedElemAndParents s >>= \case
     Nothing -> return False
-    Just (_, _, parents) -> return $ any isPaginationNode $ toList parents
+    Just (_, _, parents) -> return $ any isSomeNodePagination $ toList parents
+
+isSomeNodePagination :: SomeNode f -> Bool
+isSomeNodePagination (SomeNode node) = isPaginationNode node
 
 withNthChildAndRepoParent :: MonadIO m => AppState -> (SomeNode Fixed -> SomeNode Variable -> Node Variable RepoT -> m ()) -> m ()
 withNthChildAndRepoParent s cb =
@@ -88,52 +108,58 @@ withRepoParent s cb = do
 
 -- * Util
 
-isPaginationNode :: SomeNode Variable -> Bool
-isPaginationNode = isJust . getPaginationInfo
+-- | Check if a node is a pagination node (works for both Fixed and Variable)
+isPaginationNode :: Node f a -> Bool
+isPaginationNode node = isJust (getPaginationState node)
 
 getPaginationInfo :: SomeNode Variable -> Maybe (STM PageInfo, PageInfo -> STM ())
-getPaginationInfo (SomeNode (PaginatedIssuesNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo (SomeNode (PaginatedPullsNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo (SomeNode (PaginatedWorkflowsNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo (SomeNode (PaginatedReposNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo (SomeNode (PaginatedYourBranchesNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo (SomeNode (PaginatedActiveBranchesNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo (SomeNode (PaginatedStaleBranchesNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo (SomeNode (PaginatedNotificationsNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo (SomeNode (PaginatedBranchesNode (EntityData {_state}))) = Just (makePaginationActions _state)
-getPaginationInfo _ = Nothing
-
-makePaginationActions :: TVar (Search, PageInfo, Fetchable Int) -> (STM PageInfo, PageInfo -> STM ())
-makePaginationActions stateVar = (readPageInfo, writePageInfo)
+getPaginationInfo (SomeNode node) = makePaginationActions <$> getPaginationState node
   where
-    readPageInfo = snd3 <$> readTVar stateVar
+    makePaginationActions :: TVar (Search, PageInfo, Fetchable Int) -> (STM PageInfo, PageInfo -> STM ())
+    makePaginationActions stateVar = (readPageInfo, writePageInfo)
+      where
+        readPageInfo = snd3 <$> readTVar stateVar
 
-    writePageInfo newPageInfo = do
-      (search, _, fetchable) <- readTVar stateVar
-      writeTVar stateVar (search, newPageInfo, fetchable)
+        writePageInfo newPageInfo = do
+          (search, _, fetchable) <- readTVar stateVar
+          writeTVar stateVar (search, newPageInfo, fetchable)
 
-    snd3 :: (a, b, c) -> b
-    snd3 (_, b, _) = b
+        snd3 :: (a, b, c) -> b
+        snd3 (_, b, _) = b
+
+getPaginationState :: Node f a -> Maybe (Switchable f (Search, PageInfo, Fetchable TotalCount))
+getPaginationState (PaginatedIssuesNode (EntityData {_state})) = Just _state
+getPaginationState (PaginatedPullsNode (EntityData {_state})) = Just _state
+getPaginationState (PaginatedWorkflowsNode (EntityData {_state})) = Just _state
+getPaginationState (PaginatedReposNode (EntityData {_state})) = Just _state
+getPaginationState (PaginatedYourBranchesNode (EntityData {_state})) = Just _state
+getPaginationState (PaginatedActiveBranchesNode (EntityData {_state})) = Just _state
+getPaginationState (PaginatedStaleBranchesNode (EntityData {_state})) = Just _state
+getPaginationState (PaginatedNotificationsNode (EntityData {_state})) = Just _state
+getPaginationState (PaginatedBranchesNode (EntityData {_state})) = Just _state
+getPaginationState _ = Nothing
 
 -- * Computing nth child in the presence of expanding
 
+type GetExistentialChildrenFn f m = forall a. Node f a -> m [SomeNode f]
+
 -- | Returns the node at the head of the list, and then its successive parents
 -- going up to a tree root.
-nthChildVector :: Int -> V.Vector (SomeNode Variable) -> STM (Maybe (NonEmpty (SomeNode Variable)))
-nthChildVector n elems = nthChildList n (V.toList elems) >>= \case
+nthChildVector :: Monad m => (Switchable f Bool -> m Bool) -> GetExistentialChildrenFn f m -> Int -> V.Vector (SomeNode f) -> m (Maybe (NonEmpty (SomeNode f)))
+nthChildVector isToggled gecf n elems = nthChildList isToggled gecf n (V.toList elems) >>= \case
   Left _ -> pure Nothing
   Right x -> pure (Just (NE.reverse x))
 
-nthChildList :: Int -> [SomeNode Variable] -> STM (Either Int (NonEmpty (SomeNode Variable)))
-nthChildList n (x:xs) = nthChild n x >>= \case
+nthChildList :: Monad m => (Switchable f Bool -> m Bool) -> GetExistentialChildrenFn f m -> Int -> [SomeNode f] -> m (Either Int (NonEmpty (SomeNode f)))
+nthChildList isToggled gecf n (x:xs) = nthChild isToggled gecf n x >>= \case
   Right els -> pure $ Right els
-  Left n' -> nthChildList n' xs
-nthChildList n [] = pure $ Left n
+  Left n' -> nthChildList isToggled gecf n' xs
+nthChildList _ _ n [] = pure $ Left n
 
-nthChild :: Int -> SomeNode Variable -> STM (Either Int (NonEmpty (SomeNode Variable)))
-nthChild 0 el = pure $ Right (el :| [])
-nthChild n el@(SomeNode item@(getEntityData -> (EntityData {..}))) = readTVar _toggled >>= \case
+nthChild :: Monad m => (Switchable f Bool -> m Bool) -> GetExistentialChildrenFn f m -> Int -> SomeNode f -> m (Either Int (NonEmpty (SomeNode f)))
+nthChild _ _ 0 el = pure $ Right (el :| [])
+nthChild isToggled gecf n el@(SomeNode item@(getEntityData -> (EntityData {..}))) = isToggled _toggled >>= \case
   True -> do
-    wrappedChildren <- getExistentialChildrenWrapped item
-    (fmap ((el :|) . toList)) <$> (nthChildList (n - 1) wrappedChildren)
+    wrappedChildren <- gecf item
+    fmap ((el :|) . toList) <$> nthChildList isToggled gecf (n - 1) wrappedChildren
   False -> pure $ Left (n - 1)

@@ -255,32 +255,41 @@ getExistentialChildren :: Node Variable a -> IO [NodeChildType Variable a]
 getExistentialChildren node = readTVarIO (_children (getEntityData node))
 
 getExistentialChildrenWrapped :: Node Variable a -> STM [SomeNode Variable]
-getExistentialChildrenWrapped node = case node of
+getExistentialChildrenWrapped = getExistentialChildrenWrapped' readTVar
+
+getExistentialChildrenWrappedIdentity :: Node Fixed a -> Identity [SomeNode Fixed]
+getExistentialChildrenWrappedIdentity = getExistentialChildrenWrapped' return
+
+getExistentialChildrenWrappedPure :: Node Fixed a -> [SomeNode Fixed]
+getExistentialChildrenWrappedPure = runIdentity . getExistentialChildrenWrapped' return
+
+getExistentialChildrenWrapped' :: (Applicative m) => (Switchable f [NodeChildType f a] -> m [NodeChildType f a]) -> Node f a -> m [SomeNode f]
+getExistentialChildrenWrapped' readChildren node = case node of
   -- These types have SomeNode children
-  HeadingNode ed -> readTVar (_children ed)
-  RepoNode ed -> readTVar (_children ed)
+  HeadingNode ed -> readChildren (_children ed)
+  RepoNode ed -> readChildren (_children ed)
 
   -- These types have specific GADT constructor children, so wrap them
-  PaginatedIssuesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  PaginatedPullsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  PaginatedWorkflowsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  PaginatedReposNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  PaginatedBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  PaginatedYourBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  PaginatedActiveBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  PaginatedStaleBranchesNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  PaginatedNotificationsNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  SingleWorkflowNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  SingleJobNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  SingleBranchNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  SingleBranchWithInfoNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
-  JobLogGroupNode ed -> fmap (fmap SomeNode) (readTVar (_children ed))
+  PaginatedIssuesNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  PaginatedPullsNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  PaginatedWorkflowsNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  PaginatedReposNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  PaginatedBranchesNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  PaginatedYourBranchesNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  PaginatedActiveBranchesNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  PaginatedStaleBranchesNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  PaginatedNotificationsNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  SingleWorkflowNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  SingleJobNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  SingleBranchNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  SingleBranchWithInfoNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
+  JobLogGroupNode ed -> fmap (fmap SomeNode) (readChildren (_children ed))
 
   -- These are leaf nodes with no meaningful children
-  SingleIssueNode _ -> return []
-  SinglePullNode _ -> return []
-  SingleCommitNode _ -> return []
-  SingleNotificationNode _ -> return []
+  SingleIssueNode _ -> pure []
+  SinglePullNode _ -> pure []
+  SingleCommitNode _ -> pure []
+  SingleNotificationNode _ -> pure []
 
 getEntityData :: Node f a -> EntityData f a
 getEntityData node = node ^. entityDataL

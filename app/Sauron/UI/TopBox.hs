@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Sauron.UI.TopBox (
@@ -15,9 +16,9 @@ module Sauron.UI.TopBox (
 import Brick
 import Brick.Widgets.List
 import qualified Data.List as L
-import qualified Data.Vector as V
 import Lens.Micro
 import Relude
+import Sauron.Event.Helpers (isPaginationNode, getElemAndParents)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Branch ()
@@ -52,7 +53,7 @@ topBox app = hBox [columnPadding column1
                                   , str "/"
                                   , highlightKeyIfPredicate someRepoSelected app (str $ showKey browserToActionsKey)
                                   , str "] "
-                                  , withAttr hotkeyMessageAttr $ str "Open "
+                                  , highlightMessageIfPredicate someRepoSelected app (str "Open ")
                                   , highlightMessageIfPredicate someRepoSelected app (str "repo")
                                   , str "/"
                                   , highlightMessageIfPredicate someRepoSelected app (str "issues")
@@ -78,7 +79,7 @@ topBox app = hBox [columnPadding column1
                                    , highlightMessageIfPredicate hasFirstPageKey app (str "First")
                                    , str "/"
                                    , highlightMessageIfPredicate hasLastPageKey app (str "Last")
-                                   , withAttr hotkeyMessageAttr $ str " page"
+                                   , highlightMessageIfPredicate hasNextPageKey app (str " page")
                                    ]
                             , hBox [str "["
                                    , highlightKeyIfPredicate someRepoSelected app (str $ showKey refreshSelectedKey)
@@ -129,10 +130,13 @@ getExtraTopBoxWidgetsForSomeNode s (SomeNode node) = case node of
   JobLogGroupNode ed -> getExtraTopBoxWidgets s ed
 
 hasNextPageKey :: AppState -> Bool
-hasNextPageKey (AppState {}) = True -- TODO
-hasPrevPageKey = const True -- TODO
-hasFirstPageKey = const True -- TODO
-hasLastPageKey = const True -- TODO
+hasNextPageKey = hasAncestorMatching isPaginationNode
+hasPrevPageKey :: AppState -> Bool
+hasPrevPageKey = hasAncestorMatching isPaginationNode
+hasFirstPageKey :: AppState -> Bool
+hasFirstPageKey = hasAncestorMatching isPaginationNode
+hasLastPageKey :: AppState -> Bool
+hasLastPageKey = hasAncestorMatching isPaginationNode
 
 isSearchable s = case snd <$> listSelectedElement (s ^. appMainList) of
   Nothing -> False
@@ -175,31 +179,16 @@ keyIndicatorContextual app p key msg = case p app of
 
 -- * Predicates
 
--- | Check if the selected element has a RepoNode as an ancestor
--- by looking at preceding elements in the expanded list with lower depth
-someRepoSelected :: AppState -> Bool
-someRepoSelected s = case listSelectedElement (s ^. appMainList) of
-  Nothing -> False
-  Just (idx, SomeNode selected) -> hasRepoAncestor || isRepoNode selected
-    where
-      selectedDepth = _depth (getEntityData selected)
+-- | Check if the selected element matches a predicate or has an ancestor that does.
+hasAncestorMatching :: (forall a. Node Fixed a -> Bool) -> AppState -> Bool
+hasAncestorMatching predicate s = maybe [] toList (getElemAndParents s)
+                                & any (\(SomeNode n) -> predicate n)
 
-      -- Get all elements before the selected one
-      preceding = V.take idx (listElements (s ^. appMainList))
-
-      -- Find any RepoNode that appears before us with lower depth (i.e., is an ancestor)
-      hasRepoAncestor = V.any isRepoAncestor preceding
-      isRepoAncestor (SomeNode node) = case node of
-        RepoNode ed -> _depth ed < selectedDepth
-        _ -> False
-
--- | Check if a node is a RepoNode
-isRepoNode :: Node Fixed a -> Bool
+isRepoNode :: Node f a -> Bool
 isRepoNode (RepoNode {}) = True
 isRepoNode _ = False
 
-selectedRepoToggled = const False
+someRepoSelected :: AppState -> Bool
+someRepoSelected = hasAncestorMatching isRepoNode
 
--- selectedRepoRunning s = case L.listSelectedElement (s ^. appMainList) of
---   Nothing -> False
---   Just (_, MainListElem {..}) -> isRunning status
+selectedRepoToggled = const False
