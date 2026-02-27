@@ -18,6 +18,7 @@ import Data.Time.Clock (UTCTime(..), getCurrentTime)
 import qualified Data.Vector as V
 import GitHub
 import Network.HTTP.Conduit hiding (Proxy)
+import Network.HTTP.Types.Status (statusCode)
 import qualified Network.URI as URI
 import Relude
 import Sauron.Actions.Util
@@ -106,10 +107,11 @@ fetchJobLogs owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})
       Left err -> do
         logError' bc [i|fetchJobLogs: downloadJobLogsR failed: #{err}|]
         now <- liftIO getCurrentTime
+        let errorMessage = formatJobLogsError err
         atomically $ do
           (jobFetchable, _) <- readTVar _state
-          writeTVar _state (jobFetchable, Errored (show err))
-          childNode <- createJobLogLinesNode bc 0 (JobLogLines now [[i|Error: #{err}|]])
+          writeTVar _state (jobFetchable, Errored errorMessage)
+          childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines now (T.splitOn "\n" errorMessage))
           writeTVar _children [childNode]
       Right response -> do
         debug' bc [i|fetchJobLogs: got logs download URL: #{responseBody response}|]
@@ -199,3 +201,22 @@ createJobLogLinesNode bc depth' jobLogGroup = do
     , _depth = depth'
     , _ident = ident'
     }
+
+-- | Format an error from job logs fetch into a user-friendly message.
+-- Handles specific HTTP status codes with meaningful explanations.
+formatJobLogsError :: Error -> Text
+formatJobLogsError (HTTPError (HttpExceptionRequest _ (StatusCodeException response _))) =
+  formatStatusCode (statusCode (responseStatus response))
+formatJobLogsError (HTTPError httpErr) = "Network error: " <> toText (show httpErr :: String)
+formatJobLogsError (ParseError msg) = "Parse error: " <> msg
+formatJobLogsError (JsonError msg) = "JSON error: " <> msg
+formatJobLogsError (UserError msg) = "Error: " <> msg
+
+-- | Format a status code into a user-friendly message
+formatStatusCode :: Int -> Text
+formatStatusCode 410 = "Logs unavailable (HTTP 410): logs have been deleted."
+formatStatusCode 404 = "Logs not found (HTTP 404): the job may have been deleted or never generated logs.\n\nNote that we can't retrieve the logs from currently running jobs; see https://github.com/codedownio/sauron/issues/24."
+formatStatusCode 403 = "Access denied (HTTP 403): you may not have permission to view these logs."
+formatStatusCode 502 = "GitHub server error (HTTP 502): please try again later."
+formatStatusCode 503 = "GitHub service unavailable (HTTP 503): please try again later."
+formatStatusCode code = "HTTP error " <> show code <> ": failed to fetch logs."

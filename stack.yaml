@@ -27,7 +27,8 @@ extra-deps:
   # - Fix markNotificationAsReadR
   # - Add markNotificationAsDoneR
   # - Add checkRunsForR + supporting data types
-  commit: 55b808f511e707d5c4208a5dcf533543c77eecb8
+  # - parseRedirect: throw a proper HTTPError on invalid status
+  commit: be1622932a2ca3692ddccaf867e496d1d9114852
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf
