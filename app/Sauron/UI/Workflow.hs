@@ -44,7 +44,7 @@ instance ListDrawable Fixed 'SingleWorkflowT where
     then [hBox [str "["
               , withAttr hotkeyAttr $ str $ showKey cancelWorkflowKey
               , str "] "
-              , withAttr hotkeyMessageAttr $ str "Cancel"
+              , withAttr hotkeyMessageAttr $ str "Cancel workflow"
               ]
          ]
     else []
