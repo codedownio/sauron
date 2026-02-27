@@ -21,7 +21,7 @@ openNode bc elems el = case getNodeUrl el (toList elems) of
   Just url -> openBrowserToUrl url
   Nothing -> warn' bc [i|(#{el}) Couldn't find URL to open node|]
 
-getNodeUrl :: Node Fixed a -> [SomeNode Variable] -> Maybe String
+getNodeUrl :: Node f a -> [SomeNode Variable] -> Maybe String
 getNodeUrl (PaginatedIssuesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/issues")
 getNodeUrl (PaginatedPullsNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/pulls")
 getNodeUrl (PaginatedWorkflowsNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/actions")
@@ -35,11 +35,17 @@ getNodeUrl (SingleIssueNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)
 getNodeUrl (SinglePullNode (EntityData {_static=(Issue {issueHtmlUrl=(Just url)})})) _parents = Just (toString $ getUrl url)
 getNodeUrl (SingleWorkflowNode (EntityData {_static=workflowRun})) _ = Just (toString $ getUrl $ workflowRunHtmlUrl workflowRun)
 getNodeUrl (SingleJobNode (EntityData {_static=job})) _ = Just (toString $ getUrl $ jobHtmlUrl job)
+getNodeUrl (JobLogGroupNode _) (findJobParent -> Just (SomeNode node, rest)) = getNodeUrl node rest
 getNodeUrl (SingleBranchNode (EntityData {_static=branch})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchName branch))
 getNodeUrl (SingleBranchWithInfoNode (EntityData {_static=(branchInfo, _columnWidths)})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/tree/" <> toString (branchWithInfoBranchName branchInfo))
 getNodeUrl (SingleCommitNode (EntityData {_static=commit})) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/commit/" <> toString (untagName (commitSha commit)))
 getNodeUrl (RepoNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just repoBaseUrl
 getNodeUrl _ _ = Nothing
+
+findJobParent :: [SomeNode Variable] -> Maybe (SomeNode Variable, [SomeNode Variable])
+findJobParent [] = Nothing
+findJobParent (n@(SomeNode (SingleJobNode _)) : rest) = Just (n, rest)
+findJobParent (_ : rest) = findJobParent rest
 
 findRepoBaseUrl :: [SomeNode Variable] -> Maybe String
 findRepoBaseUrl [] = Nothing
