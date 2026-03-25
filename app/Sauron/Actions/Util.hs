@@ -21,6 +21,7 @@ module Sauron.Actions.Util (
   , findIssuesParent
   , findPullsParent
   , findWorkflowsParent
+  , findWorkflowParent
 
   , withRepoDefaultBranch
   , withRepoDefaultBranch'
@@ -93,6 +94,9 @@ findPullsParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedPullsNode _) 
 
 findWorkflowsParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable PaginatedWorkflowsT)
 findWorkflowsParent elems = viaNonEmpty head [x | SomeNode x@(PaginatedWorkflowsNode _) <- toList elems]
+
+findWorkflowParent :: NonEmpty (SomeNode Variable) -> Maybe (Node Variable SingleWorkflowT)
+findWorkflowParent elems = viaNonEmpty head [x | SomeNode x@(SingleWorkflowNode _) <- toList elems]
 
 withRepoDefaultBranch :: MonadIO m => TVar (Fetchable Repo) -> (Maybe Text -> m ()) -> m ()
 withRepoDefaultBranch = withRepoDefaultBranch' (return ())

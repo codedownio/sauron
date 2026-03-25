@@ -152,9 +152,10 @@ fetchOnOpen bc (SingleCommitNode (EntityData {_static=commit, _state})) (findRep
   liftIO $ async $ liftIO $ runReaderT (fetchCommitDetails owner name (commitSha commit) _state) bc
 
 fetchOnOpen bc item@(SingleJobNode (EntityData {_state, _static=job@(Job {jobId})})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
+  let workflowParent = findWorkflowParent parents
   liftIO $ async $ liftIO $ flip runReaderT bc $ do
     void $ concurrently (fetchJob owner name jobId item)
-                        (fetchJobLogs owner name job item)
+                        (fetchJobLogs owner name job item workflowParent)
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 
 fetchOnOpen _ _ _ = liftIO $ async (return ())

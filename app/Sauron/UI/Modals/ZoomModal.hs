@@ -120,5 +120,5 @@ generateModalTitle (SomeNode inner) =
       "Notification: " <> T.unpack subjectTitle
     JobLogGroupNode (EntityData {_static=jobLogGroup}) ->
       case jobLogGroup of
-        JobLogGroup _ title _ _ -> "Log Group: " <> T.unpack title
+        JobLogGroup _ title _ _ _ -> "Log Group: " <> T.unpack title
         JobLogLines _ _ -> "Job log lines"

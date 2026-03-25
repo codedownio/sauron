@@ -198,7 +198,7 @@ type family NodeState a where
   NodeState SingleIssueT = Fetchable (V.Vector (Either IssueEvent IssueComment))
   NodeState SinglePullT = Fetchable (V.Vector (Either IssueEvent IssueComment))
   NodeState SingleWorkflowT = Fetchable TotalCount
-  NodeState SingleJobT = (Fetchable Job, Fetchable [JobLogGroup])
+  NodeState SingleJobT = (Fetchable Job, Fetchable ([JobLogGroup], LogSplitMethod))
   NodeState SingleBranchT = Fetchable (V.Vector Commit)
   NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)
   NodeState SingleCommitT = Fetchable Commit
@@ -361,9 +361,15 @@ data SortBy =
   | SortByUpdated
   deriving (Eq)
 
+data LogSplitMethod
+  = LogsNotSplit
+  | PerStepLogs
+  | FlatLogTimestampSplit
+  deriving (Show, Eq)
+
 data JobLogGroup =
   JobLogLines UTCTime [Text]
-  | JobLogGroup UTCTime Text (Maybe Text) [JobLogGroup]
+  | JobLogGroup UTCTime Text (Maybe Text) (Maybe NominalDiffTime) [JobLogGroup]
   deriving (Show, Eq)
 
 type Var = TVar

@@ -88,7 +88,10 @@ executables:
     - -O2
     - -W
     dependencies:
+    - WEditor
+    - WEditorBrick
     - aeson
+    - bytestring
     - exceptions
     - filepath
     - git-config
@@ -97,9 +100,9 @@ executables:
     - microlens-th
     - optparse-applicative
     - safe-exceptions
-    - WEditor
-    - WEditorBrick
+    - temporary
     - yaml
+    - zip-archive
 
 tests:
   test:

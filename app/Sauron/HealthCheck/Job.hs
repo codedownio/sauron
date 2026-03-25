@@ -64,7 +64,7 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
           Fetched currentJob | hasRunningJob currentJob -> do
             -- Fetch job logs to keep them updated
             liftIO $ flip runReaderT bc $
-              fetchJobLogs owner name job jobNode
+              fetchJobLogs owner name job jobNode Nothing
             threadDelay jobHealthCheckPeriodUs
           _ -> do
             -- Job is completed, clear the thread reference and stop

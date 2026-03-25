@@ -40,9 +40,28 @@ instance ListDrawable Fixed 'SingleJobT where
 
   drawInner appState (EntityData {_state, _ident, ..}) = do
     guard _toggled
-    let (jobFetchable, _) = _state
+    let (jobFetchable, logsFetchable) = _state
+    let splitMethod = case logsFetchable of
+          Fetched (_, method) -> method
+          _ -> LogsNotSplit
     guardFetchedOrHasPrevious jobFetchable $ \job ->
-      return $ jobInner (_appAnimationCounter appState) job Nothing
+      return $ jobInner (_appAnimationCounter appState) job splitMethod
+
+  getExtraTopBoxWidgets _app (EntityData {}) =
+    [hBox [str "["
+          , withAttr hotkeyAttr $ str $ showKey zoomModalKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Zoom"
+          ]
+    ]
+
+  handleHotkey s key (EntityData {})
+    | key == zoomModalKey = do
+        withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
+          refreshOnZoom (s ^. appBaseContext) variableEl parents
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
+        return True
+  handleHotkey _ _ _ = return False
 
 instance ListDrawable Fixed 'JobLogGroupT where
   drawLine appState (EntityData {_static=jobLogGroup, ..}) =
@@ -51,7 +70,7 @@ instance ListDrawable Fixed 'JobLogGroupT where
   drawInner _appState (EntityData {_static=jobLogGroup, ..}) = do
     guard _toggled
     case jobLogGroup of
-      JobLogGroup _timestamp _title (Just _status) children' ->
+      JobLogGroup _timestamp _title (Just _status) _duration children' ->
         return $ jobLogGroupInner children'
       _ -> Nothing
 
@@ -75,21 +94,27 @@ jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
 jobLogGroupLine _animationCounter _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> padRight Max $ hBox $
   str "  " : parseAnsiText content
   ) contents
-jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status _children) = padRight Max $ hBox $ catMaybes [
-  Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
-  Just $ withAttr normalAttr $ str $ toString title,
-  statusWidget
+jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status duration _children) = hBox $ catMaybes [
+  Just $ padRight Max $ hBox $ catMaybes [
+    Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
+    Just $ withAttr normalAttr $ str $ toString title,
+    statusWidget
+    ],
+  durationWidget
   ]
   where
     statusWidget = case status of
       Just s -> Just $ padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus s
+      Nothing -> Nothing
+    durationWidget = case duration of
+      Just d -> Just $ padLeft (Pad 1) $ str $ timeDiff d
       Nothing -> Nothing
 
 jobLogGroupInner :: [JobLogGroup] -> Widget n
 jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
   where
     renderLogGroup (JobLogLines _timestamp contents) = vBox $ map renderLogLine contents
-    renderLogGroup (JobLogGroup _timestamp title _status children') = vBox [
+    renderLogGroup (JobLogGroup _timestamp title _status _duration children') = vBox [
       withAttr normalAttr $ str $ toString title,
       vBox $ map renderLogGroup children'
       ]
@@ -138,5 +163,8 @@ jobLine animationCounter toggled' (Job {..}) fetchableState healthCheckThreadDat
       ]
     runnerNameWidget Nothing = Nothing
 
-jobInner :: Int -> Job -> Maybe [JobLogGroup] -> Widget n
-jobInner _animationCounter (Job {}) _maybeJobLogs' = vBox []
+jobInner :: Int -> Job -> LogSplitMethod -> Widget n
+jobInner _animationCounter (Job {}) splitMethod = vBox $
+  case splitMethod of
+    FlatLogTimestampSplit -> [withAttr erroredAttr $ str "⚠ Job step boundaries may be unreliable (flat log format). See https://github.com/codedownio/sauron/issues/25"]
+    _ -> []
