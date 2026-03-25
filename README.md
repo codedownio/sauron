@@ -49,7 +49,19 @@ On first run, sauron will walk you through GitHub OAuth authentication. You can 
 sauron --token YOUR_GITHUB_TOKEN
 ```
 
-## Configuration
+## Configuration (single-repo)
+
+Just run sauron in the directory of a given repo, and it will load the repo.
+
+## Configuration (all repos)
+
+To browse all the repos owned by your GitHub account, run
+
+```bash
+sauron --all
+```
+
+## Configuration (organized repos)
 
 Create a YAML config file to define which repos to monitor:
 
@@ -77,11 +89,7 @@ Then run:
 sauron -c path/to/config.yaml
 ```
 
-Or just browse all your repos without a config:
-
-```bash
-sauron --all
-```
+Or just put your config file in ~/.config/sauron/config.yaml, and sauron will load it from there automatically.
 
 ## Keybindings
 
