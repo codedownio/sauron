@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
+{-# OPTIONS_GHC -Wno-partial-fields #-}
 
 module Sauron.Types where
 
@@ -198,7 +199,7 @@ type family NodeState a where
   NodeState SingleIssueT = Fetchable (V.Vector (Either IssueEvent IssueComment))
   NodeState SinglePullT = Fetchable (V.Vector (Either IssueEvent IssueComment))
   NodeState SingleWorkflowT = Fetchable TotalCount
-  NodeState SingleJobT = (Fetchable Job, Fetchable ([JobLogGroup], LogSplitMethod))
+  NodeState SingleJobT = JobNodeState
   NodeState SingleBranchT = Fetchable (V.Vector Commit)
   NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)
   NodeState SingleCommitT = Fetchable Commit
@@ -367,10 +368,25 @@ data LogSplitMethod
   | FlatLogTimestampSplit
   deriving (Show, Eq)
 
-data JobLogGroup =
-  JobLogLines UTCTime [Text]
-  | JobLogGroup UTCTime Text (Maybe Text) (Maybe NominalDiffTime) [JobLogGroup]
+data JobLogGroup = JobLogLines {
+  jlTimestamp :: UTCTime
+  , jlLines :: [Text]
+  }
+  | JobLogGroup {
+      jlgTimestamp :: UTCTime
+      , jlgTitle :: Text
+      , jlgStatus :: Maybe Text
+      , jlgDuration :: Maybe NominalDiffTime
+      , jlgMaxSiblingDuration :: Maybe NominalDiffTime
+      , jlgChildren :: [JobLogGroup]
+      }
   deriving (Show, Eq)
+
+data JobNodeState = JobNodeState {
+  jnsJob :: Fetchable Job
+  , jnsLogs :: Fetchable ([JobLogGroup], LogSplitMethod)
+  , jnsMaxSiblingDuration :: Maybe NominalDiffTime
+  } deriving (Show, Eq)
 
 type Var = TVar
 

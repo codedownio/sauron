@@ -11,34 +11,26 @@ timeFromNow :: NominalDiffTime -> String
 timeFromNow diffTime
   -- Clock skew?
   | diffTime < 0 = "just now"
-  | otherwise = show rounded ++ " " ++ unit ++ suffix
-  where
-    rounded = round value :: Integer
-    (value, unit) = timeDiffNumberAndString diffTime
-    suffix = if rounded == 1 then " ago" else "s ago"
+  | otherwise = timeDiff diffTime ++ " ago"
 
 timeDiff :: NominalDiffTime -> String
-timeDiff diffTime = show rounded ++ " " ++ unit ++ suffix
+timeDiff diffTime
+  | minutes < 1 = show secs ++ "s"
+  | hours < 1 = show mins ++ "m" ++ if remSecs > 0 then " " ++ show remSecs ++ "s" else ""
+  | days < 1 = show hrs ++ "h" ++ if remMins > 0 then " " ++ show remMins ++ "m" else ""
+  | otherwise = show ds ++ "d" ++ if remHrs > 0 then " " ++ show remHrs ++ "h" else ""
   where
-    rounded = round value :: Integer
-    (value, unit) = timeDiffNumberAndString diffTime
-    suffix = if value == 1 then "" else "s"
+    totalSeconds = round (realToFrac diffTime :: Double) :: Int
+    secs = totalSeconds
+    minutes = totalSeconds `div` 60
+    hours = totalSeconds `div` 3600
+    days = totalSeconds `div` 86400
 
-timeDiffNumberAndString :: NominalDiffTime -> (Double, String)
-timeDiffNumberAndString diffTime =
-  if | minutesAgo < 1 -> (secondsAgo, "second")
-     | hoursAgo < 1 -> (minutesAgo, "minute")
-     | daysAgo < 1 -> (hoursAgo, "hour")
-     | weeksAgo < 1 -> (daysAgo, "day")
-     | monthsAgo < 1 -> (weeksAgo, "week")
-     | yearsAgo < 1 -> (monthsAgo, "month")
-     | otherwise -> (yearsAgo, "year")
+    mins = minutes
+    remSecs = totalSeconds `mod` 60
 
-  where
-    secondsAgo :: Double = realToFrac diffTime
-    minutesAgo :: Double = secondsAgo / 60
-    hoursAgo :: Double = minutesAgo / 60
-    daysAgo :: Double = hoursAgo / 24
-    weeksAgo :: Double = daysAgo / 7
-    monthsAgo :: Double = daysAgo / (30.44 :: Double)
-    yearsAgo :: Double = daysAgo / (365.25 :: Double)
+    hrs = hours
+    remMins = (totalSeconds `mod` 3600) `div` 60
+
+    ds = days
+    remHrs = (totalSeconds `mod` 86400) `div` 3600

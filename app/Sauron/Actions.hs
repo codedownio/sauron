@@ -184,7 +184,7 @@ shouldFetchOnExpand (SingleIssueNode (EntityData {_state})) = not . isFetchingOr
 shouldFetchOnExpand (SinglePullNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SingleWorkflowNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = do
-  (jobFetchable, logsFetchable) <- readTVarIO _state
+  JobNodeState {jnsJob=jobFetchable, jnsLogs=logsFetchable} <- readTVarIO _state
   return $ not (isFetchingOrFetched jobFetchable) || not (isFetchingOrFetched logsFetchable)
 shouldFetchOnExpand (SingleBranchNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SingleBranchWithInfoNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state

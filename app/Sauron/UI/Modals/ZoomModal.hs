@@ -107,8 +107,8 @@ generateModalTitle (SomeNode inner) =
       "Workflow: " <> T.unpack (untagName workflowRunName)
     SingleJobNode (EntityData {_state}) ->
       case _state of
-        (Fetched job, _) -> "Job: " <> T.unpack (untagName (jobName job))
-        (Fetching (Just job), _) -> "Job: " <> T.unpack (untagName (jobName job))
+        JobNodeState {jnsJob = Fetched job} -> "Job: " <> T.unpack (untagName (jobName job))
+        JobNodeState {jnsJob = Fetching (Just job)} -> "Job: " <> T.unpack (untagName (jobName job))
         _ -> "Job"
     SingleBranchNode (EntityData {_static = Branch {branchName}}) ->
       "Branch: " <> T.unpack branchName
@@ -120,5 +120,5 @@ generateModalTitle (SomeNode inner) =
       "Notification: " <> T.unpack subjectTitle
     JobLogGroupNode (EntityData {_static=jobLogGroup}) ->
       case jobLogGroup of
-        JobLogGroup _ title _ _ _ -> "Log Group: " <> T.unpack title
-        JobLogLines _ _ -> "Job log lines"
+        JobLogGroup {jlgTitle = title} -> "Log Group: " <> T.unpack title
+        JobLogLines {} -> "Job log lines"

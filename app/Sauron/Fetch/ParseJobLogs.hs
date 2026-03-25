@@ -51,9 +51,9 @@ parseWithAccumulation (line:rest) groupStack accumulatedLines
                    else [createJobLogLines accumulatedLines]
           (children, remainingLines) = parseWithAccumulation rest ((timestamp, groupTitle) : groupStack) []
       in case remainingLines of
-           [] -> (result <> [JobLogGroup timestamp groupTitle Nothing Nothing children], [])
+           [] -> (result <> [JobLogGroup {jlgTimestamp = timestamp, jlgTitle = groupTitle, jlgStatus = Nothing, jlgDuration = Nothing, jlgMaxSiblingDuration = Nothing, jlgChildren = children}], [])
            _ -> let (siblings, finalLines) = parseWithAccumulation remainingLines groupStack []
-                in (result <> [JobLogGroup timestamp groupTitle Nothing Nothing children] <> siblings, finalLines)
+                in (result <> [JobLogGroup {jlgTimestamp = timestamp, jlgTitle = groupTitle, jlgStatus = Nothing, jlgDuration = Nothing, jlgMaxSiblingDuration = Nothing, jlgChildren = children}] <> siblings, finalLines)
   
   | isGroupEnd line = 
       let result = if null accumulatedLines 
@@ -66,8 +66,8 @@ parseWithAccumulation (line:rest) groupStack accumulatedLines
       in parseWithAccumulation rest groupStack (accumulatedLines <> [(timestamp, content)])
 
 createJobLogLines :: [(UTCTime, Text)] -> JobLogGroup
-createJobLogLines [] = JobLogLines (UTCTime (fromGregorian 1970 1 1) 0) []
-createJobLogLines ((timestamp, content):rest) = JobLogLines timestamp (content : map snd rest)
+createJobLogLines [] = JobLogLines {jlTimestamp = UTCTime (fromGregorian 1970 1 1) 0, jlLines = []}
+createJobLogLines ((timestamp, content):rest) = JobLogLines {jlTimestamp = timestamp, jlLines = content : map snd rest}
 
 parseGroupStart :: Text -> Maybe (UTCTime, Text)
 parseGroupStart line =
@@ -94,4 +94,4 @@ parseTimestampAndContent line =
 
 closeAllGroups :: [(UTCTime, Text)] -> [JobLogGroup]
 closeAllGroups [] = []
-closeAllGroups ((timestamp, title):rest) = [JobLogGroup timestamp title Nothing Nothing (closeAllGroups rest)]
+closeAllGroups ((timestamp, title):rest) = [JobLogGroup {jlgTimestamp = timestamp, jlgTitle = title, jlgStatus = Nothing, jlgDuration = Nothing, jlgMaxSiblingDuration = Nothing, jlgChildren = closeAllGroups rest}]

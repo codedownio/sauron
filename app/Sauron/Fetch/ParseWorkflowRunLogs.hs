@@ -8,7 +8,7 @@ module Sauron.Fetch.ParseWorkflowRunLogs (
 import Codec.Archive.Zip (Entry(..), toArchive, fromEntry)
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.ByteString.Lazy as BL
-import Data.List (isSuffixOf, sortOn)
+import Data.List (isSuffixOf)
 import qualified Data.Text as T
 import Relude
 import Sauron.Fetch.ParseJobLogs (parseJobLogs)

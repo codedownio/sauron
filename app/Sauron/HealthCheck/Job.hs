@@ -59,7 +59,7 @@ startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state,
     runJobHealthCheckLoop bc owner name jobNode@(SingleJobNode (EntityData {_state, _static=job, ..})) _pars =
       handleAny (\e -> putStrLn [i|Job health check thread crashed: #{e}|]) $
       forever $ do
-        (jobFetchable, _) <- readTVarIO _state
+        JobNodeState {jnsJob=jobFetchable} <- readTVarIO _state
         case jobFetchable of
           Fetched currentJob | hasRunningJob currentJob -> do
             -- Fetch job logs to keep them updated

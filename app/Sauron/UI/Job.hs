@@ -16,6 +16,7 @@ import Data.String.Interpolate
 import qualified Data.Text as T
 import Data.Time.Clock
 import GitHub
+import qualified Graphics.Vty as V
 import Relude
 import Sauron.Actions
 import Sauron.Event.Helpers
@@ -32,15 +33,17 @@ import UnliftIO.Async (Async)
 
 instance ListDrawable Fixed 'SingleJobT where
   drawLine appState (EntityData {..}) = case _state of
-    (Fetched job, logsFetchable) -> jobLine (_appAnimationCounter appState) _toggled job logsFetchable _healthCheckThread
-    (Fetching (Just job), logsFetchable) -> jobLine (_appAnimationCounter appState) _toggled job logsFetchable _healthCheckThread
-    (Fetching Nothing, _) -> str [i|Loading job...|]
-    (NotFetched, _) -> str [i|Job not fetched|]
-    (Errored e, _) -> str [i|Job fetch errored: #{e}|]
+    JobNodeState {jnsJob = Fetched job, jnsLogs = logsFetchable, jnsMaxSiblingDuration = maxSib} ->
+      jobLine (_appAnimationCounter appState) _toggled job logsFetchable maxSib _healthCheckThread
+    JobNodeState {jnsJob = Fetching (Just job), jnsLogs = logsFetchable, jnsMaxSiblingDuration = maxSib} ->
+      jobLine (_appAnimationCounter appState) _toggled job logsFetchable maxSib _healthCheckThread
+    JobNodeState {jnsJob = Fetching Nothing} -> str [i|Loading job...|]
+    JobNodeState {jnsJob = NotFetched} -> str [i|Job not fetched|]
+    JobNodeState {jnsJob = Errored e} -> str [i|Job fetch errored: #{e}|]
 
   drawInner appState (EntityData {_state, _ident, ..}) = do
     guard _toggled
-    let (jobFetchable, logsFetchable) = _state
+    let JobNodeState {jnsJob = jobFetchable, jnsLogs = logsFetchable} = _state
     let splitMethod = case logsFetchable of
           Fetched (_, method) -> method
           _ -> LogsNotSplit
@@ -70,7 +73,7 @@ instance ListDrawable Fixed 'JobLogGroupT where
   drawInner _appState (EntityData {_static=jobLogGroup, ..}) = do
     guard _toggled
     case jobLogGroup of
-      JobLogGroup _timestamp _title (Just _status) _duration children' ->
+      JobLogGroup {jlgStatus = Just _status, jlgChildren = children'} ->
         return $ jobLogGroupInner children'
       _ -> Nothing
 
@@ -90,31 +93,41 @@ instance ListDrawable Fixed 'JobLogGroupT where
         return True
   handleHotkey _ _ _ = return False
 
+durationWidget :: Maybe NominalDiffTime -> Maybe NominalDiffTime -> Widget n
+durationWidget (Just d) (Just maxD) | maxD > 0 =
+  let ratio = realToFrac d / realToFrac maxD :: Double
+      brightness = round (80 + 175 * min 1 ratio) :: Int
+      b = fromIntegral (min 255 brightness) :: Word8
+      attr = V.Attr V.Default (V.SetTo (V.RGBColor b b b)) V.Default V.Default
+  in modifyDefAttr (const attr) $ str $ timeDiff d
+durationWidget (Just d) _ = str $ timeDiff d
+durationWidget Nothing _ = emptyWidget
+
 jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
-jobLogGroupLine _animationCounter _toggled' (JobLogLines _timestamp contents) = vBox $ map (\content -> padRight Max $ hBox $
+jobLogGroupLine _animationCounter _toggled' (JobLogLines {jlLines = contents}) = vBox $ map (\content -> padRight Max $ hBox $
   str "  " : parseAnsiText content
   ) contents
-jobLogGroupLine animationCounter toggled' (JobLogGroup _timestamp title status duration _children) = hBox $ catMaybes [
+jobLogGroupLine animationCounter toggled' (JobLogGroup {jlgTitle = title, jlgStatus = status, jlgDuration = duration, jlgMaxSiblingDuration = maxSibDuration}) = hBox $ catMaybes [
   Just $ padRight Max $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
     Just $ withAttr normalAttr $ str $ toString title,
-    statusWidget
+    statusW
     ],
-  durationWidget
+  durationW
   ]
   where
-    statusWidget = case status of
+    statusW = case status of
       Just s -> Just $ padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus s
       Nothing -> Nothing
-    durationWidget = case duration of
-      Just d -> Just $ padLeft (Pad 1) $ str $ timeDiff d
+    durationW = case duration of
+      Just _ -> Just $ padLeft (Pad 1) $ durationWidget duration maxSibDuration
       Nothing -> Nothing
 
 jobLogGroupInner :: [JobLogGroup] -> Widget n
 jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
   where
-    renderLogGroup (JobLogLines _timestamp contents) = vBox $ map renderLogLine contents
-    renderLogGroup (JobLogGroup _timestamp title _status _duration children') = vBox [
+    renderLogGroup (JobLogLines {jlLines = contents}) = vBox $ map renderLogLine contents
+    renderLogGroup (JobLogGroup {jlgTitle = title, jlgChildren = children'}) = vBox [
       withAttr normalAttr $ str $ toString title,
       vBox $ map renderLogGroup children'
       ]
@@ -134,8 +147,8 @@ jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
       let text = T.drop 9 content  -- Remove "##[error]"
       in [ withAttr erroredAttr $ str $ toString text ]
 
-jobLine :: Int -> Bool -> Job -> Fetchable a -> Maybe (Async (), Int) -> Widget n
-jobLine animationCounter toggled' (Job {..}) fetchableState healthCheckThreadData = vBox [line1, line2]
+jobLine :: Int -> Bool -> Job -> Fetchable a -> Maybe NominalDiffTime -> Maybe (Async (), Int) -> Widget n
+jobLine animationCounter toggled' (Job {..}) fetchableState maxSibDuration healthCheckThreadData = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
@@ -143,7 +156,7 @@ jobLine animationCounter toggled' (Job {..}) fetchableState healthCheckThreadDat
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe jobStatus jobConclusion
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , healthCheckIndicatorWidget healthCheckThreadData
-      , padLeft Max $ str $ calculateDuration jobStartedAt jobCompletedAt
+      , padLeft Max $ calculateDurationWidget jobStartedAt jobCompletedAt
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox $ catMaybes [
@@ -152,9 +165,9 @@ jobLine animationCounter toggled' (Job {..}) fetchableState healthCheckThreadDat
         runnerNameWidget jobRunnerName
       ]
 
-    calculateDuration :: UTCTime -> Maybe UTCTime -> String
-    calculateDuration started (Just completed) = timeDiff $ diffUTCTime completed started
-    calculateDuration _ Nothing = "running"
+    calculateDurationWidget :: UTCTime -> Maybe UTCTime -> Widget n
+    calculateDurationWidget started (Just completed) = durationWidget (Just (diffUTCTime completed started)) maxSibDuration
+    calculateDurationWidget _ Nothing = str "running"
 
     runnerNameWidget :: Maybe Text -> Maybe (Widget n)
     runnerNameWidget (Just name) = Just $ hBox [
