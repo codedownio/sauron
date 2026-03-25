@@ -369,16 +369,16 @@ data LogSplitMethod
   deriving (Show, Eq)
 
 data JobLogGroup = JobLogLines {
-  jlTimestamp :: UTCTime
-  , jlLines :: [Text]
+  jobLogLinesTimestamp :: UTCTime
+  , jobLogLinesLines :: [Text]
   }
   | JobLogGroup {
-      jlgTimestamp :: UTCTime
-      , jlgTitle :: Text
-      , jlgStatus :: Maybe Text
-      , jlgDuration :: Maybe NominalDiffTime
-      , jlgMaxSiblingDuration :: Maybe NominalDiffTime
-      , jlgChildren :: [JobLogGroup]
+      jobLogGroupTimestamp :: UTCTime
+      , jobLogGroupTitle :: Text
+      , jobLogGroupStatus :: Maybe Text
+      , jobLogGroupDuration :: Maybe NominalDiffTime
+      , jobLogGroupMaxSiblingDuration :: Maybe NominalDiffTime
+      , jobLogGroupChildren :: [JobLogGroup]
       }
   deriving (Show, Eq)
 

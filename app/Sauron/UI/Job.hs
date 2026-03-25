@@ -73,7 +73,7 @@ instance ListDrawable Fixed 'JobLogGroupT where
   drawInner _appState (EntityData {_static=jobLogGroup, ..}) = do
     guard _toggled
     case jobLogGroup of
-      JobLogGroup {jlgStatus = Just _status, jlgChildren = children'} ->
+      JobLogGroup {jobLogGroupStatus = Just _status, jobLogGroupChildren = children'} ->
         return $ jobLogGroupInner children'
       _ -> Nothing
 
@@ -93,41 +93,41 @@ instance ListDrawable Fixed 'JobLogGroupT where
         return True
   handleHotkey _ _ _ = return False
 
-durationWidget :: Maybe NominalDiffTime -> Maybe NominalDiffTime -> Widget n
-durationWidget (Just d) (Just maxD) | maxD > 0 =
+brightnessInterpolatedDuration :: Maybe NominalDiffTime -> Maybe NominalDiffTime -> Widget n
+brightnessInterpolatedDuration (Just d) (Just maxD) | maxD > 0 =
   let ratio = realToFrac d / realToFrac maxD :: Double
       brightness = round (80 + 175 * min 1 ratio) :: Int
       b = fromIntegral (min 255 brightness) :: Word8
       attr = V.Attr V.Default (V.SetTo (V.RGBColor b b b)) V.Default V.Default
   in modifyDefAttr (const attr) $ str $ timeDiff d
-durationWidget (Just d) _ = str $ timeDiff d
-durationWidget Nothing _ = emptyWidget
+brightnessInterpolatedDuration (Just d) _ = str $ timeDiff d
+brightnessInterpolatedDuration Nothing _ = emptyWidget
 
 jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
-jobLogGroupLine _animationCounter _toggled' (JobLogLines {jlLines = contents}) = vBox $ map (\content -> padRight Max $ hBox $
+jobLogGroupLine _animationCounter _toggled' (JobLogLines {jobLogLinesLines = contents}) = vBox $ map (\content -> padRight Max $ hBox $
   str "  " : parseAnsiText content
   ) contents
-jobLogGroupLine animationCounter toggled' (JobLogGroup {jlgTitle = title, jlgStatus = status, jlgDuration = duration, jlgMaxSiblingDuration = maxSibDuration}) = hBox $ catMaybes [
+jobLogGroupLine animationCounter toggled' (JobLogGroup {jobLogGroupTitle = title, jobLogGroupStatus = status, jobLogGroupDuration = duration, jobLogGroupMaxSiblingDuration = maxSibDuration}) = hBox $ catMaybes [
   Just $ padRight Max $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
     Just $ withAttr normalAttr $ str $ toString title,
-    statusW
+    statusWidget
     ],
   durationW
   ]
   where
-    statusW = case status of
+    statusWidget = case status of
       Just s -> Just $ padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus s
       Nothing -> Nothing
     durationW = case duration of
-      Just _ -> Just $ padLeft (Pad 1) $ durationWidget duration maxSibDuration
+      Just _ -> Just $ padLeft (Pad 1) $ brightnessInterpolatedDuration duration maxSibDuration
       Nothing -> Nothing
 
 jobLogGroupInner :: [JobLogGroup] -> Widget n
 jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
   where
-    renderLogGroup (JobLogLines {jlLines = contents}) = vBox $ map renderLogLine contents
-    renderLogGroup (JobLogGroup {jlgTitle = title, jlgChildren = children'}) = vBox [
+    renderLogGroup (JobLogLines {jobLogLinesLines = contents}) = vBox $ map renderLogLine contents
+    renderLogGroup (JobLogGroup {jobLogGroupTitle = title, jobLogGroupChildren = children'}) = vBox [
       withAttr normalAttr $ str $ toString title,
       vBox $ map renderLogGroup children'
       ]
@@ -166,7 +166,7 @@ jobLine animationCounter toggled' (Job {..}) fetchableState maxSibDuration healt
       ]
 
     calculateDurationWidget :: UTCTime -> Maybe UTCTime -> Widget n
-    calculateDurationWidget started (Just completed) = durationWidget (Just (diffUTCTime completed started)) maxSibDuration
+    calculateDurationWidget started (Just completed) = brightnessInterpolatedDuration (Just (diffUTCTime completed started)) maxSibDuration
     calculateDurationWidget _ Nothing = str "running"
 
     runnerNameWidget :: Maybe Text -> Maybe (Widget n)

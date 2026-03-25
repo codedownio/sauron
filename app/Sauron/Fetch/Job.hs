@@ -80,7 +80,7 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
               writeTVar jobState (JobNodeState (Fetched job) NotFetched maxJobDuration)
 
               -- Create dummy child for log fetching
-              let dummyLogGroup = JobLogLines {jlTimestamp = UTCTime (fromGregorian 1970 1 1) 0, jlLines = ["Loading job logs..."]}
+              let dummyLogGroup = JobLogLines {jobLogLinesTimestamp = UTCTime (fromGregorian 1970 1 1) 0, jobLogLinesLines = ["Loading job logs..."]}
               dummyLogEntityData <- makeEmptyElemWithState bc dummyLogGroup () "" (_depth + 2)
               writeTVar jobChildren [JobLogGroupNode dummyLogEntityData]
 
@@ -134,7 +134,7 @@ fetchJobLogsPerJob owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData
         atomically $ do
           JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
           writeTVar _state (JobNodeState jobFetchable (Errored errorMessage) maxSib)
-          childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines {jlTimestamp = now, jlLines = T.splitOn "\n" errorMessage})
+          childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines {jobLogLinesTimestamp = now, jobLogLinesLines = T.splitOn "\n" errorMessage})
           writeTVar _children [childNode]
       Right response -> do
         debug' bc [i|fetchJobLogsPerJob: got logs download URL: #{responseBody response}|]
@@ -193,7 +193,7 @@ fetchJobLogsFromWorkflowRun owner name (Job {jobRunId, jobName}) (SingleJobNode 
           atomically $ do
             JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
             writeTVar _state (JobNodeState jobFetchable (Errored errorMessage) maxSib)
-            childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines {jlTimestamp = now, jlLines = T.splitOn "\n" errorMessage})
+            childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines {jobLogLinesTimestamp = now, jobLogLinesLines = T.splitOn "\n" errorMessage})
             writeTVar _children [childNode]
         Right response -> do
           info' bc [i|fetchJobLogsFromWorkflowRun: got redirect URL, downloading zip...|]
@@ -277,10 +277,10 @@ createZipStepNode bc depth' stepName stepStatus stepDuration maxStepDuration par
   let stepTimestamp = case parsedLogs of
         (g:_) -> getFirstTimestamp g
         [] -> UTCTime (fromGregorian 1970 1 1) 0
-  createJobLogGroupChildren bc depth' (JobLogGroup {jlgTimestamp = stepTimestamp, jlgTitle = stepName, jlgStatus = stepStatus, jlgDuration = stepDuration, jlgMaxSiblingDuration = maxStepDuration, jlgChildren = parsedLogs})
+  createJobLogGroupChildren bc depth' (JobLogGroup {jobLogGroupTimestamp = stepTimestamp, jobLogGroupTitle = stepName, jobLogGroupStatus = stepStatus, jobLogGroupDuration = stepDuration, jobLogGroupMaxSiblingDuration = maxStepDuration, jobLogGroupChildren = parsedLogs})
   where
-    getFirstTimestamp (JobLogLines {jlTimestamp = t}) = t
-    getFirstTimestamp (JobLogGroup {jlgTimestamp = t}) = t
+    getFirstTimestamp (JobLogLines {jobLogLinesTimestamp = t}) = t
+    getFirstTimestamp (JobLogGroup {jobLogGroupTimestamp = t}) = t
 
 createJobStepNode :: BaseContext -> Int -> [JobLogGroup] -> JobStep -> Maybe UTCTime -> Maybe NominalDiffTime -> STM (Node Variable 'JobLogGroupT)
 createJobStepNode bc depth' allLogs jobStep nextStepStart maxStepDuration = do
@@ -288,7 +288,7 @@ createJobStepNode bc depth' allLogs jobStep nextStepStart maxStepDuration = do
   let stepTimestamp = fromMaybe (UTCTime (fromGregorian 1970 1 1) 0) (jobStepStartedAt jobStep)
   let stepStatus = Just $ fromMaybe (jobStepStatus jobStep) (jobStepConclusion jobStep)
   let stepDuration = diffUTCTime <$> jobStepCompletedAt jobStep <*> jobStepStartedAt jobStep
-  createJobLogGroupChildren bc depth' (JobLogGroup {jlgTimestamp = stepTimestamp, jlgTitle = stepTitle, jlgStatus = stepStatus, jlgDuration = stepDuration, jlgMaxSiblingDuration = maxStepDuration, jlgChildren = logsForStep})
+  createJobLogGroupChildren bc depth' (JobLogGroup {jobLogGroupTimestamp = stepTimestamp, jobLogGroupTitle = stepTitle, jobLogGroupStatus = stepStatus, jobLogGroupDuration = stepDuration, jobLogGroupMaxSiblingDuration = maxStepDuration, jobLogGroupChildren = logsForStep})
   where
     logsForStep :: [JobLogGroup]
     logsForStep =
@@ -305,8 +305,8 @@ createJobStepNode bc depth' allLogs jobStep nextStepStart maxStepDuration = do
            (Nothing, Nothing) -> True
 
     getLogTimestamp :: JobLogGroup -> UTCTime
-    getLogTimestamp (JobLogLines {jlTimestamp = timestamp}) = timestamp
-    getLogTimestamp (JobLogGroup {jlgTimestamp = timestamp}) = timestamp
+    getLogTimestamp (JobLogLines {jobLogLinesTimestamp = timestamp}) = timestamp
+    getLogTimestamp (JobLogGroup {jobLogGroupTimestamp = timestamp}) = timestamp
 
 createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
@@ -316,8 +316,8 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
 
   childrenVar <- case jobLogGroup of
     JobLogLines {} -> newTVar []
-    JobLogGroup {jlgStatus = Just _status} -> newTVar []  -- Top-level job groups don't have children in the tree
-    JobLogGroup {jlgChildren = children'} -> do  -- Only nested log groups have children
+    JobLogGroup {jobLogGroupStatus = Just _status} -> newTVar []  -- Top-level job groups don't have children in the tree
+    JobLogGroup {jobLogGroupChildren = children'} -> do  -- Only nested log groups have children
       childElems <- mapM (createJobLogGroupChildren bc (depth' + 1)) children'
       newTVar childElems
 
