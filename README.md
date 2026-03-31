@@ -51,7 +51,7 @@ sauron --token YOUR_GITHUB_TOKEN
 
 ## Configuration (single-repo)
 
-Just run sauron in the directory of a given repo, and it will load the repo.
+Just run sauron in the directory of a given repo, and it will show that repo!
 
 ## Configuration (all repos)
 

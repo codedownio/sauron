@@ -98,7 +98,7 @@
           };
 
           packages = rec {
-            normal = flake.packages."sauron:exe:sauron";
+            dynamic = flake.packages."sauron:exe:sauron";
             static = flakeStatic.packages."sauron:exe:sauron";
             darwin-static = flakeDarwinStatic.packages."sauron:exe:sauron";
             windows = flakeWindows.packages."sauron:exe:sauron";
@@ -108,6 +108,7 @@
             githubArtifacts = let
               binary = if pkgs.stdenv.hostPlatform.isDarwin then darwin-static
                        else if pkgs.stdenv.hostPlatform.isWindows then windows
+                       else if pkgs.stdenv.hostPlatform.isLinux && pkgs.stdenv.hostPlatform.isAarch64 then dynamic
                        else if pkgs.stdenv.hostPlatform.isLinux then static
                        else throw "Unrecognized platform: ${pkgs.stdenv.hostPlatform.system}";
               exeSuffix = if pkgs.stdenv.hostPlatform.isWindows then ".exe" else "";
@@ -120,11 +121,16 @@
               name = "sauron-grand-combined-artifacts";
               paths = [
                 self.packages.x86_64-linux.githubArtifacts
-                self.packages.x86_64-linux.windowsGithubArtifacts
+                self.packages.aarch64-linux.githubArtifacts
+
                 self.packages.x86_64-darwin.githubArtifacts
                 self.packages.aarch64-darwin.githubArtifacts
+
+                self.packages.x86_64-linux.windowsGithubArtifacts
               ];
             };
+
+            inherit version;
           };
         }
     );
