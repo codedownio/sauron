@@ -12,8 +12,6 @@ module Sauron.Event.CommentModal (
 
 import Brick as B
 import Brick.BChan
-import WEditor.LineWrap (breakWords, noHyphen)
-import WEditorBrick.WrappingEditor (dumpEditor, newEditor)
 import Control.Monad.IO.Unlift
 import qualified Data.Text as T
 import Data.Time
@@ -25,6 +23,8 @@ import Sauron.Fetch.Issue (fetchIssueCommentsAndEvents)
 import qualified Sauron.Mutations.Issue as Issue
 import Sauron.Types
 import UnliftIO.Async
+import WEditor.LineWrap (breakWords, noHyphen)
+import WEditorBrick.WrappingEditor (dumpEditor, newEditor)
 
 
 handleCommentModalEvent :: AppState -> CommentModalEvent -> EventM ClickableName AppState ()
@@ -37,7 +37,7 @@ handleCommentModalEvent s (CommentSubmitted result) = case result of
     case s ^. appModal of
       Just (CommentModalState _editor issue _comments _nodeState isPR owner name _submissionState) -> do
         let issueNum = case issueNumber issue of IssueNumber n -> n
-        refreshIssueComments (s ^. appBaseContext) owner name issueNum isPR
+        void $ refreshIssueComments (s ^. appBaseContext) owner name issueNum isPR
         vScrollToEnd (viewportScroll CommentModalContent)
       _ -> return ()
   Left _err -> do
@@ -97,9 +97,9 @@ closeWithComment s (CommentModalState editor issue _comments _nodeState _isPR ow
 closeWithComment _ _ = return () -- ZoomModalState doesn't support comments
 
 
-refreshIssueComments :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> EventM ClickableName AppState ()
+refreshIssueComments :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> EventM ClickableName AppState (Async ())
 refreshIssueComments baseContext owner name issueNumber _isPR = do
-  liftIO $ void $ async $ do
+  liftIO $ async $ do
     fetchIssueCommentsAndEvents baseContext owner name issueNumber >>= \case
       Right merged -> do
         -- Send an event to update the modal with new comments and events
