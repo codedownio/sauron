@@ -6,14 +6,6 @@ settings:
     # is_green: 10m
 
 sections:
-- display_name: "Languages ecosystem"
-  repos:
-  - codedownio/markdown-spellcheck-lsp
-  - codedownio/General
-  - codedownio/cpp-notebook-language-server
-  - codedownio/go-notebook-language-server
-  - codedownio/haskell-notebook-language-server
-  - codedownio/rust-notebook-language-server
 - display_name: "Open source"
   repos:
   - codedownio/aeson-typescript
@@ -22,6 +14,14 @@ sections:
   - codedownio/sandwich
   - codedownio/servant-typescript
   - codedownio/sauron
+- display_name: "Languages ecosystem"
+  repos:
+  - codedownio/markdown-spellcheck-lsp
+  - codedownio/General
+  - codedownio/cpp-notebook-language-server
+  - codedownio/go-notebook-language-server
+  - codedownio/haskell-notebook-language-server
+  - codedownio/rust-notebook-language-server
 - display_name: "Maintaining"
   repos:
   - haskell-fswatch/hfsnotify

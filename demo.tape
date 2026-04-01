@@ -9,19 +9,28 @@ Type@1ms "sauron -c $HOME/tools/sauron/demo_config.yaml"
 Enter
 
 # Scroll down to aeson-typescript
-Sleep 1s
-Down 14
-Sleep 1s
+Sleep 2s
+Down@100ms 7
+Sleep 2s
 Tab
 Sleep 2s
 
 # Go to issues
 Down 1
+Sleep 1s
 Tab
 Sleep 2s
 
-# Go to nth issue
-Down 6
+# Search for Markdown issue
+Type "s"
+Sleep 500ms
+Space
+Type "markdown"
+Enter
+Sleep 2s
+
+# Go to markdown issue
+Down 1
 Sleep 500ms
 Tab
 Sleep 2s
@@ -45,7 +54,7 @@ Type "c"
 Sleep 2s
 
 # Type and submit a new comment
-Type "Here's a *new* comment!"
+Type "Here's a **new** comment!"
 Sleep 2s
 Alt+Enter
 Sleep 2s
@@ -75,6 +84,7 @@ Tab
 Sleep 1
 # Open the first log entry (?)
 Down 1
+Sleep 1
 Tab
 Sleep 1
 Type "z"
