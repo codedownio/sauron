@@ -22,6 +22,7 @@ Sleep 2s
 
 # Go to nth issue
 Down 6
+Sleep 500ms
 Tab
 Sleep 2s
 
@@ -35,8 +36,8 @@ Sleep 500ms
 Ctrl+v
 Sleep 500ms
 Ctrl+v
-Sleep 500ms
-Ctrl+v
+# Sleep 500ms
+# Ctrl+v
 Sleep 2s
 
 # Go into comment mode
@@ -44,16 +45,39 @@ Type "c"
 Sleep 2s
 
 # Type and submit a new comment
-Type "Here's a new comment!"
+Type "Here's a *new* comment!"
 Sleep 2s
 Alt+Enter
 Sleep 2s
 
 # Close the modal and the issues
-Esc
-Left 2
-Sleep 1
+Ctrl+q
+Left 1
+Sleep 500ms
+Left 1
+Sleep 500ms
+Left 1
+Sleep 500ms
 Down 2
+
+# Open the workflows
+Tab
+Sleep 1
+# Go to the first workflow and open it
+Down
+Sleep 500ms
+Tab
+Sleep 1
+# Go to the first job and open it
+Down
+Sleep 500ms
+Tab
+Sleep 1
+# Open the first log entry (?)
+Down 1
+Tab
+Sleep 1
+Type "z"
 
 # Final sleep
 Sleep 5s
