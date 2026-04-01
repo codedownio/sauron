@@ -61,6 +61,7 @@ handleCommentModalEvent s (CommentsRefreshed comments) = do
     Just (CommentModalState {_commentNodeState=nodeState}) ->
       liftIO $ atomically $ writeTVar nodeState (Fetched comments)
     _ -> return ()
+  invalidateCacheEntry CommentModalContent
   vScrollToEnd (viewportScroll CommentModalContent)
 
 handleCommentModalEvent _s (OpenCommentModal issue comments nodeState isPR owner name) = do
