@@ -42,7 +42,7 @@ renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber
     , buttonSection _commentEditor issue _submissionState
   ]
   & border
-  & withAttr normalAttr
+  & withDefAttr normalAttr
   & hLimit (modalWidth appState)
   & vLimitPercent modalHeightPercent
   & centerLayer

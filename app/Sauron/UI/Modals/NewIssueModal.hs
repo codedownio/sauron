@@ -42,7 +42,7 @@ renderNewIssueModal app (NewIssueModalState {..}) =
     , newIssueButtonSection _newIssueTitleEditor _newIssueSubmissionState
   ]
   & border
-  & withAttr normalAttr
+  & withDefAttr normalAttr
   & hLimit modalWidth
   & vLimitPercent 80
   & centerLayer

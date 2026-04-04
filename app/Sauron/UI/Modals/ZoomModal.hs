@@ -34,7 +34,7 @@ renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModa
     , hCenter $ hBox $ intersperse (str "  ") $ getZoomModalHotkeys someNode
   ]
   & border
-  & withAttr normalAttr
+  & withDefAttr normalAttr
   & hLimit (modalWidth appState)
   & vLimitPercent modalHeightPercent
   & centerLayer

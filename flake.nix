@@ -94,7 +94,11 @@
                 pkgs.haskell.compiler.ghc9122
                 (pkgs.haskell-language-server.override { supportedGhcVersions = ["9122"]; })
 
-                vhs
+                (pkgs.vhs.overrideAttrs (old: {
+                  patches = (old.patches or []) ++ [
+                    ./nix/vhs-add-home-end-keys.patch
+                  ];
+                }))
               ];
             };
           };

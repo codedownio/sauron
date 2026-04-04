@@ -1,0 +1,44 @@
+--- a/command.go	2026-04-03 16:57:30.287601124 -0700
++++ b/command.go	2026-04-03 16:57:45.851598590 -0700
+@@ -41,6 +41,8 @@
+ var CommandFuncs = map[parser.CommandType]CommandFunc{
+ 	token.BACKSPACE:  ExecuteKey(input.Backspace),
+ 	token.DELETE:     ExecuteKey(input.Delete),
++	token.END:        ExecuteKey(input.End),
++	token.HOME:       ExecuteKey(input.Home),
+ 	token.INSERT:     ExecuteKey(input.Insert),
+ 	token.DOWN:       ExecuteKey(input.ArrowDown),
+ 	token.ENTER:      ExecuteKey(input.Enter),
+@@ -189,6 +191,10 @@
+ 			inputKey = &input.Space
+ 		case "Backspace":
+ 			inputKey = &input.Backspace
++		case "Home":
++			inputKey = &input.Home
++		case "End":
++			inputKey = &input.End
+ 		default:
+ 			r := rune(key[0])
+ 			if k, ok := keymap[r]; ok {
+--- a/command_test.go	2026-04-03 16:57:30.290601124 -0700
++++ b/command_test.go	2026-04-03 16:57:39.605599768 -0700
+@@ -13,7 +13,7 @@
+ 		t.Errorf("Expected %d commands, got %d", numberOfCommands, len(parser.CommandTypes))
+ 	}
+ 
+-	const numberOfCommandFuncs = 29
++	const numberOfCommandFuncs = 31
+ 	if len(CommandFuncs) != numberOfCommandFuncs {
+ 		t.Errorf("Expected %d commands, got %d", numberOfCommandFuncs, len(CommandFuncs))
+ 	}
+--- a/parser/parser.go	2026-04-03 16:57:30.283601125 -0700
++++ b/parser/parser.go	2026-04-03 16:57:39.607599768 -0700
+@@ -317,6 +317,8 @@
+ 		case peek.Type == token.ENTER,
+ 			peek.Type == token.SPACE,
+ 			peek.Type == token.BACKSPACE,
++			peek.Type == token.HOME,
++			peek.Type == token.END,
+ 			peek.Type == token.MINUS,
+ 			peek.Type == token.AT,
+ 			peek.Type == token.LEFT_BRACKET,
