@@ -5,14 +5,14 @@
 <h1 align="center">sauron</h1>
 
 <p align="center">
-  A terminal UI dashboard for monitoring your GitHub repositories.
+  A terminal UI for your GitHub repositories.
   <br />
   Issues, pull requests, workflow runs, branches, and notifications — all in one place.
 </p>
 
 ---
 
-![demo](https://github.com/user-attachments/assets/TODO)
+![demo](./demo.gif)
 
 ## Features
 

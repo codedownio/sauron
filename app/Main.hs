@@ -253,7 +253,11 @@ buildBaseContext eventChan = do
 
       maybe authenticateWithGitHub pure maybeAuth
 
-  putStrLn [i|Got auth: #{auth}|]
+  case auth of
+    BasicAuth {} -> putStrLn "Got basic auth"
+    OAuth {} -> putStrLn "Got OAuth auth"
+    JWT {} -> putStrLn "Got JWT auth"
+    EnterpriseOAuth {} -> putStrLn "Got enterprise OAuth auth"
 
   debugFn <- case cliDebugFile of
     Nothing -> return $ const $ return ()
