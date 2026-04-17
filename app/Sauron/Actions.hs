@@ -58,6 +58,8 @@ refreshLine bc item@(PaginatedStaleBranchesNode _) (findRepoParent -> Just (Repo
   liftIO $ async $ withRepoDefaultBranch _state $ \defaultBranch -> runReaderT (fetchStaleBranches owner name defaultBranch item) bc
 refreshLine bc item@(PaginatedNotificationsNode _) _ =
   liftIO $ async $ liftIO $ runReaderT (fetchNotifications item) bc
+refreshLine bc item@(PaginatedReposNode _) _parents =
+  liftIO $ async $ liftIO $ runReaderT (fetchRepos item) bc
 refreshLine bc item@(SingleJobNode _) parents = do
   liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
   liftIO $ async $ return ()
