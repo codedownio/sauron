@@ -25,7 +25,58 @@
 - **Split view** — optional side-by-side layout with logs panel (`--split-logs`)
 - **Keyboard-driven** — full hotkey support for fast navigation
 
+## Why Sauron?
+
+Most Git TUIs (`lazygit`, `gitui`) focus on local operations — staging, committing, rebasing. They don't talk to the GitHub API. The `gh` CLI can fetch GitHub data but isn't an interactive dashboard. Sauron fills the gap: a persistent, keyboard-driven TUI that watches **multiple repos at once** and gives you live access to issues, PRs, CI runs, and notifications without leaving the terminal.
+
+| Feature | Sauron | `gh` CLI | `gh-dash` | lazygit | gitui |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Multi-repo dashboard | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: |
+| Browse/search issues and PRs | :white_check_mark: | list only | :white_check_mark: | :x: | :x: |
+| Comment on issues/PRs | :white_check_mark: | :white_check_mark: | :white_check_mark: | :x: | :x: |
+| Close/reopen issues/PRs | :white_check_mark: | :white_check_mark: | :white_check_mark: | :x: | :x: |
+| Create issues | :white_check_mark: | :white_check_mark: | :x: | :x: | :x: |
+| Syntax highlighting | :white_check_mark: | :x: | :x: | :white_check_mark: | :white_check_mark: |
+| Monitor workflow runs | :white_check_mark: | :x: | :x: | :x: | :x: |
+| Drill into CI job logs | :white_check_mark: | `--log` flag | :x: | :x: | :x: |
+| Auto-refresh / health checks | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: |
+| GitHub notifications | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: |
+| Branches with ahead/behind | :white_check_mark: | :x: | :x: | :white_check_mark: | :x: |
+| YAML config for repos | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: |
+| Local git operations | :x: | :x: | :x: | :white_check_mark: | :white_check_mark: |
+| Open in browser | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :x: |
+
 ## Install
+
+### Pre-built binaries
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/codedownio/sauron/releases):
+
+```bash
+# Linux (x86_64)
+TMPDIR=$(mktemp -d)
+curl -sL https://github.com/codedownio/sauron/releases/latest/download/sauron-x86_64-linux-0.1.0.1.tar.gz | tar xz -C "$TMPDIR"
+sudo mv "$TMPDIR/sauron" /usr/local/bin/
+rmdir "$TMPDIR"
+
+# macOS (Apple Silicon)
+TMPDIR=$(mktemp -d)
+curl -sL https://github.com/codedownio/sauron/releases/latest/download/sauron-aarch64-darwin-0.1.0.1.tar.gz | tar xz -C "$TMPDIR"
+sudo mv "$TMPDIR/sauron" /usr/local/bin/
+rmdir "$TMPDIR"
+
+# macOS (Intel)
+TMPDIR=$(mktemp -d)
+curl -sL https://github.com/codedownio/sauron/releases/latest/download/sauron-x86_64-darwin-0.1.0.1.tar.gz | tar xz -C "$TMPDIR"
+sudo mv "$TMPDIR/sauron" /usr/local/bin/
+rmdir "$TMPDIR"
+```
+
+### From source (Nix)
+
+```bash
+nix run github:codedownio/sauron/v0.1.0.1
+```
 
 ### From source (Stack)
 
@@ -33,12 +84,6 @@
 git clone https://github.com/codedownio/sauron.git
 cd sauron
 stack install
-```
-
-### From source (Nix)
-
-```bash
-nix build github:codedownio/sauron
 ```
 
 ## Setup
