@@ -204,7 +204,7 @@ type family NodeState a where
   NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)
   NodeState SingleCommitT = Fetchable Commit
   NodeState SingleNotificationT = Fetchable ()
-  NodeState JobLogGroupT = ()
+  NodeState JobLogGroupT = Maybe ScrollTarget
   NodeState HeadingT = ()
   NodeState RepoT = Fetchable Repo
 
@@ -516,6 +516,12 @@ data AppEvent =
   | CommentModalEvent CommentModalEvent
   | NewIssueModalEvent NewIssueModalEvent
   | LogEntryAdded LogEntry
+
+data ScrollTarget =
+  ScrollToBeginning
+  | ScrollToLine Int
+  | ScrollToEnd
+  deriving (Show, Eq)
 
 data CommentModalEvent =
   CommentSubmitted (Either Error Comment)

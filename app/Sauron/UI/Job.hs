@@ -70,11 +70,11 @@ instance ListDrawable Fixed 'JobLogGroupT where
   drawLine appState (EntityData {_static=jobLogGroup, ..}) =
     jobLogGroupLine (_appAnimationCounter appState) _toggled jobLogGroup
 
-  drawInner _appState (EntityData {_static=jobLogGroup, ..}) = do
+  drawInner _appState (EntityData {_static=jobLogGroup, _state, ..}) = do
     guard _toggled
     case jobLogGroup of
       JobLogGroup {jobLogGroupStatus = Just _status, jobLogGroupChildren = children'} ->
-        return $ jobLogGroupInner children'
+        return $ jobLogGroupInner _state children'
       _ -> Nothing
 
   getExtraTopBoxWidgets _app (EntityData {}) =
@@ -104,9 +104,7 @@ brightnessInterpolatedDuration (Just d) _ = str $ timeDiff d
 brightnessInterpolatedDuration Nothing _ = emptyWidget
 
 jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
-jobLogGroupLine _animationCounter _toggled' (JobLogLines {jobLogLinesLines = contents}) = vBox $ map (\content -> padRight Max $ hBox $
-  str "  " : parseAnsiText content
-  ) contents
+jobLogGroupLine _animationCounter _toggled' (JobLogLines {jobLogLinesLines = contents}) = vBox [padRight Max $ hBox $ str "  " : parseAnsiText c | c <- contents]
 jobLogGroupLine animationCounter toggled' (JobLogGroup {jobLogGroupTitle = title, jobLogGroupStatus = status, jobLogGroupDuration = duration, jobLogGroupMaxSiblingDuration = maxSibDuration}) = hBox $ catMaybes [
   Just $ padRight Max $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
@@ -123,29 +121,33 @@ jobLogGroupLine animationCounter toggled' (JobLogGroup {jobLogGroupTitle = title
       Just _ -> Just $ padLeft (Pad 1) $ brightnessInterpolatedDuration duration maxSibDuration
       Nothing -> Nothing
 
-jobLogGroupInner :: [JobLogGroup] -> Widget n
-jobLogGroupInner logGroups = vBox $ map renderLogGroup logGroups
+jobLogGroupInner :: Maybe ScrollTarget -> [JobLogGroup] -> Widget n
+jobLogGroupInner scrollTarget logGroups = vBox $ applyVisible $ concatMap renderLogGroup logGroups
   where
-    renderLogGroup (JobLogLines {jobLogLinesLines = contents}) = vBox $ map renderLogLine contents
-    renderLogGroup (JobLogGroup {jobLogGroupTitle = title, jobLogGroupChildren = children'}) = vBox [
-      withAttr normalAttr $ str $ toString title,
-      vBox $ map renderLogGroup children'
-      ]
+    applyVisible ws = case targetIndex of
+      Just n -> case splitAt (clamp 0 (length ws - 1) n) ws of
+        (before, w:after) -> before ++ [visible w] ++ after
+        _ -> ws
+      Nothing -> ws
+      where
+        targetIndex = case scrollTarget of
+          Just (ScrollToLine n) -> Just n
+          Just ScrollToEnd      -> Just (length ws - 1)
+          _                     -> Nothing
+        clamp lo hi = max lo . min hi
+
+    renderLogGroup (JobLogLines {jobLogLinesLines}) = map renderLogLine jobLogLinesLines
+    renderLogGroup (JobLogGroup {jobLogGroupTitle, jobLogGroupChildren}) =
+      withAttr normalAttr (str (toString jobLogGroupTitle)) : concatMap renderLogGroup jobLogGroupChildren
 
     renderLogLine content
       | "[command]" `T.isPrefixOf` content = hBox $ renderCommandLine content
       | "##[error]" `T.isPrefixOf` content = hBox $ renderErrorLine content
       | otherwise = hBox $ parseAnsiText content
 
-    renderCommandLine content =
-      let commandText = T.drop 9 content  -- Remove "[command]"
-      in [ str "▶ "
-         , withAttr commandAttr $ str $ toString commandText
-         ]
+    renderCommandLine content = [str "▶ ", withAttr commandAttr $ txt $ T.drop 9 content]
 
-    renderErrorLine content =
-      let text = T.drop 9 content  -- Remove "##[error]"
-      in [ withAttr erroredAttr $ str $ toString text ]
+    renderErrorLine content = [withAttr erroredAttr $ txt $ T.drop 9 content]
 
 jobLine :: Int -> Bool -> Job -> Fetchable a -> Maybe NominalDiffTime -> Maybe (Async (), Int) -> Widget n
 jobLine animationCounter toggled' (Job {..}) fetchableState maxSibDuration healthCheckThreadData = vBox [line1, line2]

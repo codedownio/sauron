@@ -8,7 +8,6 @@ module Sauron.Event (appEvent) where
 import Brick as B
 import Brick.Forms
 import Brick.Widgets.Edit (handleEditorEvent)
-import qualified WEditorBrick.WrappingEditor as WEditorBrick
 import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
@@ -35,6 +34,7 @@ import Sauron.UI ()
 import Sauron.UI.Keys
 import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
 import Sauron.UI.Notification () -- Import for ListDrawable instance
+import qualified WEditorBrick.WrappingEditor as WEditorBrick
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
@@ -237,14 +237,14 @@ handleMainPaneEvents' s e = case e of
 
   -- Scrolling in toggled items
   -- Wanted to make these uniformly Ctrl+whatever, but Ctrl+PageUp/PageDown was causing it to get KEsc and exit (?)
-  V.EvKey V.KUp [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
-  V.EvKey (V.KChar 'p') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp (-1)
-  V.EvKey V.KDown [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp 1
-  V.EvKey (V.KChar 'n') [V.MCtrl] -> withScroll s $ \vp -> vScrollBy vp 1
-  V.EvKey (V.KChar 'v') [V.MMeta] -> withScroll s $ \vp -> vScrollPage vp Up
-  V.EvKey (V.KChar 'v') [V.MCtrl] -> withScroll s $ \vp -> vScrollPage vp Down
-  V.EvKey V.KHome [V.MCtrl] -> withScroll s $ \vp -> vScrollToBeginning vp
-  V.EvKey V.KEnd [V.MCtrl] -> withScroll s $ \vp -> vScrollToEnd vp
+  V.EvKey V.KUp [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollBy vp (-1))
+  V.EvKey (V.KChar 'p') [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollBy vp (-1))
+  V.EvKey V.KDown [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollBy vp 1)
+  V.EvKey (V.KChar 'n') [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollBy vp 1)
+  V.EvKey (V.KChar 'v') [V.MMeta] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollPage vp Up)
+  V.EvKey (V.KChar 'v') [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollPage vp Down)
+  V.EvKey V.KHome [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollToBeginning vp)
+  V.EvKey V.KEnd [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollToEnd vp)
 
   -- Column 2
   V.EvKey c [] | c == browserToHomeKey ->
@@ -310,9 +310,19 @@ handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
 modifyToggled :: MonadIO m => AppState -> (Bool -> Bool) -> m ()
 modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode item@(getEntityData -> mle)) parents -> do
   wasOpen <- liftIO $ readTVarIO (_toggled mle)
-  isOpen <- liftIO $ atomically $ do
+  (isOpen, maybeTarget) <- liftIO $ atomically $ do
     modifyTVar' (_toggled mle) cb
-    readTVar (_toggled mle)
+    isOpen' <- readTVar (_toggled mle)
+    -- Set auto-scroll target atomically with the toggle so the fixer
+    -- thread always sees both changes together.
+    target <- if not wasOpen && isOpen'
+      then autoScrollSTM item
+      else return Nothing
+    return (isOpen', target)
+
+  whenJust maybeTarget $ \target -> do
+    let targetStr = show target :: String
+    liftIO $ info' (_appBaseContext s) [i|autoScrollSTM: set target=#{targetStr}|]
 
   -- Node opened
   when (not wasOpen && isOpen) $

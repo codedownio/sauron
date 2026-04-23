@@ -81,7 +81,7 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
 
               -- Create dummy child for log fetching
               let dummyLogGroup = JobLogLines {jobLogLinesTimestamp = UTCTime (fromGregorian 1970 1 1) 0, jobLogLinesLines = ["Loading job logs..."]}
-              dummyLogEntityData <- makeEmptyElemWithState bc dummyLogGroup () "" (_depth + 2)
+              dummyLogEntityData <- makeEmptyElemWithState bc dummyLogGroup Nothing "" (_depth + 2)
               writeTVar jobChildren [JobLogGroupNode dummyLogEntityData]
 
               return $ SingleJobNode entityData
@@ -310,7 +310,7 @@ createJobStepNode bc depth' allLogs jobStep nextStepStart maxStepDuration = do
 
 createJobLogGroupChildren :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogGroupChildren bc depth' jobLogGroup = do
-  stateVar <- newTVar ()
+  stateVar <- newTVar Nothing
   ident' <- getIdentifierSTM bc
   toggledVar <- newTVar False
 
@@ -337,7 +337,7 @@ createJobLogGroupChildren bc depth' jobLogGroup = do
 
 createJobLogLinesNode :: BaseContext -> Int -> JobLogGroup -> STM (Node Variable 'JobLogGroupT)
 createJobLogLinesNode bc depth' jobLogGroup = do
-  stateVar <- newTVar ()
+  stateVar <- newTVar Nothing
   ident' <- getIdentifierSTM bc
   toggledVar <- newTVar False
   childrenVar <- newTVar []
