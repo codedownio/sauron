@@ -125,7 +125,7 @@ jobLogGroupInner :: Maybe ScrollTarget -> [JobLogGroup] -> Widget n
 jobLogGroupInner scrollTarget logGroups = vBox $ applyVisible $ concatMap renderLogGroup logGroups
   where
     applyVisible ws = case targetIndex of
-      Just n -> case splitAt (clamp 0 (length ws - 1) n) ws of
+      Just n -> case splitAt (clamp' 0 (length ws - 1) n) ws of
         (before, w:after) -> before ++ [visible w] ++ after
         _ -> ws
       Nothing -> ws
@@ -134,7 +134,7 @@ jobLogGroupInner scrollTarget logGroups = vBox $ applyVisible $ concatMap render
           Just (ScrollToLine n) -> Just n
           Just ScrollToEnd      -> Just (length ws - 1)
           _                     -> Nothing
-        clamp lo hi = max lo . min hi
+        clamp' lo hi = max lo . min hi
 
     renderLogGroup (JobLogLines {jobLogLinesLines}) = map renderLogLine jobLogLinesLines
     renderLogGroup (JobLogGroup {jobLogGroupTitle, jobLogGroupChildren}) =
