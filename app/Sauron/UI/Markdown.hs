@@ -100,6 +100,17 @@ renderBlock maybePrefix width (B.Table _ _ _ thead tbody _) =
   case maybePrefix of
     Nothing -> renderTableWith renderBlock width thead tbody
     Just prefix -> hBox [prefix, renderTableWith renderBlock (width - 2) thead tbody]
+renderBlock maybePrefix _width (B.RawBlock _ content) =
+  let widget = if T.null (T.strip content)
+               then emptyWidget
+               else txtWrap content
+  in case maybePrefix of
+       Nothing -> widget
+       Just prefix -> hBox [prefix, widget]
+renderBlock maybePrefix width (B.Div _ blocks) =
+  vBox $ map (renderBlock maybePrefix width) blocks
+renderBlock maybePrefix width (B.LineBlock lineGroups) =
+  vBox $ map (\inlines -> fst $ runWriter $ renderWrappedParagraphM maybePrefix width (toList inlines)) lineGroups
 renderBlock maybePrefix _ b =
   case maybePrefix of
     Nothing -> strWrap [i|UNHANDLED BLOCK: #{b}|]
