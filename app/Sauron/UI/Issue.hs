@@ -118,6 +118,13 @@ instance ListDrawable Fixed 'SingleIssueT where
 maxCommentWidth :: Int
 maxCommentWidth = 120
 
+-- | Render with width capped at maxCommentWidth but shrinking for narrow terminals
+adaptiveWidth :: (Int -> Widget n) -> Widget n
+adaptiveWidth f = Widget Greedy Fixed $ do
+  c <- getContext
+  let w = min maxCommentWidth ((c ^. availWidthL) - 1)
+  render (hLimit w (f w))
+
 issueLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable (V.Vector (Either IssueEvent IssueComment)) -> Widget n
 issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
   where
@@ -167,9 +174,9 @@ renderTimelineItem now totalItems idx (itemType, _extraBody) =
                    else middleTimelineBorder
   in case itemType of
     Left (username, descriptionBody, createdAt) -> -- Issue/PR description
-      hLimit maxCommentWidth $ borderFunc
+      adaptiveWidth $ \w -> borderFunc
         (topLabel username createdAt now)
-        (markdownToWidgetsWithWidth (maxCommentWidth - 2) descriptionBody)
+        (markdownToWidgetsWithWidth (w - 2) descriptionBody)
     Right item -> renderItemWithBorder now (idx == totalItems - 1) borderFunc item
 
 topLabel :: Text -> UTCTime -> UTCTime -> Widget n
@@ -185,9 +192,9 @@ renderItemWithBorder now isLast borderFunc item =
 
 renderComment :: UTCTime -> (Widget n -> Widget n -> Widget n) -> IssueComment -> Widget n
 renderComment now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) =
-  hLimit maxCommentWidth $ borderFunc
+  adaptiveWidth $ \w -> borderFunc
     (commentTopLabel username commentTime now)
-    (markdownToWidgetsWithWidth (maxCommentWidth - 2) issueCommentBody)
+    (markdownToWidgetsWithWidth (w - 2) issueCommentBody)
   where commentTime = issueCommentCreatedAt
 
 renderEvent :: UTCTime -> Bool -> IssueEvent -> Widget n
@@ -197,7 +204,7 @@ renderEvent now isLast issueEvent =
       eventText = getEventDescription (issueEventType issueEvent)
       iconWidget = getEventIconWithColor (issueEventType issueEvent)
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
-      eventLine = hLimit maxCommentWidth $
+      eventLine = adaptiveWidth $ \_ ->
         padLeft (Pad 4) $ hBox [
           iconWidget
           , str "  "
@@ -209,7 +216,7 @@ renderEvent now isLast issueEvent =
         ]
       continuationLine = if isLast
         then emptyWidget
-        else hLimit maxCommentWidth $ padLeft (Pad 4) $ withAttr timelineBorderAttr $ str "│"
+        else adaptiveWidth $ \_ -> padLeft (Pad 4) $ withAttr timelineBorderAttr $ str "│"
   in vBox [eventLine, continuationLine]
 
 commentTopLabel :: Text -> UTCTime -> UTCTime -> Widget n

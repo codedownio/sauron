@@ -13,6 +13,7 @@ import Brick
 import Brick.Widgets.Border
 import Data.Maybe
 import Data.String.Interpolate
+import Lens.Micro
 import Relude
 import Sauron.Types
 import Sauron.UI.Branch ()
@@ -29,14 +30,14 @@ import Sauron.UI.Workflow ()
 
 
 listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget ClickableName
-listDrawElement appState ix isSelected node@(SomeNode inner) = wrapper ix isSelected (getEntityData inner) $ listDrawElement' appState node
+listDrawElement appState ix' isSelected node@(SomeNode inner) = wrapper ix' isSelected (getEntityData inner) $ listDrawElement' appState node
 
 listDrawElement' :: AppState -> SomeNode Fixed -> Widget ClickableName
 listDrawElement' appState (SomeNode inner) =
   let ed = getEntityData inner
   in vBox $ catMaybes [
     Just $ drawNodeLine appState inner
-    , fmap (padLeft (Pad 4) . fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident ed}|]) 50) (drawNodeInner appState inner)
+    , fmap (padLeft (Pad 4) . fixedHeightOrViewportPercent (InnerViewport [i|viewport_#{_ident ed}|]) 50 . reduceWidth 1) (drawNodeInner appState inner)
   ]
 
 -- Pattern match on specific node types to call their instances
@@ -92,4 +93,14 @@ drawNodeInner appState node = case node of
   JobLogGroupNode ed -> drawInner appState ed
 
 wrapper :: Int -> Bool -> EntityData a f -> Widget ClickableName -> Widget ClickableName
-wrapper ix isSelected x = clickable (ListRow ix) . padLeft (Pad (4 * (_depth x))) . (if isSelected then border else id)
+wrapper ix' isSelected x = clickable (ListRow ix') . padLeft (Pad (4 * _depth x)) . (if isSelected then border else id)
+
+-- | Reduce available width by n without adding visible padding.
+-- In the main UI, inner content is indented by wrapper/padding, so
+-- adaptive-width widgets (issue comments etc.) need a small margin
+-- to avoid rendering wider than the visible area. This doesn't apply
+-- in the zoom modal which has its own width constraints.
+reduceWidth :: Int -> Widget n -> Widget n
+reduceWidth n w = Widget (hSize w) (vSize w) $ do
+  c <- getContext
+  render $ hLimit ((c ^. availWidthL) - n) w
