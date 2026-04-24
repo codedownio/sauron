@@ -36,8 +36,8 @@ instance ListDrawable Fixed 'PaginatedReposT where
   handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedIssuesT where
-  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "Issues" appState ed search pageInfo fetchable
+  drawLine appState ed@(EntityData {_static=label, _state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine (toString label) appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets ++
     [hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey newIssueKey
@@ -56,8 +56,8 @@ instance ListDrawable Fixed 'PaginatedIssuesT where
     | otherwise = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedPullsT where
-  drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "Pulls" appState ed search pageInfo fetchable
+  drawLine appState ed@(EntityData {_static=label, _state=(search, pageInfo, fetchable)}) =
+    drawPaginatedLine (toString label) appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets
   handleHotkey s key ed = searchableHandleHotkey s key ed
 

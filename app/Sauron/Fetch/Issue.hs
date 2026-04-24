@@ -3,8 +3,10 @@
 
 module Sauron.Fetch.Issue (
   fetchIssues
+  , fetchMyIssues
   , fetchIssue
   , fetchIssueComments
+  , fetchIssueCommentsByUrl
   , fetchIssueCommentsAndEvents
   ) where
 
@@ -15,6 +17,7 @@ import Data.String.Interpolate
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GitHub
+import Network.URI (parseURI, uriPath)
 import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
@@ -30,7 +33,22 @@ fetchIssues owner name (PaginatedIssuesNode (EntityData {..})) = do
     SearchNone -> pure []
     SearchText t -> pure $ T.words t
   let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
+  fetchIssues' fullQuery _state _children _depth
 
+fetchMyIssues :: (
+  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Node Variable PaginatedIssuesT -> m ()
+fetchMyIssues (PaginatedIssuesNode (EntityData {..})) = do
+  (search, _pageInfo, _fetchable) <- readTVarIO _state
+  let fullQuery = case search of
+        SearchNone -> ""
+        SearchText t -> T.intercalate "+" (T.words t)
+  fetchIssues' fullQuery _state _children _depth
+
+fetchIssues' :: (
+  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Text -> TVar (Search, PageInfo, Fetchable TotalCount) -> TVar [Node Variable SingleIssueT] -> Int -> m ()
+fetchIssues' fullQuery _state _children _depth = do
   bc <- ask
 
   fetchPaginatedWithState (searchIssuesR fullQuery) _state $ \case
@@ -65,6 +83,31 @@ fetchIssueComments owner name issueNumber inner = do
       Left err -> atomically $ writeTVar inner (Errored (show err))
       Right merged -> atomically $ writeTVar inner (Fetched merged)
 
+-- | Fetch comments for an issue/PR using only its API URL (no owner/repo needed).
+-- Constructs pagedQuery paths from the URL path segments.
+fetchIssueCommentsByUrl :: (
+  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => URL -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> m ()
+fetchIssueCommentsByUrl issueApiUrl inner = do
+  let urlText = getUrl issueApiUrl
+  case parseURI (toString urlText) of
+    Nothing -> atomically $ writeTVar inner (Errored [i|Failed to parse issue URL: #{urlText}|])
+    Just uri -> do
+      let segments = filter (not . T.null) $ T.splitOn "/" $ toText (uriPath uri)
+      ctx <- ask
+      let commentsReq = pagedQuery (segments <> ["comments"]) [] FetchAll
+      let eventsReq = pagedQuery (segments <> ["events"]) [] FetchAll
+      bracketOnError_ (atomically $ markFetching inner)
+                      (atomically $ writeTVar inner (Errored "Issue comments and events fetch failed with exception.")) $ do
+        (commentsResult, eventsResult) <- liftIO $ concurrently
+          (withGithubApiSemaphore' (requestSemaphore ctx) (githubWithLogging' ctx commentsReq))
+          (withGithubApiSemaphore' (requestSemaphore ctx) (githubWithLogging' ctx eventsReq))
+        case (commentsResult, eventsResult) of
+          (Right comments, Right events) ->
+            atomically $ writeTVar inner (Fetched (mergeCommentsAndEvents comments events))
+          (Left err, _) -> atomically $ writeTVar inner (Errored (show err))
+          (_, Left err) -> atomically $ writeTVar inner (Errored (show err))
+
 fetchIssueCommentsAndEvents :: (HasCallStack) => BaseContext -> Name Owner -> Name Repo -> Int -> IO (Either Error (V.Vector (Either IssueEvent IssueComment)))
 fetchIssueCommentsAndEvents baseContext owner name issueNumber = do
   let fetchComments =
@@ -84,12 +127,12 @@ fetchIssueCommentsAndEvents baseContext owner name issueNumber = do
       return $ Right $ mergeCommentsAndEvents comments events
     (Left err, _) -> return $ Left err
     (_, Left err) -> return $ Left err
+
+mergeCommentsAndEvents :: V.Vector IssueComment -> V.Vector IssueEvent -> V.Vector (Either IssueEvent IssueComment)
+mergeCommentsAndEvents comments events = V.toList commentEntries <> V.toList eventEntries
+                                       & sortOn fst -- Sort by timestamp, newest first
+                                       & fmap snd
+                                       & V.fromList
   where
-    mergeCommentsAndEvents :: V.Vector IssueComment -> V.Vector IssueEvent -> V.Vector (Either IssueEvent IssueComment)
-    mergeCommentsAndEvents comments events = V.toList commentEntries <> V.toList eventEntries
-                                           & sortOn fst -- Sort by timestamp, newest first
-                                           & fmap snd
-                                           & V.fromList
-      where
-        commentEntries = fmap (\c -> (issueCommentCreatedAt c, Right c)) comments
-        eventEntries = fmap (\e -> (issueEventCreatedAt e, Left e)) events
+    commentEntries = fmap (\c -> (issueCommentCreatedAt c, Right c)) comments
+    eventEntries = fmap (\e -> (issueEventCreatedAt e, Left e)) events

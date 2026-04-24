@@ -163,8 +163,8 @@ deriving instance (Eq (NodeStatic a), Eq (NodeChildType Fixed a), Eq (NodeState 
 -- * Static state, fetched state, and child state for nodes
 
 type family NodeStatic a where
-  NodeStatic PaginatedIssuesT = ()
-  NodeStatic PaginatedPullsT = ()
+  NodeStatic PaginatedIssuesT = Text
+  NodeStatic PaginatedPullsT = Text
   NodeStatic PaginatedWorkflowsT = ()
   NodeStatic PaginatedReposT = Name User
   NodeStatic PaginatedBranchesT = ()

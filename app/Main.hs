@@ -134,7 +134,24 @@ main = do
   let PeriodSpec period = defaultHealthCheckPeriodUs
   notificationsHealthCheckThread <- newNotificationHealthCheckThread baseContext (_state notificationEntityData)
   atomically $ writeTVar (_healthCheckThread notificationEntityData) (Just (notificationsHealthCheckThread, period))
-  let listElems = V.cons (SomeNode notificationNode) listElems'
+
+  -- My Issues node
+  myIssuesNode <- atomically (PaginatedIssuesNode <$> makeEmptyElemWithState baseContext ("My Issues" :: Text)
+    (SearchText "is:issue state:open archived:false assignee:@me sort:updated-desc", emptyPageInfo, NotFetched) "" 0)
+
+  -- My Pulls heading with sub-categories
+  let mkMyPullsChild label searchQuery = atomically (PaginatedPullsNode <$> makeEmptyElemWithState baseContext label
+        (SearchText searchQuery, emptyPageInfo, NotFetched) "" 1)
+  needsYourReview <- mkMyPullsChild "Needs your review" "is:pr is:open review-requested:@me sort:updated-desc"
+  -- TODO: team-review-requested requires org/team-slug, not @me. Need to fetch user's teams first.
+  -- needsTeamReview <- mkMyPullsChild "Needs your teams' review" "is:pr is:open team-review-requested:@me sort:updated-desc"
+  needsAction <- mkMyPullsChild "Needs action" "is:pr is:open author:@me review:changes_requested sort:updated-desc"
+  readyToMerge <- mkMyPullsChild "Ready to merge" "is:pr is:open author:@me review:approved sort:updated-desc"
+  myPullsHeading <- atomically (HeadingNode <$> makeEmptyElemWithState baseContext ("My Pulls" :: Text) () "" 0)
+  atomically $ writeTVar (_children (getEntityData myPullsHeading))
+    [SomeNode needsYourReview, SomeNode needsAction, SomeNode readyToMerge]
+
+  let listElems = V.fromList [SomeNode notificationNode, SomeNode myIssuesNode, SomeNode myPullsHeading] <> listElems'
 
   -- Kick off initial fetches
   runReaderT (refreshVisibleLines listElems) baseContext

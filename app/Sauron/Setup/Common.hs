@@ -32,7 +32,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   issuesHealthCheckThreadVar <- newTVarIO Nothing
   issuesIdentifier <- liftIO getIdentifier
   let issuesChild = PaginatedIssuesNode $ EntityData {
-        _static = ()
+        _static = "Issues"
         , _state = issuesVar
         , _urlSuffix = "issues"
         , _toggled = issuesToggledVar
@@ -50,7 +50,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   pullsHealthCheckThreadVar <- newTVarIO Nothing
   pullsIdentifier <- liftIO getIdentifier
   let pullsChild = PaginatedPullsNode $ EntityData {
-        _static = ()
+        _static = "Pulls"
         , _state = pullsVar
         , _urlSuffix = "pulls"
         , _toggled = pullsToggledVar

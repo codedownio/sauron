@@ -83,10 +83,10 @@ generateModalTitle (SomeNode inner) =
       "Repository: " <> show owner <> "/" <> show name
     PaginatedReposNode _ ->
       "Repositories"
-    PaginatedIssuesNode _ ->
-      "Issues"
-    PaginatedPullsNode _ ->
-      "Pull Requests"
+    PaginatedIssuesNode (EntityData {_static = label}) ->
+      T.unpack label
+    PaginatedPullsNode (EntityData {_static = label}) ->
+      T.unpack label
     PaginatedWorkflowsNode _ ->
       "Workflow Runs"
     PaginatedBranchesNode _ ->

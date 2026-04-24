@@ -3,6 +3,7 @@
 
 module Sauron.Fetch.Pull (
   fetchPulls
+  , fetchMyPulls
   , fetchPullComments
   ) where
 
@@ -27,7 +28,22 @@ fetchPulls owner name (PaginatedPullsNode (EntityData {..})) = do
     SearchNone -> pure []
     SearchText t -> pure $ T.words t
   let fullQuery = T.intercalate "+" ([i|repo:#{untagName owner}/#{untagName name}|] : extraTerms)
+  fetchPulls' fullQuery _state _children _depth
 
+fetchMyPulls :: (
+  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Node Variable PaginatedPullsT -> m ()
+fetchMyPulls (PaginatedPullsNode (EntityData {..})) = do
+  (search, _pageInfo, _fetchable) <- readTVarIO _state
+  let fullQuery = case search of
+        SearchNone -> ""
+        SearchText t -> T.intercalate "+" (T.words t)
+  fetchPulls' fullQuery _state _children _depth
+
+fetchPulls' :: (
+  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Text -> TVar (Search, PageInfo, Fetchable TotalCount) -> TVar [Node Variable SinglePullT] -> Int -> m ()
+fetchPulls' fullQuery _state _children _depth = do
   bc <- ask
 
   fetchPaginatedWithState (searchIssuesR fullQuery) _state $ \case
