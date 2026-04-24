@@ -64,6 +64,7 @@ inlineToStyledWords attrs inline = case inline of
     pure $ altWords ++ [bracketOpen, urlWord, bracketClose]
   B.Span (_, classes, _) inlines
     | "emoji" `elem` classes -> concat <$> traverse (inlineToStyledWords attrs) inlines
+  B.RawInline _ t -> pure [StyledWord t attrs]
   _ -> pure [StyledWord ("[UNHANDLED: " <> T.pack (show inline) <> "]") []]
 
 renderInlineGroupM :: Maybe (Widget n) -> Int -> [B.Inline] -> FootnoteM (Widget n)
