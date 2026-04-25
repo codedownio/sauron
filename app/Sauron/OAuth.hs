@@ -3,8 +3,11 @@
 
 module Sauron.OAuth (
   authenticateWithGitHub
+
   , saveToken
   , loadSavedToken
+
+  , getConfigDir
   ) where
 
 import Control.Concurrent (threadDelay)

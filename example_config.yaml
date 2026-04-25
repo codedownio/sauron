@@ -1,57 +1,72 @@
 
 settings:
-  green_if: ci_green_on_default_branch
   check_period: 600000000
-    # is_green: 60000000
-    # is_green: 10m
 
-sections:
-- display_name: "Core"
-  repos:
+nodes:
+- type: notifications
+- type: issues
+  display_name: "My Issues"
+  query: "is:issue state:open archived:false assignee:@me sort:updated-desc"
+- type: heading
+  display_name: "My Pulls"
+  open: true
+  children:
+  - type: pulls
+    display_name: "Needs your review"
+    query: "is:pr is:open review-requested:@me sort:updated-desc"
+  - type: pulls
+    display_name: "Needs action"
+    query: "is:pr is:open author:@me review:changes_requested sort:updated-desc"
+  - type: pulls
+    display_name: "Ready to merge"
+    query: "is:pr is:open author:@me review:approved sort:updated-desc"
+- type: heading
+  display_name: "Core"
+  open: true
+  children:
   - name: codedownio/codedown
     settings:
       check_period: 300000000
-      # check_period: 5m
   - codedownio/codedown-db
   - codedownio/codedown-languages
   - codedownio/job-manager
   - codedownio/matheditable
   - codedownio/ot
   - codedownio/resource-map
-- display_name: "Notebook language servers"
-  repos:
+- type: heading
+  display_name: "Notebook language servers"
+  open: true
+  children:
   - codedownio/cpp-notebook-language-server
   - codedownio/go-notebook-language-server
   - codedownio/haskell-notebook-language-server
   - codedownio/rust-notebook-language-server
-- display_name: "Languages ecosystem"
-  repos:
+- type: heading
+  display_name: "Languages ecosystem"
+  open: true
+  children:
   - codedownio/markdown-spellcheck-lsp
   - codedownio/General
-- display_name: "Open source"
-  repos:
+- type: heading
+  display_name: "Open source"
+  open: true
+  children:
   - codedownio/aeson-typescript
   - codedownio/myers-diff
   - codedownio/nixpkgs-slim
   - codedownio/sandwich
   - codedownio/servant-typescript
   - codedownio/sauron
-- display_name: "Maintaining"
-  repos:
+- type: heading
+  display_name: "Maintaining"
+  open: true
+  children:
   - haskell-fswatch/hfsnotify
   - haskell-webdriver/haskell-webdriver
-- display_name: "No tests"
-  open: false
-  repos:
+- type: heading
+  display_name: "No tests"
+  open: true
+  children:
   - codedownio/immutability-helper-rfc6902
   - codedownio/julia2nix
   - codedownio/registry2nix
-
-# - display_name: "thomasjm"
-#   open: false
-#   repos:
-#   - "thomasjm/*"
-# - display_name: "codedownio"
-#   open: false
-#   repos:
-#   - "codedownio/*"

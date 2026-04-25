@@ -1,27 +1,23 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-partial-fields #-}
 
 module Sauron.Options (
-  CliArgs(..)
-  , cliArgsParser
-  , parseCliArgs
+  Command(..)
+  , CliArgs(..)
+  , parseCommand
 
   , RepoSettings(..)
-  , RepoSettingsResult(..)
 
   , PeriodSpec(..)
 
   , Config(..)
-  , ConfigSection(..)
-  , ConfigRepo(..)
+  , ConfigNode(..)
   ) where
 
 import Data.Aeson as A
 import Data.Aeson.TH
 import Data.String.Interpolate
-import Data.Text as T
 import qualified Graphics.Vty as V
 import Options.Applicative
 import Relude
@@ -29,6 +25,11 @@ import Sauron.Aeson
 
 
 -- * CLI
+
+data Command
+  = RunApp CliArgs
+  | InitConfig { initConfigWrite :: Bool }
+  deriving (Show)
 
 data CliArgs = CliArgs {
   cliOAuthToken :: Maybe Text
@@ -52,10 +53,19 @@ cliArgsParser = CliArgs
   <*> optional (option (maybeReader parseColorMode) (long "color-mode" <> help "Force a specific color mode (full, 240, 16, 8, none)" <> metavar "MODE"))
   <*> switch (long "split-logs" <> help "Split terminal view: app on left, logs on right")
 
-parseCliArgs :: IO CliArgs
-parseCliArgs = execParser opts
+initConfigParser :: Parser Command
+initConfigParser = InitConfig
+  <$> switch (long "write" <> short 'w' <> help "Write the sample config to the default config location")
+
+commandParser :: Parser Command
+commandParser = subparser (
+  command "init-config" (info (initConfigParser <**> helper) (progDesc "Print a sample config file to stdout"))
+  ) <|> (RunApp <$> cliArgsParser)
+
+parseCommand :: IO Command
+parseCommand = execParser opts
   where
-    opts = info (cliArgsParser <**> helper) (
+    opts = info (commandParser <**> helper) (
       fullDesc
       <> progDesc "A dark lord's-eye view of your GitHub repos"
       <> header "hello - a test for optparse-applicative"
@@ -85,47 +95,41 @@ data RepoSettings = RepoSettings {
   } deriving (Show, Eq)
 $(deriveFromJSON toSnake2 ''RepoSettings)
 
-data RepoSettingsResult =
-  NoSettings
-  | HasSettings RepoSettings
-  | ParseError Text
+data ConfigNode
+  = ConfigNodeNotifications { configNodeNotificationsOpen :: Maybe Bool }
+  | ConfigNodeIssues { configNodeIssuesDisplayName :: Text, configNodeIssuesQuery :: Text, configNodeIssuesOpen :: Maybe Bool }
+  | ConfigNodePulls { configNodePullsDisplayName :: Text, configNodePullsQuery :: Text, configNodePullsOpen :: Maybe Bool }
+  | ConfigNodeHeading { configNodeHeadingDisplayName :: Text, configNodeHeadingChildren :: [ConfigNode], configNodeHeadingOpen :: Maybe Bool }
+  | ConfigNodeRepo { configNodeRepoName :: Text, configNodeRepoSettings :: Maybe RepoSettings, configNodeRepoOpen :: Maybe Bool }
   deriving (Show, Eq)
 
-data ConfigRepo = ConfigRepoSingle {
-  configRepoOwner :: Text
-  , configRepoName :: Text
-  , configRepoSettings :: RepoSettingsResult
-  } | ConfigRepoWildcard {
-        configRepoOwner :: Text
-      }
-  deriving (Show, Eq)
-instance FromJSON ConfigRepo where
-  parseJSON (A.String x) = case T.splitOn "/" x of
-    [owner, "*"] -> pure (ConfigRepoWildcard owner)
-    [owner, name] -> pure (ConfigRepoSingle owner name NoSettings)
-    _ -> fail [i|Expected repo format to be "owner/name" or "owner/*". Got: "#{x}"|]
-  parseJSON (A.Object obj@(aesonLookup "name" -> Just (A.String x))) = case T.splitOn "/" x of
-    [owner, "*"] -> pure (ConfigRepoWildcard owner)
-    [owner, name] -> pure (ConfigRepoSingle owner name settingsResult)
-      where
-        settingsResult = case aesonLookup "settings" obj of
-          Nothing -> NoSettings
-          Just settingsObj@(A.Object _) -> case A.fromJSON settingsObj of
-            Error err -> ParseError [i|Error parsing settings: #{err}|]
-            A.Success y -> HasSettings y
-          Just y -> ParseError [i|Error parsing settings: expected object but got '#{A.encode y}'|]
-    _ -> fail [i|Expected repo format to be "owner/name" or "owner/*". Got: "#{x}"|]
-
-  parseJSON _ = fail "Failed to read repo"
-
-data ConfigSection = ConfigSection {
-  sectionDisplayName :: Maybe Text
-  , sectionRepos :: [ConfigRepo]
-  } deriving (Show)
-$(deriveFromJSON toSnake1 ''ConfigSection)
+instance FromJSON ConfigNode where
+  parseJSON (A.String s) = pure $ ConfigNodeRepo s Nothing Nothing
+  parseJSON o = flip (withObject "ConfigNode") o $ \obj -> do
+    typ <- obj .:? "type" .!= ("repo" :: Text)
+    case typ of
+      "notifications" -> ConfigNodeNotifications
+        <$> obj .:? "open"
+      "issues" -> ConfigNodeIssues
+        <$> obj .: "display_name"
+        <*> obj .: "query"
+        <*> obj .:? "open"
+      "pulls" -> ConfigNodePulls
+        <$> obj .: "display_name"
+        <*> obj .: "query"
+        <*> obj .:? "open"
+      "heading" -> ConfigNodeHeading
+        <$> obj .: "display_name"
+        <*> obj .: "children"
+        <*> obj .:? "open"
+      "repo" -> ConfigNodeRepo
+        <$> obj .: "name"
+        <*> obj .:? "settings"
+        <*> obj .:? "open"
+      other -> fail [i|Unknown node type: "#{other}"|]
 
 data Config = Config {
   configSettings :: Maybe RepoSettings
-  , configSections :: Maybe [ConfigSection]
+  , configNodes :: Maybe [ConfigNode]
   } deriving (Show)
 $(deriveFromJSON toSnake1 ''Config)

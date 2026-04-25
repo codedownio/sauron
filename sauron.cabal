@@ -30,6 +30,7 @@ executable sauron
       Sauron.Actions.Util
       Sauron.Aeson
       Sauron.Auth
+      Sauron.Config
       Sauron.Event
       Sauron.Event.CommentModal
       Sauron.Event.Helpers
@@ -65,9 +66,9 @@ executable sauron
       Sauron.Mutations.Workflow
       Sauron.OAuth
       Sauron.Options
+      Sauron.SampleConfig
       Sauron.Setup.AllReposForUser
       Sauron.Setup.Common
-      Sauron.Setup.ReposFromConfigFile
       Sauron.Setup.ReposFromCurrentDirectory
       Sauron.Types
       Sauron.UI

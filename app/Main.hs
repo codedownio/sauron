@@ -27,15 +27,13 @@ import Relude hiding (Down)
 import Sauron.Actions
 import Sauron.Actions.Util (githubWithLogging', withGithubApiSemaphore')
 import Sauron.Auth
+import Sauron.Config
 import Sauron.Event
 import Sauron.Expanding
-import Sauron.Fetch.Core (makeEmptyElemWithState)
 import Sauron.Fix
-import Sauron.HealthCheck.Notification (newNotificationHealthCheckThread)
 import Sauron.OAuth (authenticateWithGitHub, loadSavedToken)
 import Sauron.Options
 import Sauron.Setup.AllReposForUser
-import Sauron.Setup.ReposFromConfigFile
 import Sauron.Setup.ReposFromCurrentDirectory
 import Sauron.Types
 import Sauron.UI
@@ -57,9 +55,6 @@ import UnliftIO.IO hiding (hFlush)
 
 refreshPeriod :: Int
 refreshPeriod = 100000
-
-defaultHealthCheckPeriodUs :: PeriodSpec
-defaultHealthCheckPeriodUs = PeriodSpec (1_000_000 * 60 * 10)
 
 mkApp :: V.ColorMode -> App AppState AppEvent ClickableName
 mkApp colorMode = App {
@@ -107,11 +102,15 @@ drawUI app = case _appModal app of
       ]
 
 main :: IO ()
-main = do
-  CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitLogs} <- parseCliArgs
+main = parseCommand >>= \case
+  InitConfig doWrite -> handleInitConfig doWrite
+  RunApp cliArgs -> runApp cliArgs
+
+runApp :: CliArgs -> IO ()
+runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitLogs}) = do
 
   eventChan <- newBChan 10
-  baseContext'@(BaseContext {requestSemaphore}) <- buildBaseContext eventChan
+  baseContext'@(BaseContext {requestSemaphore}) <- buildBaseContext cliArgs eventChan
 
   currentUser@(User {userLogin}) <- withGithubApiSemaphore' requestSemaphore (githubWithLogging' baseContext' userInfoCurrentR) >>= \case
     Left err -> throwIO $ userError [i|Failed to fetch currently authenticated user: #{err}|]
@@ -119,39 +118,26 @@ main = do
 
   let baseContext = baseContext' { currentUser = Just currentUser }
 
-  listElems' :: V.Vector (SomeNode Variable) <- case cliShowAllRepos of
+  -- Parse config if provided
+  maybeConfig <- case cliConfigFile of
+    Just configFile -> Just <$> loadConfig configFile
+    Nothing -> pure Nothing
+
+  -- Build top-level nodes from config or defaults
+  let effectiveDefaultPeriod = fromMaybe defaultHealthCheckPeriodUs (maybeConfig >>= configSettings >>= repoSettingsCheckPeriod)
+  let nodeConfigs = fromMaybe defaultConfigNodes (maybeConfig >>= configNodes)
+  topLevelNodes <- buildConfigNodes baseContext effectiveDefaultPeriod nodeConfigs 0
+
+  -- Fallback repo discovery (only when no config file)
+  extraNodes :: V.Vector (SomeNode Variable) <- case cliShowAllRepos of
     True -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
-    False -> case cliConfigFile of
-      Just configFile -> reposFromConfigFile baseContext defaultHealthCheckPeriodUs configFile
+    False -> case maybeConfig of
+      Just _ -> pure V.empty
       Nothing -> isContainedInGitRepo >>= \case
         Just (namespace, name) -> fmap SomeNode <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
         Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
-  -- Prepend a PaginatedNotificationsNode with health check
-  notificationNode <- atomically (PaginatedNotificationsNode <$> makeEmptyElemWithState baseContext () (SearchNone, emptyPageInfo, NotFetched) "" 0)
-  -- Start health check thread for notifications
-  let notificationEntityData = getEntityData notificationNode
-  let PeriodSpec period = defaultHealthCheckPeriodUs
-  notificationsHealthCheckThread <- newNotificationHealthCheckThread baseContext (_state notificationEntityData)
-  atomically $ writeTVar (_healthCheckThread notificationEntityData) (Just (notificationsHealthCheckThread, period))
-
-  -- My Issues node
-  myIssuesNode <- atomically (PaginatedIssuesNode <$> makeEmptyElemWithState baseContext ("My Issues" :: Text)
-    (SearchText "is:issue state:open archived:false assignee:@me sort:updated-desc", emptyPageInfo, NotFetched) "" 0)
-
-  -- My Pulls heading with sub-categories
-  let mkMyPullsChild label searchQuery = atomically (PaginatedPullsNode <$> makeEmptyElemWithState baseContext label
-        (SearchText searchQuery, emptyPageInfo, NotFetched) "" 1)
-  needsYourReview <- mkMyPullsChild "Needs your review" "is:pr is:open review-requested:@me sort:updated-desc"
-  -- TODO: team-review-requested requires org/team-slug, not @me. Need to fetch user's teams first.
-  -- needsTeamReview <- mkMyPullsChild "Needs your teams' review" "is:pr is:open team-review-requested:@me sort:updated-desc"
-  needsAction <- mkMyPullsChild "Needs action" "is:pr is:open author:@me review:changes_requested sort:updated-desc"
-  readyToMerge <- mkMyPullsChild "Ready to merge" "is:pr is:open author:@me review:approved sort:updated-desc"
-  myPullsHeading <- atomically (HeadingNode <$> makeEmptyElemWithState baseContext ("My Pulls" :: Text) () "" 0)
-  atomically $ writeTVar (_children (getEntityData myPullsHeading))
-    [SomeNode needsYourReview, SomeNode needsAction, SomeNode readyToMerge]
-
-  let listElems = V.fromList [SomeNode notificationNode, SomeNode myIssuesNode, SomeNode myPullsHeading] <> listElems'
+  let listElems = V.fromList topLevelNodes <> extraNodes
 
   -- Kick off initial fetches
   runReaderT (refreshVisibleLines listElems) baseContext
@@ -252,9 +238,8 @@ main = do
     void $ customMain initialVty buildVty (Just eventChan) (mkApp (fromMaybe (V.outputColorMode (V.outputIface initialVty)) cliColorMode)) st
 
 
-buildBaseContext :: BChan AppEvent -> IO BaseContext
-buildBaseContext eventChan = do
-  CliArgs {..} <- parseCliArgs
+buildBaseContext :: CliArgs -> BChan AppEvent -> IO BaseContext
+buildBaseContext (CliArgs {..}) eventChan = do
 
   githubApiSemaphore <- newQSem cliConcurrentGithubApiLimit
 
