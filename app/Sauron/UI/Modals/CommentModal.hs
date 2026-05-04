@@ -66,7 +66,7 @@ modalWidth appState = case _appMainUiExtent appState of
 
 -- | Modal height as percentage of screen height
 modalHeightPercent :: Int
-modalHeightPercent = 80
+modalHeightPercent = 95
 
 buttonSection :: WrappingEditor Char ClickableName -> Issue -> SubmissionState -> Widget ClickableName
 buttonSection editor _issue submissionState' =
