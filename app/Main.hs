@@ -123,19 +123,22 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitL
     Just configFile -> Just <$> loadConfig configFile
     Nothing -> pure Nothing
 
-  -- Build top-level nodes from config or defaults
+  -- Determine repo discovery mode (before building config nodes, since single-repo mode uses fewer nodes)
   let effectiveDefaultPeriod = fromMaybe defaultHealthCheckPeriodUs (maybeConfig >>= configSettings >>= repoSettingsCheckPeriod)
-  let nodeConfigs = fromMaybe defaultConfigNodes (maybeConfig >>= configNodes)
+  (nodeConfigs, extraNodes :: V.Vector (SomeNode Variable)) <- if
+    | cliShowAllRepos -> do
+        nodes <- V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+        pure (fromMaybe defaultConfigNodes (maybeConfig >>= configNodes), nodes)
+    | Just _ <- maybeConfig ->
+        pure (fromMaybe defaultConfigNodes (maybeConfig >>= configNodes), V.empty)
+    | otherwise -> isContainedInGitRepo >>= \case
+        Just (namespace, name) -> do
+          nodes <- fmap SomeNode <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
+          pure (singleRepoConfigNodes, nodes)
+        Nothing -> do
+          nodes <- V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+          pure (defaultConfigNodes, nodes)
   topLevelNodes <- buildConfigNodes baseContext effectiveDefaultPeriod nodeConfigs 0
-
-  -- Fallback repo discovery (only when no config file)
-  extraNodes :: V.Vector (SomeNode Variable) <- case cliShowAllRepos of
-    True -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
-    False -> case maybeConfig of
-      Just _ -> pure V.empty
-      Nothing -> isContainedInGitRepo >>= \case
-        Just (namespace, name) -> fmap SomeNode <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
-        Nothing -> V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
 
   let listElems = V.fromList topLevelNodes <> extraNodes
 

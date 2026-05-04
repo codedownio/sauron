@@ -5,6 +5,7 @@ module Sauron.Config (
   handleInitConfig
   , loadConfig
   , defaultConfigNodes
+  , singleRepoConfigNodes
   , buildConfigNodes
   , defaultHealthCheckPeriodUs
   ) where
@@ -73,6 +74,12 @@ defaultConfigNodes =
       , ConfigNodePulls "Ready to merge" "is:pr is:open author:@me review:approved sort:updated-desc" Nothing
       ]
       (Just True)
+  ]
+
+-- | Top-level nodes for single-repo mode (just notifications)
+singleRepoConfigNodes :: [ConfigNode]
+singleRepoConfigNodes = [
+  ConfigNodeNotifications Nothing
   ]
 
 -- | Build Variable nodes from config node definitions
