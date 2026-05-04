@@ -59,19 +59,19 @@ getBranchesQuery = [i|
             aheadBy
             behindBy
           }
+          associatedPullRequests(states: [OPEN, CLOSED, MERGED], first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
+            nodes {
+              number
+              title
+              url
+              headRefName
+              state
+            }
+          }
         }
         pageInfo {
           hasNextPage
           endCursor
-        }
-      }
-      pullRequests(states: [OPEN, CLOSED, MERGED], first: 100) {
-        nodes {
-          number
-          title
-          url
-          headRefName
-          state
         }
       }
     }
@@ -95,7 +95,6 @@ instance FromJSON RepositoryData
 data Repository = Repository {
   refs :: Maybe Refs
   , defaultBranchRef :: Maybe DefaultBranchRef
-  , pullRequests :: Maybe PullRequests
   } deriving (Show, Generic)
 instance FromJSON Repository
 
@@ -139,12 +138,14 @@ data RefNode = RefNode {
   name :: Text
   , target :: Maybe Target
   , branchCompare :: Maybe BranchComparison
+  , associatedPullRequests :: Maybe PullRequests
   } deriving (Show, Generic)
 instance FromJSON RefNode where
   parseJSON = withObject "RefNode" $ \o -> RefNode
     <$> o .: "name"
     <*> o .:? "target"
     <*> o .:? "compare"
+    <*> o .:? "associatedPullRequests"
 
 data BranchComparison = BranchComparison {
   aheadBy :: Maybe Int
@@ -214,7 +215,9 @@ data GraphQLRequest = GraphQLRequest {
 instance ToJSON GraphQLRequest
 
 
-queryBranchesWithInfos :: MonadIO m => (Text -> IO ()) -> Text -> Text -> Text -> Maybe Text -> Int -> m (Either Text [BranchWithInfo])
+queryBranchesWithInfos :: (
+  MonadIO m
+  ) => (Text -> IO ()) -> Text -> Text -> Text -> Maybe Text -> Int -> m (Either Text [BranchWithInfo])
 queryBranchesWithInfos debugFn authToken owner' repoName repoDefaultBranch first' = liftIO $ do
   debugFn $ "GraphQL query for " <> owner' <> "/" <> repoName <> " (first " <> show first' <> ")"
 
@@ -226,13 +229,13 @@ queryBranchesWithInfos debugFn authToken owner' repoName repoDefaultBranch first
 
   result :: Either SomeException BranchResponse <- try $ do
     initialRequest <- parseRequest githubGraphQLEndpoint
-    let httpRequest = setRequestMethod "POST"
-                    $ setRequestHeader "Authorization" ["Bearer " <> encodeUtf8 authToken]
-                    $ setRequestHeader "Content-Type" ["application/json"]
-                    $ setRequestHeader "User-Agent" ["sauron-app"]
-                    $ setRequestResponseTimeout (responseTimeoutMicro (30 * 1000000))
-                    $ setRequestBodyJSON requestPayload
-                    $ initialRequest
+    let httpRequest = initialRequest
+                    & setRequestBodyJSON requestPayload
+                    & setRequestResponseTimeout (responseTimeoutMicro (30 * 1000000))
+                    & setRequestHeader "User-Agent" ["sauron-app"]
+                    & setRequestHeader "Content-Type" ["application/json"]
+                    & setRequestHeader "Authorization" ["Bearer " <> encodeUtf8 authToken]
+                    & setRequestMethod "POST"
 
     getResponseBody <$> httpJSON httpRequest
 
@@ -244,12 +247,11 @@ queryBranchesWithInfos debugFn authToken owner' repoName repoDefaultBranch first
       debugFn "Processing GraphQL response body"
       case (data' body, errors body) of
         (Just repoData, Nothing) -> do
-          case (repository repoData >>= refs >>= nodes, repository repoData >>= pullRequests >>= prNodes) of
-            (Just refNodes, maybePullRequests) -> do
-              let pullRequestList = fromMaybe [] maybePullRequests
-              debugFn $ "Found " <> show (length refNodes) <> " branches and " <> show (length pullRequestList) <> " pull requests"
-              return $ Right $ mapMaybe (refNodeToBranchWithComparison defaultBranch pullRequestList) refNodes
-            (Nothing, _) -> do
+          case repository repoData >>= refs >>= nodes of
+            Just refNodes -> do
+              debugFn $ "Found " <> show (length refNodes) <> " branches"
+              return $ Right $ mapMaybe (refNodeToBranchWithComparison defaultBranch) refNodes
+            Nothing -> do
               debugFn "No branches found in response"
               return $ Right []
         (_, Just errs) -> do
@@ -259,11 +261,18 @@ queryBranchesWithInfos debugFn authToken owner' repoName repoDefaultBranch first
           debugFn "No data returned from GitHub"
           return $ Left "No data returned from GitHub"
 
-refNodeToBranchWithComparison :: Text -> [GraphQLPullRequestWithHead] -> RefNode -> Maybe BranchWithInfo
-refNodeToBranchWithComparison defaultBranchName pullRequests refNode = do
+refNodeToBranchWithComparison :: Text -> RefNode -> Maybe BranchWithInfo
+refNodeToBranchWithComparison defaultBranchName refNode = do
   let branchName = name refNode
   target' <- target refNode
-  let prInfo = findPullRequestForBranch branchName pullRequests
+  let prInfo = case associatedPullRequests refNode >>= prNodes of
+        Just (prWithHead:_) -> Just $ GraphQLPullRequest {
+          prNumber = prWithHeadNumber prWithHead
+          , prTitle = prWithHeadTitle prWithHead
+          , prUrl = prWithHeadUrl prWithHead
+          , prState = prWithHeadState prWithHead
+        }
+        _ -> Nothing
   let compareInfo = branchCompare refNode
 
   -- Extract ahead/behind counts from the GraphQL comparison
@@ -287,16 +296,6 @@ refNodeToBranchWithComparison defaultBranchName pullRequests refNode = do
     , branchWithInfoBehindBy = behindCount
     }
 
-findPullRequestForBranch :: Text -> [GraphQLPullRequestWithHead] -> Maybe GraphQLPullRequest
-findPullRequestForBranch branchName pullRequests =
-  case find (\pr -> prWithHeadRefName pr == Just branchName) pullRequests of
-    Just prWithHead -> Just $ GraphQLPullRequest {
-      prNumber = prWithHeadNumber prWithHead
-      , prTitle = prWithHeadTitle prWithHead
-      , prUrl = prWithHeadUrl prWithHead
-      , prState = prWithHeadState prWithHead
-    }
-    Nothing -> Nothing
 
 filterBranchesByAuthor :: Text -> [BranchWithInfo] -> [BranchWithInfo]
 filterBranchesByAuthor currentUser branches =
