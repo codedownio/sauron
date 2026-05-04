@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -15,11 +16,18 @@ import Data.Time.Clock (UTCTime, diffUTCTime)
 import Data.Time.Format (parseTimeM, defaultTimeLocale)
 import qualified Data.Vector as V
 import GitHub
+import Lens.Micro
 import Relude
+import Sauron.Actions.Util (findRepoParent, withGithubApiSemaphore, githubWithLogging)
+import Sauron.Event.Helpers (withFixedElemAndParents)
+import Sauron.Fetch.Core (makeEmptyElemWithState)
+import Sauron.Fetch.Pull (fetchPullComments)
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Keys
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
+import UnliftIO.Async (async)
 
 
 instance ListDrawable Fixed 'SingleBranchWithInfoT where
@@ -30,6 +38,34 @@ instance ListDrawable Fixed 'SingleBranchWithInfoT where
     in branchLineWithInfo _toggled branch branchInfo columnWidths appState _state
 
   drawInner _ _ = Nothing
+
+  getExtraTopBoxWidgets _app (EntityData {_static=(branchInfo, _)}) =
+    let hasPR = isJust (branchWithInfoAssociatedPR branchInfo)
+        keyAttr = if hasPR then hotkeyAttr else disabledHotkeyAttr
+        msgAttr = if hasPR then hotkeyMessageAttr else disabledHotkeyMessageAttr
+    in [hBox [str "["
+             , withAttr keyAttr $ str $ showKey zoomModalKey
+             , str "] "
+             , withAttr msgAttr $ str "View PR"
+             ]]
+
+  handleHotkey s key (EntityData {_static=(branchInfo, _)})
+    | key == zoomModalKey, Just pr <- branchWithInfoAssociatedPR branchInfo = do
+        withFixedElemAndParents s $ \(SomeNode _) (SomeNode _variableEl) parents -> do
+          case findRepoParent parents of
+            Just (RepoNode (EntityData {_static=(owner, name)})) ->
+              whenJust (prNumber pr) $ \num ->
+                liftIO $ void $ async $ flip runReaderT (s ^. appBaseContext) $ do
+                  withGithubApiSemaphore (githubWithLogging (issueR owner name (IssueNumber num))) >>= \case
+                    Right issue -> do
+                      ed <- atomically $ makeEmptyElemWithState (s ^. appBaseContext) issue NotFetched ("/pull/" <> show num) 0
+                      fetchPullComments owner name (IssueNumber num) (_state ed)
+                      liftIO $ atomically $ writeTVar (_appModalVariable s)
+                        (Just (ZoomModalState (SomeNode (SinglePullNode ed)) (toList parents)))
+                    Left _err -> return ()
+            _ -> return ()
+        return True
+  handleHotkey _ _ _ = return False
 
 branchLineWithInfo :: Bool -> Branch -> BranchWithInfo -> ColumnWidths -> AppState -> Fetchable (V.Vector Commit) -> Widget n
 branchLineWithInfo toggled' (Branch {branchName, branchCommit}) branchData columnWidths appState fetchableState = vBox [line1, line2]
