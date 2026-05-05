@@ -31,13 +31,13 @@ import Sauron.UI.Statuses (getQuarterCircleSpinner)
 
 instance ListDrawable Fixed 'PaginatedReposT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "Repositories" appState ed search pageInfo fetchable
+    drawPaginatedLine Nothing "Repositories" appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets
   handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedIssuesT where
   drawLine appState ed@(EntityData {_static=label, _state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine (toString label) appState ed search pageInfo fetchable
+    drawPaginatedLine (Just jumpToIssuesKey) (toString label) appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets ++
     [hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey newIssueKey
@@ -57,36 +57,36 @@ instance ListDrawable Fixed 'PaginatedIssuesT where
 
 instance ListDrawable Fixed 'PaginatedPullsT where
   drawLine appState ed@(EntityData {_static=label, _state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine (toString label) appState ed search pageInfo fetchable
+    drawPaginatedLine (Just jumpToPullsKey) (toString label) appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets
   handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedWorkflowsT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "Actions" appState ed search pageInfo fetchable
+    drawPaginatedLine (Just jumpToActionsKey) "Actions" appState ed search pageInfo fetchable
   -- Workflows are not searchable
 
 instance ListDrawable Fixed 'PaginatedBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "All Branches" appState ed search pageInfo fetchable
+    drawPaginatedLine (Just jumpToBranchesKey) "All Branches" appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets
   handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedYourBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "Your branches" appState ed search pageInfo fetchable
+    drawPaginatedLine (Just jumpToBranchesKey) "Your branches" appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets
   handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedActiveBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "Active branches" appState ed search pageInfo fetchable
+    drawPaginatedLine (Just jumpToBranchesKey) "Active branches" appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets
   handleHotkey s key ed = searchableHandleHotkey s key ed
 
 instance ListDrawable Fixed 'PaginatedStaleBranchesT where
   drawLine appState ed@(EntityData {_state=(search, pageInfo, fetchable)}) =
-    drawPaginatedLine "Stale branches" appState ed search pageInfo fetchable
+    drawPaginatedLine (Just jumpToBranchesKey) "Stale branches" appState ed search pageInfo fetchable
   getExtraTopBoxWidgets _ _ = searchableExtraWidgets
   handleHotkey s key ed = searchableHandleHotkey s key ed
 
@@ -105,18 +105,20 @@ instance ListDrawable Fixed 'HeadingT where
 
 -- Helper functions
 
-drawPaginatedLine :: String -> AppState -> EntityData Fixed a -> Search -> PageInfo -> Fetchable Int -> Widget ClickableName
-drawPaginatedLine label appState ed search pageInfo fetchable = case fetchable of
-  Fetched totalCount -> headingWithMessage (str [i|(#{totalCount})|])
-  Fetching (Just totalCount) -> headingWithMessage (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState))
-  Fetching Nothing -> headingWithMessage (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")")
-  NotFetched -> headingWithMessage (str [i|(not fetched)|])
-  Errored err -> headingWithMessage (str [i|(error fetching: #{err})|])
+drawPaginatedLine :: Maybe V.Key -> String -> AppState -> EntityData Fixed a -> Search -> PageInfo -> Fetchable Int -> Widget ClickableName
+drawPaginatedLine maybeJumpKey label appState ed search pageInfo fetchable = case fetchable of
+  Fetched totalCount -> headingWithMessage (str [i|(#{totalCount})|]) Nothing
+  Fetching (Just totalCount) -> headingWithMessage (str [i|(#{totalCount})|]) (Just $ getQuarterCircleSpinner (_appAnimationCounter appState))
+  Fetching Nothing -> headingWithMessage (str "(-)") (Just $ getQuarterCircleSpinner (_appAnimationCounter appState))
+  NotFetched -> headingWithMessage (str [i|(not fetched)|]) Nothing
+  Errored err -> headingWithMessage (str [i|(error fetching: #{err})|]) Nothing
   where
-    headingWithMessage msg = paginatedHeading' (withAttr (mkAttrName "headingText")) ed appState label msg search pageInfo
+    headingWithMessage msg spinner = paginatedHeading' maybeJumpKey spinner (withAttr (mkAttrName "headingText")) ed appState label msg search pageInfo
 
 paginatedHeading' ::
-  (Widget ClickableName -> Widget ClickableName)
+  Maybe V.Key
+  -> Maybe (Widget ClickableName)
+  -> (Widget ClickableName -> Widget ClickableName)
   -> EntityData Fixed a
   -> AppState
   -> String
@@ -124,10 +126,12 @@ paginatedHeading' ::
   -> Search
   -> PageInfo
   -> Widget ClickableName
-paginatedHeading' modifyLabel (EntityData {..}) appState l countInParens _search _pageInfo = hBox $ catMaybes [
+paginatedHeading' maybeJumpKey maybeSpinner modifyLabel (EntityData {..}) appState l countInParens _search _pageInfo = hBox $ catMaybes [
   Just $ withAttr openMarkerAttr $ str (if _toggled then "[-] " else "[+] ")
   , Just $ padRight (Pad 1) $ modifyLabel $ str l
   , Just countInParens
+  , fmap (\k -> hBox [str " [", withAttr hotkeyAttr $ str $ showKey k, str "]"]) maybeJumpKey
+  , fmap (\s -> str " " <+> s) maybeSpinner
   , Just (hCenter (padRight (Pad 4) (searchInfo appState _ident _search) <+> paginationInfo _pageInfo))
   ]
 
@@ -163,13 +167,13 @@ data PageSegment =
 -- Special function for drawing notifications line with unread indicator
 drawNotificationsLine :: AppState -> EntityData Fixed PaginatedNotificationsT -> Search -> PageInfo -> Fetchable Int -> [Node Fixed SingleNotificationT] -> Widget ClickableName
 drawNotificationsLine appState ed search pageInfo fetchable children' = case fetchable of
-  Fetched totalCount -> headingWithMessage (str [i|(#{totalCount})|] <+> unreadIndicator)
-  Fetching (Just totalCount) -> headingWithMessage (str [i|(#{totalCount}) |] <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> unreadIndicator)
-  Fetching Nothing -> headingWithMessage (str "(" <+> getQuarterCircleSpinner (_appAnimationCounter appState) <+> str ")" <+> unreadIndicator)
-  NotFetched -> headingWithMessage (str [i|(not fetched)|])
-  Errored err -> headingWithMessage (str [i|(error fetching: #{err})|])
+  Fetched totalCount -> headingWithMessage (str [i|(#{totalCount})|] <+> unreadIndicator) Nothing
+  Fetching (Just totalCount) -> headingWithMessage (str [i|(#{totalCount})|] <+> unreadIndicator) (Just $ getQuarterCircleSpinner (_appAnimationCounter appState))
+  Fetching Nothing -> headingWithMessage (str "(-)" <+> unreadIndicator) (Just $ getQuarterCircleSpinner (_appAnimationCounter appState))
+  NotFetched -> headingWithMessage (str [i|(not fetched)|]) Nothing
+  Errored err -> headingWithMessage (str [i|(error fetching: #{err})|]) Nothing
   where
-    headingWithMessage msg = paginatedHeading' (withAttr (mkAttrName "headingText")) ed appState "Notifications" msg search pageInfo
+    headingWithMessage msg spinner = paginatedHeading' Nothing spinner (withAttr (mkAttrName "headingText")) ed appState "Notifications" msg search pageInfo
 
     unreadIndicator = case hasUnreadNotifications children' of
       True -> withAttr blueDotAttr $ str " ●"

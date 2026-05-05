@@ -246,7 +246,7 @@ handleMainPaneEvents' s e = case e of
   V.EvKey V.KHome [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollToBeginning vp)
   V.EvKey V.KEnd [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollToEnd vp)
 
-  -- Column 2
+  -- Column 2 (browser open keys)
   V.EvKey c [] | c == browserToHomeKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url)
   V.EvKey c [] | c == browserToIssuesKey ->
@@ -255,6 +255,12 @@ handleMainPaneEvents' s e = case e of
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url <> "/pulls")
   V.EvKey c [] | c == browserToActionsKey ->
     withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) -> openBrowserToUrl (toString url <> "/actions")
+
+  -- Jump-to keys
+  V.EvKey c [] | c == jumpToIssuesKey -> jumpToNextNode s isJumpToIssuesNode
+  V.EvKey c [] | c == jumpToPullsKey -> jumpToNextNode s isJumpToPullsNode
+  V.EvKey c [] | c == jumpToActionsKey -> jumpToNextNode s isJumpToActionsNode
+  V.EvKey c [] | c == jumpToBranchesKey -> jumpToNextNode s isJumpToBranchesNode
 
   V.EvKey c [] | c == refreshSelectedKey -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents ->
@@ -401,3 +407,34 @@ switchToMainPane s = when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPane
 
 switchToLogPane :: AppState -> EventM ClickableName AppState ()
 switchToLogPane s = when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+
+-- * Jump-to-node functionality
+
+jumpToNextNode :: AppState -> (SomeNode Fixed -> Bool) -> EventM ClickableName AppState ()
+jumpToNextNode s predicate = do
+  let elems = listElements (s ^. appMainList)
+      currentIdx = fromMaybe 0 (listSelected (s ^. appMainList))
+      -- Search forward from the element after the current one, wrapping around
+      remaining = Vec.drop (currentIdx + 1) elems <> Vec.take (currentIdx + 1) elems
+  case Vec.findIndex predicate remaining of
+    Just offset -> modify (appMainList %~ listMoveTo ((currentIdx + 1 + offset) `mod` Vec.length elems))
+    Nothing -> return ()
+
+isJumpToIssuesNode :: SomeNode Fixed -> Bool
+isJumpToIssuesNode (SomeNode (PaginatedIssuesNode {})) = True
+isJumpToIssuesNode _ = False
+
+isJumpToPullsNode :: SomeNode Fixed -> Bool
+isJumpToPullsNode (SomeNode (PaginatedPullsNode {})) = True
+isJumpToPullsNode _ = False
+
+isJumpToActionsNode :: SomeNode Fixed -> Bool
+isJumpToActionsNode (SomeNode (PaginatedWorkflowsNode {})) = True
+isJumpToActionsNode _ = False
+
+isJumpToBranchesNode :: SomeNode Fixed -> Bool
+isJumpToBranchesNode (SomeNode (PaginatedBranchesNode {})) = True
+isJumpToBranchesNode (SomeNode (PaginatedYourBranchesNode {})) = True
+isJumpToBranchesNode (SomeNode (PaginatedActiveBranchesNode {})) = True
+isJumpToBranchesNode (SomeNode (PaginatedStaleBranchesNode {})) = True
+isJumpToBranchesNode _ = False

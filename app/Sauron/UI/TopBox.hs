@@ -59,7 +59,7 @@ topBox app = hBox [columnPadding column1
                                   , str "/"
                                   , highlightMessageIfPredicate someRepoSelected app (str "issues")
                                   , str "/"
-                                  , highlightMessageIfPredicate someRepoSelected app (str "pulls")
+                                  , highlightMessageIfPredicate someRepoSelected app (str "PRs")
                                   , str "/"
                                   , highlightMessageIfPredicate someRepoSelected app (str "actions")
                                   ]

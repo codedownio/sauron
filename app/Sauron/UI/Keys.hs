@@ -13,10 +13,10 @@ previousKey = V.KChar 'p'
 toggleKeys = [V.KEnter, V.KChar '\t']
 exitKey = V.KChar 'q'
 
--- Column 2
+-- Column 2 (browser open keys use Ctrl modifier)
 browserToHomeKey = V.KChar 'H'
 browserToIssuesKey = V.KChar 'I'
-browserToPullsKey = V.KChar 'P'
+browserToPullsKey = V.KChar 'U'
 browserToActionsKey = V.KChar 'A'
 
 nextPageKey = V.KChar 'N'
@@ -39,12 +39,21 @@ newIssueKey = V.KChar 'c'
 markNotificationDoneKey = V.KChar 'd'
 markNotificationReadKey = V.KChar 'R'
 
+-- Jump-to keys (jump to next node of this type)
+jumpToIssuesKey = V.KChar 'i'
+jumpToActionsKey = V.KChar 'a'
+jumpToBranchesKey = V.KChar 'b'
+jumpToPullsKey = V.KChar 'u'
+
 -- Other
 
 showKey (V.KChar '\t') = "Tab"
 showKey (V.KChar c) = [c]
 showKey V.KEnter = "Enter"
 showKey _ = "?"
+
+showKeyWithCtrl (V.KChar c) = "C-" ++ [c]
+showKeyWithCtrl k = "C-" ++ showKey k
 
 showKeys = L.intercalate "/" . fmap showKey
 

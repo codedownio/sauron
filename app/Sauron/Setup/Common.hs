@@ -50,7 +50,7 @@ newRepoNode nsName repoVar healthCheckVar hcThread repoDepth getIdentifier = do
   pullsHealthCheckThreadVar <- newTVarIO Nothing
   pullsIdentifier <- liftIO getIdentifier
   let pullsChild = PaginatedPullsNode $ EntityData {
-        _static = "Pulls"
+        _static = "Pull requests"
         , _state = pullsVar
         , _urlSuffix = "pulls"
         , _toggled = pullsToggledVar
