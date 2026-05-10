@@ -59,8 +59,12 @@ isContainedInGitRepo = runMaybeT $ do
       MaybeT $ pure Nothing
   putStrLn [i|Got current git branch: #{currentBranch}|]
 
-  Section _ branchMap <- MaybeT $ pure $ L.find (\(Section initial _) -> initial == ["branch", currentBranch]) gitConfig
-  remoteName <- MaybeT $ pure $ HM.lookup "remote" branchMap
+  let remoteName = fromMaybe "origin" (remoteFromBranch <|> remoteFromConfig)
+        where
+          remoteFromBranch = do
+            Section _ branchMap <- L.find (\(Section initial _) -> initial == ["branch", currentBranch]) gitConfig
+            HM.lookup "remote" branchMap
+          remoteFromConfig = listToMaybe [name | Section ["remote", name] _ <- gitConfig]
   putStrLn [i|Got remote name: #{remoteName}|]
 
   Section _ remoteMap <- MaybeT $ pure $ L.find (\(Section initial _) -> initial == ["remote", remoteName]) gitConfig
