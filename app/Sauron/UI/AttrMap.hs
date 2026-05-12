@@ -57,6 +57,7 @@ attrToColor colorMode = ([
   -- Notification styles
   , (unreadNotificationAttr, bg (select unreadNotificationBg))
   , (blueDotAttr, fg V.blue)
+  , (highlightedCommentAttr, fg V.yellow)
 
   -- Focus styles
   , (focusedPaneBorderAttr, fg V.cyan & flip V.withStyle V.bold)
@@ -196,6 +197,7 @@ usernameAttr = mkAttrName "username"
 
 unreadNotificationAttr = mkAttrName "unreadNotification"
 blueDotAttr = mkAttrName "blueDot"
+highlightedCommentAttr = mkAttrName "highlightedComment"
 
 -- * Focus styles
 

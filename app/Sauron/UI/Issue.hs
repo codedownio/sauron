@@ -11,6 +11,7 @@ module Sauron.UI.Issue (
 
   -- Common timeline rendering functions
   , renderTimelineItem
+  , renderTimelineItemWithAttr
   , renderItemWithBorder
   , renderComment
   , renderEvent
@@ -164,14 +165,18 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
 -- * Util, exported for Pull.hs
 
 renderTimelineItem :: UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) (Either IssueEvent IssueComment), Text) -> Widget n
-renderTimelineItem now totalItems idx (itemType, _extraBody) =
-  let borderFunc = if totalItems == 1
-                   then standaloneTimelineBorder
+renderTimelineItem = renderTimelineItemWithAttr Nothing
+
+renderTimelineItemWithAttr :: Maybe AttrName -> UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) (Either IssueEvent IssueComment), Text) -> Widget n
+renderTimelineItemWithAttr maybeAttr now totalItems idx (itemType, _extraBody) =
+  let pick def attrVariant = maybe def attrVariant maybeAttr
+      borderFunc = if totalItems == 1
+                   then pick standaloneTimelineBorder standaloneTimelineBorderAttr
                    else if idx == 0
-                   then firstTimelineBorder
+                   then pick firstTimelineBorder firstTimelineBorderAttr
                    else if idx == totalItems - 1
-                   then lastTimelineBorder
-                   else middleTimelineBorder
+                   then pick lastTimelineBorder lastTimelineBorderAttr
+                   else pick middleTimelineBorder middleTimelineBorderAttr
   in case itemType of
     Left (username, descriptionBody, createdAt) -> -- Issue/PR description
       adaptiveWidth $ \w -> borderFunc

@@ -4,6 +4,11 @@ module Sauron.UI.TimelineBorder (
   , lastTimelineBorder
   , standaloneTimelineBorder
 
+  , firstTimelineBorderAttr
+  , middleTimelineBorderAttr
+  , lastTimelineBorderAttr
+  , standaloneTimelineBorderAttr
+
   , borderWithAttr
 ) where
 
@@ -18,10 +23,16 @@ import Sauron.UI.AttrMap (timelineBorderAttr)
 
 
 timelineHBorder :: Widget n
-timelineHBorder = withAttr timelineBorderAttr $ vLimit 1 $ fill '─'
+timelineHBorder = timelineHBorderAttr timelineBorderAttr
+
+timelineHBorderAttr :: AttrName -> Widget n
+timelineHBorderAttr attr = withAttr attr $ vLimit 1 $ fill '─'
 
 firstTimelineBorder :: Widget n -> Widget n -> Widget n
-firstTimelineBorder label content =
+firstTimelineBorder = firstTimelineBorderAttr timelineBorderAttr
+
+firstTimelineBorderAttr :: AttrName -> Widget n -> Widget n -> Widget n
+firstTimelineBorderAttr attr label content =
     Widget (hSize content) (vSize content) $ do
       c <- getContext
 
@@ -29,22 +40,23 @@ firstTimelineBorder label content =
                              $ vLimit (c^.availHeightL - 2)
                              $ content
 
-      let topBorder = hBox [
-            withAttr timelineBorderAttr $ str "┌───"
-            , withAttr timelineBorderAttr $ str "─"
-            , withAttr timelineBorderAttr $ str "─"
+      let hb = timelineHBorderAttr attr
+          topBorder = hBox [
+            withAttr attr $ str "┌───"
+            , withAttr attr $ str "─"
+            , withAttr attr $ str "─"
             , label
-            , withAttr timelineBorderAttr $ str "─"
-            , timelineHBorder
-            , withAttr timelineBorderAttr $ str "┐"
+            , withAttr attr $ str "─"
+            , hb
+            , withAttr attr $ str "┐"
             ]
           bottomBorder = hBox [
-            withAttr timelineBorderAttr $ str "└───"
-            , withAttr timelineBorderAttr $ str "┬"
-            , timelineHBorder
-            , withAttr timelineBorderAttr $ str "┘"
+            withAttr attr $ str "└───"
+            , withAttr attr $ str "┬"
+            , hb
+            , withAttr attr $ str "┘"
             ]
-          middle = vBorderAttr timelineBorderAttr <+> (Widget Fixed Fixed $ return middleResult) <+> vBorderAttr timelineBorderAttr
+          middle = vBorderAttr attr <+> (Widget Fixed Fixed $ return middleResult) <+> vBorderAttr attr
           total = topBorder <=> middle <=> bottomBorder
 
       render $ hLimit (middleResult^.imageL.to imageWidth + 2)
@@ -52,7 +64,10 @@ firstTimelineBorder label content =
              $ total
 
 middleTimelineBorder :: Widget n -> Widget n -> Widget n
-middleTimelineBorder label content =
+middleTimelineBorder = middleTimelineBorderAttr timelineBorderAttr
+
+middleTimelineBorderAttr :: AttrName -> Widget n -> Widget n -> Widget n
+middleTimelineBorderAttr attr label content =
     Widget (hSize content) (vSize content) $ do
       c <- getContext
 
@@ -60,22 +75,23 @@ middleTimelineBorder label content =
                              $ vLimit (c^.availHeightL - 2)
                              $ content
 
-      let topBorder = hBox [
-            withAttr timelineBorderAttr $ str "┌───"
-            , withAttr timelineBorderAttr $ str "┴"
-            , withAttr timelineBorderAttr $ str "─"
+      let hb = timelineHBorderAttr attr
+          topBorder = hBox [
+            withAttr attr $ str "┌───"
+            , withAttr attr $ str "┴"
+            , withAttr attr $ str "─"
             , label
-            , withAttr timelineBorderAttr $ str "─"
-            , timelineHBorder
-            , withAttr timelineBorderAttr $ str "┐"
+            , withAttr attr $ str "─"
+            , hb
+            , withAttr attr $ str "┐"
             ]
           bottomBorder = hBox [
-            withAttr timelineBorderAttr $ str "└───"
-            , withAttr timelineBorderAttr $ str "┬"
-            , timelineHBorder
-            , withAttr timelineBorderAttr $ str "┘"
+            withAttr attr $ str "└───"
+            , withAttr attr $ str "┬"
+            , hb
+            , withAttr attr $ str "┘"
             ]
-          middle = vBorderAttr timelineBorderAttr <+> (Widget Fixed Fixed $ return middleResult) <+> vBorderAttr timelineBorderAttr
+          middle = vBorderAttr attr <+> (Widget Fixed Fixed $ return middleResult) <+> vBorderAttr attr
           total = topBorder <=> middle <=> bottomBorder
 
       render $ hLimit (middleResult^.imageL.to imageWidth + 2)
@@ -83,7 +99,10 @@ middleTimelineBorder label content =
              $ total
 
 lastTimelineBorder :: Widget n -> Widget n -> Widget n
-lastTimelineBorder label content =
+lastTimelineBorder = lastTimelineBorderAttr timelineBorderAttr
+
+lastTimelineBorderAttr :: AttrName -> Widget n -> Widget n -> Widget n
+lastTimelineBorderAttr attr label content =
     Widget (hSize content) (vSize content) $ do
       c <- getContext
 
@@ -91,22 +110,23 @@ lastTimelineBorder label content =
                              $ vLimit (c^.availHeightL - 2)
                              $ content
 
-      let topBorder = hBox [
-            withAttr timelineBorderAttr $ str "┌───"
-            , withAttr timelineBorderAttr $ str "┴"
-            , withAttr timelineBorderAttr $ str "─"
+      let hb = timelineHBorderAttr attr
+          topBorder = hBox [
+            withAttr attr $ str "┌───"
+            , withAttr attr $ str "┴"
+            , withAttr attr $ str "─"
             , label
-            , withAttr timelineBorderAttr $ str "─"
-            , timelineHBorder
-            , withAttr timelineBorderAttr $ str "┐"
+            , withAttr attr $ str "─"
+            , hb
+            , withAttr attr $ str "┐"
             ]
           bottomBorder = hBox [
-            withAttr timelineBorderAttr $ str "└───"
-            , withAttr timelineBorderAttr $ str "─"
-            , timelineHBorder
-            , withAttr timelineBorderAttr $ str "┘"
+            withAttr attr $ str "└───"
+            , withAttr attr $ str "─"
+            , hb
+            , withAttr attr $ str "┘"
             ]
-          middle = vBorderAttr timelineBorderAttr <+> (Widget Fixed Fixed $ return middleResult) <+> vBorderAttr timelineBorderAttr
+          middle = vBorderAttr attr <+> (Widget Fixed Fixed $ return middleResult) <+> vBorderAttr attr
           total = topBorder <=> middle <=> bottomBorder
 
       render $ hLimit (middleResult^.imageL.to imageWidth + 2)
@@ -115,6 +135,9 @@ lastTimelineBorder label content =
 
 standaloneTimelineBorder :: Widget n -> Widget n -> Widget n
 standaloneTimelineBorder label content = borderWithAttr timelineBorderAttr (Just label) content
+
+standaloneTimelineBorderAttr :: AttrName -> Widget n -> Widget n -> Widget n
+standaloneTimelineBorderAttr attr label content = borderWithAttr attr (Just label) content
 
 borderWithAttr :: AttrName -> Maybe (Widget n) -> Widget n -> Widget n
 borderWithAttr attr label content =

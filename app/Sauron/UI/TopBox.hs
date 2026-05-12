@@ -41,7 +41,7 @@ topBox app = hBox [columnPadding column1
   where
     column1 = keybindingBox [keyIndicator (L.intersperse '/' [unKChar nextKey, unKChar previousKey, '↑', '↓']) "Navigate"
                             , keyIndicator (showKeys toggleKeys <> "/←/→") "Open/close node"
-                            , keyIndicatorHasSelectedRepoOpen app "Control-v/Meta-v" "Scroll node"
+                            , keyIndicatorContextual app selectedNodeCanScroll "Control-v/Meta-v" "Scroll node"
                             , keyIndicator "q" "Exit"
                             ]
 
@@ -172,8 +172,6 @@ keyIndicator key msg = keyIndicator' key (withAttr hotkeyMessageAttr $ str msg)
 
 keyIndicator' key l = hBox [str "[", withAttr hotkeyAttr $ str key, str "] ", l]
 
-keyIndicatorHasSelectedRepoOpen app = keyIndicatorContextual app selectedRepoToggled
-
 keyIndicatorContextual app p key msg = case p app of
   True -> hBox [str "[", withAttr hotkeyAttr $ str key, str "] ", withAttr hotkeyMessageAttr $ str msg]
   False -> hBox [str "[", withAttr disabledHotkeyAttr $ str key, str "] ", withAttr disabledHotkeyMessageAttr $ str msg]
@@ -212,4 +210,17 @@ isRepoNode _ = False
 someRepoSelected :: AppState -> Bool
 someRepoSelected = hasAncestorMatching isRepoNode
 
-selectedRepoToggled = const False
+selectedNodeCanScroll :: AppState -> Bool
+selectedNodeCanScroll app = case listSelectedElement (app ^. appMainList) of
+  Just (_, SomeNode node) -> _toggled (getEntityData node) && hasInnerContent node
+  Nothing -> False
+
+hasInnerContent :: Node Fixed a -> Bool
+hasInnerContent (SingleIssueNode {}) = True
+hasInnerContent (SinglePullNode {}) = True
+hasInnerContent (SingleWorkflowNode {}) = True
+hasInnerContent (SingleJobNode {}) = True
+hasInnerContent (SingleCommitNode {}) = True
+hasInnerContent (SingleNotificationNode {}) = True
+hasInnerContent (JobLogGroupNode {}) = True
+hasInnerContent _ = False

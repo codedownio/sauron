@@ -10,10 +10,14 @@ module Sauron.UI.Notification (
 
 import Brick
 import Control.Monad
+import Data.Char (isDigit)
 import Data.String.Interpolate
 import Data.Time
+import qualified Data.Vector as V
 import GitHub
+import GitHub.Data.Name
 import Lens.Micro
+import Network.URI (parseURI, uriPath)
 import Relude
 import Sauron.Actions (refreshLine)
 import Sauron.Actions.Util (findNotificationsParent)
@@ -21,19 +25,21 @@ import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Mutations.Notification (markNotificationAsDone, markNotificationAsRead)
 import Sauron.Types
 import Sauron.UI.AttrMap
+import Sauron.UI.Issue (renderTimelineItemWithAttr)
 import Sauron.UI.Keys (markNotificationDoneKey, markNotificationReadKey, showKey)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
+import qualified System.FilePath.Posix as FP
 import UnliftIO.Async (async)
 
 
 instance ListDrawable Fixed 'SingleNotificationT where
   drawLine appState (EntityData {_static=notification, ..}) =
-    notificationLine (_appNow appState) _toggled notification (_appAnimationCounter appState) _state
+    notificationLine (_appNow appState) _toggled notification (_appAnimationCounter appState) (notificationStateContent _state)
 
-  drawInner appState (EntityData {_static=notification, ..}) = do
+  drawInner appState (EntityData {_static=notification, _state, ..}) = do
     guard _toggled
-    return $ notificationInner (_appNow appState) notification
+    return $ notificationInner (_appNow appState) notification _state
 
   getExtraTopBoxWidgets _appState (EntityData {_static=notification}) =
     [hBox [str "["
@@ -118,13 +124,23 @@ reasonText reason = case reason of
   SubscribedReason -> "subscribed"
   TeamMentionReason -> "team mention"
 
-notificationInner :: UTCTime -> Notification -> Widget n
-notificationInner now notification = vBox notificationDetails
+notificationInner :: UTCTime -> Notification -> NotificationState -> Widget n
+notificationInner now notification (NotificationState {..}) = vBox (notificationDetails ++ contentWidget)
   where
+    contentState = notificationStateContent
     Notification {..} = notification
     Subject {..} = notificationSubject
-    RepoRef {..} = notificationRepo
-    SimpleOwner {..} = repoRefOwner
+
+    latestCommentId :: Maybe Int
+    latestCommentId = do
+      commentUrl <- subjectLatestCommentURL
+      uri <- parseURI (toString $ getUrl commentUrl)
+      let segments = FP.splitPath (uriPath uri)
+      -- Only extract an ID if the URL is actually a comment URL (contains "comments" segment)
+      guard ("comments/" `elem` segments)
+      case reverse segments of
+        (idStr:_) | all isDigit idStr -> readMaybe idStr
+        _ -> Nothing
 
     notificationDetails = [
       -- Notification status
@@ -134,53 +150,33 @@ notificationInner now notification = vBox notificationDetails
             then withAttr erroredAttr $ str "🔴 Unread"
             else withAttr greenCheckAttr $ str "✓ Read"
         ]
-
-      -- Repository info
-      , padTop (Pad 1) $ hBox [
-          withAttr boldText $ str "Repository: "
-          , withAttr hashAttr $ str (toString $ untagName simpleOwnerLogin)
-          , str "/"
-          , withAttr normalAttr $ str (toString $ untagName repoRefRepo)
-        ]
-
-      -- Subject details
-      , padTop (Pad 1) $ hBox [
-          withAttr boldText $ str "Type: "
-          , str (toString subjectType)
-        ]
-
-      , padTop (Pad 1) $ hBox [
-          withAttr boldText $ str "Reason: "
-          , str (toString $ reasonText notificationReason)
-        ]
-
-      -- Timestamps
-      , case notificationUpdatedAt of
-          Just updatedAt -> padTop (Pad 1) $ hBox [
-              withAttr boldText $ str "Updated: "
-              , str $ timeFromNow (diffUTCTime now updatedAt) ++ " (" ++ show updatedAt ++ ")"
-            ]
-          Nothing -> emptyWidget
-
-      , case notificationLastReadAt of
-          Just lastReadAt -> padTop (Pad 1) $ hBox [
-              withAttr boldText $ str "Last read: "
-              , str $ timeFromNow (diffUTCTime now lastReadAt) ++ " (" ++ show lastReadAt ++ ")"
-            ]
-          Nothing -> emptyWidget
-
-      -- URLs
-      , case subjectURL of
-          Just url -> padTop (Pad 1) $ hBox [
-              withAttr boldText $ str "URL: "
-              , withAttr usernameAttr $ str (toString $ getUrl url)
-            ]
-          Nothing -> emptyWidget
-
-      , case subjectLatestCommentURL of
-          Just commentUrl -> padTop (Pad 1) $ hBox [
-              withAttr boldText $ str "Latest comment: "
-              , withAttr usernameAttr $ str (toString $ getUrl commentUrl)
-            ]
-          Nothing -> emptyWidget
       ]
+
+    contentWidget = case contentState of
+      Fetched (NotificationIssue issue comments) ->
+        [padTop (Pad 1) $ renderNotificationContent now issue comments latestCommentId notificationStateAutoScroll]
+      Fetched (NotificationPull issue comments) ->
+        [padTop (Pad 1) $ renderNotificationContent now issue comments latestCommentId notificationStateAutoScroll]
+      Fetched NotificationOther -> []
+      Fetching _ -> [padTop (Pad 1) $ str "Loading..."]
+      Errored err -> [padTop (Pad 1) $ withAttr erroredAttr $ str [i|Error: #{err}|]]
+      NotFetched -> []
+
+renderNotificationContent :: UTCTime -> Issue -> V.Vector (Either IssueEvent IssueComment) -> Maybe Int -> Bool -> Widget n
+renderNotificationContent now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs maybeHighlightId autoScroll =
+  allItems
+  & zip [0..]
+  & fmap render
+  & vBox
+  where
+    allItems = (Left (openerUsername, fromMaybe "*No description provided.*" issueBody, issueCreatedAt), "")
+             : fmap (\item -> (Right item, "")) (toList cs)
+
+    render (idx, item) = if isHighlighted && autoScroll then visible widget else widget
+      where
+        isHighlighted = case (fst item, maybeHighlightId) of
+          (_, Nothing) -> False
+          (Right (Right (IssueComment {issueCommentId=cid})), Just hid) -> cid == hid
+          _ -> False
+
+        widget = renderTimelineItemWithAttr (if isHighlighted then Just highlightedCommentAttr else Nothing) now (length allItems) idx item

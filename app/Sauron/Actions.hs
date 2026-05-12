@@ -22,7 +22,7 @@ import Sauron.Actions.Util
 import Sauron.Fetch.Branch
 import Sauron.Fetch.Issue
 import Sauron.Fetch.Job
-import Sauron.Fetch.Notification
+import Sauron.Fetch.Notification (fetchNotifications, fetchNotificationContent)
 import Sauron.Fetch.Pull
 import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
@@ -186,6 +186,9 @@ fetchOnOpen bc item@(SingleJobNode (EntityData {_state, _static=job@(Job {jobId}
                         (fetchJobLogs owner name job item workflowParent)
     liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
 
+fetchOnOpen bc (SingleNotificationNode (EntityData {_static=notification, _state})) _parents =
+  liftIO $ async $ liftIO $ runReaderT (fetchNotificationContent notification _state) bc
+
 fetchOnOpen _ _ _ = liftIO $ async (return ())
 
 
@@ -218,7 +221,7 @@ shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = do
 shouldFetchOnExpand (SingleBranchNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SingleBranchWithInfoNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SingleCommitNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleNotificationNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleNotificationNode (EntityData {_state})) = (not . isFetchingOrFetched . notificationStateContent) <$> readTVarIO _state
 shouldFetchOnExpand (JobLogGroupNode (EntityData {})) = return True
 
 thd :: (a, b, c) -> c

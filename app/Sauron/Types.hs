@@ -203,7 +203,7 @@ type family NodeState a where
   NodeState SingleBranchT = Fetchable (V.Vector Commit)
   NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)
   NodeState SingleCommitT = Fetchable Commit
-  NodeState SingleNotificationT = Fetchable ()
+  NodeState SingleNotificationT = NotificationState
   NodeState JobLogGroupT = Maybe ScrollTarget
   NodeState HeadingT = ()
   NodeState RepoT = Fetchable Repo
@@ -319,6 +319,19 @@ entityDataL f (SingleNotificationNode ed) = SingleNotificationNode <$> f ed
 entityDataL f (JobLogGroupNode ed) = JobLogGroupNode <$> f ed
 entityDataL f (HeadingNode ed) = HeadingNode <$> f ed
 entityDataL f (RepoNode ed) = RepoNode <$> f ed
+
+-- * Notification content
+
+data NotificationContent =
+  NotificationIssue Issue (V.Vector (Either IssueEvent IssueComment))
+  | NotificationPull Issue (V.Vector (Either IssueEvent IssueComment))
+  | NotificationOther -- ^ For subject types we don't know how to render inline
+  deriving (Show, Eq)
+
+data NotificationState = NotificationState {
+  notificationStateContent :: Fetchable NotificationContent
+  , notificationStateAutoScroll :: Bool -- ^ Whether to auto-scroll to the latest comment
+  } deriving (Show, Eq)
 
 -- * Data types beyond "github" package
 

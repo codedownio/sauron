@@ -44,14 +44,25 @@ autoScrollSTM (JobLogGroupNode (EntityData {_static=jobLogGroup, _state=stateVar
 autoScrollSTM _ = return Nothing
 
 -- | Clear the auto-scroll target for the currently selected node (if it's a
--- JobLogGroupNode). Called when the user manually scrolls.
-clearAutoScrollTarget :: MonadIO m => AppState -> m ()
-clearAutoScrollTarget s =
+-- JobLogGroupNode or SingleNotificationNode). Called when the user manually scrolls.
+-- Updates both the Variable (TVar) and Fixed (appMainList) state so the clear
+-- takes effect immediately in the current render cycle.
+clearAutoScrollTarget :: AppState -> EventM ClickableName AppState ()
+clearAutoScrollTarget s = do
   withFixedElemAndParents s $ \_fixedEl (SomeNode variableNode) _parents ->
     case variableNode of
       JobLogGroupNode (EntityData {_state=stateVar}) ->
         liftIO $ atomically $ writeTVar stateVar Nothing
+      SingleNotificationNode (EntityData {_state=stateVar}) ->
+        liftIO $ atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateAutoScroll = False }
       _ -> return ()
+  -- Also update the Fixed snapshot so the change takes effect in the current render
+  case listSelectedElement (s ^. appMainList) of
+    Just (_, SomeNode (SingleNotificationNode ed)) ->
+      modify (appMainList %~ listModify (const (SomeNode (SingleNotificationNode (ed { _state = (_state ed) { notificationStateAutoScroll = False } })))))
+    Just (_, SomeNode (JobLogGroupNode ed)) ->
+      modify (appMainList %~ listModify (const (SomeNode (JobLogGroupNode (ed { _state = Nothing })))))
+    _ -> return ()
 
 -- | Find the 0-based line index of the first ##[error] line in rendered job log content.
 -- Line counting mirrors jobLogGroupInner rendering in UI/Job.hs.
