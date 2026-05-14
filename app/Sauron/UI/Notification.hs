@@ -25,7 +25,7 @@ import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Mutations.Notification (markNotificationAsDone, markNotificationAsRead)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (renderTimelineItemWithAttr)
+import Sauron.UI.Issue (renderTimelineItemWithAttr, consolidateEvents, TimelineItem(..))
 import Sauron.UI.Keys (markNotificationDoneKey, markNotificationReadKey, showKey)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
@@ -170,13 +170,13 @@ renderNotificationContent now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N 
   & vBox
   where
     allItems = (Left (openerUsername, fromMaybe "*No description provided.*" issueBody, issueCreatedAt), "")
-             : fmap (\item -> (Right item, "")) (toList cs)
+             : fmap (\item -> (Right item, "")) (consolidateEvents (toList cs))
 
     render (idx, item) = if isHighlighted && autoScroll then visible widget else widget
       where
         isHighlighted = case (fst item, maybeHighlightId) of
           (_, Nothing) -> False
-          (Right (Right (IssueComment {issueCommentId=cid})), Just hid) -> cid == hid
+          (Right (SingleItem (Right (IssueComment {issueCommentId=cid}))), Just hid) -> cid == hid
           _ -> False
 
         widget = renderTimelineItemWithAttr (if isHighlighted then Just highlightedCommentAttr else Nothing) now (length allItems) idx item

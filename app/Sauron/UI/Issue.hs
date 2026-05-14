@@ -7,16 +7,18 @@ module Sauron.UI.Issue (
   issueLine
   , issueInner
 
-  , maxCommentWidth
-
   -- Common timeline rendering functions
   , renderTimelineItem
   , renderTimelineItemWithAttr
   , renderItemWithBorder
   , renderComment
-  , renderEvent
   , commentTopLabel
   , topLabel
+
+  -- Re-exports from Sauron.UI.Issue.Events
+  , consolidateEvents
+  , maxCommentWidth
+  , TimelineItem(..)
 
   -- Close/reopen
   , closeReopenAndRefresh
@@ -27,17 +29,13 @@ import Brick.Forms
 import Control.Lens
 import Control.Monad
 import Data.String.Interpolate
-import qualified Data.Text as T
 import Data.Time
 import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
-import qualified Graphics.Vty as Vty
-import Numeric (readHex)
 import Relude
 import Sauron.Actions
 import Sauron.Actions.Util (findRepoParent, findIssuesParent)
-import Sauron.Contrast (RGB, bestForeground)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers
 import Sauron.Event.Search (ensureNonEmptySearch)
@@ -45,7 +43,7 @@ import Sauron.Fetch.Issue (fetchIssueComments)
 import Sauron.Mutations.Issue (closeIssue, reopenIssue)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
+import Sauron.UI.Issue.Events
 import Sauron.UI.Keys
 import Sauron.UI.Markdown
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
@@ -120,16 +118,6 @@ instance ListDrawable Fixed 'SingleIssueT where
         return True
   handleHotkey _ _ _ = return False
 
-maxCommentWidth :: Int
-maxCommentWidth = 120
-
--- | Render with width capped at maxCommentWidth but shrinking for narrow terminals
-adaptiveWidth :: (Int -> Widget n) -> Widget n
-adaptiveWidth f = Widget Greedy Fixed $ do
-  c <- getContext
-  let w = min maxCommentWidth ((c ^. availWidthL) - 1)
-  render (hLimit w (f w))
-
 issueLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable (V.Vector (Either IssueEvent IssueComment)) -> Widget n
 issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
   where
@@ -157,21 +145,17 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
   & fmap (uncurry (renderTimelineItem now (length allItems)))
   & vBox
   where
-    commentsAndEvents :: [Either IssueEvent IssueComment]
-    commentsAndEvents = toList cs
-
     issueDescriptionBody = fromMaybe "*No description provided.*" issueBody
 
-    -- allItems :: _
     allItems = (Left (openerUsername, issueDescriptionBody, issueCreatedAt), "")
-             : fmap (\item -> (Right item, "")) commentsAndEvents
+             : fmap (\item -> (Right item, "")) (consolidateEvents (toList cs))
 
 -- * Util, exported for Pull.hs
 
-renderTimelineItem :: UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) (Either IssueEvent IssueComment), Text) -> Widget n
+renderTimelineItem :: UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) TimelineItem, Text) -> Widget n
 renderTimelineItem = renderTimelineItemWithAttr Nothing
 
-renderTimelineItemWithAttr :: Maybe AttrName -> UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) (Either IssueEvent IssueComment), Text) -> Widget n
+renderTimelineItemWithAttr :: Maybe AttrName -> UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) TimelineItem, Text) -> Widget n
 renderTimelineItemWithAttr maybeAttr now totalItems idx (itemType, _extraBody) =
   let pick def attrVariant = maybe def attrVariant maybeAttr
       borderFunc = if totalItems == 1
@@ -193,11 +177,12 @@ topLabel username createdAt now =
   (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|opened #{timeFromNow (diffUTCTime now createdAt)}|])
     & padLeftRight 1
 
-renderItemWithBorder :: UTCTime -> Bool -> (Widget n -> Widget n -> Widget n) -> Either IssueEvent IssueComment -> Widget n
+renderItemWithBorder :: UTCTime -> Bool -> (Widget n -> Widget n -> Widget n) -> TimelineItem -> Widget n
 renderItemWithBorder now isLast borderFunc item =
   case item of
-    Right comment -> renderComment now borderFunc comment
-    Left event -> renderEvent now isLast event
+    SingleItem (Right comment) -> renderComment now borderFunc comment
+    SingleItem (Left event) -> renderEvent now isLast event
+    LabelGroup rep added removed -> renderLabelGroup now isLast rep added removed
 
 renderComment :: UTCTime -> (Widget n -> Widget n -> Widget n) -> IssueComment -> Widget n
 renderComment now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) =
@@ -205,52 +190,6 @@ renderComment now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simple
     (commentTopLabel username commentTime now)
     (markdownToWidgetsWithWidth (w - 2) issueCommentBody)
   where commentTime = issueCommentCreatedAt
-
-renderEvent :: UTCTime -> Bool -> IssueEvent -> Widget n
-renderEvent now isLast issueEvent =
-  let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
-        N username -> username
-      (labelWidget, labelSuffix) = case issueEventLabel issueEvent of
-        Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> (str " the " <+> labelPill hexColor name, " label")
-        Nothing -> (emptyWidget, if issueEventType issueEvent `elem` [Labeled, Unlabeled] then " a label" else "")
-      eventText = getEventDescription (issueEventType issueEvent)
-      iconWidget = getEventIconWithColor (issueEventType issueEvent)
-      timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
-      eventLine = adaptiveWidth $ \_ ->
-        padLeft (Pad 4) $ hBox [
-          iconWidget
-          , str "  "
-          , withAttr usernameAttr $ str (toString actorName)
-          , str " "
-          , str eventText
-          , labelWidget
-          , str (labelSuffix <> " ")
-          , withAttr italicText $ str timeAgo
-        ]
-      continuationLine = if isLast
-        then emptyWidget
-        else adaptiveWidth $ \_ -> padLeft (Pad 4) $ withAttr timelineBorderAttr $ str "│"
-  in vBox [eventLine, continuationLine]
-
-labelPill :: Text -> Text -> Widget n
-labelPill hexColor name = modifyDefAttr (const pillAttr) $ str [i| #{name} |]
-  where
-    bg' = parseHexColor hexColor
-    (fr, fg', fb) = bestForeground bg' [(0, 0, 0), (255, 255, 255)]
-    (br, bg'', bb) = bg'
-    bgColor = Vty.rgbColor (round br :: Int) (round bg'' :: Int) (round bb :: Int)
-    fgColor = Vty.rgbColor (round fr :: Int) (round fg' :: Int) (round fb :: Int)
-    pillAttr = Vty.Attr Vty.Default (Vty.SetTo fgColor) (Vty.SetTo bgColor) Vty.Default
-
-parseHexColor :: Text -> RGB
-parseHexColor hex = case mapMaybe parseComponent [T.take 2 s, T.take 2 (T.drop 2 s), T.take 2 (T.drop 4 s)] of
-  [r, g, b] -> (r, g, b)
-  _ -> (128, 128, 128)
-  where
-    s = T.dropWhile (== '#') hex
-    parseComponent t = case readHex (toString t) of
-      [(n, "")] -> Just (fromIntegral (n :: Int) :: Double)
-      _ -> Nothing
 
 commentTopLabel :: Text -> UTCTime -> UTCTime -> Widget n
 commentTopLabel username commentTime now =

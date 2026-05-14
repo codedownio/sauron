@@ -83,6 +83,7 @@ executable sauron
       Sauron.UI.Commit
       Sauron.UI.Event
       Sauron.UI.Issue
+      Sauron.UI.Issue.Events
       Sauron.UI.Job
       Sauron.UI.Keys
       Sauron.UI.Markdown

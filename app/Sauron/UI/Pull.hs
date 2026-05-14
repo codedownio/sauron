@@ -27,7 +27,7 @@ import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Fetch.Pull (fetchPullComments)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (issueInner, renderTimelineItem, closeReopenAndRefresh)
+import Sauron.UI.Issue (issueInner, renderTimelineItem, closeReopenAndRefresh, consolidateEvents)
 import Sauron.UI.Keys
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util
@@ -140,4 +140,4 @@ pullInner now (Issue {..}) body inner =
 
     -- All timeline items including the PR description
     allItems = (Left (openerUsername, body, issueCreatedAt), "")
-             : fmap (\item -> (Right item, "")) commentsAndEvents
+             : fmap (\item -> (Right item, "")) (consolidateEvents commentsAndEvents)
