@@ -27,13 +27,17 @@ import Brick.Forms
 import Control.Lens
 import Control.Monad
 import Data.String.Interpolate
+import qualified Data.Text as T
 import Data.Time
 import qualified Data.Vector as V
 import GitHub
 import GitHub.Data.Name
+import qualified Graphics.Vty as Vty
+import Numeric (readHex)
 import Relude
 import Sauron.Actions
 import Sauron.Actions.Util (findRepoParent, findIssuesParent)
+import Sauron.Contrast (RGB, bestForeground)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers
 import Sauron.Event.Search (ensureNonEmptySearch)
@@ -206,6 +210,9 @@ renderEvent :: UTCTime -> Bool -> IssueEvent -> Widget n
 renderEvent now isLast issueEvent =
   let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
         N username -> username
+      (labelWidget, labelSuffix) = case issueEventLabel issueEvent of
+        Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> (str " the " <+> labelPill hexColor name, " label")
+        Nothing -> (emptyWidget, if issueEventType issueEvent `elem` [Labeled, Unlabeled] then " a label" else "")
       eventText = getEventDescription (issueEventType issueEvent)
       iconWidget = getEventIconWithColor (issueEventType issueEvent)
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
@@ -216,13 +223,34 @@ renderEvent now isLast issueEvent =
           , withAttr usernameAttr $ str (toString actorName)
           , str " "
           , str eventText
-          , str " "
+          , labelWidget
+          , str (labelSuffix <> " ")
           , withAttr italicText $ str timeAgo
         ]
       continuationLine = if isLast
         then emptyWidget
         else adaptiveWidth $ \_ -> padLeft (Pad 4) $ withAttr timelineBorderAttr $ str "│"
   in vBox [eventLine, continuationLine]
+
+labelPill :: Text -> Text -> Widget n
+labelPill hexColor name = modifyDefAttr (const pillAttr) $ str [i| #{name} |]
+  where
+    bg' = parseHexColor hexColor
+    (fr, fg', fb) = bestForeground bg' [(0, 0, 0), (255, 255, 255)]
+    (br, bg'', bb) = bg'
+    bgColor = Vty.rgbColor (round br :: Int) (round bg'' :: Int) (round bb :: Int)
+    fgColor = Vty.rgbColor (round fr :: Int) (round fg' :: Int) (round fb :: Int)
+    pillAttr = Vty.Attr Vty.Default (Vty.SetTo fgColor) (Vty.SetTo bgColor) Vty.Default
+
+parseHexColor :: Text -> RGB
+parseHexColor hex = case mapMaybe parseComponent [T.take 2 s, T.take 2 (T.drop 2 s), T.take 2 (T.drop 4 s)] of
+  [r, g, b] -> (r, g, b)
+  _ -> (128, 128, 128)
+  where
+    s = T.dropWhile (== '#') hex
+    parseComponent t = case readHex (toString t) of
+      [(n, "")] -> Just (fromIntegral (n :: Int) :: Double)
+      _ -> Nothing
 
 commentTopLabel :: Text -> UTCTime -> UTCTime -> Widget n
 commentTopLabel username commentTime now =
