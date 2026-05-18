@@ -23,9 +23,10 @@ Sleep 1s
 
 # Search for Markdown issue
 Type "s"
-Sleep 500ms
+Sleep 100ms
 Space
 Type "markdown"
+Sleep 2s
 Enter
 Sleep 2s
 
