@@ -34,10 +34,10 @@ instance ListDrawable Fixed 'SingleWorkflowT where
   drawLine appState (EntityData {_static=wf, ..}) =
     workflowLine (_appAnimationCounter appState) (_appNow appState) _toggled wf _state _healthCheckThread
 
-  drawInner _appState (EntityData {_static=wf, _state, _ident, ..}) = do
+  drawInner _appState (EntityData {_static=wf, _state, _children, ..}) = do
     guard _toggled
     guardFetchedOrHasPrevious _state $ \_ ->
-      return $ workflowInner wf _state
+      return $ workflowInner wf _children
 
   getExtraTopBoxWidgets _app (EntityData {_static=wf}) =
     if isNothing (workflowRunConclusion wf)
@@ -96,12 +96,33 @@ workflowLine animationCounter currentTime toggled' (WorkflowRun {..}) fetchableS
       , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
       ] <> (if workflowRunAttempt > 1 then [str [i| • Attempt #{workflowRunAttempt}|]] else [])
 
-workflowInner :: WorkflowRun -> NodeState SingleWorkflowT -> Widget n
-workflowInner (WorkflowRun {..}) _jobsFetchable = vBox $ workflowDetails
+workflowInner :: WorkflowRun -> [Node Fixed SingleJobT] -> Widget n
+workflowInner (WorkflowRun {..}) jobs = vBox $ workflowDetails
   where
+    jobStatuses = [chooseWorkflowStatus (fromMaybe (jobStatus j) (jobConclusion j))
+                  | SingleJobNode (EntityData {_state=JobNodeState {jnsJob=Fetched j}}) <- jobs]
+    succeeded = length [() | WorkflowSuccess <- jobStatuses]
+    failed = length [() | WorkflowFailed <- jobStatuses]
+    running = length [() | WorkflowRunning <- jobStatuses]
+    notStarted = length [() | s <- jobStatuses, s `elem` [WorkflowPending, WorkflowNeutral, WorkflowUnknown]]
+    cancelled = length [() | WorkflowCancelled <- jobStatuses]
+
+    parts = catMaybes [
+      ifPositive succeeded $ withAttr greenCheckAttr (str [i|#{succeeded}|]) <+> str " succeeded"
+      , ifPositive failed $ withAttr redXAttr (str [i|#{failed}|]) <+> str " failed"
+      , ifPositive running $ withAttr queuedAttr (str [i|#{running}|]) <+> str " running"
+      , ifPositive cancelled $ withAttr cancelledAttr (str [i|#{cancelled}|]) <+> str " cancelled"
+      , ifPositive notStarted $ withAttr queuedAttr (str [i|#{notStarted}|]) <+> str " not started"
+      ]
+    jobSummary = hBox $ intercalate [str " / "] [[w] | w <- parts]
+
+    ifPositive n w
+      | n > 0 = Just w
+      | otherwise = Nothing
+
     workflowDetails = [
       hBox [
           str "File: "
           , withAttr hashAttr $ str $ toString workflowRunPath
         ]
-      ]
+      ] ++ [jobSummary | not (null jobStatuses)]
