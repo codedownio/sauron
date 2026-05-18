@@ -40,6 +40,8 @@ getEventIcon eventType = case eventType of
   ProjectItemStatusChanged -> "↔"
   RemovedFromProject -> "-"
   ConvertedNoteToIssue -> "*"
+  AddedToMergeQueue -> "⊕"
+  RemovedFromMergeQueue -> "-"
   HeadRefDeleted -> "∅"
   HeadRefRestored -> "↪"
   Unknown _ -> "?"
@@ -79,6 +81,8 @@ getEventColorAttr eventType = case eventType of
   ProjectItemStatusChanged -> eventProjectColor
   RemovedFromProject -> eventProjectColor
   ConvertedNoteToIssue -> eventConvertedColor
+  AddedToMergeQueue -> eventProjectColor
+  RemovedFromMergeQueue -> eventProjectColor
   HeadRefDeleted -> eventRefDeletedColor
   HeadRefRestored -> eventRefRestoredColor
   Unknown _ -> eventRefRestoredColor
@@ -101,7 +105,7 @@ getEventDescription eventType = case eventType of
   Mentioned -> "was mentioned"
   Subscribed -> "subscribed to this"
   Unsubscribed -> "unsubscribed from this"
-  ReviewRequested -> "requested review"
+  ReviewRequested -> "requested review from"
   ReviewDismissed -> "dismissed a review"
   ReviewRequestRemoved -> "removed review request"
   MarkedAsDuplicate -> "marked this as duplicate"
@@ -112,6 +116,8 @@ getEventDescription eventType = case eventType of
   ProjectItemStatusChanged -> "changed the status in a project"
   RemovedFromProject -> "removed this from a project"
   ConvertedNoteToIssue -> "converted note to issue"
+  AddedToMergeQueue -> "added this to the merge queue"
+  RemovedFromMergeQueue -> "removed this from the merge queue"
   HeadRefDeleted -> "deleted the head branch"
   HeadRefRestored -> "restored the head branch"
   Unknown t -> [i|#{t} (unknown event type)|]

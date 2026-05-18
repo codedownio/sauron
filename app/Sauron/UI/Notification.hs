@@ -19,14 +19,14 @@ import GitHub.Data.Name
 import Lens.Micro
 import Network.URI (parseURI, uriPath)
 import Relude
-import Sauron.Actions (refreshLine)
+import Sauron.Actions (refreshLine, refreshOnZoom)
 import Sauron.Actions.Util (findNotificationsParent)
 import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Mutations.Notification (markNotificationAsDone, markNotificationAsRead)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (renderTimelineItemWithAttr, consolidateEvents, TimelineItem(..))
-import Sauron.UI.Keys (markNotificationDoneKey, markNotificationReadKey, showKey)
+import Sauron.UI.Keys (markNotificationDoneKey, markNotificationReadKey, zoomModalKey, showKey)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
 import qualified System.FilePath.Posix as FP
@@ -57,8 +57,19 @@ instance ListDrawable Fixed 'SingleNotificationT where
              ]
         else []
        )
+    ++ [hBox [str "["
+             , withAttr hotkeyAttr $ str $ showKey zoomModalKey
+             , str "] "
+             , withAttr hotkeyMessageAttr $ str "Zoom"
+             ]
+       ]
 
   handleHotkey appState key (EntityData {_static=notification})
+    | key == zoomModalKey = do
+        withFixedElemAndParents appState $ \(SomeNode _) (SomeNode variableEl) parents -> do
+          refreshOnZoom (appState ^. appBaseContext) variableEl parents
+          liftIO $ atomically $ writeTVar (_appModalVariable appState) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
+        return True
     | key == markNotificationDoneKey = do
         liftIO $ void $ async $ do
           runReaderT (markNotificationAsDone notification) (appState ^. appBaseContext)

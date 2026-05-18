@@ -3,7 +3,6 @@ resolver: nightly-2025-09-22
 
 packages:
 - .
-# - /home/tom/tools/github
 
 nix:
   enable: false
@@ -13,8 +12,6 @@ system-ghc: true
 extra-deps:
 - vty-windows-0.2.0.3
 - brick-skylighting-1.0@sha256:64764b6be36c05261959f68ed38b9cb37e1acb6180a3bde5dd98255f62ea7e3b,1812
-
-# - github-0.29
 
 - git: https://github.com/codedownio/github.git
   # sauron-sep18-2025 branch, which has some changes from upstream:
@@ -28,7 +25,10 @@ extra-deps:
   # - Add markNotificationAsDoneR
   # - Add checkRunsForR + supporting data types
   # - parseRedirect: throw a proper HTTPError on invalid status
-  commit: be1622932a2ca3692ddccaf867e496d1d9114852
+  # - Issue events: add merge queue and requested reviewer support
+  # - IssueEvent: make actor field optional (Maybe SimpleUser)
+  # - issueEventActor: switch to a Maybe
+  commit: 111982ea4dd02de1e81e4ff310ab548e05e4db62
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf

@@ -84,6 +84,8 @@ executable sauron
       Sauron.UI.Event
       Sauron.UI.Issue
       Sauron.UI.Issue.Events
+      Sauron.UI.Issue.Events.Common
+      Sauron.UI.Issue.Events.ReviewRequests
       Sauron.UI.Job
       Sauron.UI.Keys
       Sauron.UI.Markdown

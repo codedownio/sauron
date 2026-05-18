@@ -13,6 +13,9 @@ module Sauron.UI.Issue.Events (
   -- * Layout
   , adaptiveWidth
   , maxCommentWidth
+
+  -- * Re-exports from Common
+  , wrapWidgets
   ) where
 
 import Brick
@@ -28,16 +31,17 @@ import Relude
 import Sauron.Contrast (RGB, bestForeground)
 import Sauron.UI.AttrMap
 import Sauron.UI.Event (getEventDescription, getEventIconWithColor)
+import Sauron.UI.Issue.Events.Common (wrapWidgets)
 import Sauron.UI.Util.TimeDiff
 
 
 -- * Types
 
--- | A timeline item is either a single comment/event or a group of label events
--- that share the same timestamp and actor.
+-- | A timeline item is either a single comment/event or a consolidated group.
 data TimelineItem
   = SingleItem (Either IssueEvent IssueComment)
   | LabelGroup IssueEvent [IssueEvent] [IssueEvent]  -- ^ representative event, added events, removed events
+  | ReviewRequestGroup IssueEvent [IssueEvent]        -- ^ representative event, all review_requested events
 
 
 -- * Layout
@@ -55,55 +59,79 @@ adaptiveWidth f = Widget Greedy Fixed $ do
 
 -- * Consolidation
 
--- | Consolidate consecutive label events with the same timestamp and actor
--- into 'LabelGroup' items.
+-- | Consolidate consecutive events of the same kind, timestamp, and actor
+-- into grouped items.
 consolidateEvents :: [Either IssueEvent IssueComment] -> [TimelineItem]
 consolidateEvents [] = []
 consolidateEvents (Right c : rest) = SingleItem (Right c) : consolidateEvents rest
 consolidateEvents (Left e : rest)
   | isLabelEvent e =
-      let (labelRun, remaining) = span (isMatchingLabel e) rest
-          labelEvents = e : [ev | Left ev <- labelRun]
-          added = filter (\ev -> issueEventType ev == Labeled) labelEvents
-          removed = filter (\ev -> issueEventType ev == Unlabeled) labelEvents
-      in if length labelEvents > 1
+      let (run, remaining) = span (isMatchingEvent isLabelEvent e) rest
+          events = e : [ev | Left ev <- run]
+          added = filter (\ev -> issueEventType ev == Labeled) events
+          removed = filter (\ev -> issueEventType ev == Unlabeled) events
+      in if length events > 1
          then LabelGroup e added removed : consolidateEvents remaining
          else SingleItem (Left e) : consolidateEvents rest
+  | isReviewRequestEvent e =
+      let (run, remaining) = span (isMatchingEvent isReviewRequestEvent e) rest
+          events = e : [ev | Left ev <- run]
+      in if length events > 1
+         then ReviewRequestGroup e events : consolidateEvents remaining
+         else SingleItem (Left e) : consolidateEvents rest
   | otherwise = SingleItem (Left e) : consolidateEvents rest
-  where
-    isMatchingLabel ref (Left ev) =
-      isLabelEvent ev
-      && abs (diffUTCTime (issueEventCreatedAt ev) (issueEventCreatedAt ref)) < 10
-      && simpleUserLogin (issueEventActor ev) == simpleUserLogin (issueEventActor ref)
-    isMatchingLabel _ _ = False
+
+isMatchingEvent :: (IssueEvent -> Bool) -> IssueEvent -> Either IssueEvent IssueComment -> Bool
+isMatchingEvent predicate ref (Left ev) =
+  predicate ev
+  && abs (diffUTCTime (issueEventCreatedAt ev) (issueEventCreatedAt ref)) < 10
+  && fmap simpleUserLogin (issueEventActor ev) == fmap simpleUserLogin (issueEventActor ref)
+isMatchingEvent _ _ _ = False
 
 isLabelEvent :: IssueEvent -> Bool
 isLabelEvent e = issueEventType e `elem` [Labeled, Unlabeled]
+
+isReviewRequestEvent :: IssueEvent -> Bool
+isReviewRequestEvent e = issueEventType e == ReviewRequested
 
 
 -- * Rendering
 
 renderEvent :: UTCTime -> Bool -> IssueEvent -> Widget n
 renderEvent now isLast issueEvent =
-  let actorName :: Text = case simpleUserLogin (issueEventActor issueEvent) of
-        N username -> username
-      (labelWidget, labelSuffix) = case issueEventLabel issueEvent of
-        Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> (str " the " <+> labelPill hexColor name, " label")
-        Nothing -> (emptyWidget, if issueEventType issueEvent `elem` [Labeled, Unlabeled] then " a label" else "")
+  let actorName :: Text = case issueEventActor issueEvent of
+        Just (SimpleUser {simpleUserLogin=(N username)}) -> username
+        Nothing -> "ghost"
+      -- Each sized item is (width, widget)
+      eventSuffixItems :: [(Int, Widget n)]
+      eventSuffixItems = case issueEventType issueEvent of
+        Labeled -> case issueEventLabel issueEvent of
+          Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> [(5, str " the "), (T.length name + 2, labelPill hexColor name), (7, str " label")]
+          Nothing -> [(8, str " a label")]
+        Unlabeled -> case issueEventLabel issueEvent of
+          Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> [(5, str " the "), (T.length name + 2, labelPill hexColor name), (7, str " label")]
+          Nothing -> [(8, str " a label")]
+        ReviewRequested -> case issueEventRequestedReviewer issueEvent of
+          Just (SimpleUser {simpleUserLogin=(N reviewer)}) -> [(1 + T.length reviewer, str " " <+> withAttr usernameAttr (str (toString reviewer)))]
+          Nothing -> []
+        _ -> []
       eventText = getEventDescription (issueEventType issueEvent)
       iconWidget = getEventIconWithColor (issueEventType issueEvent)
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
-      eventLine = adaptiveWidth $ \_ ->
-        padLeft (Pad 4) $ hBox [
-          iconWidget
-          , str "  "
-          , withAttr usernameAttr $ str (toString actorName)
-          , str " "
-          , str eventText
-          , labelWidget
-          , str (labelSuffix <> " ")
-          , withAttr italicText $ str timeAgo
-        ]
+      timeAgoWidget = (length timeAgo, withAttr italicText $ str timeAgo)
+      descriptionItems = [(length eventText, str eventText)] ++ eventSuffixItems ++ [(1, str " "), timeAgoWidget]
+      prefixWidth = 1 + 2 + T.length actorName + 1  -- icon + spaces + username + space
+      eventLine = adaptiveWidth $ \w ->
+        let availableWidth = w - 4
+            wrappedLines = wrapWidgets (availableWidth - prefixWidth) descriptionItems
+            prefix = hBox [iconWidget, str "  ", withAttr usernameAttr $ str (toString actorName), str " "]
+            firstLine = case wrappedLines of
+              [] -> prefix
+              (l:_) -> hBox [prefix, hBox (map snd l)]
+            restLines = case wrappedLines of
+              [] -> []
+              (_:ls) -> [padLeft (Pad 3) $ hBox (map snd l) | l <- ls]
+        in padLeft (Pad 4) $ vBox (firstLine : restLines)
       continuationLine = if isLast
         then emptyWidget
         else adaptiveWidth $ \_ -> padLeft (Pad 4) $ withAttr timelineBorderAttr $ str "│"
@@ -111,8 +139,9 @@ renderEvent now isLast issueEvent =
 
 renderLabelGroup :: UTCTime -> Bool -> IssueEvent -> [IssueEvent] -> [IssueEvent] -> Widget n
 renderLabelGroup now isLast rep added removed =
-  let actorName :: Text = case simpleUserLogin (issueEventActor rep) of
-        N username -> username
+  let actorName :: Text = case issueEventActor rep of
+        Just (SimpleUser {simpleUserLogin=(N username)}) -> username
+        Nothing -> "ghost"
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt rep))
       iconWidget = getEventIconWithColor (issueEventType rep)
       addedItems = mapMaybe eventLabelPillWithWidth added
@@ -150,19 +179,6 @@ eventLabelPillWithWidth :: IssueEvent -> Maybe (Int, Widget n)
 eventLabelPillWithWidth e = case issueEventLabel e of
   Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> Just (T.length name + 3, labelPill hexColor name <+> str " ")
   Nothing -> Nothing
-
--- | Greedily wrap sized widgets into lines that fit within the given width.
-wrapWidgets :: Int -> [(Int, a)] -> [[(Int, a)]]
-wrapWidgets _ [] = []
-wrapWidgets maxW items =
-  let (line, rest) = takeLine maxW items
-  in line : wrapWidgets maxW rest
-  where
-    takeLine _ [] = ([], [])
-    takeLine remaining (item@(w, _):xs)
-      | w <= remaining = let (moreLine, leftover) = takeLine (remaining - w) xs
-                         in (item : moreLine, leftover)
-      | otherwise = ([], item : xs)
 
 labelPill :: Text -> Text -> Widget n
 labelPill hexColor name = modifyDefAttr (const pillAttr) $ str [i| #{name} |]

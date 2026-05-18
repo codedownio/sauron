@@ -44,6 +44,7 @@ import Sauron.Mutations.Issue (closeIssue, reopenIssue)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue.Events
+import Sauron.UI.Issue.Events.ReviewRequests (renderReviewRequestGroup)
 import Sauron.UI.Keys
 import Sauron.UI.Markdown
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
@@ -183,6 +184,7 @@ renderItemWithBorder now isLast borderFunc item =
     SingleItem (Right comment) -> renderComment now borderFunc comment
     SingleItem (Left event) -> renderEvent now isLast event
     LabelGroup rep added removed -> renderLabelGroup now isLast rep added removed
+    ReviewRequestGroup rep events -> renderReviewRequestGroup now isLast rep events
 
 renderComment :: UTCTime -> (Widget n -> Widget n -> Widget n) -> IssueComment -> Widget n
 renderComment now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) =
