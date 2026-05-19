@@ -16,4 +16,7 @@ wrapWidgets maxW items =
     takeLine remaining (item@(w, _):xs)
       | w <= remaining = let (moreLine, leftover) = takeLine (remaining - w) xs
                          in (item : moreLine, leftover)
+      -- Item doesn't fit but nothing else has been taken yet — take it anyway
+      -- to guarantee progress. Without this, maxW <= 0 causes an infinite loop.
+      | remaining == maxW = ([item], xs)
       | otherwise = ([], item : xs)
