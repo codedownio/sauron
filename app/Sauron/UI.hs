@@ -30,7 +30,7 @@ import Sauron.UI.Workflow ()
 
 
 listDrawElement :: AppState -> Int -> Bool -> SomeNode Fixed -> Widget ClickableName
-listDrawElement appState ix' isSelected node@(SomeNode inner) = wrapper ix' isSelected (getEntityData inner) $ listDrawElement' appState node
+listDrawElement appState ix' isSelected node@(SomeNode inner) = wrapper ix' isSelected (getEntityData inner) $ (if isSelected then padRight (Pad 1) else id) $ listDrawElement' appState node
 
 listDrawElement' :: AppState -> SomeNode Fixed -> Widget ClickableName
 listDrawElement' appState (SomeNode inner) =

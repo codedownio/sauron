@@ -101,7 +101,7 @@ notificationLine now toggled' (Notification {..}) animationCounter fetchableStat
       , Just $ fetchableQuarterCircleSpinner animationCounter fetchableState
       , Just $ padLeft Max $ hBox [
           case subjectType of
-            "PullRequest" -> str "🔄"
+            "PullRequest" -> str "⎇"
             "Issue" -> str "◉"
             _ -> str (toString subjectType)
         ]
