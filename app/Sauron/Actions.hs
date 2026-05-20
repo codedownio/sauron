@@ -37,7 +37,7 @@ refreshSelected :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (So
 refreshSelected = fetchOnOpen
 
 refreshOnZoom :: (MonadIO m, SomeNodeConstraints Fixed a) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m ()
-refreshOnZoom bc node parents = fetchOnOpenIfNecessary bc node parents >>= wait
+refreshOnZoom bc node parents = void $ fetchOnOpenIfNecessary bc node parents
 
 refreshLine :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
 refreshLine bc (RepoNode (EntityData {_static=(owner, name), _state})) _parents =

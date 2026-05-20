@@ -64,10 +64,19 @@ getZoomModalHotkeys (SomeNode node) = nodeSpecificHotkeys ++ commonHotkeys
 renderNodeContent :: AppState -> SomeNode Fixed -> Widget ClickableName
 renderNodeContent appState (SomeNode inner) = vBox $ catMaybes [
   if skipLine then Nothing else Just $ drawNodeLine appState inner'
-  , fmap (padLeft (Pad paddingAmount)) (drawNodeInner appState inner')
+  , fmap (padLeft (Pad paddingAmount)) innerContent
+  , if isNothing innerContent then loadingWidget else Nothing
   ]
   where
     inner' = over entityDataL transformEntityData inner
+    innerContent = drawNodeInner appState inner'
+
+    loadingWidget = case inner of
+      SingleIssueNode {} -> Just $ str "Loading..."
+      SinglePullNode {} -> Just $ str "Loading..."
+      SingleCommitNode {} -> Just $ str "Loading..."
+      SingleJobNode {} -> Just $ str "Loading..."
+      _ -> Nothing
 
     transformEntityData :: EntityData Fixed a -> EntityData Fixed a
     transformEntityData = set toggled True
@@ -80,6 +89,7 @@ renderNodeContent appState (SomeNode inner) = vBox $ catMaybes [
       _ -> False
 
     paddingAmount = if skipLine then 0 else 1
+
 
 -- | Generate a nice title for the zoom modal based on node type
 generateModalTitle :: SomeNode Fixed -> String

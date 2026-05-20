@@ -56,13 +56,22 @@ clearAutoScrollTarget s = do
       SingleNotificationNode (EntityData {_state=stateVar}) ->
         liftIO $ atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateAutoScroll = False }
       _ -> return ()
-  -- Also update the Fixed snapshot so the change takes effect in the current render
+  -- Also update the Fixed snapshots so the change takes effect in the current render
   case listSelectedElement (s ^. appMainList) of
     Just (_, SomeNode (SingleNotificationNode ed)) ->
       modify (appMainList %~ listModify (const (SomeNode (SingleNotificationNode (ed { _state = (_state ed) { notificationStateAutoScroll = False } })))))
     Just (_, SomeNode (JobLogGroupNode ed)) ->
       modify (appMainList %~ listModify (const (SomeNode (JobLogGroupNode (ed { _state = Nothing })))))
     _ -> return ()
+  -- Update the modal's Fixed snapshot too (for zoom modal scrolling)
+  modify (appModal . _Just . zoomModalSomeNode %~ clearAutoScrollInSomeNode)
+
+clearAutoScrollInSomeNode :: SomeNode Fixed -> SomeNode Fixed
+clearAutoScrollInSomeNode (SomeNode (SingleNotificationNode ed)) =
+  SomeNode (SingleNotificationNode (ed { _state = (_state ed) { notificationStateAutoScroll = False } }))
+clearAutoScrollInSomeNode (SomeNode (JobLogGroupNode ed)) =
+  SomeNode (JobLogGroupNode (ed { _state = Nothing }))
+clearAutoScrollInSomeNode x = x
 
 -- | Find the 0-based line index of the first ##[error] line in rendered job log content.
 -- Line counting mirrors jobLogGroupInner rendering in UI/Job.hs.

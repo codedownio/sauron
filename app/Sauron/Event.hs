@@ -107,7 +107,7 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
-      _ -> void $ handleModalScrolling ZoomModalContent ev
+      _ -> whenM (handleModalScrolling ZoomModalContent ev) $ clearAutoScrollTarget s
     (LogModalState _) -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
