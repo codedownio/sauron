@@ -3,7 +3,6 @@ module Sauron.UI.Markdown.Table (
   ) where
 
 import Brick
-import qualified Data.Text as T
 import Graphics.Text.Width (safeWctwidth)
 import Relude
 import Sauron.UI.AttrMap
