@@ -3,15 +3,15 @@ module Sauron.UI.Issue.Events.ReviewRequests (
   ) where
 
 import Brick
-import qualified Data.Text as T
 import Data.Time
 import GitHub
 import GitHub.Data.Name
+import Graphics.Text.Width (safeWcswidth, safeWctwidth)
 import Relude
 import Sauron.UI.AttrMap
 import Sauron.UI.Event (getEventIconWithColor)
-import Sauron.UI.Issue.Events.Common (wrapWidgets)
 import Sauron.UI.Issue.Events (adaptiveWidth)
+import Sauron.UI.Issue.Events.Common (wrapWidgets)
 import Sauron.UI.Util.TimeDiff
 
 
@@ -25,8 +25,8 @@ renderReviewRequestGroup now isLast rep events =
       reviewerNames = mapMaybe (\e -> case issueEventRequestedReviewer e of
         Just (SimpleUser {simpleUserLogin=(N name)}) -> Just name
         Nothing -> Nothing) events
-      sizedName n = (T.length n, withAttr usernameAttr $ str (toString n))
-      timeAgoWidget = (length timeAgo, withAttr italicText $ str timeAgo)
+      sizedName n = (safeWctwidth n, withAttr usernameAttr $ str (toString n))
+      timeAgoWidget = (safeWcswidth timeAgo, withAttr italicText $ str timeAgo)
       descriptionItems = case reviewerNames of
         [] -> [(7, str "review "), timeAgoWidget]
         [x] -> [(12, str "review from "), sizedName x, (1, str " "), timeAgoWidget]
@@ -36,7 +36,7 @@ renderReviewRequestGroup now isLast rep events =
             [(12, str "review from ")]
             ++ intercalate [(2, str ", ")] [[sizedName n] | n <- toList (init ne)]
             ++ [(6, str ", and "), sizedName (last ne), (1, str " "), timeAgoWidget]
-      prefixWidth = 1 + 2 + T.length actorName + 1 + 10  -- icon + spaces + username + space + "requested "
+      prefixWidth = 1 + 2 + safeWctwidth actorName + 1 + 10  -- icon + spaces + username + space + "requested "
       eventLine = adaptiveWidth $ \w ->
         let availableWidth = w - 4
             wrappedLines = wrapWidgets (availableWidth - prefixWidth) descriptionItems

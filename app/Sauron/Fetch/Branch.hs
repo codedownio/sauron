@@ -17,6 +17,7 @@ import Control.Monad.IO.Class
 import qualified Data.List as List
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime, getCurrentTime)
+import Graphics.Text.Width (safeWctwidth)
 import qualified Data.Vector as V
 import GitHub
 import Relude
@@ -136,10 +137,10 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar depth'
     calculateColumnWidths :: UTCTime -> [BranchWithInfo] -> ColumnWidths
     calculateColumnWidths _ [] = ColumnWidths 0 0 0 0  -- Default widths for empty list
     calculateColumnWidths currentTime branches = ColumnWidths {
-      cwCommitTime = fromMaybe 0 $ viaNonEmpty List.maximum $ map (T.length . formatCommitTimeText currentTime) branches
+      cwCommitTime = fromMaybe 0 $ viaNonEmpty List.maximum $ map (safeWctwidth . formatCommitTimeText currentTime) branches
       , cwCheckStatus = fromMaybe 0 $ viaNonEmpty List.maximum $ map (snd . formatCheckStatusWithWidth) branches
       , cwAheadBehind = fromMaybe 0 $ viaNonEmpty List.maximum $ map (snd . formatAheadBehindWithWidth) branches
-      , cwPRInfo = fromMaybe 0 $ viaNonEmpty List.maximum $ map (T.length . formatPRInfoText) branches
+      , cwPRInfo = fromMaybe 0 $ viaNonEmpty List.maximum $ map (safeWctwidth . formatPRInfoText) branches
     }
 
 fetchYourBranches :: (

@@ -6,6 +6,7 @@ module Sauron.UI.Markdown.Wrapping (
 import Brick
 import Control.Monad.Writer
 import qualified Data.Text as T
+import Graphics.Text.Width (safeWctwidth)
 import Relude
 import Sauron.UI.AttrMap
 import qualified Text.Pandoc.Builder as B
@@ -89,17 +90,17 @@ wrapStyledWords maxWidth styledWords =
 takeWordsUpToWidth :: Int -> [StyledWord] -> ([StyledWord], [StyledWord])
 takeWordsUpToWidth _ [] = ([], [])
 takeWordsUpToWidth maxWidth (w:ws)
-  | T.length (wordText w) > maxWidth = ([w], ws)  -- Single word exceeds width
+  | safeWctwidth (wordText w) > maxWidth = ([w], ws)  -- Single word exceeds width
   | otherwise =
-      let (taken, remaining) = go (T.length (wordText w)) [w] ws
+      let (taken, remaining) = go (safeWctwidth (wordText w)) [w] ws
           -- Check if we should adjust to avoid lone punctuation
           (finalTaken, finalRemaining) = avoidLonePunct taken remaining
       in (reverse finalTaken, finalRemaining)
   where
     go _ acc [] = (acc, [])
     go currentLen acc (word:rest)
-      | currentLen + T.length (wordText word) <= maxWidth =
-          go (currentLen + T.length (wordText word)) (word:acc) rest
+      | currentLen + safeWctwidth (wordText word) <= maxWidth =
+          go (currentLen + safeWctwidth (wordText word)) (word:acc) rest
       | otherwise = (acc, word:rest)
 
     -- Avoid leaving lone punctuation at end of line

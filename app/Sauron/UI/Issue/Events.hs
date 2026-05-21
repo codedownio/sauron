@@ -25,6 +25,7 @@ import qualified Data.Text as T
 import Data.Time
 import GitHub
 import GitHub.Data.Name
+import Graphics.Text.Width (safeWcswidth, safeWctwidth)
 import qualified Graphics.Vty as Vty
 import Numeric (readHex)
 import Relude
@@ -106,21 +107,21 @@ renderEvent now isLast issueEvent =
       eventSuffixItems :: [(Int, Widget n)]
       eventSuffixItems = case issueEventType issueEvent of
         Labeled -> case issueEventLabel issueEvent of
-          Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> [(5, str " the "), (T.length name + 2, labelPill hexColor name), (7, str " label")]
+          Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> [(5, str " the "), (safeWctwidth name + 2, labelPill hexColor name), (7, str " label")]
           Nothing -> [(8, str " a label")]
         Unlabeled -> case issueEventLabel issueEvent of
-          Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> [(5, str " the "), (T.length name + 2, labelPill hexColor name), (7, str " label")]
+          Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> [(5, str " the "), (safeWctwidth name + 2, labelPill hexColor name), (7, str " label")]
           Nothing -> [(8, str " a label")]
         ReviewRequested -> case issueEventRequestedReviewer issueEvent of
-          Just (SimpleUser {simpleUserLogin=(N reviewer)}) -> [(1 + T.length reviewer, str " " <+> withAttr usernameAttr (str (toString reviewer)))]
+          Just (SimpleUser {simpleUserLogin=(N reviewer)}) -> [(1 + safeWctwidth reviewer, str " " <+> withAttr usernameAttr (str (toString reviewer)))]
           Nothing -> []
         _ -> []
       eventText = getEventDescription (issueEventType issueEvent)
       iconWidget = getEventIconWithColor (issueEventType issueEvent)
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
-      timeAgoWidget = (length timeAgo, withAttr italicText $ str timeAgo)
-      descriptionItems = [(length eventText, str eventText)] ++ eventSuffixItems ++ [(1, str " "), timeAgoWidget]
-      prefixWidth = 1 + 2 + T.length actorName + 1  -- icon + spaces + username + space
+      timeAgoWidget = (safeWcswidth timeAgo, withAttr italicText $ str timeAgo)
+      descriptionItems = [(safeWcswidth eventText, str eventText)] ++ eventSuffixItems ++ [(1, str " "), timeAgoWidget]
+      prefixWidth = 1 + 2 + safeWctwidth actorName + 1  -- icon + spaces + username + space
       eventLine = adaptiveWidth $ \w ->
         let availableWidth = w - 4
             wrappedLines = wrapWidgets (availableWidth - prefixWidth) descriptionItems
@@ -148,13 +149,13 @@ renderLabelGroup now isLast rep added removed =
       removedItems = mapMaybe eventLabelPillWithWidth removed
       totalLabels = length added + length removed
       labelWord = if totalLabels > 1 then "labels " else "label "
-      timeAgoWidget = (length timeAgo, withAttr italicText $ str timeAgo)
+      timeAgoWidget = (safeWcswidth timeAgo, withAttr italicText $ str timeAgo)
       descriptionItems = case (addedItems, removedItems) of
-        ([], rs) -> (8, str "removed ") : rs ++ [(length labelWord, str labelWord), timeAgoWidget]
-        (as, []) -> (6, str "added ") : as ++ [(length labelWord, str labelWord), timeAgoWidget]
-        (as, rs) -> (6, str "added ") : as ++ [(13, str " and removed ")] ++ rs ++ [(length labelWord, str labelWord), timeAgoWidget]
+        ([], rs) -> (8, str "removed ") : rs ++ [(safeWcswidth labelWord, str labelWord), timeAgoWidget]
+        (as, []) -> (6, str "added ") : as ++ [(safeWcswidth labelWord, str labelWord), timeAgoWidget]
+        (as, rs) -> (6, str "added ") : as ++ [(13, str " and removed ")] ++ rs ++ [(safeWcswidth labelWord, str labelWord), timeAgoWidget]
       -- Prefix on first line: 1 icon + 2 spaces + username + 1 space
-      prefixWidth = 1 + 2 + T.length actorName + 1
+      prefixWidth = 1 + 2 + safeWctwidth actorName + 1
       eventLine = adaptiveWidth $ \w ->
         let availableWidth = w - 4  -- subtract outer padding
             wrappedLines = wrapWidgets (availableWidth - prefixWidth) descriptionItems
@@ -177,7 +178,7 @@ renderLabelGroup now isLast rep added removed =
 -- | A label pill with its known width (space + name + space + trailing gap)
 eventLabelPillWithWidth :: IssueEvent -> Maybe (Int, Widget n)
 eventLabelPillWithWidth e = case issueEventLabel e of
-  Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> Just (T.length name + 3, labelPill hexColor name <+> str " ")
+  Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> Just (safeWctwidth name + 3, labelPill hexColor name <+> str " ")
   Nothing -> Nothing
 
 labelPill :: Text -> Text -> Widget n

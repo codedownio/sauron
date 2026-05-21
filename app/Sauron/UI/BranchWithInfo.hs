@@ -13,6 +13,7 @@ module Sauron.UI.BranchWithInfo (
 import Brick
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime, diffUTCTime)
+import Graphics.Text.Width (safeWcswidth, safeWctwidth)
 import Data.Time.Format (parseTimeM, defaultTimeLocale)
 import qualified Data.Vector as V
 import GitHub
@@ -108,14 +109,14 @@ branchLineWithInfo toggled' (Branch {branchName, branchCommit}) branchData colum
 formatCheckStatusWithWidth :: BranchWithInfo -> (Widget n, Int)
 formatCheckStatusWithWidth branchInfo =
   case branchWithInfoCheckStatus branchInfo of
-    Nothing -> let text = "No checks" in (str text, length text)
-    Just "SUCCESS" -> let widget = hBox [withAttr greenCheckAttr $ str "✓", str " Checks"] in (widget, 8) -- ✓ Checks = 8 chars
-    Just "FAILURE" -> let widget = hBox [withAttr redXAttr $ str "✗", str " Failed"] in (widget, 8) -- ✗ Failed = 8 chars
-    Just "PENDING" -> let widget = hBox [withAttr queuedAttr $ str "●", str " Running"] in (widget, 9) -- ● Running = 9 chars
-    Just status -> let text = toString status in (str text, T.length status)
+    Nothing -> let text = "No checks" in (str text, safeWcswidth text)
+    Just "SUCCESS" -> let widget = hBox [withAttr greenCheckAttr $ str "✓", str " Checks"] in (widget, safeWcswidth "✓ Checks")
+    Just "FAILURE" -> let widget = hBox [withAttr redXAttr $ str "✗", str " Failed"] in (widget, safeWcswidth "✗ Failed")
+    Just "PENDING" -> let widget = hBox [withAttr queuedAttr $ str "●", str " Running"] in (widget, safeWcswidth "● Running")
+    Just status -> let text = toString status in (str text, safeWcswidth text)
 
 formatAheadBehindWithWidth :: BranchWithInfo -> (Widget n, Int)
-formatAheadBehindWithWidth branchInfo = (widget, T.length totalText)
+formatAheadBehindWithWidth branchInfo = (widget, safeWctwidth totalText)
   where
     ahead = fromMaybe 0 (branchWithInfoAheadBy branchInfo)
     behind = fromMaybe 0 (branchWithInfoBehindBy branchInfo)

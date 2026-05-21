@@ -4,6 +4,7 @@ module Sauron.UI.Markdown.Table (
 
 import Brick
 import qualified Data.Text as T
+import Graphics.Text.Width (safeWctwidth)
 import Relude
 import Sauron.UI.AttrMap
 import qualified Text.Pandoc.Builder as B
@@ -81,8 +82,8 @@ getCellTextWidth (B.Cell _ _ _ _ blocks) =
     getBlockTextWidth _ = 5 -- fallback for other block types
 
     getInlineTextWidth :: B.Inline -> Int
-    getInlineTextWidth (B.Str text) = T.length text
-    getInlineTextWidth (B.Code _ text) = T.length text
+    getInlineTextWidth (B.Str text) = safeWctwidth text
+    getInlineTextWidth (B.Code _ text) = safeWctwidth text
     getInlineTextWidth B.Space = 1
     getInlineTextWidth (B.Emph inlines) = sum $ map getInlineTextWidth inlines
     getInlineTextWidth (B.Strong inlines) = sum $ map getInlineTextWidth inlines
