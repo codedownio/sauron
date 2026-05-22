@@ -40,6 +40,7 @@ data CliArgs = CliArgs {
   , cliShowAllRepos :: Bool
   , cliColorMode :: Maybe V.ColorMode
   , cliSplitLogs :: Bool
+  , cliRefreshCharacterWidths :: Bool
   } deriving (Show)
 
 cliArgsParser :: Parser CliArgs
@@ -52,6 +53,7 @@ cliArgsParser = CliArgs
   <*> switch (long "all" <> help "Show all repositories for the authenticated user")
   <*> optional (option (maybeReader parseColorMode) (long "color-mode" <> help "Force a specific color mode (full, 240, 16, 8, none)" <> metavar "MODE"))
   <*> switch (long "split-logs" <> help "Split terminal view: app on left, logs on right")
+  <*> switch (long "refresh-character-widths" <> help "Rebuild the Unicode character width table for the current terminal")
 
 initConfigParser :: Parser Command
 initConfigParser = InitConfig

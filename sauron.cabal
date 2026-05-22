@@ -107,6 +107,7 @@ executable sauron
       Sauron.UI.Util
       Sauron.UI.Util.TimeDiff
       Sauron.UI.Workflow
+      Sauron.UnicodeWidthTable
       Sauron.Util
       Paths_sauron
   hs-source-dirs:
