@@ -46,7 +46,7 @@ import Sauron.UI.Modals.NewIssueModal (renderNewIssueModal)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TimelineBorder (borderWithAttr)
 import Sauron.UI.TopBox (topBox)
-import Sauron.UnicodeWidthTable (buildAndSaveWidthTable, loadWidthTable)
+import Sauron.UnicodeWidthTable (WidthTableMode(..), buildAndSaveWidthTable, loadWidthTable)
 import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
@@ -108,11 +108,13 @@ main = parseCommand >>= \case
   RunApp cliArgs -> runApp cliArgs
 
 runApp :: CliArgs -> IO ()
-runApp (CliArgs {cliRefreshCharacterWidths=True}) = buildAndSaveWidthTable
+runApp (CliArgs {cliRebuildCharacterWidths=True}) =
+  buildAndSaveWidthTable EmojiOnly
+runApp (CliArgs {cliRebuildCharacterWidthsFull=True}) =
+  buildAndSaveWidthTable FullUnicode
 runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitLogs}) = do
-  -- Build or load Unicode width table before starting TUI
-  unlessM (loadWidthTable) $ do
-    buildAndSaveWidthTable
+  unlessM loadWidthTable $ do
+    buildAndSaveWidthTable EmojiOnly
     void loadWidthTable
 
   eventChan <- newBChan 10
