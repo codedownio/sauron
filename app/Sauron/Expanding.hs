@@ -10,6 +10,7 @@ import Control.Monad.Writer
 import qualified Data.Vector as V
 import Relude
 import Sauron.Types
+import Sauron.Workflow.Sorting
 
 
 getExpandedList :: V.Vector (SomeNode Fixed) -> V.Vector (SomeNode Fixed)
@@ -31,7 +32,10 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
           PaginatedNotificationsNode (EntityData {..}) -> expandTyped _children
           SingleIssueNode (EntityData {..}) -> expandChildless _children
           SinglePullNode (EntityData {..}) -> expandChildless _children
-          SingleWorkflowNode (EntityData {..}) -> expandTyped _children
+          SingleWorkflowNode (EntityData {..}) ->
+            sortWorkflowJobsFixed (workflowNodeStateJobSortBy _state) _children
+            & paginateJobs (workflowNodeStateJobPage _state)
+            & expandTyped
           SingleJobNode (EntityData {..}) -> expandTyped _children
           SingleBranchNode (EntityData {..}) -> expandTyped _children
           SingleBranchWithInfoNode (EntityData {..}) -> expandTyped _children

@@ -26,6 +26,7 @@ import GitHub
 import Lens.Micro
 import Relude hiding (Down, pred)
 import Sauron.Types
+import Sauron.Workflow.Sorting
 
 
 getFixedElemAndParents :: (
@@ -35,7 +36,7 @@ getFixedElemAndParents s =
   case listSelectedElement (s ^. appMainList) of
     Nothing -> return Nothing
     Just (n, fixedElem) ->
-      atomically (nthChildVector readTVar getExistentialChildrenWrapped n (s ^. appMainListVariable)) >>= \case
+      atomically (nthChildVector readTVar getExistentialChildrenWrappedPaginated n (s ^. appMainListVariable)) >>= \case
         Nothing -> return Nothing
         Just elems -> return $ Just (fixedElem, head elems, elems)
 
@@ -127,6 +128,17 @@ getPaginationState (PaginatedStaleBranchesNode (EntityData {_state})) = Just _st
 getPaginationState (PaginatedNotificationsNode (EntityData {_state})) = Just _state
 getPaginationState (PaginatedBranchesNode (EntityData {_state})) = Just _state
 getPaginationState _ = Nothing
+
+-- | Like 'getExistentialChildrenWrapped' but applies sort+pagination for workflow nodes,
+-- so nthChild traversal matches the paginated expanded list.
+getExistentialChildrenWrappedPaginated :: Node Variable a -> STM [SomeNode Variable]
+getExistentialChildrenWrappedPaginated (SingleWorkflowNode ed) = do
+  children <- readTVar (_children ed)
+  state <- readTVar (_state ed)
+  sorted <- sortWorkflowJobsSTM (workflowNodeStateJobSortBy state) children
+  let paginated = paginateJobs (workflowNodeStateJobPage state) sorted
+  return (fmap SomeNode paginated)
+getExistentialChildrenWrappedPaginated node = getExistentialChildrenWrapped node
 
 -- * Computing nth child in the presence of expanding
 

@@ -37,14 +37,14 @@ fetchWorkflowJobs :: (
   ) => Name Owner -> Name Repo -> Id WorkflowRun -> Node Variable SingleWorkflowT -> m (Either Error (V.Vector Job))
 fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})) = do
   bc <- ask
-  bracketOnError_ (atomically $ markFetching _state)
-                  (atomically $ writeTVar _state (Errored "Workflow jobs fetch failed with exception.")) $
+  bracketOnError_ (atomically $ modifyTVar' _state (\wns -> wns { workflowNodeStateFetchable = Fetching (fetchableCurrent (workflowNodeStateFetchable wns)) }))
+                  (atomically $ modifyTVar' _state (\wns -> wns { workflowNodeStateFetchable = Errored "Workflow jobs fetch failed with exception." })) $
     withGithubApiSemaphore (githubWithLogging (jobsForWorkflowRunR owner name workflowRunId FetchAll)) >>= \case
       Left err -> do
-        atomically $ writeTVar _state (Errored (show err))
+        atomically $ modifyTVar' _state (\wns -> wns { workflowNodeStateFetchable = Errored (show err) })
         return $ Left err
       Right (WithTotalCount results totalCount) -> atomically $ do
-        writeTVar _state (Fetched totalCount)
+        modifyTVar' _state (\wns -> wns { workflowNodeStateFetchable = Fetched totalCount })
 
         -- Compute max job duration across all sibling jobs
         let maxJobDuration = case [diffUTCTime completed started

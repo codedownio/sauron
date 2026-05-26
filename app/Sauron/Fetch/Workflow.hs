@@ -40,4 +40,4 @@ fetchWorkflows owner name (PaginatedWorkflowsNode (EntityData {..})) = do
           Just (SingleWorkflowNode existingEd) ->
             return $ SingleWorkflowNode (existingEd { _static = workflow })
           Nothing ->
-            SingleWorkflowNode <$> makeEmptyElemWithState bc workflow NotFetched "" (_depth + 1)
+            SingleWorkflowNode <$> makeEmptyElemWithState bc workflow (WorkflowNodeState NotFetched 1 SortJobsByFailures) "" (_depth + 1)

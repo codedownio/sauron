@@ -198,7 +198,7 @@ type family NodeState a where
   NodeState PaginatedNotificationsT = (Search, PageInfo, Fetchable TotalCount)
   NodeState SingleIssueT = Fetchable (V.Vector (Either IssueEvent IssueComment))
   NodeState SinglePullT = Fetchable (V.Vector (Either IssueEvent IssueComment))
-  NodeState SingleWorkflowT = Fetchable TotalCount
+  NodeState SingleWorkflowT = WorkflowNodeState
   NodeState SingleJobT = JobNodeState
   NodeState SingleBranchT = Fetchable (V.Vector Commit)
   NodeState SingleBranchWithInfoT = Fetchable (V.Vector Commit)
@@ -476,6 +476,21 @@ data WorkflowStatus =
   | WorkflowNeutral
   | WorkflowUnknown
   deriving (Show, Eq)
+
+data WorkflowJobSortBy =
+  SortJobsByFailures
+  | SortJobsByName
+  | SortJobsByRuntime
+  deriving (Show, Eq)
+
+data WorkflowNodeState = WorkflowNodeState {
+  workflowNodeStateFetchable :: Fetchable TotalCount
+  , workflowNodeStateJobPage :: Int
+  , workflowNodeStateJobSortBy :: WorkflowJobSortBy
+  } deriving (Show, Eq)
+
+workflowJobPageSize :: Int
+workflowJobPageSize = 20
 
 data HealthCheckResult =
   HealthCheckWorkflowResult WorkflowStatus

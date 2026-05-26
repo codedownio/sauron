@@ -109,6 +109,7 @@ executable sauron
       Sauron.UI.Workflow
       Sauron.UnicodeWidthTable
       Sauron.Util
+      Sauron.Workflow.Sorting
       Paths_sauron
   hs-source-dirs:
       app

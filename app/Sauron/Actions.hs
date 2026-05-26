@@ -214,7 +214,7 @@ shouldFetchOnExpand (PaginatedStaleBranchesNode (EntityData {_state})) = not . i
 shouldFetchOnExpand (PaginatedNotificationsNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
 shouldFetchOnExpand (SingleIssueNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
 shouldFetchOnExpand (SinglePullNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SingleWorkflowNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SingleWorkflowNode (EntityData {_state})) = not . isFetchingOrFetched . workflowNodeStateFetchable <$> readTVarIO _state
 shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = do
   JobNodeState {jnsJob=jobFetchable, jnsLogs=logsFetchable} <- readTVarIO _state
   return $ not (isFetchingOrFetched jobFetchable) || not (isFetchingOrFetched logsFetchable)

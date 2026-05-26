@@ -29,6 +29,10 @@ refreshSelectedKey = V.KChar 'r'
 
 openSelectedKey = V.KChar 'o'
 
+sortJobsByFailuresKey = V.KChar 'X'
+sortJobsByNameKey = V.KChar 'M'
+sortJobsByRuntimeKey = V.KChar 'T'
+
 -- Column 3
 editSearchKey = V.KChar 's'
 commentKey = V.KChar 'c'
