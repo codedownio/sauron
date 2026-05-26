@@ -19,7 +19,7 @@ import Sauron.Types
 type JobSortKey = (Int, Data.Ord.Down NominalDiffTime, Text)
 
 jobSortKey :: WorkflowJobSortBy -> Maybe Job -> JobSortKey
-jobSortKey sortBy mj = case sortBy of
+jobSortKey workflowJobSortBy mj = case workflowJobSortBy of
   SortJobsByName -> (0, Data.Ord.Down 0, name)
   SortJobsByRuntime -> (0, Data.Ord.Down runtime, name)
   SortJobsByFailures -> (if isFailed then 0 else 1, Data.Ord.Down 0, name)
@@ -33,20 +33,20 @@ jobSortKey sortBy mj = case sortBy of
       Nothing -> False
 
 sortWorkflowJobsSTM :: WorkflowJobSortBy -> [Node Variable SingleJobT] -> STM [Node Variable SingleJobT]
-sortWorkflowJobsSTM sortBy jobs = do
+sortWorkflowJobsSTM workflowJobSortBy jobs = do
   tagged <- forM jobs $ \job@(SingleJobNode (EntityData {_state})) -> do
     jobState <- readTVar _state
     let mj = fetchableCurrent (jnsJob jobState)
-    let key = jobSortKey sortBy mj
+    let key = jobSortKey workflowJobSortBy mj
     return (key, job)
   return $ map snd $ DL.sortOn fst tagged
 
 sortWorkflowJobsFixed :: WorkflowJobSortBy -> [Node Fixed SingleJobT] -> [Node Fixed SingleJobT]
-sortWorkflowJobsFixed sortBy jobs = DL.sortOn getKey jobs
+sortWorkflowJobsFixed workflowJobSortBy = DL.sortOn getKey
   where
     getKey :: Node Fixed SingleJobT -> JobSortKey
     getKey (SingleJobNode (EntityData {_state=JobNodeState {jnsJob}})) =
-      jobSortKey sortBy (fetchableCurrent jnsJob)
+      jobSortKey workflowJobSortBy (fetchableCurrent jnsJob)
 
 -- * Pagination
 

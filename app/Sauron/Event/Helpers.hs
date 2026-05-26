@@ -133,10 +133,10 @@ getPaginationState _ = Nothing
 -- so nthChild traversal matches the paginated expanded list.
 getExistentialChildrenWrappedPaginated :: Node Variable a -> STM [SomeNode Variable]
 getExistentialChildrenWrappedPaginated (SingleWorkflowNode ed) = do
-  children <- readTVar (_children ed)
-  state <- readTVar (_state ed)
-  sorted <- sortWorkflowJobsSTM (workflowNodeStateJobSortBy state) children
-  let paginated = paginateJobs (workflowNodeStateJobPage state) sorted
+  children' <- readTVar (_children ed)
+  state' <- readTVar (_state ed)
+  sorted <- sortWorkflowJobsSTM (workflowNodeStateJobSortBy state') children'
+  let paginated = paginateJobs (workflowNodeStateJobPage state') sorted
   return (fmap SomeNode paginated)
 getExistentialChildrenWrappedPaginated node = getExistentialChildrenWrapped node
 
