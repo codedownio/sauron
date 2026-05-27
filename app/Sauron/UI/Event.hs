@@ -46,8 +46,6 @@ getEventIcon eventType = case eventType of
   HeadRefForcePushed -> "↑"
   HeadRefRestored -> "↪"
   CrossReferenced -> "&"
-  Committed -> "●"
-  Reviewed -> "✓"
   Unknown _ -> "?"
 
 -- | Get a colored icon widget for an event type using GitHub's color scheme
@@ -91,8 +89,6 @@ getEventColorAttr eventType = case eventType of
   HeadRefForcePushed -> eventRefDeletedColor
   HeadRefRestored -> eventRefRestoredColor
   CrossReferenced -> eventReferencedColor
-  Committed -> eventReferencedColor
-  Reviewed -> eventReviewColor
   Unknown _ -> eventRefRestoredColor
 
 getEventDescription :: EventType -> String
@@ -130,6 +126,4 @@ getEventDescription eventType = case eventType of
   HeadRefForcePushed -> "force-pushed the head branch"
   HeadRefRestored -> "restored the head branch"
   CrossReferenced -> "referenced this"
-  Committed -> "added a commit"
-  Reviewed -> "reviewed this"
   Unknown t -> [i|#{t} (unknown event type)|]

@@ -21,7 +21,7 @@ renderReviewRequestGroup now isLast rep events =
         Just (SimpleUser {simpleUserLogin=(N username)}) -> username
         Nothing -> "ghost"
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt rep))
-      iconWidget = getEventIconWithColor (issueEventType rep)
+      iconWidget = getEventIconWithColor (issueEventEvent rep)
       reviewerNames = mapMaybe (\e -> case issueEventRequestedReviewer e of
         Just (SimpleUser {simpleUserLogin=(N name)}) -> Just name
         Nothing -> Nothing) events

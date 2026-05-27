@@ -7,6 +7,8 @@ module Sauron.UI.Issue.Events (
 
   -- * Rendering
   , renderEvent
+  , renderCommitEvent
+  , renderReviewEvent
   , renderLabelGroup
   , labelPill
 
@@ -65,12 +67,14 @@ adaptiveWidth f = Widget Greedy Fixed $ do
 consolidateEvents :: [TimelineEvent] -> [TimelineItem]
 consolidateEvents [] = []
 consolidateEvents (TimelineComment c : rest) = SingleItem (TimelineComment c) : consolidateEvents rest
+consolidateEvents (TimelineCommit c : rest) = SingleItem (TimelineCommit c) : consolidateEvents rest
+consolidateEvents (TimelineReview r : rest) = SingleItem (TimelineReview r) : consolidateEvents rest
 consolidateEvents (TimelineIssueEvent e : rest)
   | isLabelEvent e =
       let (run, remaining) = span (isMatchingEvent isLabelEvent e) rest
           events = e : [ev | TimelineIssueEvent ev <- run]
-          added = filter (\ev -> issueEventType ev == Labeled) events
-          removed = filter (\ev -> issueEventType ev == Unlabeled) events
+          added = filter (\ev -> issueEventEvent ev == Labeled) events
+          removed = filter (\ev -> issueEventEvent ev == Unlabeled) events
       in if length events > 1
          then LabelGroup e added removed : consolidateEvents remaining
          else SingleItem (TimelineIssueEvent e) : consolidateEvents rest
@@ -90,10 +94,10 @@ isMatchingEvent predicate ref (TimelineIssueEvent ev) =
 isMatchingEvent _ _ _ = False
 
 isLabelEvent :: IssueEvent -> Bool
-isLabelEvent e = issueEventType e `elem` [Labeled, Unlabeled]
+isLabelEvent e = issueEventEvent e `elem` [Labeled, Unlabeled]
 
 isReviewRequestEvent :: IssueEvent -> Bool
-isReviewRequestEvent e = issueEventType e == ReviewRequested
+isReviewRequestEvent e = issueEventEvent e == ReviewRequested
 
 
 -- * Rendering
@@ -102,10 +106,10 @@ renderEvent :: UTCTime -> Bool -> IssueEvent -> Widget n
 renderEvent now isLast issueEvent =
   let actorName :: Text = case issueEventActor issueEvent of
         Just (SimpleUser {simpleUserLogin=(N username)}) -> username
-        Nothing -> fromMaybe "ghost" (issueEventAuthorName issueEvent)
+        Nothing -> "ghost"
       -- Each sized item is (width, widget)
       eventSuffixItems :: [(Int, Widget n)]
-      eventSuffixItems = case issueEventType issueEvent of
+      eventSuffixItems = case issueEventEvent issueEvent of
         Labeled -> case issueEventLabel issueEvent of
           Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> [(5, str " the "), (safeWctwidth name + 2, labelPill hexColor name), (7, str " label")]
           Nothing -> [(8, str " a label")]
@@ -115,7 +119,7 @@ renderEvent now isLast issueEvent =
         Referenced -> case issueEventCommitId issueEvent of
           Just sha -> let short = T.take 7 sha in [(11, str " in commit "), (safeWctwidth short, withAttr hashAttr (str (toString short)))]
           Nothing -> []
-        CrossReferenced -> case issueEventSourceIssue issueEvent of
+        CrossReferenced -> case issueEventSource issueEvent >>= crossReferenceSourceIssue of
           Just sourceIssue ->
             let num = show (unIssueNumber (issueNumber sourceIssue))
                 ref = "#" <> num
@@ -123,19 +127,67 @@ renderEvent now isLast issueEvent =
                 quoted = "\"" <> title <> "\""
             in [(5, str " from "), (safeWcswidth ref, withAttr hashNumberAttr (str ref)), (1 + safeWcswidth quoted, str " " <+> withAttr normalAttr (str quoted))]
           Nothing -> []
-        Committed -> case issueEventCommitId issueEvent of
-          Just sha -> let short = T.take 7 sha in [(1 + safeWctwidth short, str " " <+> withAttr hashAttr (str (toString short)))]
-          Nothing -> []
         ReviewRequested -> case issueEventRequestedReviewer issueEvent of
           Just (SimpleUser {simpleUserLogin=(N reviewer)}) -> [(1 + safeWctwidth reviewer, str " " <+> withAttr usernameAttr (str (toString reviewer)))]
           Nothing -> []
         _ -> []
-      eventText = getEventDescription (issueEventType issueEvent)
-      iconWidget = getEventIconWithColor (issueEventType issueEvent)
+      eventText = getEventDescription (issueEventEvent issueEvent)
+      iconWidget = getEventIconWithColor (issueEventEvent issueEvent)
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt issueEvent))
       timeAgoWidget = (safeWcswidth timeAgo, withAttr italicText $ str timeAgo)
       descriptionItems = [(safeWcswidth eventText, str eventText)] ++ eventSuffixItems ++ [(1, str " "), timeAgoWidget]
       prefixWidth = 1 + 2 + safeWctwidth actorName + 1  -- icon + spaces + username + space
+      eventLine = adaptiveWidth $ \w ->
+        let availableWidth = w - 4
+            wrappedLines = wrapWidgets (availableWidth - prefixWidth) descriptionItems
+            prefix = hBox [iconWidget, str "  ", withAttr usernameAttr $ str (toString actorName), str " "]
+            firstLine = case wrappedLines of
+              [] -> prefix
+              (l:_) -> hBox [prefix, hBox (map snd l)]
+            restLines = case wrappedLines of
+              [] -> []
+              (_:ls) -> [padLeft (Pad 3) $ hBox (map snd l) | l <- ls]
+        in padLeft (Pad 4) $ vBox (firstLine : restLines)
+      continuationLine = if isLast
+        then emptyWidget
+        else adaptiveWidth $ \_ -> padLeft (Pad 4) $ withAttr timelineBorderAttr $ str "│"
+  in vBox [eventLine, continuationLine]
+
+renderCommitEvent :: UTCTime -> Bool -> TimelineCommitEvent -> Widget n
+renderCommitEvent now isLast commit =
+  let actorName = gitAuthorName (timelineCommitEventAuthor commit)
+      short = T.take 7 (timelineCommitEventSha commit)
+      timeAgo = timeFromNow (diffUTCTime now (gitAuthorDate (timelineCommitEventAuthor commit)))
+      firstMsgLine = T.takeWhile (/= '\n') (timelineCommitEventMessage commit)
+      iconWidget = withAttr eventReferencedColor (str "●")
+      descriptionItems =
+        [(16, str "added a commit "), (safeWctwidth short, withAttr hashAttr (str (toString short))), (1, str " "), (safeWcswidth timeAgo, withAttr italicText $ str timeAgo)]
+      prefixWidth = 1 + 2 + safeWctwidth actorName + 1
+      eventLine = adaptiveWidth $ \w ->
+        let availableWidth = w - 4
+            wrappedLines = wrapWidgets (availableWidth - prefixWidth) descriptionItems
+            prefix = hBox [iconWidget, str "  ", withAttr usernameAttr $ str (toString actorName), str " "]
+            firstLine = case wrappedLines of
+              [] -> prefix
+              (l:_) -> hBox [prefix, hBox (map snd l)]
+            restLines = case wrappedLines of
+              [] -> []
+              (_:ls) -> [padLeft (Pad 3) $ hBox (map snd l) | l <- ls]
+            msgLine = padLeft (Pad 3) $ hLimit (w - 4 - 3) $ withAttr normalAttr $ str (toString firstMsgLine)
+        in padLeft (Pad 4) $ vBox (firstLine : restLines ++ [msgLine])
+      continuationLine = if isLast
+        then emptyWidget
+        else adaptiveWidth $ \_ -> padLeft (Pad 4) $ withAttr timelineBorderAttr $ str "│"
+  in vBox [eventLine, continuationLine]
+
+renderReviewEvent :: UTCTime -> Bool -> TimelineReviewEvent -> Widget n
+renderReviewEvent now isLast review =
+  let actorName = case timelineReviewEventUser review of
+        SimpleUser {simpleUserLogin=(N username)} -> username
+      timeAgo = timeFromNow (diffUTCTime now (timelineReviewEventSubmittedAt review))
+      iconWidget = withAttr eventReviewColor (str "✓")
+      descriptionItems = [(13, str "reviewed this "), (safeWcswidth timeAgo, withAttr italicText $ str timeAgo)]
+      prefixWidth = 1 + 2 + safeWctwidth actorName + 1
       eventLine = adaptiveWidth $ \w ->
         let availableWidth = w - 4
             wrappedLines = wrapWidgets (availableWidth - prefixWidth) descriptionItems
@@ -158,7 +210,7 @@ renderLabelGroup now isLast rep added removed =
         Just (SimpleUser {simpleUserLogin=(N username)}) -> username
         Nothing -> "ghost"
       timeAgo = timeFromNow (diffUTCTime now (issueEventCreatedAt rep))
-      iconWidget = getEventIconWithColor (issueEventType rep)
+      iconWidget = getEventIconWithColor (issueEventEvent rep)
       addedItems = mapMaybe eventLabelPillWithWidth added
       removedItems = mapMaybe eventLabelPillWithWidth removed
       totalLabels = length added + length removed

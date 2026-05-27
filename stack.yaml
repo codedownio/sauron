@@ -13,6 +13,7 @@ extra-deps:
 - vty-windows-0.2.0.3
 - brick-skylighting-1.0@sha256:64764b6be36c05261959f68ed38b9cb37e1acb6180a3bde5dd98255f62ea7e3b,1812
 
+# - /home/tom/tools/github
 - git: https://github.com/codedownio/github.git
   # sauron-sep18-2025 branch, which has some changes from upstream:
   # - fixes for search query escaping
@@ -30,7 +31,9 @@ extra-deps:
   # - issueEventActor: switch to a Maybe
   # - Add HeadRefForcePushed event type
   # - Add /issues/timeline API support
-  commit: 3d100995c86b5b574b50f68e6d6f430290f3cee2
+  # - Parse issue event message
+  # - GitHub.Data.Issues: auto-derive JSON instances
+  commit: 4fd5d4525dca35f2e54aea76f4665b97e951ab3a
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf

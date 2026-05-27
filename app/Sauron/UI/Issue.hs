@@ -183,6 +183,8 @@ renderItemWithBorder now isLast borderFunc item =
   case item of
     SingleItem (TimelineComment comment) -> renderComment now borderFunc comment
     SingleItem (TimelineIssueEvent event) -> renderEvent now isLast event
+    SingleItem (TimelineCommit commit) -> renderCommitEvent now isLast commit
+    SingleItem (TimelineReview review) -> renderReviewEvent now isLast review
     LabelGroup rep added removed -> renderLabelGroup now isLast rep added removed
     ReviewRequestGroup rep events -> renderReviewRequestGroup now isLast rep events
 
