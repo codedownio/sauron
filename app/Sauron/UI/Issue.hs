@@ -119,7 +119,7 @@ instance ListDrawable Fixed 'SingleIssueT where
         return True
   handleHotkey _ _ _ = return False
 
-issueLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable (V.Vector (Either IssueEvent IssueComment)) -> Widget n
+issueLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable (V.Vector TimelineEvent) -> Widget n
 issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
   where
     markerAttr = if issueState == StateOpen then openStateMarkerAttr else closedStateMarkerAttr
@@ -138,7 +138,7 @@ issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationC
       , withAttr usernameAttr $ str [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
-issueInner :: UTCTime -> Issue -> V.Vector (Either IssueEvent IssueComment) -> Widget n
+issueInner :: UTCTime -> Issue -> V.Vector TimelineEvent -> Widget n
 -- issueInner now issue body cs = vBox [strWrap (show issue), strWrap (show body), strWrap (show cs)]
 issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs =
   allItems
@@ -181,8 +181,8 @@ topLabel username createdAt now =
 renderItemWithBorder :: UTCTime -> Bool -> (Widget n -> Widget n -> Widget n) -> TimelineItem -> Widget n
 renderItemWithBorder now isLast borderFunc item =
   case item of
-    SingleItem (Right comment) -> renderComment now borderFunc comment
-    SingleItem (Left event) -> renderEvent now isLast event
+    SingleItem (TimelineComment comment) -> renderComment now borderFunc comment
+    SingleItem (TimelineIssueEvent event) -> renderEvent now isLast event
     LabelGroup rep added removed -> renderLabelGroup now isLast rep added removed
     ReviewRequestGroup rep events -> renderReviewRequestGroup now isLast rep events
 
@@ -204,9 +204,9 @@ closeReopenAndRefresh ::
   (MonadIO m)
   => BaseContext -> Name Owner -> Name Repo -> Issue
   -> TVar [child]
-  -> (child -> (Issue, TVar (Fetchable (V.Vector (Either IssueEvent IssueComment)))))
+  -> (child -> (Issue, TVar (Fetchable (V.Vector TimelineEvent))))
   -> (child -> Issue -> child)
-  -> (Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> ReaderT BaseContext IO ())
+  -> (Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector TimelineEvent)) -> ReaderT BaseContext IO ())
   -> m ()
 closeReopenAndRefresh bc owner name issue childrenVar getInfo setIssue fetchComments = do
   let action = if issueState issue == StateOpen then closeIssue else reopenIssue

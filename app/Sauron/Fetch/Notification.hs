@@ -53,7 +53,7 @@ fetchNotificationContent notification stateVar = do
 
 fetchAsIssueOrPull :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => (Issue -> V.Vector (Either IssueEvent IssueComment) -> NotificationContent)
+  ) => (Issue -> V.Vector TimelineEvent -> NotificationContent)
     -> Name Owner -> Name Repo -> URL -> TVar NotificationState -> m ()
 fetchAsIssueOrPull wrap owner repo subUrl stateVar = do
   ctx <- ask

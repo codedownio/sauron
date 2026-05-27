@@ -43,7 +43,11 @@ getEventIcon eventType = case eventType of
   AddedToMergeQueue -> "⊕"
   RemovedFromMergeQueue -> "-"
   HeadRefDeleted -> "∅"
+  HeadRefForcePushed -> "↑"
   HeadRefRestored -> "↪"
+  CrossReferenced -> "&"
+  Committed -> "●"
+  Reviewed -> "✓"
   Unknown _ -> "?"
 
 -- | Get a colored icon widget for an event type using GitHub's color scheme
@@ -84,7 +88,11 @@ getEventColorAttr eventType = case eventType of
   AddedToMergeQueue -> eventProjectColor
   RemovedFromMergeQueue -> eventProjectColor
   HeadRefDeleted -> eventRefDeletedColor
+  HeadRefForcePushed -> eventRefDeletedColor
   HeadRefRestored -> eventRefRestoredColor
+  CrossReferenced -> eventReferencedColor
+  Committed -> eventReferencedColor
+  Reviewed -> eventReviewColor
   Unknown _ -> eventRefRestoredColor
 
 getEventDescription :: EventType -> String
@@ -119,5 +127,9 @@ getEventDescription eventType = case eventType of
   AddedToMergeQueue -> "added this to the merge queue"
   RemovedFromMergeQueue -> "removed this from the merge queue"
   HeadRefDeleted -> "deleted the head branch"
+  HeadRefForcePushed -> "force-pushed the head branch"
   HeadRefRestored -> "restored the head branch"
+  CrossReferenced -> "referenced this"
+  Committed -> "added a commit"
+  Reviewed -> "reviewed this"
   Unknown t -> [i|#{t} (unknown event type)|]

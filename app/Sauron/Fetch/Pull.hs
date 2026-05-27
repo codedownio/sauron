@@ -59,7 +59,7 @@ fetchPulls' fullQuery _state _children _depth = do
 
 fetchPullComments :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> m ()
+  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector TimelineEvent)) -> m ()
 fetchPullComments owner name issueNumber inner = do
   ctx <- ask
   bracketOnError_ (atomically $ markFetching inner)

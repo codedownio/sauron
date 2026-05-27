@@ -109,7 +109,7 @@ refreshIssueComments baseContext owner name issueNumber _isPR = do
         writeBChan (eventChan baseContext) (TimeUpdated now)
       Left _err -> return ()
 
-fetchCommentsAndOpenModal :: BaseContext -> Issue -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> Bool -> Name Owner -> Name Repo -> EventM ClickableName AppState ()
+fetchCommentsAndOpenModal :: BaseContext -> Issue -> TVar (Fetchable (V.Vector TimelineEvent)) -> Bool -> Name Owner -> Name Repo -> EventM ClickableName AppState ()
 fetchCommentsAndOpenModal baseContext issue@(Issue {issueNumber=(IssueNumber issueNum)}) nodeState isPR owner name = do
   liftIO $ void $ async $ do
     fetchIssueCommentsAndEvents baseContext owner name issueNum >>= \case

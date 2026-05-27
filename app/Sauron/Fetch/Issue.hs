@@ -22,7 +22,6 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.Types
-import UnliftIO.Async
 
 fetchIssues :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -74,7 +73,7 @@ fetchIssue owner name issueNumber issueVar = do
 
 fetchIssueComments :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> m ()
+  ) => Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector TimelineEvent)) -> m ()
 fetchIssueComments owner name issueNumber inner = do
   ctx <- ask
   bracketOnError_ (atomically $ markFetching inner)
@@ -87,7 +86,7 @@ fetchIssueComments owner name issueNumber inner = do
 -- Constructs pagedQuery paths from the URL path segments.
 fetchIssueCommentsByUrl :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => URL -> TVar (Fetchable (V.Vector (Either IssueEvent IssueComment))) -> m ()
+  ) => URL -> TVar (Fetchable (V.Vector TimelineEvent)) -> m ()
 fetchIssueCommentsByUrl issueApiUrl inner = do
   let urlText = getUrl issueApiUrl
   case parseURI (toString urlText) of
@@ -95,44 +94,18 @@ fetchIssueCommentsByUrl issueApiUrl inner = do
     Just uri -> do
       let segments = filter (not . T.null) $ T.splitOn "/" $ toText (uriPath uri)
       ctx <- ask
-      let commentsReq = pagedQuery (segments <> ["comments"]) [] FetchAll
-      let eventsReq = pagedQuery (segments <> ["events"]) [] FetchAll
+      let timelineReq = pagedQuery (segments <> ["timeline"]) [] FetchAll
       bracketOnError_ (atomically $ markFetching inner)
                       (atomically $ writeTVar inner (Errored "Issue comments and events fetch failed with exception.")) $ do
-        (commentsResult, eventsResult) <- liftIO $ concurrently
-          (withGithubApiSemaphore' (requestSemaphore ctx) (githubWithLogging' ctx commentsReq))
-          (withGithubApiSemaphore' (requestSemaphore ctx) (githubWithLogging' ctx eventsReq))
-        case (commentsResult, eventsResult) of
-          (Right comments, Right events) ->
-            atomically $ writeTVar inner (Fetched (mergeCommentsAndEvents comments events))
-          (Left err, _) -> atomically $ writeTVar inner (Errored (show err))
-          (_, Left err) -> atomically $ writeTVar inner (Errored (show err))
+        liftIO (withGithubApiSemaphore' (requestSemaphore ctx) (githubWithLogging' ctx timelineReq)) >>= \case
+          Right timeline ->
+            atomically $ writeTVar inner (Fetched timeline)
+          Left err -> atomically $ writeTVar inner (Errored (show err))
 
-fetchIssueCommentsAndEvents :: (HasCallStack) => BaseContext -> Name Owner -> Name Repo -> Int -> IO (Either Error (V.Vector (Either IssueEvent IssueComment)))
-fetchIssueCommentsAndEvents baseContext owner name issueNumber = do
-  let fetchComments =
-        withGithubApiSemaphore' (requestSemaphore baseContext)
-          (githubWithLogging' baseContext
-            (commentsR owner name (IssueNumber issueNumber) FetchAll))
-
-  let fetchEvents =
-        withGithubApiSemaphore' (requestSemaphore baseContext)
-          (githubWithLogging' baseContext
-            (eventsForIssueR owner name (GitHub.mkId (Proxy :: Proxy Issue) issueNumber) FetchAll))
-
-  (commentsResult, eventsResult) <- concurrently fetchComments fetchEvents
-
-  case (commentsResult, eventsResult) of
-    (Right comments, Right events) -> do
-      return $ Right $ mergeCommentsAndEvents comments events
-    (Left err, _) -> return $ Left err
-    (_, Left err) -> return $ Left err
-
-mergeCommentsAndEvents :: V.Vector IssueComment -> V.Vector IssueEvent -> V.Vector (Either IssueEvent IssueComment)
-mergeCommentsAndEvents comments events = V.toList commentEntries <> V.toList eventEntries
-                                       & sortOn fst -- Sort by timestamp, newest first
-                                       & fmap snd
-                                       & V.fromList
-  where
-    commentEntries = fmap (\c -> (issueCommentCreatedAt c, Right c)) comments
-    eventEntries = fmap (\e -> (issueEventCreatedAt e, Left e)) events
+fetchIssueCommentsAndEvents :: (HasCallStack) => BaseContext -> Name Owner -> Name Repo -> Int -> IO (Either Error (V.Vector TimelineEvent))
+fetchIssueCommentsAndEvents baseContext owner name issueNumber =
+  withGithubApiSemaphore' (requestSemaphore baseContext)
+    (githubWithLogging' baseContext
+      (timelineForIssueR owner name (IssueNumber issueNumber) FetchAll)) >>= \case
+    Left err -> return $ Left err
+    Right timeline -> return $ Right timeline

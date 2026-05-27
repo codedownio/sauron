@@ -196,8 +196,8 @@ type family NodeState a where
   NodeState PaginatedActiveBranchesT = (Search, PageInfo, Fetchable TotalCount)
   NodeState PaginatedStaleBranchesT = (Search, PageInfo, Fetchable TotalCount)
   NodeState PaginatedNotificationsT = (Search, PageInfo, Fetchable TotalCount)
-  NodeState SingleIssueT = Fetchable (V.Vector (Either IssueEvent IssueComment))
-  NodeState SinglePullT = Fetchable (V.Vector (Either IssueEvent IssueComment))
+  NodeState SingleIssueT = Fetchable (V.Vector TimelineEvent)
+  NodeState SinglePullT = Fetchable (V.Vector TimelineEvent)
   NodeState SingleWorkflowT = WorkflowNodeState
   NodeState SingleJobT = JobNodeState
   NodeState SingleBranchT = Fetchable (V.Vector Commit)
@@ -323,8 +323,8 @@ entityDataL f (RepoNode ed) = RepoNode <$> f ed
 -- * Notification content
 
 data NotificationContent =
-  NotificationIssue Issue (V.Vector (Either IssueEvent IssueComment))
-  | NotificationPull Issue (V.Vector (Either IssueEvent IssueComment))
+  NotificationIssue Issue (V.Vector TimelineEvent)
+  | NotificationPull Issue (V.Vector TimelineEvent)
   | NotificationOther -- ^ For subject types we don't know how to render inline
   deriving (Show, Eq)
 
@@ -554,8 +554,8 @@ data ScrollTarget =
 data CommentModalEvent =
   CommentSubmitted (Either Error Comment)
   | IssueClosedWithComment (Either Error Issue)
-  | CommentsRefreshed (V.Vector (Either IssueEvent IssueComment))
-  | OpenCommentModal Issue (V.Vector (Either IssueEvent IssueComment)) (TVar (Fetchable (V.Vector (Either IssueEvent IssueComment)))) Bool (Name Owner) (Name Repo)
+  | CommentsRefreshed (V.Vector TimelineEvent)
+  | OpenCommentModal Issue (V.Vector TimelineEvent) (TVar (Fetchable (V.Vector TimelineEvent))) Bool (Name Owner) (Name Repo)
 
 data NewIssueModalEvent =
   NewIssueCreated (Either Error Issue)
@@ -572,8 +572,8 @@ data ModalState f =
   CommentModalState {
     _commentEditor :: WrappingEditor Char ClickableName
     , _commentIssue :: Issue
-    , _commentIssueComments :: V.Vector (Either IssueEvent IssueComment)
-    , _commentNodeState :: TVar (Fetchable (V.Vector (Either IssueEvent IssueComment)))
+    , _commentIssueComments :: V.Vector TimelineEvent
+    , _commentNodeState :: TVar (Fetchable (V.Vector TimelineEvent))
     , _issueIsPR :: Bool
     , _commentRepoOwner :: Name Owner
     , _commentRepoName :: Name Repo

@@ -173,7 +173,7 @@ notificationInner now notification (NotificationState {..}) = vBox (notification
       Errored err -> [padTop (Pad 1) $ withAttr erroredAttr $ str [i|Error: #{err}|]]
       NotFetched -> []
 
-renderNotificationContent :: UTCTime -> Issue -> V.Vector (Either IssueEvent IssueComment) -> Maybe Int -> Bool -> Widget n
+renderNotificationContent :: UTCTime -> Issue -> V.Vector TimelineEvent -> Maybe Int -> Bool -> Widget n
 renderNotificationContent now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs maybeHighlightId autoScroll =
   allItems
   & zip [0..]
@@ -187,7 +187,7 @@ renderNotificationContent now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N 
       where
         isHighlighted = case (fst item, maybeHighlightId) of
           (_, Nothing) -> False
-          (Right (SingleItem (Right (IssueComment {issueCommentId=cid}))), Just hid) -> cid == hid
+          (Right (SingleItem (TimelineComment (IssueComment {issueCommentId=cid}))), Just hid) -> cid == hid
           _ -> False
 
         widget = renderTimelineItemWithAttr (if isHighlighted then Just highlightedCommentAttr else Nothing) now (length allItems) idx item

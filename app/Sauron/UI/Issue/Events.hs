@@ -40,7 +40,7 @@ import Sauron.UI.Util.TimeDiff
 
 -- | A timeline item is either a single comment/event or a consolidated group.
 data TimelineItem
-  = SingleItem (Either IssueEvent IssueComment)
+  = SingleItem TimelineEvent
   | LabelGroup IssueEvent [IssueEvent] [IssueEvent]  -- ^ representative event, added events, removed events
   | ReviewRequestGroup IssueEvent [IssueEvent]        -- ^ representative event, all review_requested events
 
@@ -62,28 +62,28 @@ adaptiveWidth f = Widget Greedy Fixed $ do
 
 -- | Consolidate consecutive events of the same kind, timestamp, and actor
 -- into grouped items.
-consolidateEvents :: [Either IssueEvent IssueComment] -> [TimelineItem]
+consolidateEvents :: [TimelineEvent] -> [TimelineItem]
 consolidateEvents [] = []
-consolidateEvents (Right c : rest) = SingleItem (Right c) : consolidateEvents rest
-consolidateEvents (Left e : rest)
+consolidateEvents (TimelineComment c : rest) = SingleItem (TimelineComment c) : consolidateEvents rest
+consolidateEvents (TimelineIssueEvent e : rest)
   | isLabelEvent e =
       let (run, remaining) = span (isMatchingEvent isLabelEvent e) rest
-          events = e : [ev | Left ev <- run]
+          events = e : [ev | TimelineIssueEvent ev <- run]
           added = filter (\ev -> issueEventType ev == Labeled) events
           removed = filter (\ev -> issueEventType ev == Unlabeled) events
       in if length events > 1
          then LabelGroup e added removed : consolidateEvents remaining
-         else SingleItem (Left e) : consolidateEvents rest
+         else SingleItem (TimelineIssueEvent e) : consolidateEvents rest
   | isReviewRequestEvent e =
       let (run, remaining) = span (isMatchingEvent isReviewRequestEvent e) rest
-          events = e : [ev | Left ev <- run]
+          events = e : [ev | TimelineIssueEvent ev <- run]
       in if length events > 1
          then ReviewRequestGroup e events : consolidateEvents remaining
-         else SingleItem (Left e) : consolidateEvents rest
-  | otherwise = SingleItem (Left e) : consolidateEvents rest
+         else SingleItem (TimelineIssueEvent e) : consolidateEvents rest
+  | otherwise = SingleItem (TimelineIssueEvent e) : consolidateEvents rest
 
-isMatchingEvent :: (IssueEvent -> Bool) -> IssueEvent -> Either IssueEvent IssueComment -> Bool
-isMatchingEvent predicate ref (Left ev) =
+isMatchingEvent :: (IssueEvent -> Bool) -> IssueEvent -> TimelineEvent -> Bool
+isMatchingEvent predicate ref (TimelineIssueEvent ev) =
   predicate ev
   && abs (diffUTCTime (issueEventCreatedAt ev) (issueEventCreatedAt ref)) < 10
   && fmap simpleUserLogin (issueEventActor ev) == fmap simpleUserLogin (issueEventActor ref)
@@ -102,7 +102,7 @@ renderEvent :: UTCTime -> Bool -> IssueEvent -> Widget n
 renderEvent now isLast issueEvent =
   let actorName :: Text = case issueEventActor issueEvent of
         Just (SimpleUser {simpleUserLogin=(N username)}) -> username
-        Nothing -> "ghost"
+        Nothing -> fromMaybe "ghost" (issueEventAuthorName issueEvent)
       -- Each sized item is (width, widget)
       eventSuffixItems :: [(Int, Widget n)]
       eventSuffixItems = case issueEventType issueEvent of
@@ -112,6 +112,20 @@ renderEvent now isLast issueEvent =
         Unlabeled -> case issueEventLabel issueEvent of
           Just (IssueLabel {labelName=(N name), labelColor=hexColor}) -> [(5, str " the "), (safeWctwidth name + 2, labelPill hexColor name), (7, str " label")]
           Nothing -> [(8, str " a label")]
+        Referenced -> case issueEventCommitId issueEvent of
+          Just sha -> let short = T.take 7 sha in [(11, str " in commit "), (safeWctwidth short, withAttr hashAttr (str (toString short)))]
+          Nothing -> []
+        CrossReferenced -> case issueEventSourceIssue issueEvent of
+          Just sourceIssue ->
+            let num = show (unIssueNumber (issueNumber sourceIssue))
+                ref = "#" <> num
+                title = toString (issueTitle sourceIssue)
+                quoted = "\"" <> title <> "\""
+            in [(5, str " from "), (safeWcswidth ref, withAttr hashNumberAttr (str ref)), (1 + safeWcswidth quoted, str " " <+> withAttr normalAttr (str quoted))]
+          Nothing -> []
+        Committed -> case issueEventCommitId issueEvent of
+          Just sha -> let short = T.take 7 sha in [(1 + safeWctwidth short, str " " <+> withAttr hashAttr (str (toString short)))]
+          Nothing -> []
         ReviewRequested -> case issueEventRequestedReviewer issueEvent of
           Just (SimpleUser {simpleUserLogin=(N reviewer)}) -> [(1 + safeWctwidth reviewer, str " " <+> withAttr usernameAttr (str (toString reviewer)))]
           Nothing -> []
