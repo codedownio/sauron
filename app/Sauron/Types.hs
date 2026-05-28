@@ -634,7 +634,12 @@ data AppState = AppState {
 
   , _appLogLevelFilter :: LogLevel
   , _appShowStackTraces :: Bool
+
+  , _appDetailsExpanded :: DetailsExpanded
   }
+
+data DetailsExpanded = DetailsCollapsed | DetailsExpanded
+  deriving (Show, Eq)
 
 
 makeLenses ''EntityData

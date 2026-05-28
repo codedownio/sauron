@@ -9,10 +9,13 @@ import Commonmark hiding (str)
 import Commonmark.Extensions
 import Commonmark.Pandoc
 import Control.Monad.Writer
+import Data.List (partition)
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Relude
+import Sauron.Types (DetailsExpanded(..))
 import Sauron.UI.AttrMap
+import Sauron.UI.Markdown.Html (preprocessHtml)
 import Sauron.UI.Markdown.Table
 import Sauron.UI.Markdown.Wrapping (FootnoteM, renderWrappedParagraphM)
 import qualified Skylighting as Sky
@@ -20,14 +23,18 @@ import qualified Skylighting.Core as SkyCore
 import qualified Text.Pandoc.Builder as B
 
 
-markdownToWidgetsWithWidth :: Int -> Text -> Widget n
-markdownToWidgetsWithWidth width (T.replace "\r\n" "\n" -> t) = -- TODO: do this T.replace on the initial fetch for perf
-  case parseCommonmarkWith (defaultSyntaxSpec <> gfmExtensions) (tokenize "source" t) :: Maybe (Either ParseError (Cm () B.Blocks)) of
+allExtensions :: SyntaxSpec Maybe (Cm () B.Inlines) (Cm () B.Blocks)
+allExtensions = defaultSyntaxSpec <> gfmExtensions <> emojiSpec
+
+markdownToWidgetsWithWidth :: DetailsExpanded -> Int -> Text -> Widget n
+markdownToWidgetsWithWidth detailsExpanded width (T.replace "\r\n" "\n" -> t) = -- TODO: do this T.replace on the initial fetch for perf
+  case parseCommonmarkWith allExtensions (tokenize "source" t) :: Maybe (Either ParseError (Cm () B.Blocks)) of
     Nothing -> strWrap [i|Parse error.|]
     Just (Left err) -> strWrap [i|Parse error: '#{err}'.|]
     Just (Right (Cm (B.Many bs))) -> vBox $ contentWidgets ++ [footnoteWidget]
       where
-        (renderedBlocks, footnoteBlocks) = runWriter $ traverse (renderBlockM Nothing width) (toList bs)
+        preprocessedBlocks = preprocessHtml (toList bs)
+        (renderedBlocks, footnoteBlocks) = runWriter $ traverse (renderBlockM detailsExpanded Nothing width) preprocessedBlocks
         contentWidgets = case renderedBlocks of
                            (x:xs) -> x : fmap (padTop (Pad 1)) xs
                            x -> x
@@ -35,24 +42,26 @@ markdownToWidgetsWithWidth width (T.replace "\r\n" "\n" -> t) = -- TODO: do this
                          then emptyWidget
                          else vBox [
                            padTop (Pad 1) $ withAttr horizontalRuleAttr $ str (replicate width '─'),
-                           padTop (Pad 1) $ vBox $ zipWith (renderFootnoteRef width) [1..] footnoteBlocks
+                           padTop (Pad 1) $ vBox $ zipWith (renderFootnoteRef detailsExpanded width) [1..] footnoteBlocks
                          ]
 
-renderBlockM :: Maybe (Widget n) -> Int -> B.Block -> FootnoteM (Widget n)
-renderBlockM maybePrefix width block = case block of
+renderBlockM :: DetailsExpanded -> Maybe (Widget n) -> Int -> B.Block -> FootnoteM (Widget n)
+renderBlockM detailsExpanded maybePrefix width block = case block of
   B.Para inlines -> renderWrappedParagraphM maybePrefix width inlines
   B.Plain inlines -> renderWrappedParagraphM maybePrefix width inlines
   B.Header level _ inlines -> withAttr (getHeaderAttr level) <$> renderWrappedParagraphM maybePrefix width inlines
-  other -> pure $ renderBlock maybePrefix width other
+  B.Div (_, classes, _) blocks
+    | "details" `elem` classes -> renderDetailsBlockM detailsExpanded maybePrefix width blocks
+  other -> pure $ renderBlock detailsExpanded maybePrefix width other
 
-renderFootnoteRef :: Int -> Int -> [B.Block] -> Widget n
-renderFootnoteRef width num blocks =
+renderFootnoteRef :: DetailsExpanded -> Int -> Int -> [B.Block] -> Widget n
+renderFootnoteRef detailsExpanded width num blocks =
   let numberPrefix = withAttr hashNumberAttr $ str ("[" <> show num <> "] ")
-      renderedContent = vBox $ map (renderBlock Nothing (width - 4)) blocks
+      renderedContent = vBox $ map (renderBlock detailsExpanded Nothing (width - 4)) blocks
   in hBox [numberPrefix, renderedContent]
 
-renderBlock :: forall n. Maybe (Widget n) -> Int -> B.Block -> Widget n
-renderBlock maybePrefix width (B.Para inlines) =
+renderBlock :: forall n. DetailsExpanded -> Maybe (Widget n) -> Int -> B.Block -> Widget n
+renderBlock _detailsExpanded maybePrefix width (B.Para inlines) =
   case inlines of
     (B.Str headerLevel : B.Space : rest) | T.all (== '#') headerLevel && not (T.null headerLevel) ->
       let headerAttr = getHeaderAttr (T.length headerLevel)
@@ -61,60 +70,103 @@ renderBlock maybePrefix width (B.Para inlines) =
     _ -> fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
   where
     showHeaderSymbols = False
-renderBlock maybePrefix width (B.Plain inlines) = fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
-renderBlock maybePrefix width (B.Header level _ inlines) =
+renderBlock _detailsExpanded maybePrefix width (B.Plain inlines) = fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
+renderBlock _detailsExpanded maybePrefix width (B.Header level _ inlines) =
   withAttr (getHeaderAttr level) $ fst $ runWriter $ renderWrappedParagraphM maybePrefix width inlines
-renderBlock _maybePrefix width (B.CodeBlock (_, classes, _) codeContent) =
+renderBlock _detailsExpanded _maybePrefix width (B.CodeBlock (_, classes, _) codeContent) =
   renderHighlightedCodeBlock width classes codeContent
-renderBlock maybePrefix width (B.OrderedList _ items) =
+renderBlock detailsExpanded maybePrefix width (B.OrderedList _ items) =
   vBox $ zipWith (\n blocks -> go n blocks) [1..] items
   where
     go :: Int -> [B.Block] -> Widget n
     go n blocks =
       let itemPrefix = str [i|#{n}. |]
-          content = vBox $ map (renderBlock maybePrefix (width - 3)) blocks
+          content = vBox $ map (renderBlock detailsExpanded maybePrefix (width - 3)) blocks
           fullPrefix = case maybePrefix of
                         Nothing -> itemPrefix
                         Just prefix -> hBox [prefix, itemPrefix]
       in hBox [fullPrefix, content]
-renderBlock maybePrefix width (B.BulletList items) =
+renderBlock detailsExpanded maybePrefix width (B.BulletList items) =
   vBox $ map go items
   where
     go :: [B.Block] -> Widget n
     go blocks =
       let bulletPrefix = str "• "
-          content = vBox $ map (renderBlock maybePrefix (width - 2)) blocks
+          content = vBox $ map (renderBlock detailsExpanded maybePrefix (width - 2)) blocks
           fullPrefix = case maybePrefix of
                         Nothing -> bulletPrefix
                         Just prefix -> hBox [prefix, bulletPrefix]
       in hBox [fullPrefix, content]
-renderBlock _ width (B.BlockQuote blocks) =
+renderBlock detailsExpanded _ width (B.BlockQuote blocks) =
   -- Nested blockquotes get double prefix
   let quotePrefix = Just (withAttr italicText $ str "│ ")
-  in vBox $ map (renderBlock quotePrefix (width - 2)) blocks
-renderBlock maybePrefix width B.HorizontalRule =
+  in vBox $ map (renderBlock detailsExpanded quotePrefix (width - 2)) blocks
+renderBlock _detailsExpanded maybePrefix width B.HorizontalRule =
   case maybePrefix of
     Nothing -> withAttr horizontalRuleAttr $ str (replicate width '─')
     Just prefix -> hBox [prefix, withAttr horizontalRuleAttr $ str (replicate (width - 2) '─')]
-renderBlock maybePrefix width (B.Table _ _ _ thead tbody _) =
+renderBlock detailsExpanded maybePrefix width (B.Table _ _ _ thead tbody _) =
   case maybePrefix of
-    Nothing -> renderTableWith renderBlock width thead tbody
-    Just prefix -> hBox [prefix, renderTableWith renderBlock (width - 2) thead tbody]
-renderBlock maybePrefix _width (B.RawBlock _ content) =
+    Nothing -> renderTableWith (renderBlock detailsExpanded) width thead tbody
+    Just prefix -> hBox [prefix, renderTableWith (renderBlock detailsExpanded) (width - 2) thead tbody]
+renderBlock _detailsExpanded maybePrefix _width (B.RawBlock _ content) =
   let widget = if T.null (T.strip content)
                then emptyWidget
                else txtWrap content
   in case maybePrefix of
        Nothing -> widget
        Just prefix -> hBox [prefix, widget]
-renderBlock maybePrefix width (B.Div _ blocks) =
-  vBox $ map (renderBlock maybePrefix width) blocks
-renderBlock maybePrefix width (B.LineBlock lineGroups) =
+renderBlock detailsExpanded maybePrefix width (B.Div (_, classes, _) blocks)
+  | "details" `elem` classes =
+    fst $ runWriter $ renderDetailsBlockM detailsExpanded maybePrefix width blocks
+renderBlock detailsExpanded maybePrefix width (B.Div _ blocks) =
+  vBox $ map (renderBlock detailsExpanded maybePrefix width) blocks
+renderBlock _detailsExpanded maybePrefix width (B.LineBlock lineGroups) =
   vBox $ map (\inlines -> fst $ runWriter $ renderWrappedParagraphM maybePrefix width (toList inlines)) lineGroups
-renderBlock maybePrefix _ b =
+renderBlock _detailsExpanded maybePrefix _ b =
   case maybePrefix of
     Nothing -> strWrap [i|UNHANDLED BLOCK: #{b}|]
     Just prefix -> hBox [prefix, strWrap [i|UNHANDLED BLOCK: #{b}|]]
+
+-- * Details/summary rendering
+
+renderDetailsBlockM :: DetailsExpanded -> Maybe (Widget n) -> Int -> [B.Block] -> FootnoteM (Widget n)
+renderDetailsBlockM detailsExpanded maybePrefix width blocks = do
+  let (summaryBlocks, contentBlocks) = partition isSummaryDiv blocks
+  let summaryRawText = case summaryBlocks of
+        (B.Div _ [B.Plain [B.Str t]] : _) -> t
+        (B.Div _ [B.Para [B.Str t]] : _) -> t
+        _ -> "Details"
+  let summaryInlines = parseInlineMarkdown summaryRawText
+  let expanded = detailsExpanded == DetailsExpanded
+  let indicator = if expanded then "▼ " else "▶ "
+  summaryWidget <- renderWrappedParagraphM Nothing (width - 2) summaryInlines
+  let headerWidget = hBox [withAttr boldText $ str indicator, summaryWidget]
+  let prefixedHeader = case maybePrefix of
+        Nothing -> headerWidget
+        Just prefix -> hBox [prefix, headerWidget]
+  if expanded
+    then do
+      contentWidgets <- traverse (renderBlockM detailsExpanded maybePrefix width) contentBlocks
+      pure $ vBox (prefixedHeader : map (padLeft (Pad 2)) contentWidgets)
+    else pure prefixedHeader
+
+isSummaryDiv :: B.Block -> Bool
+isSummaryDiv (B.Div (_, classes, _) _) = "summary" `elem` classes
+isSummaryDiv _ = False
+
+-- | Parse text as inline markdown (with emoji and HTML support).
+-- Used for details summary text extracted from raw HTML.
+parseInlineMarkdown :: Text -> [B.Inline]
+parseInlineMarkdown t =
+  case parseCommonmarkWith allExtensions (tokenize "source" t) :: Maybe (Either ParseError (Cm () B.Blocks)) of
+    Just (Right (Cm (B.Many bs))) -> case toList (preprocessHtml (toList bs)) of
+      (B.Para inlines : _) -> inlines
+      (B.Plain inlines : _) -> inlines
+      _ -> [B.Str t]
+    _ -> [B.Str t]
+
+-- * Helpers
 
 getHeaderAttr :: Int -> AttrName
 getHeaderAttr level = case level of

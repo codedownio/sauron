@@ -22,6 +22,9 @@ module Sauron.UI.Issue (
 
   -- Close/reopen
   , closeReopenAndRefresh
+
+  -- Details toggle widget
+  , detailsToggleWidget
   ) where
 
 import Brick
@@ -61,9 +64,9 @@ instance ListDrawable Fixed 'SingleIssueT where
   drawInner appState (EntityData {_static=issue, _state, _ident, ..}) = do
     guard _toggled
     guardFetchedOrHasPrevious _state $ \comments ->
-      return $ issueInner (_appNow appState) issue comments
+      return $ issueInner (_appDetailsExpanded appState) (_appNow appState) issue comments
 
-  getExtraTopBoxWidgets _app (EntityData {_static=issue}) =
+  getExtraTopBoxWidgets app (EntityData {_static=issue}) =
     [hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey editSearchKey
           , str "] "
@@ -84,6 +87,7 @@ instance ListDrawable Fixed 'SingleIssueT where
           , str "] "
           , withAttr hotkeyMessageAttr $ str (if issueState issue == StateOpen then "Close" else "Reopen")
           ]
+    , detailsToggleWidget app
     ]
 
   handleHotkey s key (EntityData {_static=issue})
@@ -138,12 +142,12 @@ issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationC
       , withAttr usernameAttr $ str [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
-issueInner :: UTCTime -> Issue -> V.Vector TimelineEvent -> Widget n
--- issueInner now issue body cs = vBox [strWrap (show issue), strWrap (show body), strWrap (show cs)]
-issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs =
+issueInner :: DetailsExpanded -> UTCTime -> Issue -> V.Vector TimelineEvent -> Widget n
+-- issueInner detailsExpanded now issue body cs = vBox [strWrap (show issue), strWrap (show body), strWrap (show cs)]
+issueInner detailsExpanded now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs =
   allItems
   & zip [0..]
-  & fmap (uncurry (renderTimelineItem now (length allItems)))
+  & fmap (uncurry (renderTimelineItem detailsExpanded now (length allItems)))
   & vBox
   where
     issueDescriptionBody = fromMaybe "*No description provided.*" issueBody
@@ -153,11 +157,11 @@ issueInner now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)
 
 -- * Util, exported for Pull.hs
 
-renderTimelineItem :: UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) TimelineItem, Text) -> Widget n
-renderTimelineItem = renderTimelineItemWithAttr Nothing
+renderTimelineItem :: DetailsExpanded -> UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) TimelineItem, Text) -> Widget n
+renderTimelineItem detailsExpanded = renderTimelineItemWithAttr detailsExpanded Nothing
 
-renderTimelineItemWithAttr :: Maybe AttrName -> UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) TimelineItem, Text) -> Widget n
-renderTimelineItemWithAttr maybeAttr now totalItems idx (itemType, _extraBody) =
+renderTimelineItemWithAttr :: DetailsExpanded -> Maybe AttrName -> UTCTime -> Int -> Int -> (Either (Text, Text, UTCTime) TimelineItem, Text) -> Widget n
+renderTimelineItemWithAttr detailsExpanded maybeAttr now totalItems idx (itemType, _extraBody) =
   let pick def attrVariant = maybe def attrVariant maybeAttr
       borderFunc = if totalItems == 1
                    then pick standaloneTimelineBorder standaloneTimelineBorderAttr
@@ -170,29 +174,29 @@ renderTimelineItemWithAttr maybeAttr now totalItems idx (itemType, _extraBody) =
     Left (username, descriptionBody, createdAt) -> -- Issue/PR description
       adaptiveWidth $ \w -> borderFunc
         (topLabel username createdAt now)
-        (markdownToWidgetsWithWidth (w - 2) descriptionBody)
-    Right item -> renderItemWithBorder now (idx == totalItems - 1) borderFunc item
+        (markdownToWidgetsWithWidth detailsExpanded (w - 2) descriptionBody)
+    Right item -> renderItemWithBorder detailsExpanded now (idx == totalItems - 1) borderFunc item
 
 topLabel :: Text -> UTCTime -> UTCTime -> Widget n
 topLabel username createdAt now =
   (withAttr usernameAttr (str [i|#{username} |]) <+> str [i|opened #{timeFromNow (diffUTCTime now createdAt)}|])
     & padLeftRight 1
 
-renderItemWithBorder :: UTCTime -> Bool -> (Widget n -> Widget n -> Widget n) -> TimelineItem -> Widget n
-renderItemWithBorder now isLast borderFunc item =
+renderItemWithBorder :: DetailsExpanded -> UTCTime -> Bool -> (Widget n -> Widget n -> Widget n) -> TimelineItem -> Widget n
+renderItemWithBorder detailsExpanded now isLast borderFunc item =
   case item of
-    SingleItem (TimelineComment comment) -> renderComment now borderFunc comment
+    SingleItem (TimelineComment comment) -> renderComment detailsExpanded now borderFunc comment
     SingleItem (TimelineIssueEvent event) -> renderEvent now isLast event
     SingleItem (TimelineCommit commit) -> renderCommitEvent now isLast commit
     SingleItem (TimelineReview review) -> renderReviewEvent now isLast review
     LabelGroup rep added removed -> renderLabelGroup now isLast rep added removed
     ReviewRequestGroup rep events -> renderReviewRequestGroup now isLast rep events
 
-renderComment :: UTCTime -> (Widget n -> Widget n -> Widget n) -> IssueComment -> Widget n
-renderComment now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) =
+renderComment :: DetailsExpanded -> UTCTime -> (Widget n -> Widget n -> Widget n) -> IssueComment -> Widget n
+renderComment detailsExpanded now borderFunc (IssueComment {issueCommentUser=(SimpleUser {simpleUserLogin=(N username)}), issueCommentCreatedAt, ..}) =
   adaptiveWidth $ \w -> borderFunc
     (commentTopLabel username commentTime now)
-    (markdownToWidgetsWithWidth (w - 2) issueCommentBody)
+    (markdownToWidgetsWithWidth detailsExpanded (w - 2) issueCommentBody)
   where commentTime = issueCommentCreatedAt
 
 commentTopLabel :: Text -> UTCTime -> UTCTime -> Widget n
@@ -224,3 +228,15 @@ closeReopenAndRefresh bc owner name issue childrenVar getInfo setIssue fetchComm
       whenJust mStateVar $ \stateVar ->
         liftIO $ runReaderT (fetchComments owner name targetNum stateVar) bc
     Left _err -> return ()
+
+-- * Details toggle
+
+detailsToggleWidget :: AppState -> Widget n
+detailsToggleWidget app = hBox [
+  str "["
+  , withAttr hotkeyAttr $ str $ showKey detailsToggleKey
+  , str "] "
+  , withAttr hotkeyMessageAttr $ str $ case _appDetailsExpanded app of
+      DetailsExpanded -> "Collapse details"
+      DetailsCollapsed -> "Expand details"
+  ]

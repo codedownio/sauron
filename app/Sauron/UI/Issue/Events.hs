@@ -155,7 +155,7 @@ renderEvent now isLast issueEvent =
 
 renderCommitEvent :: UTCTime -> Bool -> TimelineCommitEvent -> Widget n
 renderCommitEvent now isLast commit =
-  let actorName = gitAuthorName (timelineCommitEventAuthor commit)
+  let actorName = gitAuthorUsername (timelineCommitEventAuthor commit)
       short = T.take 7 (timelineCommitEventSha commit)
       timeAgo = timeFromNow (diffUTCTime now (gitAuthorDate (timelineCommitEventAuthor commit)))
       firstMsgLine = T.takeWhile (/= '\n') (timelineCommitEventMessage commit)
@@ -240,6 +240,19 @@ renderLabelGroup now isLast rep added removed =
 
 
 -- * Internal helpers
+
+-- | Extract a GitHub username from a git author, trying the noreply email first.
+-- GitHub noreply emails have the format "12345+username@users.noreply.github.com"
+-- or "username@users.noreply.github.com".
+gitAuthorUsername :: GitAuthor -> Text
+gitAuthorUsername (GitAuthor {gitAuthorName, gitAuthorEmail})
+  | "@users.noreply.github.com" `T.isSuffixOf` gitAuthorEmail =
+    case T.breakOn "+" localPart of
+      (_, rest) | not (T.null rest) -> T.drop 1 rest
+      _ -> localPart
+  | otherwise = gitAuthorName
+  where
+    localPart = T.takeWhile (/= '@') gitAuthorEmail
 
 -- | A label pill with its known width (space + name + space + trailing gap)
 eventLabelPillWithWidth :: IssueEvent -> Maybe (Int, Widget n)

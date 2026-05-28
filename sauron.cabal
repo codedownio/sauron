@@ -90,6 +90,7 @@ executable sauron
       Sauron.UI.Keys
       Sauron.UI.Markdown
       Sauron.UI.Markdown.Footnotes
+      Sauron.UI.Markdown.Html
       Sauron.UI.Markdown.Table
       Sauron.UI.Markdown.Wrapping
       Sauron.UI.Modals.CommentModal

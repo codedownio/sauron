@@ -27,7 +27,7 @@ import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Fetch.Pull (fetchPullComments)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (issueInner, renderTimelineItem, closeReopenAndRefresh, consolidateEvents)
+import Sauron.UI.Issue (issueInner, renderTimelineItem, closeReopenAndRefresh, consolidateEvents, detailsToggleWidget)
 import Sauron.UI.Keys
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util
@@ -42,9 +42,9 @@ instance ListDrawable Fixed 'SinglePullT where
   drawInner appState (EntityData {_static=issue, _state, _ident, ..}) = do
     guard _toggled
     guardFetchedOrHasPrevious _state $ \comments ->
-      return $ issueInner (_appNow appState) issue comments
+      return $ issueInner (_appDetailsExpanded appState) (_appNow appState) issue comments
 
-  getExtraTopBoxWidgets _app (EntityData {_static=issue}) =
+  getExtraTopBoxWidgets app (EntityData {_static=issue}) =
     [hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey editSearchKey
           , str "] "
@@ -65,6 +65,7 @@ instance ListDrawable Fixed 'SinglePullT where
           , str "] "
           , withAttr hotkeyMessageAttr $ str (if issueState issue == StateOpen then "Close" else "Reopen")
           ]
+    , detailsToggleWidget app
     ]
 
   handleHotkey s key (EntityData {_static=issue})
@@ -120,11 +121,11 @@ pullLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCo
       , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
 
-pullInner :: UTCTime -> Issue -> Text -> NodeState 'SinglePullT -> Widget n
-pullInner now (Issue {..}) body inner =
+pullInner :: DetailsExpanded -> UTCTime -> Issue -> Text -> NodeState 'SinglePullT -> Widget n
+pullInner detailsExpanded now (Issue {..}) body inner =
   allItems
   & zip [0..]
-  & fmap (uncurry (renderTimelineItem now (length allItems)))
+  & fmap (uncurry (renderTimelineItem detailsExpanded now (length allItems)))
   & (++ statusMessages)
   & vBox
   where

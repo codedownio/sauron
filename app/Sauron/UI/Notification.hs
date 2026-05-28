@@ -25,7 +25,7 @@ import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Mutations.Notification (markNotificationAsDone, markNotificationAsRead)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (renderTimelineItemWithAttr, consolidateEvents, TimelineItem(..))
+import Sauron.UI.Issue (renderTimelineItemWithAttr, consolidateEvents, TimelineItem(..), detailsToggleWidget)
 import Sauron.UI.Keys (markNotificationDoneKey, markNotificationReadKey, zoomModalKey, showKey)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
@@ -39,9 +39,9 @@ instance ListDrawable Fixed 'SingleNotificationT where
 
   drawInner appState (EntityData {_static=notification, _state, ..}) = do
     guard _toggled
-    return $ notificationInner (_appNow appState) notification _state
+    return $ notificationInner (_appDetailsExpanded appState) (_appNow appState) notification _state
 
-  getExtraTopBoxWidgets _appState (EntityData {_static=notification}) =
+  getExtraTopBoxWidgets appState (EntityData {_static=notification}) =
     [hBox [str "["
                 , withAttr hotkeyAttr $ str $ showKey markNotificationDoneKey
                 , str "] "
@@ -62,6 +62,7 @@ instance ListDrawable Fixed 'SingleNotificationT where
              , str "] "
              , withAttr hotkeyMessageAttr $ str "Zoom"
              ]
+       , detailsToggleWidget appState
        ]
 
   handleHotkey appState key (EntityData {_static=notification})
@@ -135,8 +136,8 @@ reasonText reason = case reason of
   SubscribedReason -> "subscribed"
   TeamMentionReason -> "team mention"
 
-notificationInner :: UTCTime -> Notification -> NotificationState -> Widget n
-notificationInner now notification (NotificationState {..}) = vBox (notificationDetails ++ contentWidget)
+notificationInner :: DetailsExpanded -> UTCTime -> Notification -> NotificationState -> Widget n
+notificationInner detailsExpanded now notification (NotificationState {..}) = vBox (notificationDetails ++ contentWidget)
   where
     contentState = notificationStateContent
     Notification {..} = notification
@@ -165,16 +166,16 @@ notificationInner now notification (NotificationState {..}) = vBox (notification
 
     contentWidget = case contentState of
       Fetched (NotificationIssue issue comments) ->
-        [padTop (Pad 1) $ renderNotificationContent now issue comments latestCommentId notificationStateAutoScroll]
+        [padTop (Pad 1) $ renderNotificationContent detailsExpanded now issue comments latestCommentId notificationStateAutoScroll]
       Fetched (NotificationPull issue comments) ->
-        [padTop (Pad 1) $ renderNotificationContent now issue comments latestCommentId notificationStateAutoScroll]
+        [padTop (Pad 1) $ renderNotificationContent detailsExpanded now issue comments latestCommentId notificationStateAutoScroll]
       Fetched NotificationOther -> []
       Fetching _ -> [padTop (Pad 1) $ str "Loading..."]
       Errored err -> [padTop (Pad 1) $ withAttr erroredAttr $ str [i|Error: #{err}|]]
       NotFetched -> []
 
-renderNotificationContent :: UTCTime -> Issue -> V.Vector TimelineEvent -> Maybe Int -> Bool -> Widget n
-renderNotificationContent now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs maybeHighlightId autoScroll =
+renderNotificationContent :: DetailsExpanded -> UTCTime -> Issue -> V.Vector TimelineEvent -> Maybe Int -> Bool -> Widget n
+renderNotificationContent detailsExpanded now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N openerUsername)}), ..}) cs maybeHighlightId autoScroll =
   allItems
   & zip [0..]
   & fmap render
@@ -190,4 +191,4 @@ renderNotificationContent now (Issue {issueUser=(SimpleUser {simpleUserLogin=(N 
           (Right (SingleItem (TimelineComment (IssueComment {issueCommentId=cid}))), Just hid) -> cid == hid
           _ -> False
 
-        widget = renderTimelineItemWithAttr (if isHighlighted then Just highlightedCommentAttr else Nothing) now (length allItems) idx item
+        widget = renderTimelineItemWithAttr detailsExpanded (if isHighlighted then Just highlightedCommentAttr else Nothing) now (length allItems) idx item

@@ -278,6 +278,11 @@ handleMainPaneEvents' s e = case e of
   V.EvKey c [] | c == firstPageKey -> tryNavigatePage s goFirstPage
   V.EvKey c [] | c == lastPageKey -> tryNavigatePage s goLastPage
 
+  V.EvKey c [] | c == detailsToggleKey -> modify (appDetailsExpanded %~ toggleDetails)
+    where
+      toggleDetails DetailsCollapsed = DetailsExpanded
+      toggleDetails DetailsExpanded = DetailsCollapsed
+
   V.EvKey (V.KChar 'l') [V.MCtrl] -> do
     let modalState = LogModalState (list LogModalContent (Vec.fromList []) 1)
     modify (appModal ?~ modalState)

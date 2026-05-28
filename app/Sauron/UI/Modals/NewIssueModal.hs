@@ -56,7 +56,7 @@ renderNewIssueModal app (NewIssueModalState {..}) =
 renderNewIssueModal _ _ = str "Invalid modal state for NewIssueModal"
 
 renderBodyEditor :: AppState -> Bool -> Int -> Int -> WrappingEditor Char ClickableName -> Widget ClickableName
-renderBodyEditor (AppState {}) focused modalWidth editorHeight editor =
+renderBodyEditor (AppState {_appDetailsExpanded}) focused modalWidth editorHeight editor =
   vLimit (editorHeight + 3) $ hBox [
     -- Left: Editor
     vBox [
@@ -75,7 +75,7 @@ renderBodyEditor (AppState {}) focused modalWidth editorHeight editor =
           vLimit editorHeight $
           case text of
             "" -> withAttr italicText $ strWrap [i|(preview will appear here)|]
-            t -> markdownToWidgetsWithWidth (sectionWidth - 4) t
+            t -> markdownToWidgetsWithWidth _appDetailsExpanded (sectionWidth - 4) t
     ]
   ]
   where

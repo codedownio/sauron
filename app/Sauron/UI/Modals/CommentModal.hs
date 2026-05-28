@@ -52,7 +52,7 @@ renderModal appState (CommentModalState {_commentIssue=issue@(Issue {issueNumber
 
     modalTitle = [i|Comment on #{typ} \##{num}|]
 
-    issueWidget = hLimit maxCommentWidth $ issueInner (appState ^. appNow) issue _commentIssueComments
+    issueWidget = hLimit maxCommentWidth $ issueInner (appState ^. appDetailsExpanded) (appState ^. appNow) issue _commentIssueComments
 
     bodyLineCount = length (dumpEditor _commentEditor)
     editorLines = max 10 (min bodyLineCount 30)

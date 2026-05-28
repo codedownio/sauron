@@ -189,6 +189,8 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitL
 
           , _appLogLevelFilter = LevelInfo
           , _appShowStackTraces = False
+
+          , _appDetailsExpanded = DetailsCollapsed
         }
 
 
