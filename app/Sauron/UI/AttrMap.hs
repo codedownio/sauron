@@ -73,6 +73,8 @@ attrToColor colorMode = ([
   , (openMarkerAttr, fg (select midGray))
   , (openStateMarkerAttr, fg (select solarizedGreen))
   , (closedStateMarkerAttr, fg (select solarizedViolet))
+  , (draftMarkerAttr, fg (select brightGray))
+
 
   -- Hotkey stuff
   , (hotkeyAttr, fg V.blue)
@@ -211,6 +213,8 @@ toggleMarkerAttr = mkAttrName "toggleMarker"
 openMarkerAttr = mkAttrName "openMarker"
 openStateMarkerAttr = mkAttrName "openStateMarker"
 closedStateMarkerAttr = mkAttrName "closedStateMarker"
+draftMarkerAttr = mkAttrName "draftMarker"
+
 
 -- * Text
 

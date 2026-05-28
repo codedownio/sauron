@@ -89,23 +89,30 @@ refreshParentNotifications appState =
     whenJust (findNotificationsParent parents) $ \notificationsNode ->
       liftIO $ void $ refreshLine (appState ^. appBaseContext) notificationsNode parents
 
-notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable a -> Widget n
+notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable NotificationContent -> Widget n
 notificationLine now toggled' (Notification {..}) animationCounter fetchableState = vBox [line1, line2]
   where
     Subject {..} = notificationSubject
     RepoRef {repoRefOwner=(SimpleOwner {..}), ..} = notificationRepo
+
+    (stateIcon, stateAttr) = case fetchableCurrent fetchableState of
+      Just (NotificationIssue (Issue {issueState}) _) ->
+        if issueState == StateOpen then ("⊙", openStateMarkerAttr) else ("☑", closedStateMarkerAttr)
+      Just (NotificationPull (Issue {issueState, issueDraft}) _) ->
+        if issueDraft == Just True then ("◌", draftMarkerAttr)
+        else if issueState == StateOpen then ("⎇", openStateMarkerAttr)
+        else ("⎇", closedStateMarkerAttr)
+      _ -> case subjectType of
+        "Issue" -> ("⊙", openStateMarkerAttr)
+        "PullRequest" -> ("⎇", closedStateMarkerAttr)
+        _ -> (toString subjectType, normalAttr)
 
     line1 = hBox (catMaybes [
       Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , Just $ withAttr normalAttr $ str $ toString subjectTitle
       , if notificationUnread then Just (withAttr blueDotAttr $ str " ●") else Nothing
       , Just $ fetchableQuarterCircleSpinner animationCounter fetchableState
-      , Just $ padLeft Max $ hBox [
-          case subjectType of
-            "PullRequest" -> str "⎇"
-            "Issue" -> str "◉"
-            _ -> str (toString subjectType)
-        ]
+      , Just $ padLeft Max $ withAttr stateAttr $ str stateIcon
       ])
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox [
