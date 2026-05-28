@@ -35,7 +35,7 @@ import UnliftIO.Async (async)
 
 instance ListDrawable Fixed 'SingleNotificationT where
   drawLine appState (EntityData {_static=notification, ..}) =
-    notificationLine (_appNow appState) _toggled notification (_appAnimationCounter appState) (notificationStateContent _state)
+    notificationLine (_appNow appState) _toggled notification (_appAnimationCounter appState) _state
 
   drawInner appState (EntityData {_static=notification, _state, ..}) = do
     guard _toggled
@@ -89,30 +89,29 @@ refreshParentNotifications appState =
     whenJust (findNotificationsParent parents) $ \notificationsNode ->
       liftIO $ void $ refreshLine (appState ^. appBaseContext) notificationsNode parents
 
-notificationLine :: UTCTime -> Bool -> Notification -> Int -> Fetchable NotificationContent -> Widget n
-notificationLine now toggled' (Notification {..}) animationCounter fetchableState = vBox [line1, line2]
+notificationLine :: UTCTime -> Bool -> Notification -> Int -> NotificationState -> Widget n
+notificationLine now toggled' (Notification {..}) animationCounter notifState = vBox [line1, line2]
   where
     Subject {..} = notificationSubject
     RepoRef {repoRefOwner=(SimpleOwner {..}), ..} = notificationRepo
+    fetchableState = notificationStateContent notifState
 
-    (stateIcon, stateAttr) = case fetchableCurrent fetchableState of
+    maybeStateIcon = case fetchableCurrent fetchableState of
       Just (NotificationIssue (Issue {issueState}) _) ->
-        if issueState == StateOpen then ("⊙", openStateMarkerAttr) else ("☑", closedStateMarkerAttr)
+        Just $ subjectStateIcon (if issueState == StateOpen then IssueOpen else IssueClosed)
       Just (NotificationPull (Issue {issueState, issueDraft}) _) ->
-        if issueDraft == Just True then ("◌", draftMarkerAttr)
-        else if issueState == StateOpen then ("⎇", openStateMarkerAttr)
-        else ("⎇", closedStateMarkerAttr)
-      _ -> case subjectType of
-        "Issue" -> ("⊙", openStateMarkerAttr)
-        "PullRequest" -> ("⎇", closedStateMarkerAttr)
-        _ -> (toString subjectType, normalAttr)
+        Just $ subjectStateIcon $
+          if issueDraft == Just True then PullDraft
+          else if issueState == StateOpen then PullOpen
+          else PullClosed
+      _ -> subjectStateIcon <$> notificationStateSubjectState notifState
 
     line1 = hBox (catMaybes [
       Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , Just $ withAttr normalAttr $ str $ toString subjectTitle
       , if notificationUnread then Just (withAttr blueDotAttr $ str " ●") else Nothing
       , Just $ fetchableQuarterCircleSpinner animationCounter fetchableState
-      , Just $ padLeft Max $ withAttr stateAttr $ str stateIcon
+      , fmap (\(icon, attr) -> padLeft Max $ withAttr attr $ str icon) maybeStateIcon
       ])
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox [

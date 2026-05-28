@@ -7,6 +7,8 @@ module Sauron.GraphQL (
   , filterBranchesByAuthor
   , filterBranchesByActivity
   , filterBranchesByInactivity
+  , githubGraphQLEndpoint
+  , GraphQLError(..)
   ) where
 
 import Control.Exception.Safe (try)

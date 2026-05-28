@@ -10,6 +10,7 @@ import Brick.Widgets.ProgressBar
 import Brick.Widgets.Skylighting (attrMappingsForStyle)
 import qualified Graphics.Vty as V
 import Relude hiding (on)
+import Sauron.Types (SubjectState(..))
 import Sauron.UI.AttrMap.Dim
 import qualified Skylighting.Styles as Sky
 import qualified Skylighting.Types as SkyTypes
@@ -214,6 +215,14 @@ openMarkerAttr = mkAttrName "openMarker"
 openStateMarkerAttr = mkAttrName "openStateMarker"
 closedStateMarkerAttr = mkAttrName "closedStateMarker"
 draftMarkerAttr = mkAttrName "draftMarker"
+
+subjectStateIcon :: SubjectState -> (String, AttrName)
+subjectStateIcon IssueOpen = ("⊙", openStateMarkerAttr)
+subjectStateIcon IssueClosed = ("☑", closedStateMarkerAttr)
+subjectStateIcon PullOpen = ("⎇", openStateMarkerAttr)
+subjectStateIcon PullClosed = ("⎇", closedStateMarkerAttr)
+subjectStateIcon PullMerged = ("⎇", closedStateMarkerAttr)
+subjectStateIcon PullDraft = ("◌", draftMarkerAttr)
 
 
 -- * Text

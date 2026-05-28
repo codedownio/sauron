@@ -126,10 +126,10 @@ instance ListDrawable Fixed 'SingleIssueT where
 issueLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable (V.Vector TimelineEvent) -> Widget n
 issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
   where
-    markerAttr = if issueState == StateOpen then openStateMarkerAttr else closedStateMarkerAttr
+    (icon, markerAttr) = subjectStateIcon (if issueState == StateOpen then IssueOpen else IssueClosed)
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
-      , withAttr markerAttr $ str (if issueState == StateOpen then "⊙  " else "☑  ")
+      , withAttr markerAttr $ str (icon <> "  ")
       , withAttr normalAttr $ str $ toString issueTitle
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , padLeft Max $ str (if issueComments > 0 then [i|🗨  #{issueComments}|] else "")

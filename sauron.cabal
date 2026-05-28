@@ -46,6 +46,7 @@ executable sauron
       Sauron.Fetch.Issue
       Sauron.Fetch.Job
       Sauron.Fetch.Notification
+      Sauron.Fetch.NotificationStates
       Sauron.Fetch.ParseJobLogs
       Sauron.Fetch.ParseWorkflowRunLogs
       Sauron.Fetch.Pull

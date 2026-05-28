@@ -19,6 +19,7 @@ import Relude
 import Sauron.Actions.Util (withGithubApiSemaphore, githubWithLogging)
 import Sauron.Fetch.Core
 import Sauron.Fetch.Issue (fetchIssueCommentsAndEvents)
+import Sauron.Fetch.NotificationStates (fetchNotificationSubjectStates, notificationToQueryItem)
 import Sauron.Types
 import UnliftIO.Async (async)
 
@@ -36,13 +37,17 @@ fetchNotifications (PaginatedNotificationsNode (EntityData {..})) = do
       (s, _, _) <- readTVar _state
       writeTVar _state (s, newPageInfo, Fetched (V.length notifications))
       (writeTVar _children =<<) $ forM (V.toList notifications) $ \notification ->
-        SingleNotificationNode <$> makeEmptyElemWithState bc notification (NotificationState NotFetched True) "" (_depth + 1)
+        SingleNotificationNode <$> makeEmptyElemWithState bc notification (NotificationState NotFetched Nothing True) "" (_depth + 1)
 
-  -- Pre-fetch content for all notifications so we can show state icons immediately
-  -- TODO: replace this with a more efficient way
+  -- Batch-fetch subject states (open/closed/merged/draft) via a single GraphQL query
   notifChildren <- readTVarIO _children
-  forM_ notifChildren $ \(SingleNotificationNode (EntityData {_static=notification, _state=stateVar})) ->
-    void $ liftIO $ async $ runReaderT (fetchNotificationContent notification stateVar) bc
+  void $ liftIO $ async $ do
+    let queryItems = catMaybes
+          [ notificationToQueryItem ("n" <> show idx) stateVar notification
+          | (idx, SingleNotificationNode (EntityData {_static=notification, _state=stateVar})) <- zip [(0 :: Int)..] notifChildren
+          ]
+    unless (null queryItems) $
+      runReaderT (fetchNotificationSubjectStates queryItems) bc
 
 fetchNotificationContent :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m

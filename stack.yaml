@@ -33,7 +33,8 @@ extra-deps:
   # - Add /issues/timeline API support
   # - Parse issue event message
   # - GitHub.Data.Issues: auto-derive JSON instances
-  commit: 4fd5d4525dca35f2e54aea76f4665b97e951ab3a
+  # - Add issueDraft field
+  commit: 263f22125e1974fce8614787b563fd0cd1b930a0
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf

@@ -328,8 +328,12 @@ data NotificationContent =
   | NotificationOther -- ^ For subject types we don't know how to render inline
   deriving (Show, Eq)
 
+data SubjectState = IssueOpen | IssueClosed | PullOpen | PullClosed | PullMerged | PullDraft
+  deriving (Show, Eq)
+
 data NotificationState = NotificationState {
   notificationStateContent :: Fetchable NotificationContent
+  , notificationStateSubjectState :: Maybe SubjectState
   , notificationStateAutoScroll :: Bool -- ^ Whether to auto-scroll to the latest comment
   } deriving (Show, Eq)
 
