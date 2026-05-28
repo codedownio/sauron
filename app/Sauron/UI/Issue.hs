@@ -188,7 +188,7 @@ renderItemWithBorder detailsExpanded now isLast borderFunc item =
     SingleItem (TimelineComment comment) -> renderComment detailsExpanded now borderFunc comment
     SingleItem (TimelineIssueEvent event) -> renderEvent now isLast event
     SingleItem (TimelineCommit commit) -> renderCommitEvent now isLast commit
-    SingleItem (TimelineReview review) -> renderReviewEvent now isLast review
+    SingleItem (TimelineReview rev) -> renderReviewEvent now isLast rev
     LabelGroup rep added removed -> renderLabelGroup now isLast rep added removed
     ReviewRequestGroup rep events -> renderReviewRequestGroup now isLast rep events
 
