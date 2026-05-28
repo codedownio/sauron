@@ -20,6 +20,7 @@ import Sauron.Actions.Util (withGithubApiSemaphore, githubWithLogging)
 import Sauron.Fetch.Core
 import Sauron.Fetch.Issue (fetchIssueCommentsAndEvents)
 import Sauron.Types
+import UnliftIO.Async (async)
 
 fetchNotifications :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -36,6 +37,12 @@ fetchNotifications (PaginatedNotificationsNode (EntityData {..})) = do
       writeTVar _state (s, newPageInfo, Fetched (V.length notifications))
       (writeTVar _children =<<) $ forM (V.toList notifications) $ \notification ->
         SingleNotificationNode <$> makeEmptyElemWithState bc notification (NotificationState NotFetched True) "" (_depth + 1)
+
+  -- Pre-fetch content for all notifications so we can show state icons immediately
+  -- TODO: replace this with a more efficient way
+  notifChildren <- readTVarIO _children
+  forM_ notifChildren $ \(SingleNotificationNode (EntityData {_static=notification, _state=stateVar})) ->
+    void $ liftIO $ async $ runReaderT (fetchNotificationContent notification stateVar) bc
 
 fetchNotificationContent :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
