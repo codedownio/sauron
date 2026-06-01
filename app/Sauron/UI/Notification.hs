@@ -26,7 +26,8 @@ import Sauron.Mutations.Notification (markNotificationAsDone, markNotificationAs
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (renderTimelineItemWithAttr, consolidateEvents, TimelineItem(..), detailsToggleWidget)
-import Sauron.UI.Keys (markNotificationDoneKey, markNotificationReadKey, zoomModalKey, showKey)
+import Sauron.Event.CommentModal (openCommentForNotification)
+import Sauron.UI.Keys (commentKey, markNotificationDoneKey, markNotificationReadKey, zoomModalKey, showKey)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
 import qualified System.FilePath.Posix as FP
@@ -43,33 +44,41 @@ instance ListDrawable Fixed 'SingleNotificationT where
 
   getExtraTopBoxWidgets appState (EntityData {_static=notification}) =
     [hBox [str "["
-                , withAttr hotkeyAttr $ str $ showKey markNotificationDoneKey
-                , str "] "
-                , withAttr hotkeyMessageAttr $ str "Mark done"
-                ]
+          , withAttr hotkeyAttr $ str $ showKey markNotificationReadKey
+          , str "/"
+          , withAttr hotkeyAttr $ str $ showKey markNotificationDoneKey
+          , str "] "
+          , withAttr hotkeyMessageAttr $ str "Mark read/done"
+          ]
     ]
-    ++ (if notificationUnread notification
-        then [hBox [str "["
-                   , withAttr hotkeyAttr $ str $ showKey markNotificationReadKey
-                   , str "] "
-                   , withAttr hotkeyMessageAttr $ str "Mark read"
-                   ]
-             ]
-        else []
-       )
     ++ [hBox [str "["
              , withAttr hotkeyAttr $ str $ showKey zoomModalKey
              , str "] "
              , withAttr hotkeyMessageAttr $ str "Zoom"
              ]
-       , detailsToggleWidget appState
        ]
+    ++ (if subjectType (notificationSubject notification) `elem` ["Issue", "PullRequest"]
+        then [hBox [str "["
+                   , withAttr hotkeyAttr $ str $ showKey commentKey
+                   , str "] "
+                   , withAttr hotkeyMessageAttr $ str "Comment"
+                   ]]
+        else [])
+    ++ [detailsToggleWidget appState]
 
   handleHotkey appState key (EntityData {_static=notification})
     | key == zoomModalKey = do
         withFixedElemAndParents appState $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (appState ^. appBaseContext) variableEl parents
           liftIO $ atomically $ writeTVar (_appModalVariable appState) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
+        return True
+    | key == commentKey = do
+        withFixedElemAndParents appState $ \_ (SomeNode variableEl) _parents ->
+          case variableEl of
+            SingleNotificationNode (EntityData {_state=notifStateVar}) -> do
+              notifState <- liftIO $ readTVarIO notifStateVar
+              openCommentForNotification (appState ^. appBaseContext) notification notifState
+            _ -> return ()
         return True
     | key == markNotificationDoneKey = do
         liftIO $ void $ async $ do

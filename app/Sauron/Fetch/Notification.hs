@@ -76,7 +76,7 @@ fetchAsIssueOrPull wrap owner repo subUrl stateVar = do
                           Fetched x -> Fetching (Just x)
                           Fetching x -> Fetching x
                           _ -> Fetching Nothing })
-                      (atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Errored "Fetch failed with exception." }) $ do
+                      (atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Errored "Fetch failed with exception." }) $
         withGithubApiSemaphore (githubWithLogging (issueR owner repo (IssueNumber num))) >>= \case
           Left err -> atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Errored (show err) }
           Right issue ->

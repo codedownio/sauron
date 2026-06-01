@@ -7,18 +7,22 @@ module Sauron.Event.CommentModal (
   closeWithComment,
   refreshIssueComments,
   fetchCommentsAndOpenModal,
-  fetchIssueCommentsAndEvents
+  fetchIssueCommentsAndEvents,
+  openCommentForNotification
 ) where
 
 import Brick as B
 import Brick.BChan
 import Control.Monad.IO.Unlift
+import Data.Char (isDigit)
 import qualified Data.Text as T
 import Data.Time
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
+import Network.URI (parseURI, uriPath)
 import Relude
+import Sauron.Actions.Util (withGithubApiSemaphore, githubWithLogging)
 import Sauron.Fetch.Issue (fetchIssueCommentsAndEvents)
 import qualified Sauron.Mutations.Issue as Issue
 import Sauron.Types
@@ -121,3 +125,42 @@ fetchCommentsAndOpenModal baseContext issue@(Issue {issueNumber=(IssueNumber iss
       Left _err -> do
         -- On error, open modal with empty comments and events
         writeBChan (eventChan baseContext) (CommentModalEvent (OpenCommentModal issue V.empty nodeState isPR owner name))
+
+-- | Open comment modal for a notification that contains an issue or PR.
+-- Uses the fetched content if available, otherwise fetches the issue from scratch.
+openCommentForNotification :: BaseContext -> Notification -> NotificationState -> EventM ClickableName AppState ()
+openCommentForNotification baseContext notification notifState =
+  case notificationStateContent notifState of
+    Fetched (NotificationIssue issue comments) -> do
+      commentsVar <- liftIO $ newTVarIO (Fetched comments)
+      fetchCommentsAndOpenModal baseContext issue commentsVar False owner name
+    Fetched (NotificationPull issue comments) -> do
+      commentsVar <- liftIO $ newTVarIO (Fetched comments)
+      fetchCommentsAndOpenModal baseContext issue commentsVar True owner name
+    _ | subjectType subject `elem` ["Issue", "PullRequest"] ->
+      whenJust (subjectURL subject >>= extractIssueNumber) $ \issueNum ->
+        liftIO $ fetchIssueAndOpenCommentModal baseContext owner name issueNum (subjectType subject == "PullRequest")
+    _ -> return ()
+  where
+    subject = notificationSubject notification
+    RepoRef {repoRefOwner=(SimpleOwner {simpleOwnerLogin=owner}), repoRefRepo=name} = notificationRepo notification
+
+fetchIssueAndOpenCommentModal :: BaseContext -> Name Owner -> Name Repo -> Int -> Bool -> IO ()
+fetchIssueAndOpenCommentModal baseContext owner name issueNum isPR =
+  void $ async $ flip runReaderT baseContext $
+    withGithubApiSemaphore (githubWithLogging (issueR owner name (IssueNumber issueNum))) >>= \case
+      Left _err -> return ()
+      Right issue -> liftIO $ do
+        commentsResult <- fetchIssueCommentsAndEvents baseContext owner name issueNum
+        commentsVar <- newTVarIO (Fetched (either (const V.empty) id commentsResult))
+        now <- getCurrentTime
+        writeBChan (eventChan baseContext) (CommentModalEvent (OpenCommentModal issue (either (const V.empty) id commentsResult) commentsVar isPR owner name))
+        writeBChan (eventChan baseContext) (TimeUpdated now)
+
+extractIssueNumber :: URL -> Maybe Int
+extractIssueNumber (URL url) = do
+  uri <- parseURI (toString url)
+  let segments = filter (not . T.null) $ T.splitOn "/" $ toText (uriPath uri)
+  case reverse (toList segments) of
+    (idStr:_) | T.all isDigit idStr -> readMaybe (toString idStr)
+    _ -> Nothing

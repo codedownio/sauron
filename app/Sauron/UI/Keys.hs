@@ -40,10 +40,10 @@ closeReopenKey = V.KChar 'C'
 cancelWorkflowKey = V.KChar 'C'
 zoomModalKey = V.KChar 'z'
 newIssueKey = V.KChar 'c'
-markNotificationDoneKey = V.KChar 'd'
+markNotificationDoneKey = V.KChar 'D'
 markNotificationReadKey = V.KChar 'R'
 
-detailsToggleKey = V.KChar 'D'
+detailsToggleKey = V.KChar 'd'
 
 -- Jump-to keys (jump to next node of this type)
 jumpToIssuesKey = V.KChar 'i'

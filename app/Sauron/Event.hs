@@ -105,11 +105,13 @@ appEvent s@(_appModal -> Just modalState) e = case e of
           modify (appModal . _Just . newIssueBodyEditor .~ bodyEd')
     ZoomModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
       _ -> whenM (handleModalScrolling ZoomModalContent ev) $ clearAutoScrollTarget s
     (LogModalState _) -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey (V.KChar 'c') []) -> modify (appLogs .~ Seq.empty)
       (V.EvKey (V.KChar 's') []) -> modify (appShowStackTraces %~ not)
@@ -243,6 +245,8 @@ handleMainPaneEvents' s e = case e of
   V.EvKey (V.KChar 'n') [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollBy vp 1)
   V.EvKey (V.KChar 'v') [V.MMeta] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollPage vp Up)
   V.EvKey (V.KChar 'v') [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollPage vp Down)
+  V.EvKey V.KPageUp [] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollPage vp Up)
+  V.EvKey V.KPageDown [] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollPage vp Down)
   V.EvKey V.KHome [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollToBeginning vp)
   V.EvKey V.KEnd [V.MCtrl] -> clearAutoScrollTarget s >> withScroll s (\vp -> vScrollToEnd vp)
 
@@ -363,6 +367,9 @@ handleZoomModalComment s = do
         Just (RepoNode (EntityData {_static=(owner, name)})) ->
           fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar True owner name
         Nothing -> return ()
+    Just (ZoomModalState (SomeNode (SingleNotificationNode (EntityData {_static=notification, _state=notifStateVar}))) _parents) -> do
+      notifState <- liftIO $ readTVarIO notifStateVar
+      openCommentForNotification (s ^. appBaseContext) notification notifState
     _ -> return ()
   where
     -- findRepoParent expects NonEmpty, but we have a list. Create a dummy NonEmpty.

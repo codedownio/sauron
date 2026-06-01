@@ -46,11 +46,15 @@ renderZoomModal _ _ = str "Invalid modal state" -- This should never happen
 getZoomModalHotkeys :: SomeNode Fixed -> [Widget ClickableName]
 getZoomModalHotkeys (SomeNode node) = nodeSpecificHotkeys ++ commonHotkeys
   where
-    commonHotkeys = [hotkeyWidget "Esc" "Close"]
+    commonHotkeys = [hotkeyWidget "q" "Close"]
 
     nodeSpecificHotkeys = case node of
       SingleIssueNode {} -> [hotkeyWidget (showKey commentKey) "Comment"]
       SinglePullNode {} -> [hotkeyWidget (showKey commentKey) "Comment"]
+      SingleNotificationNode (EntityData {_static=notification}) ->
+        if subjectType (notificationSubject notification) `elem` ["Issue", "PullRequest"]
+        then [hotkeyWidget (showKey commentKey) "Comment"]
+        else []
       _ -> []
 
     hotkeyWidget :: String -> String -> Widget ClickableName
