@@ -10,6 +10,7 @@ module Sauron.Options (
   , RepoSettings(..)
 
   , PeriodSpec(..)
+  , defaultHealthCheckPeriodUs
 
   , Config(..)
   , ConfigNode(..)
@@ -93,6 +94,9 @@ instance FromJSON PeriodSpec where
   parseJSON (A.Number n) = pure (PeriodSpec (round n))
   -- TODO: parse k8s-style time specs like 5m
   parseJSON x = fail [i|Can't parse period spec: #{x}|]
+
+defaultHealthCheckPeriodUs :: PeriodSpec
+defaultHealthCheckPeriodUs = PeriodSpec (1_000_000 * 60 * 10)
 
 data RepoSettings = RepoSettings {
   repoSettingsCheckPeriod :: Maybe PeriodSpec

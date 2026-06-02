@@ -27,6 +27,7 @@ import Sauron.Fetch.Pull
 import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
+import Sauron.HealthCheck.Repo (runRepoHealthCheck)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
 import Sauron.Types
 import Sauron.UI.Util (isFetchingOrFetched)
@@ -40,8 +41,10 @@ refreshOnZoom :: (MonadIO m, SomeNodeConstraints Fixed a) => BaseContext -> Node
 refreshOnZoom bc node parents = void $ fetchOnOpenIfNecessary bc node parents
 
 refreshLine :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
-refreshLine bc (RepoNode (EntityData {_static=(owner, name), _state})) _parents =
-  liftIO $ async $ flip runReaderT bc $ fetchRepo owner name _state
+refreshLine bc (RepoNode (EntityData {_static=(owner, name), _state, _healthCheck})) _parents =
+  liftIO $ async $ do
+    flip runReaderT bc $ fetchRepo owner name _state
+    runRepoHealthCheck bc (owner, name) _state _healthCheck
 refreshLine bc item@(PaginatedIssuesNode _) parents =
   case findRepoParent parents of
     Just (RepoNode (EntityData {_static=(owner, name)})) ->
@@ -68,9 +71,13 @@ refreshLine bc item@(PaginatedNotificationsNode _) _ =
   liftIO $ async $ liftIO $ runReaderT (fetchNotifications item) bc
 refreshLine bc item@(PaginatedReposNode _) _parents =
   liftIO $ async $ liftIO $ runReaderT (fetchRepos item) bc
-refreshLine bc item@(SingleJobNode _) parents = do
-  liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
-  liftIO $ async $ return ()
+refreshLine bc item@(SingleJobNode (EntityData {_static=job@(Job {jobId})})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state=repoState, _healthCheck}))) = do
+  let workflowParent = findWorkflowParent parents
+  liftIO $ async $ flip runReaderT bc $ do
+    void $ concurrently (fetchJob owner name jobId item)
+                        (fetchJobLogs owner name job item workflowParent)
+    liftIO $ void $ startJobHealthCheckIfNeeded bc item parents
+    liftIO $ runRepoHealthCheck bc (owner, name) repoState _healthCheck
 refreshLine _ _ _ = liftIO $ async $ return ()
 
 refreshVisibleLines :: (

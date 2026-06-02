@@ -30,9 +30,6 @@ import UnliftIO.Directory (createDirectoryIfMissing, doesFileExist)
 import UnliftIO.Exception
 
 
-defaultHealthCheckPeriodUs :: PeriodSpec
-defaultHealthCheckPeriodUs = PeriodSpec (1_000_000 * 60 * 10)
-
 -- | Handle the init-config command
 handleInitConfig :: Bool -> IO ()
 handleInitConfig doWrite = do

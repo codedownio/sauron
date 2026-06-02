@@ -15,6 +15,8 @@ import GitHub
 import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
+import Sauron.HealthCheck.Repo (newRepoHealthCheckThread)
+import Sauron.Options (PeriodSpec(..), defaultHealthCheckPeriodUs)
 import Sauron.Setup.Common (newRepoNode)
 import Sauron.Types
 
@@ -59,5 +61,7 @@ fetchRepos (PaginatedReposNode (EntityData {..})) = do
         let nsName = (simpleOwnerLogin $ repoOwner r, repoName r)
         repoVar <- newTVarIO (Fetched r)
         healthCheckVar <- newTVarIO NotFetched
-        newRepoNode nsName repoVar healthCheckVar Nothing (_depth + 1) (getIdentifier bc)
+        let ps@(PeriodSpec period) = defaultHealthCheckPeriodUs
+        hcThread <- liftIO $ newRepoHealthCheckThread bc nsName repoVar healthCheckVar ps
+        newRepoNode nsName repoVar healthCheckVar (Just (hcThread, period)) (_depth + 1) (getIdentifier bc)
       atomically $ writeTVar _children repoNodes
