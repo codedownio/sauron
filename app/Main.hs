@@ -31,7 +31,7 @@ import Sauron.Config
 import Sauron.Event
 import Sauron.Expanding
 import Sauron.Fix
-import Sauron.OAuth (authenticateWithGitHub, loadSavedToken)
+import Sauron.OAuth (authenticateWithGitHub, getConfigDir, loadSavedToken)
 import Sauron.Options
 import Sauron.Setup.AllReposForUser
 import Sauron.Setup.ReposFromCurrentDirectory
@@ -47,15 +47,20 @@ import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TimelineBorder (borderWithAttr)
 import Sauron.UI.TopBox (topBox)
 import Sauron.UnicodeWidthTable (WidthTableMode(..), buildAndSaveWidthTable, loadWidthTable)
+import System.FilePath ((</>))
 import System.IO.Error (userError)
 import UnliftIO.Async
 import UnliftIO.Concurrent
+import UnliftIO.Directory (doesFileExist)
 import UnliftIO.Exception
 import UnliftIO.IO hiding (hFlush)
 
 
 refreshPeriod :: Int
 refreshPeriod = 100000
+
+periodFromConfig :: Maybe Config -> PeriodSpec
+periodFromConfig mc = fromMaybe defaultHealthCheckPeriodUs (mc >>= configSettings >>= repoSettingsCheckPeriod)
 
 mkApp :: V.ColorMode -> App AppState AppEvent ClickableName
 mkApp colorMode = App {
@@ -131,21 +136,26 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitL
     Just configFile -> Just <$> loadConfig configFile
     Nothing -> pure Nothing
 
+  globalConfigPath <- (</> "config.yaml") <$> getConfigDir
+
   -- Determine repo discovery mode (before building config nodes, since single-repo mode uses fewer nodes)
-  let effectiveDefaultPeriod = fromMaybe defaultHealthCheckPeriodUs (maybeConfig >>= configSettings >>= repoSettingsCheckPeriod)
-  (nodeConfigs, extraNodes :: V.Vector (SomeNode Variable)) <- if
+  (nodeConfigs, extraNodes :: V.Vector (SomeNode Variable), effectiveDefaultPeriod) <- if
     | cliShowAllRepos -> do
         nodes <- V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
-        pure (fromMaybe defaultConfigNodes (maybeConfig >>= configNodes), nodes)
-    | Just _ <- maybeConfig ->
-        pure (fromMaybe defaultConfigNodes (maybeConfig >>= configNodes), V.empty)
+        pure (fromMaybe defaultConfigNodes (maybeConfig >>= configNodes), nodes, periodFromConfig maybeConfig)
+    | Just config <- maybeConfig ->
+        pure (fromMaybe defaultConfigNodes (configNodes config), V.empty, periodFromConfig maybeConfig)
     | otherwise -> isContainedInGitRepo >>= \case
         Just (namespace, name) -> do
           nodes <- fmap SomeNode <$> reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs (namespace, name)
-          pure (singleRepoConfigNodes, nodes)
-        Nothing -> do
-          nodes <- V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
-          pure (defaultConfigNodes, nodes)
+          pure (singleRepoConfigNodes, nodes, defaultHealthCheckPeriodUs)
+        Nothing -> doesFileExist globalConfigPath >>= \case
+          True -> do
+            globalConfig <- loadConfig globalConfigPath
+            pure (fromMaybe defaultConfigNodes (configNodes globalConfig), V.empty, periodFromConfig (Just globalConfig))
+          False -> do
+            nodes <- V.singleton . SomeNode <$> allReposForUser baseContext defaultHealthCheckPeriodUs userLogin
+            pure (defaultConfigNodes, nodes, defaultHealthCheckPeriodUs)
   topLevelNodes <- buildConfigNodes baseContext effectiveDefaultPeriod nodeConfigs 0
 
   let listElems = V.fromList topLevelNodes <> extraNodes
