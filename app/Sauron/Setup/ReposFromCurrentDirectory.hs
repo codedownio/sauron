@@ -86,10 +86,10 @@ isContainedInGitRepo = runMaybeT $ do
 
 -- | Autodetect repos for user
 reposFromCurrentDirectory :: BaseContext -> PeriodSpec -> (Name Owner, Name Repo) -> IO (V.Vector (Node Variable RepoT))
-reposFromCurrentDirectory baseContext defaultHealthCheckPeriodUs nsName = do
+reposFromCurrentDirectory baseContext healthCheckPeriodUs nsName = do
   repoVar <- newTVarIO NotFetched
   healthCheckVar <- newTVarIO NotFetched
-  let ps@(PeriodSpec period) = defaultHealthCheckPeriodUs
+  let ps@(PeriodSpec period) = healthCheckPeriodUs
   hcThread <- newRepoHealthCheckThread baseContext nsName repoVar healthCheckVar ps
   node@(RepoNode (EntityData {..})) <- newRepoNode nsName repoVar healthCheckVar (Just (hcThread, period)) 0 (getIdentifier baseContext)
 
