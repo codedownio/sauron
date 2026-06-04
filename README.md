@@ -51,7 +51,7 @@ Organize your repos into named sections with a simple YAML config and watch them
 all at once — issues, pull requests, CI runs, branches, and notifications — each
 repo showing live health-check status.
 
-![Multi-repo dashboard](./demo_overview.gif)
+![Multi-repo dashboard](./gifs/demo_overview.gif)
 
 ## Issues & Pull Requests
 
@@ -59,35 +59,35 @@ Browse and search issues and pull requests with full GitHub search-qualifier
 support, and read them rendered inline — markdown, tables, task lists, and
 syntax-highlighted code.
 
-![Browsing and searching issues](./demo_issues.gif)
+![Browsing and searching issues](./gifs/demo_issues.gif)
 
 ## Commenting
 
 Comment on an issue or PR without leaving the terminal. A split Write/Preview
 composer renders your markdown — and highlights code — as you type.
 
-![Commenting on an issue](./demo_comment.gif)
+![Commenting on an issue](./gifs/demo_comment.gif)
 
 ## Workflow runs & job logs
 
 Monitor CI runs, drill into individual jobs, and read syntax-highlighted job
 logs. Sort jobs by failures, name, or runtime to find what you need fast.
 
-![Workflow runs and job logs](./demo_workflows.gif)
+![Workflow runs and job logs](./gifs/demo_workflows.gif)
 
 ## Branches
 
 View all, your, active, and stale branches — with ahead/behind counts, CI check
 status, and associated PR state at a glance.
 
-![Branches with ahead/behind counts and CI status](./demo_branches.gif)
+![Branches with ahead/behind counts and CI status](./gifs/demo_branches.gif)
 
 ## Notifications
 
 View and manage your GitHub notifications. Opening one jumps straight to the
 latest comment and highlights it, so you immediately see what changed.
 
-![Notifications](./demo_notifications.gif)
+![Notifications](./gifs/demo_notifications.gif)
 
 ## Install
 
