@@ -55,7 +55,7 @@ queuedIcon = withAttr queuedAttr (str "●")
 cancelled = withAttr cancelledAttr (str "⊘")
 greenCheck = withAttr greenCheckAttr (str "✓")
 redX = withAttr redXAttr (str "✗")
-neutral = withAttr neutralAttr (str "-")
+neutral = withAttr neutralAttr (str "○")
 unknown = withAttr unknownAttr (str "?")
 
 chooseWorkflowStatus :: Text -> WorkflowStatus

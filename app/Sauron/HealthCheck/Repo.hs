@@ -100,7 +100,9 @@ aggregateCheckRuns runs
   | WorkflowRunning `elem` statuses = WorkflowRunning
   | WorkflowPending `elem` statuses = WorkflowPending
   | WorkflowFailed `elem` statuses = WorkflowFailed
-  | all (== WorkflowSuccess) statuses = WorkflowSuccess
+  -- Neutral/skipped check runs don't block a commit on GitHub (it still shows a green check),
+  -- so treat them as passing: any non-failing mix of success/neutral/skipped reads as success.
+  | all (`elem` [WorkflowSuccess, WorkflowNeutral]) statuses = WorkflowSuccess
   | otherwise = WorkflowNeutral
   where
     statuses = map checkRunToStatus runs
