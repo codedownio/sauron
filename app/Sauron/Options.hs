@@ -55,8 +55,8 @@ cliArgsParser = CliArgs
   <*> switch (long "all" <> help "Show all repositories for the authenticated user")
   <*> optional (option (maybeReader parseColorMode) (long "color-mode" <> help "Force a specific color mode (full, 240, 16, 8, none)" <> metavar "MODE"))
   <*> switch (long "split-logs" <> help "Split terminal view: app on left, logs on right")
-  <*> switch (long "rebuild-widths" <> help "Rebuild the Unicode character width table to improve display (emoji/symbol ranges)")
-  <*> switch (long "rebuild-widths-full" <> help "Rebuild the Unicode character width table to improve display (full Unicode scan, slower)")
+  <*> switch (long "rebuild-widths" <> help "Rebuild the Unicode width table (emoji/symbol ranges)")
+  <*> switch (long "rebuild-widths-full" <> help "Rebuild the Unicode width table (full Unicode scan, slower)")
 
 initConfigParser :: Parser Command
 initConfigParser = InitConfig

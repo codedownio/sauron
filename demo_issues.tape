@@ -1,50 +1,53 @@
+# Chapter 2 — Issue browsing & search (on the sauron repo)
+# Ends with issue #1 (Markdown test issue) open, scrolled to the bottom.
 Output demo_issues.gif
-
-Set FontSize 18
-Set Width 1400
-Set Height 1000
+Source header.tape
 
 Hide
 Type@1ms "sauron -c $HOME/tools/sauron/demo_config.yaml"
 Enter
-Sleep 2s
+Sleep 6s
+Down 7
+Tab
+Sleep 3s
+Down 1
 Show
 
-# Scroll down to aeson-typescript
-Down@200ms 7
-Sleep 1s
+# Sit on the Issues section a beat before opening it
+Source pause_medium.tape
 Tab
-Sleep 1s
+Source pause_fetch.tape
 
-# Go to issues
-Down 1
-Sleep 1s
-Tab
-Sleep 1s
+# Scroll through the open issues
+Down@500ms 4
+Source pause_short.tape
+Up@400ms 4
+Source pause_short.tape
 
-# Search for Markdown issue
+# Search — append a term to the GitHub qualifiers to narrow down
 Type "s"
-Sleep 100ms
-Space
-Type "markdown"
-Sleep 2s
+Source pause_short.tape
+Ctrl+e
+Type " Markdown"
+Source pause_medium.tape
 Enter
-Sleep 2s
+Source pause_medium.tape
 
-# Scroll down markdown issue
+# Open the matching issue (short pause, then straight into scrolling)
 Down 1
-Sleep 1s
+Source pause_short.tape
 Tab
-Sleep 1s
+Source pause_long.tape
+
+# Scroll all the way through the rendered markdown body
 Ctrl+v
-Sleep 500ms
+Source pause_medium.tape
 Ctrl+v
-Sleep 500ms
+Source pause_medium.tape
 Ctrl+v
-Sleep 500ms
+Source pause_medium.tape
 Ctrl+v
-Sleep 500ms
+Source pause_medium.tape
 Ctrl+v
-Sleep 500ms
-Ctrl+v
-Sleep 500ms
+# Longer hold at the bottom
+Sleep 4s

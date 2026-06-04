@@ -12,18 +12,15 @@
 
 ---
 
-![demo](./demo.gif)
+## Table of Contents
 
-## Features
-
-- **Multi-repo dashboard** — organize repos into named sections with a simple YAML config
-- **Issues & pull requests** — browse, search, comment, close/reopen, and create new issues
-- **Workflow runs & job logs** — monitor CI status, drill into job logs with syntax highlighting
-- **Branches** — view all, yours, active, and stale branches with ahead/behind counts
-- **Notifications** — view and manage GitHub notifications, mark as read/done
-- **Health checks** — periodic background polling to keep statuses up to date
-- **Split view** — optional side-by-side layout with logs panel (`--split-logs`)
-- **Keyboard-driven** — full hotkey support for fast navigation
+- [Why Sauron?](#why-sauron)
+- [Features](#features)
+- [Install](#install)
+- [Setup](#setup)
+- [Configuration](#configuration-single-repo)
+- [CLI Options](#cli-options)
+- [License](#license)
 
 ## Why Sauron?
 
@@ -46,6 +43,52 @@ Most Git TUIs (`lazygit`, `gitui`) focus on local operations — staging, commit
 | Local git operations | :x: | :x: | :x: | :white_check_mark: | :white_check_mark: |
 | Open in browser | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :x: |
 
+# Features
+
+## Multi-repo dashboard
+
+Organize your repos into named sections with a simple YAML config and watch them
+all at once — issues, pull requests, CI runs, branches, and notifications — each
+repo showing live health-check status.
+
+![Multi-repo dashboard](./demo_overview.gif)
+
+## Issues & Pull Requests
+
+Browse and search issues and pull requests with full GitHub search-qualifier
+support, and read them rendered inline — markdown, tables, task lists, and
+syntax-highlighted code.
+
+![Browsing and searching issues](./demo_issues.gif)
+
+## Commenting
+
+Comment on an issue or PR without leaving the terminal. A split Write/Preview
+composer renders your markdown — and highlights code — as you type.
+
+![Commenting on an issue](./demo_comment.gif)
+
+## Workflow runs & job logs
+
+Monitor CI runs, drill into individual jobs, and read syntax-highlighted job
+logs. Sort jobs by failures, name, or runtime to find what you need fast.
+
+![Workflow runs and job logs](./demo_workflows.gif)
+
+## Branches
+
+View all, your, active, and stale branches — with ahead/behind counts, CI check
+status, and associated PR state at a glance.
+
+![Branches with ahead/behind counts and CI status](./demo_branches.gif)
+
+## Notifications
+
+View and manage your GitHub notifications. Opening one jumps straight to the
+latest comment and highlights it, so you immediately see what changed.
+
+![Notifications](./demo_notifications.gif)
+
 ## Install
 
 ### Pre-built binaries
@@ -58,13 +101,17 @@ TMPDIR=$(mktemp -d)
 curl -sL https://github.com/codedownio/sauron/releases/latest/download/sauron-x86_64-linux-0.1.0.1.tar.gz | tar xz -C "$TMPDIR"
 sudo mv "$TMPDIR/sauron" /usr/local/bin/
 rmdir "$TMPDIR"
+```
 
+```bash
 # macOS (Apple Silicon)
 TMPDIR=$(mktemp -d)
 curl -sL https://github.com/codedownio/sauron/releases/latest/download/sauron-aarch64-darwin-0.1.0.1.tar.gz | tar xz -C "$TMPDIR"
 sudo mv "$TMPDIR/sauron" /usr/local/bin/
 rmdir "$TMPDIR"
+```
 
+``` bash
 # macOS (Intel)
 TMPDIR=$(mktemp -d)
 curl -sL https://github.com/codedownio/sauron/releases/latest/download/sauron-x86_64-darwin-0.1.0.1.tar.gz | tar xz -C "$TMPDIR"
@@ -134,39 +181,32 @@ Then run:
 sauron -c path/to/config.yaml
 ```
 
-Or just put your config file in ~/.config/sauron/config.yaml, and sauron will load it from there automatically.
-
-## Keybindings
-
-| Key | Action |
-|-----|--------|
-| `Enter` / `Tab` | Toggle open/close |
-| `n` / `p` | Next / previous item |
-| `o` | Open in browser |
-| `H` `I` `P` `A` | Open repo home / issues / pulls / actions in browser |
-| `r` / `R` | Refresh selected / refresh all |
-| `s` | Search |
-| `c` | Comment on issue/PR or create new issue |
-| `C` | Close/reopen issue or cancel workflow |
-| `z` | Zoom into selected item |
-| `N` `B` `F` `L` | Next / back / first / last page |
-| `d` | Mark notification done |
-| `q` | Quit |
+Or just put your config file in `~/.config/sauron/config.yaml`, and `sauron` will load it from there automatically.
 
 ## CLI Options
 
 ```
-sauron [OPTIONS]
+sauron [COMMAND | OPTIONS]
 
-  --token STRING       OAuth token for GitHub
-  -c, --config FILE    Config file path (YAML)
-  -r INT               Max concurrent GitHub API requests (default: 10)
-  --debug-file FILE    Write debug logs to file
-  --auth               Force OAuth authentication flow
-  --all                Show all repos for the authenticated user
-  --color-mode MODE    Force color mode: full, 240, 16, 8, none
-  --split-logs         Split view: app on left, logs on right
+Options:
+  --token STRING            OAuth token to auth to GitHub
+  -c, --config STRING       Config file path
+  -r, --github-concurrent-requests INT
+                            Maximum number of concurrent requests to GitHub (default: 10)
+  --debug-file STRING       Debug file path (for optional logging)
+  --auth                    Force OAuth authentication flow
+  --all                     Show all repositories for the authenticated user
+  --color-mode MODE         Force a specific color mode (full, 240, 16, 8, none)
+  --split-logs              Split terminal view: app on left, logs on right
+  --rebuild-widths          Rebuild the Unicode width table (emoji/symbol ranges)
+  --rebuild-widths-full     Rebuild the Unicode width table (full Unicode scan, slower)
+  -h, --help                Show this help text
+
+Commands:
+  init-config               Print a sample config file to stdout
 ```
+
+Keybindings are shown in the app itself, in the help bar at the top.
 
 ## License
 

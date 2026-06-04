@@ -1,55 +1,33 @@
+# Chapter 1 — Repo viewing (multi-repo dashboard)
+# Ends with codedownio/sauron's Issues section opened.
 Output demo_overview.gif
-
-Set FontSize 18
-Set Width 1400
-Set Height 1000
+Source header.tape
 
 Hide
 Type@1ms "sauron -c $HOME/tools/sauron/demo_config.yaml"
 Enter
-Sleep 2s
+Sleep 6s
 Show
 
-Sleep 1s
+# Take in the multi-repo dashboard
+Source pause_medium.tape
 
-# Open notifications
+# Open a repo to reveal its sections, and sit on it a beat
+Down@400ms 2
+Source pause_short.tape
 Tab
-Sleep 2s
+Source pause_long.tape
 
-# Scroll through some notifications
-Down@200ms 3
-Sleep 1s
+# Collapse it and move down to the sauron repo
+Left
+Source pause_short.tape
+Down@400ms 5
+Source pause_short.tape
 
-# Close notifications
-Left 1
-Sleep 1s
-
-# Scroll down through repos
-Down@200ms 5
-Sleep 1s
-
-# Open a repo's issues/PRs
+# Open sauron, go to its Issues section, and open that too
 Tab
-Sleep 1s
-Down@200ms 2
-Sleep 1s
-
-# Close and continue scrolling
-Left 1
-Sleep 1s
-Down@200ms 5
-Sleep 1s
-
-# Open another repo
+Source pause_medium.tape
+Down 1
+Source pause_short.tape
 Tab
-Sleep 1s
-Down@200ms 2
-Sleep 1s
-Left 1
-Sleep 1s
-
-# Scroll down through more headings
-Down@200ms 5
-Sleep 1s
-Down@200ms 5
-Sleep 2s
+Source pause_fetch.tape
