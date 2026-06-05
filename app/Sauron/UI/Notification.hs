@@ -21,14 +21,17 @@ import Network.URI (parseURI, uriPath)
 import Relude
 import Sauron.Actions (refreshLine, refreshOnZoom)
 import Sauron.Actions.Util (findNotificationsParent)
+import Sauron.Event.CommentModal (openCommentForNotification)
 import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Mutations.Notification (markNotificationAsDone, markNotificationAsRead)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (renderTimelineItemWithAttr, consolidateEvents, TimelineItem(..), detailsToggleWidget)
-import Sauron.Event.CommentModal (openCommentForNotification)
+import Sauron.UI.Issue.Events (adaptiveWidth)
 import Sauron.UI.Keys (commentKey, markNotificationDoneKey, markNotificationReadKey, zoomModalKey, showKey)
+import Sauron.UI.Markdown (markdownToWidgetsWithWidth)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
+import Sauron.UI.TimelineBorder (standaloneTimelineBorder)
 import Sauron.UI.Util.TimeDiff (timeFromNow)
 import qualified System.FilePath.Posix as FP
 import UnliftIO.Async (async)
@@ -113,6 +116,7 @@ notificationLine now toggled' (Notification {..}) animationCounter notifState = 
           if issueDraft == Just True then PullDraft
           else if issueState == StateOpen then PullOpen
           else PullClosed
+      _ | subjectType == subjectTypeRelease -> Just releaseIcon
       _ -> subjectStateIcon <$> notificationStateSubjectState notifState
 
     line1 = hBox (catMaybes [
@@ -184,6 +188,8 @@ notificationInner detailsExpanded now notification (NotificationState {..}) = vB
         [padTop (Pad 1) $ renderNotificationContent detailsExpanded now issue comments latestCommentId notificationStateAutoScroll]
       Fetched (NotificationPull issue comments) ->
         [padTop (Pad 1) $ renderNotificationContent detailsExpanded now issue comments latestCommentId notificationStateAutoScroll]
+      Fetched (NotificationRelease release) ->
+        [padTop (Pad 1) $ renderRelease detailsExpanded now release]
       Fetched NotificationOther -> []
       Fetching _ -> [padTop (Pad 1) $ str "Loading..."]
       Errored err -> [padTop (Pad 1) $ withAttr erroredAttr $ str [i|Error: #{err}|]]
@@ -207,3 +213,14 @@ renderNotificationContent detailsExpanded now (Issue {issueUser=(SimpleUser {sim
           _ -> False
 
         widget = renderTimelineItemWithAttr detailsExpanded (if isHighlighted then Just highlightedCommentAttr else Nothing) now (length allItems) idx item
+
+renderRelease :: DetailsExpanded -> UTCTime -> Release -> Widget n
+renderRelease detailsExpanded now (Release {releaseAuthor=(SimpleUser {simpleUserLogin=(N authorName)}), ..}) =
+  adaptiveWidth $ \w -> standaloneTimelineBorder headerWidget (markdownToWidgetsWithWidth detailsExpanded (w - 2) bodyText)
+  where
+    publishedTime = fromMaybe releaseCreatedAt releasePublishedAt
+    headerWidget = padLeftRight 1 $ hBox [
+      withAttr usernameAttr (str [i|#{authorName} |])
+      , str [i|released #{releaseName} (#{releaseTagName}) #{timeFromNow (diffUTCTime now publishedTime)}|]
+      ]
+    bodyText = if releaseBody == "" then "*No release notes provided.*" else releaseBody

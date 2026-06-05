@@ -12,14 +12,33 @@ import GitHub
 import Network.URI (parseURI, uriPath)
 import Relude hiding (Down, pi)
 import Sauron.Actions
+import Sauron.Fetch.Notification (fetchNotificationContent)
 import Sauron.Logging
 import Sauron.Types
+import UnliftIO.Async (async)
 
 
-openNode :: (MonadIO m) => BaseContext -> NonEmpty (SomeNode Variable) -> Node Fixed a -> m ()
-openNode bc elems el = case getNodeUrl el (toList elems) of
+openNode :: (MonadIO m) => BaseContext -> SomeNode Variable -> NonEmpty (SomeNode Variable) -> Node Fixed a -> m ()
+openNode bc (SomeNode (SingleNotificationNode (EntityData {_static=notification, _state=stateVar}))) _ _ =
+  -- Resolve the notification's web URL in the background, fetching its content first if needed
+  -- (the same fetch that runs when the notification is opened) so 'o' always lands on the right
+  -- page, whether or not the notification has been opened yet.
+  void $ liftIO $ async $ flip runReaderT bc $ do
+    (notificationStateContent <$> readTVarIO stateVar) >>= \case
+      Fetched _ -> pure ()
+      _ -> fetchNotificationContent notification stateVar
+    openBrowserToUrl . notificationWebUrl notification =<< readTVarIO stateVar
+openNode bc _ elems el = case getNodeUrl el (toList elems) of
   Just url -> openBrowserToUrl url
   Nothing -> warn' bc [i|(#{el}) Couldn't find URL to open node|]
+
+-- | Resolve a notification's web URL. Releases are referenced only by API id in the notification,
+-- so we read the real web URL from the fetched release; everything else is derived from the
+-- notification subject (which preserves issue/PR comment anchors).
+notificationWebUrl :: Notification -> NotificationState -> String
+notificationWebUrl notification (NotificationState {notificationStateContent=content}) = case content of
+  Fetched (NotificationRelease release) -> toString $ getUrl $ releaseHtmlUrl release
+  _ -> getNotificationUrl notification
 
 getNodeUrl :: Node f a -> [SomeNode Variable] -> Maybe String
 getNodeUrl (PaginatedIssuesNode _) (findRepoBaseUrl -> Just repoBaseUrl) = Just (repoBaseUrl <> "/issues")
@@ -73,6 +92,10 @@ getNotificationUrl notification = case (subjectLatestCommentURL, subjectURL, sub
     case extractIdFromApiUrl (toString $ getUrl subUrl) of
       Just prId -> "https://github.com/" <> toString ownerName <> "/" <> toString repoName <> "/pull/" <> prId
       Nothing -> toString $ getUrl subUrl
+  -- Best-effort fallback only: 'openNode' fetches the release and opens its exact web URL.
+  -- This branch is reached only if that fetch failed, so fall back to the repo's releases page
+  -- (the subject URL is an API endpoint, and the tag can't be reconstructed from the release id).
+  (_, _, typ) | typ == subjectTypeRelease -> "https://github.com/" <> toString ownerName <> "/" <> toString repoName <> "/releases"
   (_, Just subUrl, _) -> toString $ getUrl subUrl  -- Fallback to API URL for other types
   (_, Nothing, _) -> toString $ getUrl $ notificationUrl notification
   where

@@ -61,7 +61,24 @@ fetchNotificationContent notification stateVar = do
   case (subjectType, subjectURL) of
     ("Issue", Just subUrl) -> fetchAsIssueOrPull NotificationIssue owner repo subUrl stateVar
     ("PullRequest", Just subUrl) -> fetchAsIssueOrPull NotificationPull owner repo subUrl stateVar
+    (typ, Just subUrl) | typ == subjectTypeRelease -> fetchAsRelease owner repo subUrl stateVar
     _ -> atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Fetched NotificationOther }
+
+fetchAsRelease :: (
+  HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
+  ) => Name Owner -> Name Repo -> URL -> TVar NotificationState -> m ()
+fetchAsRelease owner repo subUrl stateVar =
+  case extractNumberFromApiUrl (toString $ getUrl subUrl) of
+    Nothing -> atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Errored "Could not parse release ID from URL" }
+    Just num ->
+      bracketOnError_ (atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = case notificationStateContent ns of
+                          Fetched x -> Fetching (Just x)
+                          Fetching x -> Fetching x
+                          _ -> Fetching Nothing })
+                      (atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Errored "Fetch failed with exception." }) $
+        withGithubApiSemaphore (githubWithLogging (releaseR owner repo (mkId (Proxy :: Proxy Release) num))) >>= \case
+          Left err -> atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Errored (show err) }
+          Right release -> atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Fetched (NotificationRelease release) }
 
 fetchAsIssueOrPull :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -84,11 +101,10 @@ fetchAsIssueOrPull wrap owner repo subUrl stateVar = do
               Left err -> atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Errored (show err) }
               Right merged -> atomically $ modifyTVar' stateVar $ \ns -> ns { notificationStateContent = Fetched (wrap issue merged) }
 
-  where
-    extractNumberFromApiUrl :: String -> Maybe Int
-    extractNumberFromApiUrl url = do
-      uri <- parseURI url
-      let segments = filter (not . T.null) $ T.splitOn "/" $ toText (uriPath uri)
-      case reverse (toList segments) of
-        (idStr:_) | T.all isDigit idStr -> readMaybe (toString idStr)
-        _ -> Nothing
+extractNumberFromApiUrl :: String -> Maybe Int
+extractNumberFromApiUrl url = do
+  uri <- parseURI url
+  let segments = filter (not . T.null) $ T.splitOn "/" $ toText (uriPath uri)
+  case reverse (toList segments) of
+    (idStr:_) | T.all isDigit idStr -> readMaybe (toString idStr)
+    _ -> Nothing

@@ -325,8 +325,13 @@ entityDataL f (RepoNode ed) = RepoNode <$> f ed
 data NotificationContent =
   NotificationIssue Issue (V.Vector TimelineEvent)
   | NotificationPull Issue (V.Vector TimelineEvent)
+  | NotificationRelease Release
   | NotificationOther -- ^ For subject types we don't know how to render inline
   deriving (Show, Eq)
+
+-- | The GitHub notification @subject.type@ value for a release.
+subjectTypeRelease :: Text
+subjectTypeRelease = "Release"
 
 data SubjectState = IssueOpen | IssueClosed | PullOpen | PullClosed | PullMerged | PullDraft
   deriving (Show, Eq)

@@ -273,8 +273,8 @@ handleMainPaneEvents' s e = case e of
     liftIO $ runReaderT (refreshVisibleLines (s ^. appMainListVariable)) (s ^. appBaseContext)
 
   V.EvKey c [] | c == openSelectedKey -> do
-    withFixedElemAndParents s $ \(SomeNode el) _variableEl elems -> do
-      openNode (s ^. appBaseContext) elems el
+    withFixedElemAndParents s $ \(SomeNode el) variableEl elems -> do
+      openNode (s ^. appBaseContext) variableEl elems el
 
   -- Column 3
   V.EvKey c [] | c == nextPageKey -> tryNavigatePage s goNextPage

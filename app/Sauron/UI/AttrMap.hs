@@ -75,6 +75,7 @@ attrToColor colorMode = ([
   , (openStateMarkerAttr, fg (select solarizedGreen))
   , (closedStateMarkerAttr, fg (select solarizedViolet))
   , (draftMarkerAttr, fg (select brightGray))
+  , (releaseMarkerAttr, fg (select solarizedBlue))
 
 
   -- Hotkey stuff
@@ -215,6 +216,7 @@ openMarkerAttr = mkAttrName "openMarker"
 openStateMarkerAttr = mkAttrName "openStateMarker"
 closedStateMarkerAttr = mkAttrName "closedStateMarker"
 draftMarkerAttr = mkAttrName "draftMarker"
+releaseMarkerAttr = mkAttrName "releaseMarker"
 
 subjectStateIcon :: SubjectState -> (String, AttrName)
 subjectStateIcon IssueOpen = ("⊙", openStateMarkerAttr)
@@ -223,6 +225,14 @@ subjectStateIcon PullOpen = ("⎇", openStateMarkerAttr)
 subjectStateIcon PullClosed = ("⎇", closedStateMarkerAttr)
 subjectStateIcon PullMerged = ("⎇", closedStateMarkerAttr)
 subjectStateIcon PullDraft = ("◌", draftMarkerAttr)
+
+-- | Releases have no open/closed state, so they get a standalone tag icon
+-- (keyed off the notification subject type rather than a 'SubjectState').
+-- U+1F3F7 (🏷) falls inside the EmojiOnly width-table ranges (Misc Symbols and
+-- Pictographs), so its display width is measured against the terminal at startup.
+-- Use the bare codepoint (no U+FE0F) so the rendered glyph matches what was measured.
+releaseIcon :: (String, AttrName)
+releaseIcon = ("\x1F3F7", releaseMarkerAttr)
 
 
 -- * Text
