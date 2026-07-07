@@ -21,6 +21,7 @@ import Control.Monad.IO.Unlift
 import Data.Function
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
+import Data.Time.Clock (UTCTime)
 import qualified Data.Vector as V
 import GitHub
 import Lens.Micro
@@ -36,7 +37,7 @@ getFixedElemAndParents s =
   case listSelectedElement (s ^. appMainList) of
     Nothing -> return Nothing
     Just (n, fixedElem) ->
-      atomically (nthChildVector readTVar getExistentialChildrenWrappedPaginated n (s ^. appMainListVariable)) >>= \case
+      atomically (nthChildVector readTVar (getExistentialChildrenWrappedPaginated (s ^. appSortNow)) n (s ^. appMainListVariable)) >>= \case
         Nothing -> return Nothing
         Just elems -> return $ Just (fixedElem, head elems, elems)
 
@@ -131,14 +132,14 @@ getPaginationState _ = Nothing
 
 -- | Like 'getExistentialChildrenWrapped' but applies sort+pagination for workflow nodes,
 -- so nthChild traversal matches the paginated expanded list.
-getExistentialChildrenWrappedPaginated :: Node Variable a -> STM [SomeNode Variable]
-getExistentialChildrenWrappedPaginated (SingleWorkflowNode ed) = do
+getExistentialChildrenWrappedPaginated :: UTCTime -> Node Variable a -> STM [SomeNode Variable]
+getExistentialChildrenWrappedPaginated now (SingleWorkflowNode ed) = do
   children' <- readTVar (_children ed)
   state' <- readTVar (_state ed)
-  sorted <- sortWorkflowJobsSTM (workflowNodeStateJobSortBy state') children'
+  sorted <- sortWorkflowJobsSTM (workflowNodeStateJobSortBy state') now children'
   let paginated = paginateJobs (workflowNodeStateJobPage state') sorted
   return (fmap SomeNode paginated)
-getExistentialChildrenWrappedPaginated node = getExistentialChildrenWrapped node
+getExistentialChildrenWrappedPaginated _now node = getExistentialChildrenWrapped node
 
 -- * Computing nth child in the presence of expanding
 

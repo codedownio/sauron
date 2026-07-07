@@ -7,14 +7,15 @@ module Sauron.Expanding (
   ) where
 
 import Control.Monad.Writer
+import Data.Time.Clock (UTCTime)
 import qualified Data.Vector as V
 import Relude
 import Sauron.Types
 import Sauron.Workflow.Sorting
 
 
-getExpandedList :: V.Vector (SomeNode Fixed) -> V.Vector (SomeNode Fixed)
-getExpandedList = V.fromList . concatMap expandNodes . V.toList
+getExpandedList :: UTCTime -> V.Vector (SomeNode Fixed) -> V.Vector (SomeNode Fixed)
+getExpandedList now = V.fromList . concatMap expandNodes . V.toList
   where
     expandNodes :: (SomeNode Fixed) -> [(SomeNode Fixed)]
     expandNodes x@(SomeNode item) = execWriter $ do
@@ -33,7 +34,7 @@ getExpandedList = V.fromList . concatMap expandNodes . V.toList
           SingleIssueNode (EntityData {..}) -> expandChildless _children
           SinglePullNode (EntityData {..}) -> expandChildless _children
           SingleWorkflowNode (EntityData {..}) ->
-            sortWorkflowJobsFixed (workflowNodeStateJobSortBy _state) _children
+            sortWorkflowJobsFixed (workflowNodeStateJobSortBy _state) now _children
             & paginateJobs (workflowNodeStateJobPage _state)
             & expandTyped
           SingleJobNode (EntityData {..}) -> expandTyped _children

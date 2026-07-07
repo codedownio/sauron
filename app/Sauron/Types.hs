@@ -546,7 +546,7 @@ data FocusedPane =
 -- * Overall app state
 
 data AppEvent =
-  ListUpdate (V.Vector (SomeNode Fixed))
+  ListUpdate UTCTime (V.Vector (SomeNode Fixed))
   | ModalUpdate (Maybe (ModalState Fixed))
   | AnimationTick
   | TimeUpdated UTCTime
@@ -631,6 +631,9 @@ data AppState = AppState {
 
   , _appSortBy :: SortBy
   , _appNow :: UTCTime
+  -- | The time used to sort the currently-displayed job list. Navigation re-sorts the
+  -- variable tree with this same value so its ordering matches what's on screen.
+  , _appSortNow :: UTCTime
 
   , _appAnimationCounter :: Int
 

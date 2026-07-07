@@ -183,10 +183,11 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitL
           , _appForm = Nothing
 
           , _appMainListVariable = listElems
-          , _appMainList = list MainList (getExpandedList listElemsFixed) 1
+          , _appMainList = list MainList (getExpandedList now listElemsFixed) 1
 
           , _appSortBy = SortByStars
           , _appNow = now
+          , _appSortNow = now
 
           , _appAnimationCounter = 0
 
@@ -227,7 +228,8 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitL
 
           writeTVar listElemsVar newFixed
           return newFixed
-        writeBChan eventChan (ListUpdate (getExpandedList newFixed))
+        sortNow <- getCurrentTime
+        writeBChan eventChan (ListUpdate sortNow (getExpandedList sortNow newFixed))
         threadDelay refreshPeriod
 
   modalFixedVar <- newTVarIO modalFixed

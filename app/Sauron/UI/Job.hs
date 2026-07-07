@@ -34,9 +34,9 @@ import UnliftIO.Async (Async)
 instance ListDrawable Fixed 'SingleJobT where
   drawLine appState (EntityData {..}) = case _state of
     JobNodeState {jnsJob = Fetched job, jnsLogs = logsFetchable, jnsMaxSiblingDuration = maxSib} ->
-      jobLine (_appAnimationCounter appState) _toggled job logsFetchable maxSib _healthCheckThread
+      jobLine (_appAnimationCounter appState) (_appNow appState) _toggled job logsFetchable maxSib _healthCheckThread
     JobNodeState {jnsJob = Fetching (Just job), jnsLogs = logsFetchable, jnsMaxSiblingDuration = maxSib} ->
-      jobLine (_appAnimationCounter appState) _toggled job logsFetchable maxSib _healthCheckThread
+      jobLine (_appAnimationCounter appState) (_appNow appState) _toggled job logsFetchable maxSib _healthCheckThread
     JobNodeState {jnsJob = Fetching Nothing} -> str [i|Loading job...|]
     JobNodeState {jnsJob = NotFetched} -> str [i|Job not fetched|]
     JobNodeState {jnsJob = Errored e} -> str [i|Job fetch errored: #{e}|]
@@ -149,8 +149,8 @@ jobLogGroupInner scrollTarget logGroups = vBox $ applyVisible $ concatMap render
 
     renderErrorLine content = [withAttr erroredAttr $ txt $ T.drop 9 content]
 
-jobLine :: Int -> Bool -> Job -> Fetchable a -> Maybe NominalDiffTime -> Maybe (Async (), Int) -> Widget n
-jobLine animationCounter toggled' (Job {..}) fetchableState maxSibDuration healthCheckThreadData = vBox [line1, line2]
+jobLine :: Int -> UTCTime -> Bool -> Job -> Fetchable a -> Maybe NominalDiffTime -> Maybe (Async (), Int) -> Widget n
+jobLine animationCounter now toggled' (Job {..}) fetchableState maxSibDuration healthCheckThreadData = vBox [line1, line2]
   where
     line1 = hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
@@ -169,7 +169,7 @@ jobLine animationCounter toggled' (Job {..}) fetchableState maxSibDuration healt
 
     calculateDurationWidget :: UTCTime -> Maybe UTCTime -> Widget n
     calculateDurationWidget started (Just completed) = brightnessInterpolatedDuration (Just (diffUTCTime completed started)) maxSibDuration
-    calculateDurationWidget _ Nothing = str "running"
+    calculateDurationWidget started Nothing = str [i|(running) #{timeDiff (diffUTCTime now started)}|]
 
     runnerNameWidget :: Maybe Text -> Maybe (Widget n)
     runnerNameWidget (Just name) = Just $ hBox [

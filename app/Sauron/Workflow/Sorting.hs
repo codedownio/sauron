@@ -6,7 +6,7 @@ module Sauron.Workflow.Sorting where
 
 import qualified Data.List as DL
 import qualified Data.Ord
-import Data.Time.Clock (NominalDiffTime, diffUTCTime)
+import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime)
 import GitHub
 import Relude
 import Sauron.Types
@@ -30,38 +30,41 @@ workflowStatusRank WorkflowNeutral = 4
 workflowStatusRank WorkflowUnknown = 5
 workflowStatusRank WorkflowSuccess = 6
 
-jobSortKey :: WorkflowJobSortBy -> Maybe Job -> JobSortKey
-jobSortKey workflowJobSortBy mj = case workflowJobSortBy of
+jobSortKey :: WorkflowJobSortBy -> UTCTime -> Maybe Job -> JobSortKey
+jobSortKey workflowJobSortBy now mj = case workflowJobSortBy of
   SortJobsByName -> (0, Data.Ord.Down 0, name)
-  -- Jobs without a runtime yet (still running / not started) sort to the bottom.
+  -- Jobs without a runtime yet (queued / not started) sort to the bottom. A running
+  -- job counts its elapsed time so far, so it interleaves with completed jobs by duration.
   SortJobsByRuntime -> case runtime of
     Just r -> (0, Data.Ord.Down r, name)
     Nothing -> (1, Data.Ord.Down 0, name)
   SortJobsByFailures -> (statusRank, Data.Ord.Down 0, name)
   where
     name = maybe "" (untagName . jobName) mj
-    runtime = case mj of
-      Just j -> (\c -> diffUTCTime c (jobStartedAt j)) <$> jobCompletedAt j
-      Nothing -> Nothing
-    statusRank = case mj of
-      Just j -> workflowStatusRank (chooseWorkflowStatus (fromMaybe (jobStatus j) (jobConclusion j)))
-      Nothing -> workflowStatusRank WorkflowUnknown
+    runtime = mj >>= jobRuntime
+    jobRuntime j = case jobCompletedAt j of
+      Just c -> Just (diffUTCTime c (jobStartedAt j))
+      Nothing
+        | jobStatusOf j == WorkflowRunning -> Just (diffUTCTime now (jobStartedAt j))
+        | otherwise -> Nothing
+    jobStatusOf j = chooseWorkflowStatus (fromMaybe (jobStatus j) (jobConclusion j))
+    statusRank = maybe (workflowStatusRank WorkflowUnknown) (workflowStatusRank . jobStatusOf) mj
 
-sortWorkflowJobsSTM :: WorkflowJobSortBy -> [Node Variable SingleJobT] -> STM [Node Variable SingleJobT]
-sortWorkflowJobsSTM workflowJobSortBy jobs = do
+sortWorkflowJobsSTM :: WorkflowJobSortBy -> UTCTime -> [Node Variable SingleJobT] -> STM [Node Variable SingleJobT]
+sortWorkflowJobsSTM workflowJobSortBy now jobs = do
   tagged <- forM jobs $ \job@(SingleJobNode (EntityData {_state})) -> do
     jobState <- readTVar _state
     let mj = fetchableCurrent (jnsJob jobState)
-    let key = jobSortKey workflowJobSortBy mj
+    let key = jobSortKey workflowJobSortBy now mj
     return (key, job)
   return $ map snd $ DL.sortOn fst tagged
 
-sortWorkflowJobsFixed :: WorkflowJobSortBy -> [Node Fixed SingleJobT] -> [Node Fixed SingleJobT]
-sortWorkflowJobsFixed workflowJobSortBy = DL.sortOn getKey
+sortWorkflowJobsFixed :: WorkflowJobSortBy -> UTCTime -> [Node Fixed SingleJobT] -> [Node Fixed SingleJobT]
+sortWorkflowJobsFixed workflowJobSortBy now = DL.sortOn getKey
   where
     getKey :: Node Fixed SingleJobT -> JobSortKey
     getKey (SingleJobNode (EntityData {_state=JobNodeState {jnsJob}})) =
-      jobSortKey workflowJobSortBy (fetchableCurrent jnsJob)
+      jobSortKey workflowJobSortBy now (fetchableCurrent jnsJob)
 
 -- * Pagination
 

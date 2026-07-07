@@ -38,7 +38,9 @@ import qualified WEditorBrick.WrappingEditor as WEditorBrick
 
 
 appEvent :: AppState -> BrickEvent ClickableName AppEvent -> EventM ClickableName AppState ()
-appEvent s (AppEvent (ListUpdate l')) = modify (appMainList %~ listReplace l' (listSelected $ s ^. appMainList))
+appEvent s (AppEvent (ListUpdate sortNow l')) = do
+  modify (appMainList %~ listReplace l' (listSelected $ s ^. appMainList))
+  modify (appSortNow .~ sortNow)
 
 appEvent _ (AppEvent (ModalUpdate newModal)) = modify (appModal .~ newModal)
 
