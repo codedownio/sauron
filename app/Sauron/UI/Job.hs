@@ -96,7 +96,9 @@ instance ListDrawable Fixed 'JobLogGroupT where
 brightnessInterpolatedDuration :: Maybe NominalDiffTime -> Maybe NominalDiffTime -> Widget n
 brightnessInterpolatedDuration (Just d) (Just maxD) | maxD > 0 =
   let ratio = realToFrac d / realToFrac maxD :: Double
-      brightness = round (80 + 175 * min 1 ratio) :: Int
+      -- Floor at 150 (not 0) so even the shortest job's runtime stays clearly readable; the
+      -- gradient up to 255 still makes longer-running jobs brighter.
+      brightness = round (150 + 105 * min 1 ratio) :: Int
       b = fromIntegral (min 255 brightness) :: Word8
       attr = V.Attr V.Default (V.SetTo (V.RGBColor b b b)) V.Default V.Default
   in modifyDefAttr (const attr) $ str $ timeDiff d
@@ -158,7 +160,7 @@ jobLine animationCounter now toggled' (Job {..}) fetchableState maxSibDuration h
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe jobStatus jobConclusion
       , fetchableQuarterCircleSpinner animationCounter fetchableState
       , healthCheckIndicatorWidget healthCheckThreadData
-      , padLeft Max $ calculateDurationWidget jobStartedAt jobCompletedAt
+      , padLeft Max durationWidget
       ]
 
     line2 = padRight Max $ padLeft (Pad 4) $ hBox $ catMaybes [
@@ -167,9 +169,16 @@ jobLine animationCounter now toggled' (Job {..}) fetchableState maxSibDuration h
         runnerNameWidget jobRunnerName
       ]
 
-    calculateDurationWidget :: UTCTime -> Maybe UTCTime -> Widget n
-    calculateDurationWidget started (Just completed) = brightnessInterpolatedDuration (Just (diffUTCTime completed started)) maxSibDuration
-    calculateDurationWidget started Nothing = str [i|(running) #{timeDiff (diffUTCTime now started)}|]
+    -- Only completed and actively-running jobs have a run time to show. A queued / not-yet-started
+    -- job has no run time yet (jobStartedAt for those is a queue timestamp, not a run start), so we
+    -- show nothing rather than counting time since it was queued.
+    durationWidget :: Widget n
+    durationWidget = case jobCompletedAt of
+      Just completed -> brightnessInterpolatedDuration (Just (diffUTCTime completed jobStartedAt)) maxSibDuration
+      Nothing
+        | chooseWorkflowStatus (fromMaybe jobStatus jobConclusion) == WorkflowRunning ->
+            str [i|(running) #{timeDiff (diffUTCTime now jobStartedAt)}|]
+        | otherwise -> emptyWidget
 
     runnerNameWidget :: Maybe Text -> Maybe (Widget n)
     runnerNameWidget (Just name) = Just $ hBox [
