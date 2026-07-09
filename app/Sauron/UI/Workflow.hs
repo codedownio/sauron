@@ -38,10 +38,13 @@ instance ListDrawable Fixed 'SingleWorkflowT where
   drawLine appState (EntityData {_static=wf, ..}) =
     workflowLine (_appAnimationCounter appState) (_appNow appState) _toggled wf (workflowNodeStateFetchable _state) _healthCheckThread _state (length _children)
 
-  drawInner _appState (EntityData {_static=wf, _state, _children, ..}) = do
-    guard _toggled
+  drawInner _appState (EntityData {_static=wf, _state, _children, _toggled}) =
     guardFetchedOrHasPrevious (workflowNodeStateFetchable _state) $ \_ ->
-      return $ workflowInner wf _children _state
+      if _toggled
+      then Just (workflowInner wf _children _state)
+      -- When collapsed, still show the job summary for in-progress workflows. Their jobs are
+      -- kept fresh by the health-check thread, so this needs no extra fetch.
+      else if workflowIsInProgress wf then workflowJobSummary _children else Nothing
 
   getExtraTopBoxWidgets _app (EntityData {_static=wf, _state}) = concat [
     if isNothing (workflowRunConclusion wf)
@@ -157,7 +160,26 @@ navigateJobPage key totalJobs wns =
   in wns { workflowNodeStateJobPage = newPage }
 
 workflowInner :: WorkflowRun -> [Node Fixed SingleJobT] -> WorkflowNodeState -> Widget n
-workflowInner (WorkflowRun {..}) jobs _wfState = vBox $ workflowDetails
+workflowInner (WorkflowRun {..}) jobs _wfState = vBox $ [
+  hBox [
+      str "File: "
+      , withAttr hashAttr $ str $ toString workflowRunPath
+    ]
+  ] ++ maybeToList (workflowJobSummary jobs)
+
+-- | True for any not-yet-completed workflow (running, queued, or otherwise in progress). This
+-- is exactly the set whose jobs are kept fresh by the health-check thread, so showing the
+-- summary for these needs no extra fetch.
+workflowIsInProgress :: WorkflowRun -> Bool
+workflowIsInProgress wf =
+  chooseWorkflowStatus (fromMaybe (workflowRunStatus wf) (workflowRunConclusion wf))
+    `notElem` [WorkflowSuccess, WorkflowFailed, WorkflowCancelled, WorkflowNeutral]
+
+-- | The "1 running / 54 not started" summary row, or Nothing if no job statuses are known yet.
+workflowJobSummary :: [Node Fixed SingleJobT] -> Maybe (Widget n)
+workflowJobSummary jobs
+  | null jobStatuses = Nothing
+  | otherwise = Just $ hBox $ intercalate [str " / "] [[w] | w <- parts]
   where
     jobStatuses = [chooseWorkflowStatus (fromMaybe (jobStatus j) (jobConclusion j))
                   | SingleJobNode (EntityData {_state=JobNodeState {jnsJob=Fetched j}}) <- jobs]
@@ -174,15 +196,7 @@ workflowInner (WorkflowRun {..}) jobs _wfState = vBox $ workflowDetails
       , ifPositive cancelled $ withAttr cancelledAttr (str [i|#{cancelled}|]) <+> str " cancelled"
       , ifPositive notStarted $ withAttr queuedAttr (str [i|#{notStarted}|]) <+> str " not started"
       ]
-    jobSummary = hBox $ intercalate [str " / "] [[w] | w <- parts]
 
     ifPositive n w
       | n > 0 = Just w
       | otherwise = Nothing
-
-    workflowDetails = [
-      hBox [
-          str "File: "
-          , withAttr hashAttr $ str $ toString workflowRunPath
-        ]
-      ] ++ [jobSummary | not (null jobStatuses)]
