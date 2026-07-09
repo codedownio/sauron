@@ -4,7 +4,8 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Sauron.Event.Helpers (
-  withFixedElemAndParents
+  getFixedElemAndParents
+  , withFixedElemAndParents
   , withNthChildAndPaginationParent
   , withRepoParent
   , withNthChildAndRepoParent

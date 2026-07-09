@@ -32,7 +32,7 @@ import Sauron.UI.Notification ()
 import Sauron.UI.Pagination ()
 import Sauron.UI.Pull ()
 import Sauron.UI.Repo ()
-import Sauron.UI.Workflow ()
+import Sauron.UI.Workflow (sortJobsByWidget)
 
 
 topBox app = hBox [columnPadding column1
@@ -123,12 +123,21 @@ getExtraTopBoxWidgetsForSomeNode s (SomeNode node) = case node of
   SingleIssueNode ed -> getExtraTopBoxWidgets s ed
   SinglePullNode ed -> getExtraTopBoxWidgets s ed
   SingleWorkflowNode ed -> getExtraTopBoxWidgets s ed
-  SingleJobNode ed -> getExtraTopBoxWidgets s ed
+  -- Jobs and their log groups also show the parent workflow's "Sort by" row so it stays
+  -- visible (and the sort hotkeys keep working) while navigating inside a workflow.
+  SingleJobNode ed -> getExtraTopBoxWidgets s ed <> ancestorWorkflowSortWidget s
   SingleBranchNode ed -> getExtraTopBoxWidgets s ed
   SingleBranchWithInfoNode ed -> getExtraTopBoxWidgets s ed
   SingleCommitNode ed -> getExtraTopBoxWidgets s ed
   SingleNotificationNode ed -> getExtraTopBoxWidgets s ed
-  JobLogGroupNode ed -> getExtraTopBoxWidgets s ed
+  JobLogGroupNode ed -> getExtraTopBoxWidgets s ed <> ancestorWorkflowSortWidget s
+
+-- | The parent workflow's "Sort by" widget, for showing under a selected job / log group.
+ancestorWorkflowSortWidget :: AppState -> [Widget ClickableName]
+ancestorWorkflowSortWidget s =
+  case [_state ed | SomeNode (SingleWorkflowNode ed) <- selectedWithAncestors s] of
+    (wfState : _) -> [sortJobsByWidget wfState]
+    [] -> []
 
 hasNextPageKey :: AppState -> Bool
 hasNextPageKey = hasAncestorMatching isPaginationNode
@@ -186,16 +195,20 @@ keyIndicatorContextual app p key msg = case p app of
 -- pure, and thus we have to work with appMainList. But appMainList is flattened
 -- (whereas appMainListVariable is a tree).
 hasAncestorMatching :: (forall a. Node Fixed a -> Bool) -> AppState -> Bool
-hasAncestorMatching predicate s = case listSelectedElement (s ^. appMainList) of
-  Nothing -> False
-  Just (idx, SomeNode selected) ->
-    predicate selected || any (\(SomeNode n) -> predicate n) ancestors
+hasAncestorMatching predicate s = any (\(SomeNode n) -> predicate n) (selectedWithAncestors s)
+
+-- | The selected node followed by its ancestors, closest first. Ancestors are recovered by
+-- walking backwards through the flattened list, collecting the first node at each decreasing
+-- depth (we can't traverse the tree here because we only have the flattened appMainList).
+selectedWithAncestors :: AppState -> [SomeNode Fixed]
+selectedWithAncestors s = case listSelectedElement (s ^. appMainList) of
+  Nothing -> []
+  Just (idx, sel@(SomeNode selected)) ->
+    sel : findAncestors (selectedDepth - 1) (L.reverse preceding)
     where
       selectedDepth = _depth (getEntityData selected)
       preceding = V.toList $ V.take idx (listElements (s ^. appMainList))
-      ancestors = findAncestors (selectedDepth - 1) (L.reverse preceding)
 
-      -- Walk backwards through the list, collecting the first node at each depth level
       findAncestors :: Int -> [SomeNode Fixed] -> [SomeNode Fixed]
       findAncestors targetDepth _ | targetDepth < 0 = []
       findAncestors targetDepth nodes =
