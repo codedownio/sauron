@@ -40,6 +40,7 @@ import Sauron.UI
 import Sauron.UI.AttrMap
 import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
+import Sauron.UI.Toast (renderToasts)
 import Sauron.UI.Modals.CommentModal (renderModal)
 import Sauron.UI.Modals.LogModal (renderLogModal, renderLogPanel)
 import Sauron.UI.Modals.NewIssueModal (renderNewIssueModal)
@@ -72,7 +73,7 @@ mkApp colorMode = App {
   }
 
 drawUI :: AppState -> [Widget ClickableName]
-drawUI app = case _appModal app of
+drawUI app = maybe id (:) (renderToasts app) $ case _appModal app of
   Nothing -> [ui]
   Just modalState -> case modalState of
     CommentModalState {} -> [renderModal app modalState, dimmedUi]
@@ -202,6 +203,8 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitL
           , _appShowStackTraces = False
 
           , _appDetailsExpanded = DetailsCollapsed
+
+          , _appToasts = []
         }
 
 

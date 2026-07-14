@@ -69,7 +69,7 @@ instance ListDrawable Fixed 'SingleWorkflowT where
           withFixedElemAndParents s $ \_ _ parents -> do
             case findRepoParent parents of
               Just (RepoNode (EntityData {_static=(owner, name)})) -> do
-                runReaderT (cancelWorkflowRun owner name (workflowRunWorkflowRunId wf)) (s ^. appBaseContext)
+                runReaderT (cancelWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)) (s ^. appBaseContext)
                 whenJust (findWorkflowsParent parents) $ \workflowsNode ->
                   liftIO $ void $ refreshLine (s ^. appBaseContext) workflowsNode parents
               _ -> return ()

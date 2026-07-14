@@ -10,7 +10,8 @@ import Brick.Widgets.ProgressBar
 import Brick.Widgets.Skylighting (attrMappingsForStyle)
 import qualified Graphics.Vty as V
 import Relude hiding (on)
-import Sauron.Types (SubjectState(..))
+import Sauron.Contrast (RGB, bestForeground)
+import Sauron.Types (SubjectState(..), ToastLevel(..))
 import Sauron.UI.AttrMap.Dim
 import qualified Skylighting.Styles as Sky
 import qualified Skylighting.Types as SkyTypes
@@ -168,6 +169,23 @@ hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
 
 circleSpinnerAttr = mkAttrName "circleSpinner"
+
+-- | The solarized background for each toast level (same sRGB values as the
+-- 'solarized*' definitions). Foreground is picked for readability by WCAG contrast.
+toastBgFor :: ToastLevel -> RGB
+toastBgFor ToastDefault = (0x26, 0x8b, 0xd2)  -- solarizedBlue
+toastBgFor ToastSuccess = (0x85, 0x99, 0x00)  -- solarizedGreen
+toastBgFor ToastWarn    = (0xb5, 0x89, 0x00)  -- solarizedYellow
+toastBgFor ToastError   = (0xdc, 0x32, 0x2f)  -- solarizedRed
+
+toastAttrFor :: ToastLevel -> V.Attr
+toastAttrFor level = rgbOn (bestForeground background [(0, 0, 0), (255, 255, 255)]) background
+  where background = toastBgFor level
+
+-- | Build a @foreground \`on\` background@ vty attribute from two 'RGB' triples.
+rgbOn :: RGB -> RGB -> V.Attr
+rgbOn foreground background = rgb foreground `on` rgb background
+  where rgb (r, g, b) = V.rgbColor (round r :: Int) (round g :: Int) (round b :: Int)
 
 -- * Search and pagination
 

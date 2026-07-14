@@ -32,6 +32,7 @@ import Sauron.Logging
 import Sauron.Types
 import Sauron.UI ()
 import Sauron.UI.Keys
+import Sauron.UI.Toast (showToast)
 import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
 import Sauron.UI.Notification () -- Import for ListDrawable instance
 import qualified WEditorBrick.WrappingEditor as WEditorBrick
@@ -53,6 +54,9 @@ appEvent _ (AppEvent AnimationTick) = do
   mainUiExtent <- lookupExtent MainUI
   modify (appMainUiExtent .~ mainUiExtent)
 
+  -- Expire any toasts whose deadline has passed
+  modify (appToasts %~ filter (\(_, _, deadline) -> counter' < deadline))
+
 appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModalEvent s commentModalEvent
 
 appEvent s (AppEvent (NewIssueModalEvent newIssueEvent)) = handleNewIssueModalEvent s newIssueEvent
@@ -60,6 +64,8 @@ appEvent s (AppEvent (NewIssueModalEvent newIssueEvent)) = handleNewIssueModalEv
 appEvent _s (AppEvent (TimeUpdated newTime)) = do
   -- Update the current time for accurate timestamps
   modify (appNow .~ newTime)
+
+appEvent _s (AppEvent (ToastFired level msg)) = showToast level msg
 
 appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
   -- Add log entry to the logs sequence, limiting to maxLogEntries to prevent unbounded growth
@@ -152,6 +158,13 @@ appEvent s (VtyEvent e) = case e of
   -- Focus switching hotkeys (work regardless of current focus)
   V.EvKey V.KLeft [V.MCtrl] -> switchToMainPane s
   V.EvKey V.KRight [V.MCtrl] -> switchToLogPane s
+
+  -- Dummy toast-preview hotkeys (F1..F4), remove once the styling is settled.
+  -- (Ctrl+digit can't be used: terminals map them to control codes, e.g. Ctrl+3 = Esc.)
+  V.EvKey (V.KFun 1) [] -> showToast ToastDefault "Sample toast: Default"
+  V.EvKey (V.KFun 2) [] -> showToast ToastSuccess "Sample toast: Success"
+  V.EvKey (V.KFun 3) [] -> showToast ToastWarn "Sample toast: Warning"
+  V.EvKey (V.KFun 4) [] -> showToast ToastError "Sample toast: Error"
 
   -- Handle events based on focused pane when split logs is enabled
   _ | _appSplitLogs s && _appFocusedPane s == LogPaneFocus -> handleLogPaneEvents s e

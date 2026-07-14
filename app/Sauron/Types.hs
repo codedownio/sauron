@@ -545,6 +545,9 @@ data FocusedPane =
 
 -- * Overall app state
 
+data ToastLevel = ToastDefault | ToastSuccess | ToastWarn | ToastError
+  deriving (Show, Eq, Enum, Bounded)
+
 data AppEvent =
   ListUpdate UTCTime (V.Vector (SomeNode Fixed))
   | ModalUpdate (Maybe (ModalState Fixed))
@@ -553,6 +556,7 @@ data AppEvent =
   | CommentModalEvent CommentModalEvent
   | NewIssueModalEvent NewIssueModalEvent
   | LogEntryAdded LogEntry
+  | ToastFired ToastLevel Text
 
 data ScrollTarget =
   ScrollToBeginning
@@ -648,6 +652,8 @@ data AppState = AppState {
   , _appShowStackTraces :: Bool
 
   , _appDetailsExpanded :: DetailsExpanded
+
+  , _appToasts :: [(ToastLevel, Text, Int)]
   }
 
 data DetailsExpanded = DetailsCollapsed | DetailsExpanded
