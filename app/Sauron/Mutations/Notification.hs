@@ -6,6 +6,7 @@ module Sauron.Mutations.Notification (
   , markNotificationAsDone
   ) where
 
+import Brick.BChan (writeBChan)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import GitHub
@@ -20,7 +21,7 @@ markNotificationAsRead :: (
 markNotificationAsRead notification =
   withGithubApiSemaphore (githubWithLoggingUnit (markNotificationAsReadR (notificationId notification))) >>= \case
     Left err -> logError $ "Failed to mark notification as read: " <> show err
-    Right _ -> return ()
+    Right _ -> toast (ToastFired ToastSuccess "Marked notification as read")
 
 markNotificationAsDone :: (
   MonadReader BaseContext m, MonadIO m, MonadMask m
@@ -28,4 +29,7 @@ markNotificationAsDone :: (
 markNotificationAsDone notification =
   withGithubApiSemaphore (githubWithLoggingUnit (markNotificationAsDoneR (notificationId notification))) >>= \case
     Left err -> logError $ "Failed to mark notification as done: " <> show err
-    Right _ -> return ()
+    Right _ -> toast (ToastFired ToastSuccess "Marked notification as done")
+
+toast :: (MonadReader BaseContext m, MonadIO m) => AppEvent -> m ()
+toast event = asks eventChan >>= \chan -> liftIO (writeBChan chan event)
