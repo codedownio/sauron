@@ -24,7 +24,7 @@ prevPageKey = V.KChar 'P'
 firstPageKey = V.KChar 'F'
 lastPageKey = V.KChar 'L'
 
-refreshAllKey = V.KChar 'R'
+refreshAllKey = V.KChar 'r'  -- matched with Ctrl (Ctrl+R), so 'R' is free for mark-read
 refreshSelectedKey = V.KChar 'r'
 
 openSelectedKey = V.KChar 'o'

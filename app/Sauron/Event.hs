@@ -284,7 +284,7 @@ handleMainPaneEvents' s e = case e of
   V.EvKey c [] | c == refreshSelectedKey -> do
     withFixedElemAndParents s $ \_fixedEl (SomeNode el) parents ->
       void $ refreshSelected (s ^. appBaseContext) el parents
-  V.EvKey c [] | c == refreshAllKey -> do
+  V.EvKey c [V.MCtrl] | c == refreshAllKey -> do
     liftIO $ runReaderT (refreshVisibleLines (s ^. appMainListVariable)) (s ^. appBaseContext)
 
   V.EvKey c [] | c == openSelectedKey -> do

@@ -85,7 +85,7 @@ topBox app = hBox [columnPadding column1
                             , hBox [str "["
                                    , highlightKeyIfPredicate someRepoSelected app (str $ showKey refreshSelectedKey)
                                    , str "/"
-                                   , highlightKeyIfPredicate (const True) app (str $ showKey refreshAllKey)
+                                   , highlightKeyIfPredicate (const True) app (str $ showKeyWithCtrl refreshAllKey)
                                    , str "] "
                                    , withAttr hotkeyMessageAttr $ str "Refresh "
                                    , highlightMessageIfPredicate someRepoSelected app (str "selected")
