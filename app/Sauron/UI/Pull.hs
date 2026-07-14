@@ -57,12 +57,11 @@ instance ListDrawable Fixed 'SinglePullT where
           ]
     , hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey commentKey
-          , str "] "
-          , withAttr hotkeyMessageAttr $ str "Comment"
-          ]
-    , hBox [str "["
+          , str "/"
           , withAttr hotkeyAttr $ str $ showKey closeReopenKey
           , str "] "
+          , withAttr hotkeyMessageAttr $ str "Comment"
+          , str "/"
           , withAttr hotkeyMessageAttr $ str (if issueState issue == StateOpen then "Close" else "Reopen")
           ]
     , detailsToggleWidget app
