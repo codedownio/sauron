@@ -58,8 +58,8 @@ fetchPaginatedWithState :: (
   )
   => (FetchCount -> Request k res)
   -> TVar (Search, PageInfo, Fetchable a)
-  -> (Either Text (res, PageInfo) -> STM ())
-  -> m ()
+  -> (Either Text (res, PageInfo) -> STM b)
+  -> m b
 fetchPaginatedWithState mkReq stateVar cb = do
   (_, PageInfo {pageInfoCurrentPage}, _) <- readTVarIO stateVar
 

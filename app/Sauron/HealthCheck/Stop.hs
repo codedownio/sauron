@@ -4,6 +4,8 @@
 module Sauron.HealthCheck.Stop (
   stopHealthCheckThreadIfRunning
   , stopHealthCheckThreadsForChildren
+  , swapChildrenClearingRemoved
+  , cancelGatheredHealthCheckThreads
   , healthCheckIndicatorWidget
   ) where
 
@@ -32,6 +34,27 @@ stopHealthCheckThreadIfRunning bc someNode = do
   forM_ threads $ \(identifier, thread) -> do
     liftIO $ cancel thread
     info' bc [i|(#{identifier}) Stopped health check thread|]
+
+-- | Atomically replace a node's children, returning the health check threads of any children
+-- (and their descendants) that are no longer present. Nodes are matched by their identity, so a
+-- node reused across a fetch keeps its thread; only genuinely removed subtrees are cleared. The
+-- caller cancels the returned threads with 'cancelGatheredHealthCheckThreads' once out of STM.
+swapChildrenClearingRemoved ::
+  (SomeNodeConstraints Variable a)
+  => TVar [Node Variable a] -> [Node Variable a] -> STM [(Text, Async ())]
+swapChildrenClearingRemoved childrenVar newChildren = do
+  oldChildren <- readTVar childrenVar
+  writeTVar childrenVar newChildren
+  let survivingIdents = fmap (_ident . getEntityData) newChildren
+  concat <$> mapM (gatherAndClearAllHealthCheckThreads . SomeNode)
+                  (filter ((`notElem` survivingIdents) . _ident . getEntityData) oldChildren)
+
+-- | Cancel health check threads gathered by 'swapChildrenClearingRemoved'.
+cancelGatheredHealthCheckThreads :: MonadIO m => BaseContext -> [(Text, Async ())] -> m ()
+cancelGatheredHealthCheckThreads bc threads = do
+  unless (null threads) $
+    info' bc [i|Stopped #{length threads} health check thread(s) for removed nodes: #{fmap fst threads}|]
+  liftIO $ mapM_ (cancel . snd) threads
 
 gatherAndClearAllHealthCheckThreads :: SomeNode Variable -> STM [(Text, Async ())]
 gatherAndClearAllHealthCheckThreads someNode@(SomeNode node) = do

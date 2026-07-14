@@ -5,6 +5,7 @@
 
 module Sauron.HealthCheck.Workflow (
   startWorkflowHealthCheckIfNeeded,
+  startWorkflowHealthCheckForNode,
   workflowHealthCheckPeriodUs
   ) where
 
@@ -40,19 +41,32 @@ startWorkflowHealthCheckIfNeeded ::
   -> Node Variable 'SingleWorkflowT
   -> NonEmpty (SomeNode Variable)
   -> IO (Maybe (Async ()))
-startWorkflowHealthCheckIfNeeded baseContext node@(SingleWorkflowNode (EntityData {_static=workflowRun, _ident=nodeIdent, ..})) parents = do
+startWorkflowHealthCheckIfNeeded baseContext node parents =
   case (findRepoParent parents, findWorkflowsParent parents) of
-    (Just (RepoNode (EntityData {_static=(owner, name)})), Just (PaginatedWorkflowsNode (EntityData {_children=workflowsChildren})))
-      | isRunningWorkflow workflowRun -> do
-        info' baseContext [i|Considering whether to start workflow healthcheck thread for run: #{workflowRun}|]
-        readTVarIO _healthCheckThread >>= \case
-          Nothing -> do
-            log baseContext LevelInfo [i|Starting health check thread for workflow: #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun} (period: #{workflowHealthCheckPeriodUs}us)|] Nothing
-            newThread <- async $ runWorkflowHealthCheckLoop baseContext owner name node workflowsChildren nodeIdent
-            atomically $ writeTVar _healthCheckThread (Just (newThread, workflowHealthCheckPeriodUs))
-            return (Just newThread)
-          Just (thread, _) -> return (Just thread)
+    (Just (RepoNode (EntityData {_static=(owner, name)})), Just (PaginatedWorkflowsNode (EntityData {_children=workflowsChildren}))) ->
+      startWorkflowHealthCheckForNode baseContext owner name workflowsChildren node
     _ -> return Nothing
+
+-- | Start a health check thread for a single workflow node, if it's still running and doesn't
+-- already have one. Keyed on the workflow's state rather than whether its node is expanded, so
+-- queued/running workflows get polled even when they aren't opened in the UI.
+startWorkflowHealthCheckForNode ::
+  BaseContext
+  -> Name Owner
+  -> Name Repo
+  -> TVar [Node Variable 'SingleWorkflowT]
+  -> Node Variable 'SingleWorkflowT
+  -> IO (Maybe (Async ()))
+startWorkflowHealthCheckForNode baseContext owner name workflowsChildren node@(SingleWorkflowNode (EntityData {_static=workflowRun, _ident=nodeIdent, ..}))
+  | isRunningWorkflow workflowRun =
+      readTVarIO _healthCheckThread >>= \case
+        Nothing -> do
+          log baseContext LevelInfo [i|Starting health check thread for workflow: #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun} (period: #{workflowHealthCheckPeriodUs}us)|] Nothing
+          newThread <- async $ runWorkflowHealthCheckLoop baseContext owner name node workflowsChildren nodeIdent
+          atomically $ writeTVar _healthCheckThread (Just (newThread, workflowHealthCheckPeriodUs))
+          return (Just newThread)
+        Just (thread, _) -> return (Just thread)
+  | otherwise = return Nothing
   where
     runWorkflowHealthCheckLoop :: BaseContext -> Name Owner -> Name Repo -> Node Variable 'SingleWorkflowT -> TVar [Node Variable 'SingleWorkflowT] -> Int -> IO ()
     runWorkflowHealthCheckLoop bc owner name (SingleWorkflowNode (EntityData {_static=staticWorkflowRun})) workflowsChildren nodeIdent' =

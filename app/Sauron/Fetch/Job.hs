@@ -27,6 +27,7 @@ import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.Fetch.ParseJobLogs
 import Sauron.Fetch.ParseWorkflowRunLogs
+import Sauron.HealthCheck.Stop (cancelGatheredHealthCheckThreads, swapChildrenClearingRemoved)
 import Sauron.Logging
 import Sauron.Types
 import System.IO.Temp (emptySystemTempFile)
@@ -43,49 +44,53 @@ fetchWorkflowJobs owner name workflowRunId (SingleWorkflowNode (EntityData {..})
       Left err -> do
         atomically $ modifyTVar' _state (\wns -> wns { workflowNodeStateFetchable = Errored (show err) })
         return $ Left err
-      Right (WithTotalCount results totalCount) -> atomically $ do
-        modifyTVar' _state (\wns -> wns { workflowNodeStateFetchable = Fetched totalCount })
+      Right (WithTotalCount results totalCount) -> do
+        removedThreads <- atomically $ do
+          modifyTVar' _state (\wns -> wns { workflowNodeStateFetchable = Fetched totalCount })
 
-        -- Compute max job duration across all sibling jobs
-        let maxJobDuration = case [diffUTCTime completed started
-                                   | Job {jobStartedAt=started, jobCompletedAt=Just completed} <- V.toList results] of
-              [] -> Nothing
-              durations -> Just (L.maximum durations)
+          -- Compute max job duration across all sibling jobs
+          let maxJobDuration = case [diffUTCTime completed started
+                                     | Job {jobStartedAt=started, jobCompletedAt=Just completed} <- V.toList results] of
+                [] -> Nothing
+                durations -> Just (L.maximum durations)
 
-        -- Preserve existing job nodes and their toggle state
-        existingChildren <- readTVar _children
+          -- Preserve existing job nodes and their toggle state
+          existingChildren <- readTVar _children
 
-        -- Build a map of existing jobs by their IDs
-        existingJobsMap <- foldM (\acc node -> case node of
-          SingleJobNode (EntityData {_state=jobState}) -> do
-            JobNodeState {jnsJob=jobFetchable} <- readTVar jobState
-            case jobFetchable of
-              Fetched existingJob -> return $ Map.insert (jobId existingJob) node acc
-              Fetching (Just existingJob) -> return $ Map.insert (jobId existingJob) node acc
-              _ -> return acc
-          ) (Map.empty :: Map.Map (Id Job) (Node Variable SingleJobT)) existingChildren
+          -- Build a map of existing jobs by their IDs
+          existingJobsMap <- foldM (\acc node -> case node of
+            SingleJobNode (EntityData {_state=jobState}) -> do
+              JobNodeState {jnsJob=jobFetchable} <- readTVar jobState
+              case jobFetchable of
+                Fetched existingJob -> return $ Map.insert (jobId existingJob) node acc
+                Fetching (Just existingJob) -> return $ Map.insert (jobId existingJob) node acc
+                _ -> return acc
+            ) (Map.empty :: Map.Map (Id Job) (Node Variable SingleJobT)) existingChildren
 
-        (writeTVar _children =<<) $ forM (V.toList results) $ \job@(Job {jobId}) -> do
-          case Map.lookup jobId existingJobsMap of
-            Just existingNode@(SingleJobNode existingEntityData) -> do
-              -- Update existing node's job data while preserving toggle state
-              let EntityData {_state=jobState} = existingEntityData
-              JobNodeState {jnsLogs=logsFetchable} <- readTVar jobState
-              writeTVar jobState (JobNodeState (Fetched job) logsFetchable maxJobDuration)
-              return existingNode
-            Nothing -> do
-              -- Create new node for new jobs
-              entityData <- makeEmptyElemWithState bc job (JobNodeState NotFetched NotFetched Nothing) "" (_depth + 1)
-              let EntityData {_state=jobState, _children=jobChildren} = entityData
-              writeTVar jobState (JobNodeState (Fetched job) NotFetched maxJobDuration)
+          newChildren <- forM (V.toList results) $ \job@(Job {jobId}) -> do
+            case Map.lookup jobId existingJobsMap of
+              Just existingNode@(SingleJobNode existingEntityData) -> do
+                -- Update existing node's job data while preserving toggle state
+                let EntityData {_state=jobState} = existingEntityData
+                JobNodeState {jnsLogs=logsFetchable} <- readTVar jobState
+                writeTVar jobState (JobNodeState (Fetched job) logsFetchable maxJobDuration)
+                return existingNode
+              Nothing -> do
+                -- Create new node for new jobs
+                entityData <- makeEmptyElemWithState bc job (JobNodeState NotFetched NotFetched Nothing) "" (_depth + 1)
+                let EntityData {_state=jobState, _children=jobChildren} = entityData
+                writeTVar jobState (JobNodeState (Fetched job) NotFetched maxJobDuration)
 
-              -- Create dummy child for log fetching
-              let dummyLogGroup = JobLogLines {jobLogLinesTimestamp = UTCTime (fromGregorian 1970 1 1) 0, jobLogLinesLines = ["Loading job logs..."]}
-              dummyLogEntityData <- makeEmptyElemWithState bc dummyLogGroup Nothing "" (_depth + 2)
-              writeTVar jobChildren [JobLogGroupNode dummyLogEntityData]
+                -- Create dummy child for log fetching
+                let dummyLogGroup = JobLogLines {jobLogLinesTimestamp = UTCTime (fromGregorian 1970 1 1) 0, jobLogLinesLines = ["Loading job logs..."]}
+                dummyLogEntityData <- makeEmptyElemWithState bc dummyLogGroup Nothing "" (_depth + 2)
+                writeTVar jobChildren [JobLogGroupNode dummyLogEntityData]
 
-              return $ SingleJobNode entityData
+                return $ SingleJobNode entityData
 
+          swapChildrenClearingRemoved _children newChildren
+
+        cancelGatheredHealthCheckThreads bc removedThreads
         return $ Right results
 
 fetchJob :: (
