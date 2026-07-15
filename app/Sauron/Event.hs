@@ -32,9 +32,9 @@ import Sauron.Logging
 import Sauron.Types
 import Sauron.UI ()
 import Sauron.UI.Keys
-import Sauron.UI.Toast (showToast, showToastWidget)
 import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
 import Sauron.UI.Notification () -- Import for ListDrawable instance
+import Sauron.UI.Toast (showToast, showToastWidget)
 import qualified WEditorBrick.WrappingEditor as WEditorBrick
 
 
@@ -160,6 +160,9 @@ appEvent s (VtyEvent e) = case e of
   -- Focus switching hotkeys (work regardless of current focus)
   V.EvKey V.KLeft [V.MCtrl] -> switchToMainPane s
   V.EvKey V.KRight [V.MCtrl] -> switchToLogPane s
+
+  V.EvKey (V.KChar c) mods
+    | c `elem` ['l', 'L'], V.MCtrl `elem` mods, V.MMeta `elem` mods -> toggleSplitLogs
 
   -- Dummy toast-preview hotkeys (F1..F4), remove once the styling is settled.
   -- (Ctrl+digit can't be used: terminals map them to control codes, e.g. Ctrl+3 = Esc.)
@@ -436,6 +439,12 @@ switchToMainPane s = when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPane
 
 switchToLogPane :: AppState -> EventM ClickableName AppState ()
 switchToLogPane s = when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
+
+toggleSplitLogs :: EventM ClickableName AppState ()
+toggleSplitLogs = do
+  modify (appSplitLogs %~ not)
+  -- Don't leave focus stranded on the log pane once it's hidden again.
+  unlessM (gets _appSplitLogs) $ modify (appFocusedPane .~ MainPaneFocus)
 
 -- * Jump-to-node functionality
 
