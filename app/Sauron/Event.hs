@@ -32,7 +32,7 @@ import Sauron.Logging
 import Sauron.Types
 import Sauron.UI ()
 import Sauron.UI.Keys
-import Sauron.UI.Toast (showToast)
+import Sauron.UI.Toast (showToast, showToastWidget)
 import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
 import Sauron.UI.Notification () -- Import for ListDrawable instance
 import qualified WEditorBrick.WrappingEditor as WEditorBrick
@@ -66,6 +66,8 @@ appEvent _s (AppEvent (TimeUpdated newTime)) = do
   modify (appNow .~ newTime)
 
 appEvent _s (AppEvent (ToastFired level msg)) = showToast level msg
+
+appEvent _s (AppEvent (ToastWidgetFired level content)) = showToastWidget level content
 
 appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
   -- Add log entry to the logs sequence, limiting to maxLogEntries to prevent unbounded growth

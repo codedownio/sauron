@@ -557,6 +557,7 @@ data AppEvent =
   | NewIssueModalEvent NewIssueModalEvent
   | LogEntryAdded LogEntry
   | ToastFired ToastLevel Text
+  | ToastWidgetFired ToastLevel (Widget ClickableName)
 
 data ScrollTarget =
   ScrollToBeginning
@@ -653,7 +654,7 @@ data AppState = AppState {
 
   , _appDetailsExpanded :: DetailsExpanded
 
-  , _appToasts :: [(ToastLevel, Text, Int)]
+  , _appToasts :: [(ToastLevel, Widget ClickableName, Int)]
   }
 
 data DetailsExpanded = DetailsCollapsed | DetailsExpanded
