@@ -9,6 +9,7 @@ module Sauron.UI.Notification (
   ) where
 
 import Brick
+import Brick.BChan (writeBChan)
 import Control.Monad
 import Data.Char (isDigit)
 import Data.String.Interpolate
@@ -85,12 +86,14 @@ instance ListDrawable Fixed 'SingleNotificationT where
         return True
     | key == markNotificationDoneKey = do
         liftIO $ void $ async $ do
-          runReaderT (markNotificationAsDone notification) (appState ^. appBaseContext)
+          whenM (runReaderT (markNotificationAsDone notification) (appState ^. appBaseContext)) $
+            writeBChan (eventChan (appState ^. appBaseContext)) (markToast "Marked notification as done:" notification)
           refreshParentNotifications appState
         return True
     | key == markNotificationReadKey && notificationUnread notification = do
         liftIO $ void $ async $ do
-          runReaderT (markNotificationAsRead notification) (appState ^. appBaseContext)
+          whenM (runReaderT (markNotificationAsRead notification) (appState ^. appBaseContext)) $
+            writeBChan (eventChan (appState ^. appBaseContext)) (markToast "Marked notification as read" notification)
           refreshParentNotifications appState
         return True
   handleHotkey _ _ _ = return False
@@ -100,6 +103,11 @@ refreshParentNotifications appState =
   withFixedElemAndParents appState $ \_ _ parents ->
     whenJust (findNotificationsParent parents) $ \notificationsNode ->
       liftIO $ void $ refreshLine (appState ^. appBaseContext) notificationsNode parents
+
+-- | A success toast whose second line is the notification title, styled like the list item.
+markToast :: Text -> Notification -> AppEvent
+markToast msg (Notification {notificationSubject=Subject {subjectTitle}}) =
+  ToastWidgetFired ToastSuccess $ vBox [txt msg, withAttr normalAttr $ txt subjectTitle]
 
 notificationLine :: UTCTime -> Bool -> Notification -> Int -> NotificationState -> Widget n
 notificationLine now toggled' (Notification {..}) animationCounter notifState = vBox [line1, line2]
