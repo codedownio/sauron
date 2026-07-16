@@ -32,7 +32,7 @@ import Sauron.Logging
 import Sauron.Types
 import Sauron.UI ()
 import Sauron.UI.Keys
-import Sauron.UI.Modals.LogModal (autoScrollLogsToBottom)
+import Sauron.UI.LogPane (autoScrollLogsToBottom)
 import Sauron.UI.Notification () -- Import for ListDrawable instance
 import Sauron.UI.Toast (showToast, showToastWidget)
 import qualified WEditorBrick.WrappingEditor as WEditorBrick
@@ -119,16 +119,6 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
       _ -> whenM (handleModalScrolling ZoomModalContent ev) $ clearAutoScrollTarget s
-    (LogModalState _) -> case ev of
-      (V.EvKey V.KEsc []) -> closeModal s
-      (V.EvKey (V.KChar 'q') []) -> closeModal s
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
-      (V.EvKey (V.KChar 'c') []) -> modify (appLogs .~ Seq.empty)
-      (V.EvKey (V.KChar 's') []) -> modify (appShowStackTraces %~ not)
-      _ -> do
-        void $ handleModalScrolling LogModalContent ev
-        handleViewportScrolling LogModalContent ev
-        handleLogLevelFiltering ev
   _ -> return ()
 
 -- Form events
@@ -157,12 +147,8 @@ appEvent s@(_appForm -> Just (form, formIdentifier)) e = case e of
   _ -> zoom (appForm . _Just . _1) $ handleFormEvent e
 
 appEvent s (VtyEvent e) = case e of
-  -- Focus switching hotkeys (work regardless of current focus)
-  V.EvKey V.KLeft [V.MCtrl] -> switchToMainPane s
-  V.EvKey V.KRight [V.MCtrl] -> switchToLogPane s
-
-  V.EvKey (V.KChar c) mods
-    | c `elem` ['l', 'L'], V.MCtrl `elem` mods, V.MMeta `elem` mods -> toggleSplitLogs
+  -- Ctrl+L toggles the split-screen log view
+  V.EvKey (V.KChar c) [V.MCtrl] | c `elem` ['l', 'L'] -> toggleSplitLogs
 
   -- Dummy toast-preview hotkeys (F1..F4), remove once the styling is settled.
   -- (Ctrl+digit can't be used: terminals map them to control codes, e.g. Ctrl+3 = Esc.)
@@ -171,33 +157,25 @@ appEvent s (VtyEvent e) = case e of
   V.EvKey (V.KFun 3) [] -> showToast ToastWarn "Sample toast: Warning"
   V.EvKey (V.KFun 4) [] -> showToast ToastError "Sample toast: Error"
 
-  -- Handle events based on focused pane when split logs is enabled
-  _ | _appSplitLogs s && _appFocusedPane s == LogPaneFocus -> handleLogPaneEvents s e
-  _ -> handleMainPaneEvents s e
+  -- When the split log view is open its hotkeys are live alongside the main pane's;
+  -- they use distinct keys (Ctrl+C, Meta+scroll) so the two sets don't collide.
+  _ -> do
+    handled <- if _appSplitLogs s then handleLogHotkeys e else return False
+    unless handled $ handleMainPaneEvents s e
 
 -- Mouse events for main pane
-appEvent s (MouseDown (ListRow _i) V.BScrollUp _ _) = do
-  switchToMainPane s
+appEvent _ (MouseDown (ListRow _i) V.BScrollUp _ _) =
   vScrollBy (viewportScroll MainList) (-1)
-appEvent s (MouseDown (ListRow _i) V.BScrollDown _ _) = do
-  switchToMainPane s
+appEvent _ (MouseDown (ListRow _i) V.BScrollDown _ _) =
   vScrollBy (viewportScroll MainList) 1
-appEvent s (MouseDown (ListRow n) V.BLeft _ _) = do
-  switchToMainPane s
+appEvent _ (MouseDown (ListRow n) V.BLeft _ _) =
   modify (appMainList %~ listMoveTo n)
 
 -- Log pane viewport events
-appEvent s (MouseDown LogSplitContent V.BScrollUp _ _) = do
-  switchToLogPane s
+appEvent _ (MouseDown LogSplitContent V.BScrollUp _ _) =
   vScrollBy (viewportScroll LogSplitContent) (-1)
-appEvent s (MouseDown LogSplitContent V.BScrollDown _ _) = do
-  switchToLogPane s
+appEvent _ (MouseDown LogSplitContent V.BScrollDown _ _) =
   vScrollBy (viewportScroll LogSplitContent) 1
-appEvent s (MouseDown LogSplitContent V.BLeft _ _) = switchToLogPane s
-
--- Pane focus switching
-appEvent s (MouseDown MainPane V.BLeft _ _) = switchToMainPane s
-appEvent s (MouseDown LogPane V.BLeft _ _) = switchToLogPane s
 
 -- Clickable scrollbar events
 appEvent _ (MouseDown (ScrollbarClick SBHandleBefore vpName) V.BLeft _ _) =
@@ -307,12 +285,6 @@ handleMainPaneEvents' s e = case e of
       toggleDetails DetailsCollapsed = DetailsExpanded
       toggleDetails DetailsExpanded = DetailsCollapsed
 
-  V.EvKey (V.KChar 'l') [V.MCtrl] -> do
-    let modalState = LogModalState (list LogModalContent (Vec.fromList []) 1)
-    modify (appModal ?~ modalState)
-    -- Scroll to the bottom to show latest logs
-    vScrollToEnd (viewportScroll LogModalContent)
-
   V.EvKey c args | (c, args) `elem` [(V.KEsc, []), (exitKey, []), (exitKey, [V.MCtrl])] -> do
     -- Cancel everything and wait for cleanups
     -- liftIO $ mapM_ cancelNode (s ^. appRunTreeBase)
@@ -321,15 +293,27 @@ handleMainPaneEvents' s e = case e of
 
   ev -> zoom appMainList $ handleListEvent ev
 
-handleLogPaneEvents :: AppState -> V.Event -> EventM ClickableName AppState ()
-handleLogPaneEvents _s e = case e of
-  V.EvKey (V.KChar 'c') [] -> modify (appLogs .~ Seq.empty)
-  V.EvKey (V.KChar 's') [] -> modify (appShowStackTraces %~ not)
-  V.EvKey c [] | c `elem` [V.KEsc, exitKey] -> halt
-  _ -> do
-    void $ handleModalScrolling LogSplitContent e
-    handleViewportScrolling LogSplitContent e
-    handleLogLevelFilteringForSplit e LogSplitContent
+-- | Handle the split log view's hotkeys. Returns True if the event was a log hotkey
+-- (so the main pane shouldn't also act on it). These keys are chosen to be orthogonal
+-- to the main pane's: clear is Ctrl+C and scrolling is on Meta so they don't collide
+-- with the main pane's own 'c' and Ctrl-based scrolling. The level filters (d/i/w/e)
+-- and stack-trace toggle (s) stay as single letters and take precedence while open.
+handleLogHotkeys :: V.Event -> EventM ClickableName AppState Bool
+handleLogHotkeys e = case e of
+  V.EvKey (V.KChar 'c') [V.MCtrl] -> True <$ modify (appLogs .~ Seq.empty)
+  V.EvKey (V.KChar 's') [] -> True <$ modify (appShowStackTraces %~ not)
+
+  -- Scrolling: Meta+Up/Down by line, Meta+PgUp/PgDown by page
+  V.EvKey V.KUp [V.MMeta] -> True <$ vScrollBy (viewportScroll LogSplitContent) (-1)
+  V.EvKey V.KDown [V.MMeta] -> True <$ vScrollBy (viewportScroll LogSplitContent) 1
+  V.EvKey V.KPageUp [V.MMeta] -> True <$ vScrollPage (viewportScroll LogSplitContent) Up
+  V.EvKey V.KPageDown [V.MMeta] -> True <$ vScrollPage (viewportScroll LogSplitContent) Down
+  V.EvKey V.KHome [V.MMeta] -> True <$ vScrollToBeginning (viewportScroll LogSplitContent)
+  V.EvKey V.KEnd [V.MMeta] -> True <$ vScrollToEnd (viewportScroll LogSplitContent)
+
+  V.EvKey (V.KChar c) [] | c `elem` ['d', 'i', 'w', 'e'] ->
+    True <$ handleLogLevelFilteringForSplit e LogSplitContent
+  _ -> return False
 
 handleLeftArrow :: AppState -> EventM ClickableName AppState ()
 handleLeftArrow s = withFixedElemAndParents s $ \_ (SomeNode mle) parents -> do
@@ -405,9 +389,6 @@ handleModalScrolling viewportName ev = case ev of
   (V.EvKey (V.KChar 'p') [V.MCtrl]) -> vScrollBy (viewportScroll viewportName) (-1) >> return True
   _ -> return False
 
-handleLogLevelFiltering :: V.Event -> EventM ClickableName AppState ()
-handleLogLevelFiltering = flip handleLogLevelFilteringForSplit LogModalContent
-
 handleLogLevelFilteringForSplit :: V.Event -> ClickableName -> EventM ClickableName AppState ()
 handleLogLevelFilteringForSplit ev viewportName = case ev of
   (V.EvKey (V.KChar 'd') []) -> do
@@ -424,27 +405,8 @@ handleLogLevelFilteringForSplit ev viewportName = case ev of
     vScrollToEnd (viewportScroll viewportName)
   _ -> return ()
 
-handleViewportScrolling :: ClickableName -> V.Event -> EventM ClickableName AppState ()
-handleViewportScrolling viewportName ev = case ev of
-  (V.EvKey V.KUp []) -> vScrollBy (viewportScroll viewportName) (-1)
-  (V.EvKey V.KDown []) -> vScrollBy (viewportScroll viewportName) 1
-  (V.EvKey V.KPageUp []) -> vScrollPage (viewportScroll viewportName) Up
-  (V.EvKey V.KPageDown []) -> vScrollPage (viewportScroll viewportName) Down
-  (V.EvKey V.KHome []) -> vScrollToBeginning (viewportScroll viewportName)
-  (V.EvKey V.KEnd []) -> vScrollToEnd (viewportScroll viewportName)
-  _ -> return ()
-
-switchToMainPane :: AppState -> EventM ClickableName AppState ()
-switchToMainPane s = when (_appSplitLogs s) $ modify (appFocusedPane .~ MainPaneFocus)
-
-switchToLogPane :: AppState -> EventM ClickableName AppState ()
-switchToLogPane s = when (_appSplitLogs s) $ modify (appFocusedPane .~ LogPaneFocus)
-
 toggleSplitLogs :: EventM ClickableName AppState ()
-toggleSplitLogs = do
-  modify (appSplitLogs %~ not)
-  -- Don't leave focus stranded on the log pane once it's hidden again.
-  unlessM (gets _appSplitLogs) $ modify (appFocusedPane .~ MainPaneFocus)
+toggleSplitLogs = modify (appSplitLogs %~ not)
 
 -- * Jump-to-node functionality
 

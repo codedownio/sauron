@@ -89,13 +89,13 @@ executable sauron
       Sauron.UI.Issue.Events.ReviewRequests
       Sauron.UI.Job
       Sauron.UI.Keys
+      Sauron.UI.LogPane
       Sauron.UI.Markdown
       Sauron.UI.Markdown.Footnotes
       Sauron.UI.Markdown.Html
       Sauron.UI.Markdown.Table
       Sauron.UI.Markdown.Wrapping
       Sauron.UI.Modals.CommentModal
-      Sauron.UI.Modals.LogModal
       Sauron.UI.Modals.NewIssueModal
       Sauron.UI.Modals.ZoomModal
       Sauron.UI.Notification

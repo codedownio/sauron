@@ -5,7 +5,7 @@ module Main (main) where
 
 import Brick as B
 import Brick.BChan
-import Brick.Widgets.Border (vBorder, border)
+import Brick.Widgets.Border (vBorder)
 import Brick.Widgets.Center
 import Brick.Widgets.List
 import qualified Brick.Widgets.List as L
@@ -42,10 +42,9 @@ import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
 import Sauron.UI.Toast (renderToasts)
 import Sauron.UI.Modals.CommentModal (renderModal)
-import Sauron.UI.Modals.LogModal (renderLogModal, renderLogPanel)
+import Sauron.UI.LogPane (renderLogPane)
 import Sauron.UI.Modals.NewIssueModal (renderNewIssueModal)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
-import Sauron.UI.TimelineBorder (borderWithAttr)
 import Sauron.UI.TopBox (topBox)
 import Sauron.UnicodeWidthTable (WidthTableMode(..), buildAndSaveWidthTable, loadWidthTable)
 import System.FilePath ((</>))
@@ -79,7 +78,6 @@ drawUI app = maybe id (:) (renderToasts app) $ case _appModal app of
     CommentModalState {} -> [renderModal app modalState, dimmedUi]
     NewIssueModalState {} -> [renderNewIssueModal app modalState, dimmedUi]
     ZoomModalState {} -> [renderZoomModal app modalState, dimmedUi]
-    LogModalState {} -> [renderLogModal app modalState, dimmedUi]
   where
     colorMode = fromMaybe (_appActualColorMode app) (_appCliColorMode app)
     dimmedUi = updateAttrMap (const (buildAdaptiveDimmedAttrMap colorMode 0.35)) ui
@@ -95,17 +93,9 @@ drawUI app = maybe id (:) (renderToasts app) $ case _appModal app of
       ]
 
     splitUI = hBox [
-      clickable MainPane $
-        (if _appFocusedPane app == MainPaneFocus
-         then borderWithAttr (attrName "focusedPaneBorder") Nothing
-         else border) $
-        hLimitPercent 50 mainUI,
-      vBorder,
-      clickable LogPane $
-        (if _appFocusedPane app == LogPaneFocus
-         then borderWithAttr (attrName "focusedPaneBorder") Nothing
-         else border) $
-        padRight Max $ renderLogPanel app LogSplitContent
+      hLimitPercent 50 mainUI
+      , vBorder
+      , padRight Max $ renderLogPane app
       ]
 
 main :: IO ()
@@ -195,7 +185,6 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitL
           , _appCliColorMode = Nothing
           , _appActualColorMode = V.FullColor
           , _appSplitLogs = cliSplitLogs
-          , _appFocusedPane = MainPaneFocus
 
           , _appLogs = mempty
 

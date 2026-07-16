@@ -434,10 +434,7 @@ data ClickableName =
   | CommentModalContent
   | CommentEditor
   | ZoomModalContent
-  | LogModalContent
   | LogSplitContent
-  | MainPane
-  | LogPane
   | NewIssueTitleEditor
   | NewIssueBodyEditor
   | ScrollbarClick ClickableScrollbarElement ClickableName
@@ -536,13 +533,6 @@ instance Eq LogEntry where
   (LogEntry t1 l1 m1 d1 _) == (LogEntry t2 l2 m2 d2 _) =
     t1 == t2 && l1 == l2 && m1 == m2 && d1 == d2
 
--- * Focused pane
-
-data FocusedPane =
-  MainPaneFocus
-  | LogPaneFocus
-  deriving (Show, Eq)
-
 -- * Overall app state
 
 data ToastLevel = ToastDefault | ToastSuccess | ToastWarn | ToastError
@@ -605,9 +595,6 @@ data ModalState f =
       , _newIssueSubmissionState :: SubmissionState
       , _newIssueFocusTitle :: Bool -- True = title focused, False = body focused
       }
-  | LogModalState {
-      _logModalList :: L.GenericList ClickableName V.Vector LogEntry
-      }
 
 instance Eq (ModalState Fixed) where
   (CommentModalState _editor1 issue1 comments1 _nodeState1 isPR1 owner1 name1 submission1) ==
@@ -617,7 +604,6 @@ instance Eq (ModalState Fixed) where
   (ZoomModalState node1 parents1) == (ZoomModalState node2 parents2) = node1 == node2 && parents1 == parents2
   (NewIssueModalState _t1 _b1 o1 n1 s1 _f1) == (NewIssueModalState _t2 _b2 o2 n2 s2 _f2) =
     o1 == o2 && n1 == n2 && s1 == s2
-  (LogModalState _list1) == (LogModalState _list2) = True  -- We'll consider all log modal states equal for simplicity
   _ == _ = False
 
 data AppState = AppState {
@@ -645,7 +631,6 @@ data AppState = AppState {
   , _appCliColorMode :: Maybe V.ColorMode
   , _appActualColorMode :: V.ColorMode
   , _appSplitLogs :: Bool
-  , _appFocusedPane :: FocusedPane
 
   , _appLogs :: Seq LogEntry
 

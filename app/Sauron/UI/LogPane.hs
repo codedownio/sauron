@@ -1,70 +1,97 @@
-module Sauron.UI.Modals.LogModal (
-  renderLogModal,
-  renderLogPanel,
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+
+module Sauron.UI.LogPane (
+  renderLogPane,
   filterLogsByLevel,
   autoScrollLogsToBottom
   ) where
 
 import Brick
 import Brick.Widgets.Border
-import Brick.Widgets.Center
+import Brick.Widgets.Center (hCenter)
 import Control.Monad.Logger (LogLevel(..))
+import Data.String.Interpolate
 import qualified Data.Sequence as Seq
 import Data.Time
 import GHC.Stack (SrcLoc(..))
-import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude
 import Sauron.Types
-import Sauron.UI.AttrMap (errorLogAttr, warningLogAttr, infoLogAttr, debugLogAttr, normalAttr, hotkeyMessageAttr, boldText, hashNumberAttr)
+import Sauron.UI.AttrMap (errorLogAttr, warningLogAttr, infoLogAttr, debugLogAttr, normalAttr, hotkeyMessageAttr, disabledHotkeyMessageAttr, hotkeyAttr, disabledHotkeyAttr, boldText, hashNumberAttr)
 
 
-renderLogModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderLogModal appState (LogModalState _) =
-  renderLogPanel appState LogModalContent
-  & border
-  & withAttr normalAttr
-  & hLimitPercent 80
-  & vLimitPercent 90
-  & centerLayer
-renderLogModal _ _ = str "Invalid modal state" -- This should never happen
+-- | Render the split-view log pane: a hotkey top box (like the main app's TopBox),
+-- an info border, and the scrollable log viewport.
+renderLogPane :: AppState -> Widget ClickableName
+renderLogPane appState = vBox [
+    logTopBox appState
+    , logInfoBorder filteredLogs
+    , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport LogSplitContent Vertical $
+        vBox (renderLogEntries (appState ^. appNow) (appState ^. appShowStackTraces) filteredLogs)
+    ]
+  where
+    filteredLogs = filterLogsByLevel (appState ^. appLogLevelFilter) (appState ^. appLogs)
 
--- | Render the log panel content, can be used in modal or split view
-renderLogPanel :: AppState -> ClickableName -> Widget ClickableName
-renderLogPanel appState viewportName = vBox [
-    hCenter $ withAttr boldText $ str (
-        "Application Logs - Filter: "
-        <> filterText
-        <> " (" <> show (Seq.length filteredLogs) <> " lines)"
-        <> " - Colors: " <> showColorModeMaybe (appState ^. appCliColorMode) <> " (cfg) / " <> showColorMode (appState ^. appActualColorMode) <> " (actual)"
-        )
-    , hBorder
-    -- Simple scrollable viewport with scrollbar - always works
-    , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport viewportName Vertical $
-      vBox (renderLogEntries (appState ^. appNow) (appState ^. appShowStackTraces) filteredLogs)
-    , hBorder
-    , hCenter $ withAttr hotkeyMessageAttr $ str "Press [Esc] or [Ctrl+Q] to close, [c] to clear logs, [d/i/w/e] to filter levels, [s] to toggle stack traces, [↑↓] to scroll"
-  ]
+-- | Hotkey box for the log pane, modeled on the main app's TopBox. Filter levels and
+-- the stack-trace toggle are highlighted to show which one is currently active.
+logTopBox :: AppState -> Widget ClickableName
+logTopBox appState = hBox [columnPadding column1, columnPadding column2]
   where
     currentFilter = appState ^. appLogLevelFilter
-    filteredLogs = filterLogsByLevel currentFilter (appState ^. appLogs)
-    filterText = case currentFilter of
-      LevelDebug -> "All"
-      LevelInfo -> "Info"
-      LevelWarn -> "Warn"
-      LevelError -> "Error"
-      LevelOther t -> toString t
+    showStackTraces = appState ^. appShowStackTraces
 
-showColorModeMaybe :: Maybe V.ColorMode -> String
-showColorModeMaybe Nothing = "Nothing"
-showColorModeMaybe (Just x) = showColorMode x
+    column1 = vBox [keyIndicator "Meta+↑/↓" "Scroll line"
+                   , keyIndicator "Meta+PgUp/PgDn" "Scroll page"
+                   , keyIndicator "Ctrl+C" "Clear logs"
+                   , keyIndicator "Ctrl+L" "Close logs"
+                   ]
 
-showColorMode :: V.ColorMode -> String
-showColorMode V.FullColor = "Full"
-showColorMode (V.ColorMode240 _) = "240"
-showColorMode V.ColorMode16 = "16"
-showColorMode V.ColorMode8 = "8"
-showColorMode V.NoColor = "None"
+    column2 = vBox [hBox [str "["
+                         , highlightKey (isFilter LevelDebug) "d"
+                         , str "/"
+                         , highlightKey (isFilter LevelInfo) "i"
+                         , str "/"
+                         , highlightKey (isFilter LevelWarn) "w"
+                         , str "/"
+                         , highlightKey (isFilter LevelError) "e"
+                         , str "] "
+                         , withAttr hotkeyMessageAttr $ str "Filter: "
+                         , withAttr boldText $ str (filterLabel currentFilter)
+                         ]
+                   , hBox [str "["
+                          , highlightKey showStackTraces "s"
+                          , str "] "
+                          , highlightMessage showStackTraces "Stack traces "
+                          , withAttr boldText $ str (if showStackTraces then "(on)" else "(off)")
+                          ]
+                   ]
+
+    isFilter lvl = currentFilter == lvl
+
+columnPadding = padLeft (Pad 1) . padRight (Pad 3)
+
+keyIndicator key msg = hBox [str "[", withAttr hotkeyAttr $ str key, str "] ", withAttr hotkeyMessageAttr $ str msg]
+
+highlightKey :: Bool -> String -> Widget ClickableName
+highlightKey True x = withAttr hotkeyAttr $ str x
+highlightKey False x = withAttr disabledHotkeyAttr $ str x
+
+highlightMessage :: Bool -> String -> Widget ClickableName
+highlightMessage True x = withAttr hotkeyMessageAttr $ str x
+highlightMessage False x = withAttr disabledHotkeyMessageAttr $ str x
+
+filterLabel :: LogLevel -> String
+filterLabel LevelDebug = "All"
+filterLabel LevelInfo = "Info"
+filterLabel LevelWarn = "Warn"
+filterLabel LevelError = "Error"
+filterLabel (LevelOther t) = toString t
+
+logInfoBorder :: Seq LogEntry -> Widget ClickableName
+logInfoBorder logs = hBorderWithLabel $ padLeftRight 1 $ hBox [
+    withAttr boldText $ str "Application Logs"
+    , str [i| (#{Seq.length logs} lines)|]
+    ]
 
 renderLogEntries :: UTCTime -> Bool -> Seq LogEntry -> [Widget ClickableName]
 renderLogEntries currentTime showStackTraces logs =
@@ -152,9 +179,7 @@ filterLogsByLevel filterLevel = Seq.filter (\logEntry -> logLevelPriority (_logE
     logLevelPriority (LevelOther _) = 0
 
 autoScrollLogsToBottom :: EventM ClickableName AppState ()
-autoScrollLogsToBottom = do
-  autoScrollViewportIfAtBottom LogModalContent
-  autoScrollViewportIfAtBottom LogSplitContent
+autoScrollLogsToBottom = autoScrollViewportIfAtBottom LogSplitContent
 
 autoScrollViewportIfAtBottom :: ClickableName -> EventM ClickableName AppState ()
 autoScrollViewportIfAtBottom viewportName = do
