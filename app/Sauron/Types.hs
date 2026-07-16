@@ -595,6 +595,7 @@ data ModalState f =
       , _newIssueSubmissionState :: SubmissionState
       , _newIssueFocusTitle :: Bool -- True = title focused, False = body focused
       }
+  | HelpModalState
 
 instance Eq (ModalState Fixed) where
   (CommentModalState _editor1 issue1 comments1 _nodeState1 isPR1 owner1 name1 submission1) ==
@@ -604,6 +605,7 @@ instance Eq (ModalState Fixed) where
   (ZoomModalState node1 parents1) == (ZoomModalState node2 parents2) = node1 == node2 && parents1 == parents2
   (NewIssueModalState _t1 _b1 o1 n1 s1 _f1) == (NewIssueModalState _t2 _b2 o2 n2 s2 _f2) =
     o1 == o2 && n1 == n2 && s1 == s2
+  HelpModalState == HelpModalState = True
   _ == _ = False
 
 data AppState = AppState {

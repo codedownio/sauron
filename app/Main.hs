@@ -42,6 +42,7 @@ import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
 import Sauron.UI.Toast (renderToasts)
 import Sauron.UI.Modals.CommentModal (renderModal)
+import Sauron.UI.Modals.HelpModal (renderHelpModal)
 import Sauron.UI.LogPane (renderLogPane)
 import Sauron.UI.Modals.NewIssueModal (renderNewIssueModal)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
@@ -78,6 +79,7 @@ drawUI app = maybe id (:) (renderToasts app) $ case _appModal app of
     CommentModalState {} -> [renderModal app modalState, dimmedUi]
     NewIssueModalState {} -> [renderNewIssueModal app modalState, dimmedUi]
     ZoomModalState {} -> [renderZoomModal app modalState, dimmedUi]
+    HelpModalState -> [renderHelpModal app, dimmedUi]
   where
     colorMode = fromMaybe (_appActualColorMode app) (_appCliColorMode app)
     dimmedUi = updateAttrMap (const (buildAdaptiveDimmedAttrMap colorMode 0.35)) ui

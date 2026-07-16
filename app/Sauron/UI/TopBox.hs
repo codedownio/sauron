@@ -42,7 +42,7 @@ topBox app = hBox [columnPadding column1
     column1 = keybindingBox [keyIndicator (L.intersperse '/' [unKChar nextKey, unKChar previousKey, '↑', '↓']) "Navigate"
                             , keyIndicator (showKeys toggleKeys <> "/←/→") "Open/close node"
                             , keyIndicatorContextual app selectedNodeCanScroll "Control-v/Meta-v" "Scroll node"
-                            , keyIndicator "q" "Exit"
+                            , keyIndicator "q/?" "Exit/Help"
                             ]
 
     column2 = keybindingBox [hBox [str "["

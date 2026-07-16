@@ -96,6 +96,7 @@ executable sauron
       Sauron.UI.Markdown.Table
       Sauron.UI.Markdown.Wrapping
       Sauron.UI.Modals.CommentModal
+      Sauron.UI.Modals.HelpModal
       Sauron.UI.Modals.NewIssueModal
       Sauron.UI.Modals.ZoomModal
       Sauron.UI.Notification

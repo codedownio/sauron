@@ -119,6 +119,12 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
       _ -> whenM (handleModalScrolling ZoomModalContent ev) $ clearAutoScrollTarget s
+    HelpModalState -> case ev of
+      (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') []) -> closeModal s
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+      (V.EvKey (V.KChar '?') []) -> closeModal s
+      _ -> return ()
   _ -> return ()
 
 -- Form events
@@ -284,6 +290,8 @@ handleMainPaneEvents' s e = case e of
     where
       toggleDetails DetailsCollapsed = DetailsExpanded
       toggleDetails DetailsExpanded = DetailsCollapsed
+
+  V.EvKey c [] | c == helpKey -> modify (appModal ?~ HelpModalState)
 
   V.EvKey c args | (c, args) `elem` [(V.KEsc, []), (exitKey, []), (exitKey, [V.MCtrl])] -> do
     -- Cancel everything and wait for cleanups

@@ -45,6 +45,8 @@ markNotificationReadKey = V.KChar 'R'
 
 detailsToggleKey = V.KChar 'd'
 
+helpKey = V.KChar '?'
+
 -- Jump-to keys (jump to next node of this type)
 jumpToIssuesKey = V.KChar 'i'
 jumpToActionsKey = V.KChar 'a'
