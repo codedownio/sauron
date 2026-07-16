@@ -42,7 +42,7 @@ echo "Saw artifacts:\n$ARTIFACTS"
 TAG=v"$VERSION"
 
 echo ""
-echo "This will tag the current commit as $TAG and upload the above aliases to Git."
+echo "This will tag the current commit as $TAG and upload the above artifacts to GitHub."
 echo ""
 confirm_execution
 
