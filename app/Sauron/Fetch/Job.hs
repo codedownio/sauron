@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Sauron.Fetch.Job (
   fetchWorkflowJobs
@@ -7,7 +8,7 @@ module Sauron.Fetch.Job (
   , fetchJobLogs
   ) where
 
-import Control.Exception.Safe (bracketOnError_)
+import Control.Exception.Safe (bracketOnError_, catch, catchAny, throwIO)
 import Control.Monad (foldM)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
@@ -125,43 +126,65 @@ fetchJobLogsPerJob :: (
   ) => Name Owner -> Name Repo -> Job -> Node Variable SingleJobT -> m ()
 fetchJobLogsPerJob owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData {..})) = do
   bc@(BaseContext {auth, manager}) <- ask
+  info' bc [i|fetchJobLogsPerJob: starting for jobId=#{jobId} (#{V.length jobSteps} steps)|]
   bracketOnError_ (atomically $ do
                      JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
                      writeTVar _state (JobNodeState jobFetchable (Fetching Nothing) maxSib))
                   (atomically $ do
                      JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
-                     writeTVar _state (JobNodeState jobFetchable (Errored "Job logs fetch failed with exception.") maxSib)) $ do
-    withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
-      Left err -> do
-        logError' bc [i|fetchJobLogsPerJob: downloadJobLogsR failed: #{err}|]
-        now <- liftIO getCurrentTime
-        let errorMessage = formatJobLogsError err
-        atomically $ do
-          JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
-          writeTVar _state (JobNodeState jobFetchable (Errored errorMessage) maxSib)
-          childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines {jobLogLinesTimestamp = now, jobLogLinesLines = T.splitOn "\n" errorMessage})
-          writeTVar _children [childNode]
-      Right response -> do
-        debug' bc [i|fetchJobLogsPerJob: got logs download URL: #{responseBody response}|]
-        logs <- simpleHttp (URI.uriToString id (responseBody response) "")
+                     writeTVar _state (JobNodeState jobFetchable (Errored "Job logs fetch failed with exception.") maxSib)
+                     -- Replace the "Loading job logs..." placeholder so the UI doesn't stay stuck.
+                     childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines {jobLogLinesTimestamp = UTCTime (fromGregorian 1970 1 1) 0, jobLogLinesLines = ["Job logs fetch failed with an exception."]})
+                     writeTVar _children [childNode]) $
+    flip catchAny (\e -> logError' bc [i|fetchJobLogsPerJob: exception: #{e}|] >> throwIO e) $ do
+      info' bc [i|fetchJobLogsPerJob: requesting per-job logs download URL|]
+      withGithubApiSemaphore (liftIO $ executeRequestWithMgrAndRes manager auth (downloadJobLogsR owner name jobId)) >>= \case
+        Left err -> do
+          logError' bc [i|fetchJobLogsPerJob: downloadJobLogsR failed: #{err}|]
+          now <- liftIO getCurrentTime
+          let errorMessage = formatJobLogsError err
+          atomically $ do
+            JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
+            writeTVar _state (JobNodeState jobFetchable (Errored errorMessage) maxSib)
+            childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines {jobLogLinesTimestamp = now, jobLogLinesLines = T.splitOn "\n" errorMessage})
+            writeTVar _children [childNode]
+        Right response -> do
+          info' bc [i|fetchJobLogsPerJob: got logs download URL: #{responseBody response}|]
+          info' bc [i|fetchJobLogsPerJob: downloading logs...|]
+          -- The GitHub API redirects us to a blob URL. For a still-running job that blob
+          -- doesn't exist yet, so simpleHttp throws a 404; catch it and show a clean message.
+          ((Right <$> simpleHttp (URI.uriToString id (responseBody response) "")) `catch` (\(e :: HttpException) -> return (Left e))) >>= \case
+            Left httpErr -> do
+              let errorMessage = formatJobLogsDownloadError httpErr
+              logError' bc [i|fetchJobLogsPerJob: log download failed: #{errorMessage}|]
+              now <- liftIO getCurrentTime
+              atomically $ do
+                JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
+                writeTVar _state (JobNodeState jobFetchable (Errored errorMessage) maxSib)
+                childNode <- createJobLogLinesNode bc (_depth + 1) (JobLogLines {jobLogLinesTimestamp = now, jobLogLinesLines = T.splitOn "\n" errorMessage})
+                writeTVar _children [childNode]
+            Right logs -> do
+              info' bc [i|fetchJobLogsPerJob: downloaded #{BL.length logs} bytes|]
 
-        tempFile <- liftIO $ emptySystemTempFile "sauron-job-logs-.txt"
-        liftIO $ writeFileLBS tempFile logs
-        debug' bc [i|fetchJobLogsPerJob: wrote raw logs to #{tempFile}|]
+              tempFile <- liftIO $ emptySystemTempFile "sauron-job-logs-.txt"
+              liftIO $ writeFileLBS tempFile logs
+              info' bc [i|fetchJobLogsPerJob: wrote raw logs to #{tempFile}|]
 
-        let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
-        let stepsList = V.toList jobSteps
-            stepsWithNextStart = zipWith (\step nextStep -> (step, jobStepStartedAt nextStep))
-                                         stepsList (drop 1 stepsList)
-                              ++ [(s, Nothing) | s <- take 1 (reverse stepsList)]
-            maxStepDuration = computeMaxStepDuration stepsList
-        children' <- liftIO $ atomically $ do
-          mapM (\(step, nextStart) -> createJobStepNode bc (_depth + 1) parsedLogs step nextStart maxStepDuration) stepsWithNextStart
+              let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
+              let stepsList = V.toList jobSteps
+                  stepsWithNextStart = zipWith (\step nextStep -> (step, jobStepStartedAt nextStep))
+                                               stepsList (drop 1 stepsList)
+                                    ++ [(s, Nothing) | s <- take 1 (reverse stepsList)]
+                  maxStepDuration = computeMaxStepDuration stepsList
+              info' bc [i|fetchJobLogsPerJob: parsed #{length parsedLogs} log groups; building #{length stepsWithNextStart} step nodes|]
+              children' <- liftIO $ atomically $
+                mapM (\(step, nextStart) -> createJobStepNode bc (_depth + 1) parsedLogs step nextStart maxStepDuration) stepsWithNextStart
 
-        atomically $ do
-          writeTVar _children children'
-          JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
-          writeTVar _state (JobNodeState jobFetchable (Fetched (parsedLogs, FlatLogTimestampSplit)) maxSib)
+              atomically $ do
+                writeTVar _children children'
+                JobNodeState {jnsJob=jobFetchable, jnsMaxSiblingDuration=maxSib} <- readTVar _state
+                writeTVar _state (JobNodeState jobFetchable (Fetched (parsedLogs, FlatLogTimestampSplit)) maxSib)
+              info' bc [i|fetchJobLogsPerJob: done, updated children and state|]
 
 -- | Fetch logs for a job using the workflow run logs endpoint.
 -- This returns a zip file with logs split by step (for multi-step jobs),
@@ -380,6 +403,15 @@ formatJobLogsError (HTTPError httpErr) = "Network error: " <> toText (show httpE
 formatJobLogsError (ParseError msg) = "Parse error: " <> msg
 formatJobLogsError (JsonError msg) = "JSON error: " <> msg
 formatJobLogsError (UserError msg) = "Error: " <> msg
+
+-- | Format a failure from downloading the per-job logs blob. A 404 here means the blob
+-- doesn't exist yet, which is the normal case for a job that's still running.
+formatJobLogsDownloadError :: HttpException -> Text
+formatJobLogsDownloadError (HttpExceptionRequest _ (StatusCodeException response _)) =
+  case statusCode (responseStatus response) of
+    404 -> "Logs aren't available yet.\n\nGitHub doesn't publish a job's logs until it finishes running; they'll appear once the job completes. See https://github.com/codedownio/sauron/issues/24."
+    code -> formatStatusCode code
+formatJobLogsDownloadError e = "Network error: " <> toText (show e :: String)
 
 -- | Format a status code into a user-friendly message
 formatStatusCode :: Int -> Text
