@@ -40,8 +40,8 @@ logTopBox appState = hBox [columnPadding column1, columnPadding column2]
     currentFilter = appState ^. appLogLevelFilter
     showStackTraces = appState ^. appShowStackTraces
 
-    column1 = vBox [keyIndicator "Meta+↑/↓" "Scroll line"
-                   , keyIndicator "Meta+PgUp/PgDn" "Scroll page"
+    column1 = vBox [keyIndicator "Ctrl+E/Y" "Scroll line"
+                   , keyIndicator "Ctrl+F/B" "Scroll page"
                    , keyIndicator "Ctrl+C" "Clear logs"
                    , keyIndicator "Ctrl+L" "Close logs"
                    ]

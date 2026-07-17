@@ -311,13 +311,12 @@ handleLogHotkeys e = case e of
   V.EvKey (V.KChar 'c') [V.MCtrl] -> True <$ modify (appLogs .~ Seq.empty)
   V.EvKey (V.KChar 's') [] -> True <$ modify (appShowStackTraces %~ not)
 
-  -- Scrolling: Meta+Up/Down by line, Meta+PgUp/PgDown by page
-  V.EvKey V.KUp [V.MMeta] -> True <$ vScrollBy (viewportScroll LogSplitContent) (-1)
-  V.EvKey V.KDown [V.MMeta] -> True <$ vScrollBy (viewportScroll LogSplitContent) 1
-  V.EvKey V.KPageUp [V.MMeta] -> True <$ vScrollPage (viewportScroll LogSplitContent) Up
-  V.EvKey V.KPageDown [V.MMeta] -> True <$ vScrollPage (viewportScroll LogSplitContent) Down
-  V.EvKey V.KHome [V.MMeta] -> True <$ vScrollToBeginning (viewportScroll LogSplitContent)
-  V.EvKey V.KEnd [V.MMeta] -> True <$ vScrollToEnd (viewportScroll LogSplitContent)
+  -- Scrolling: Ctrl+E/Ctrl+Y by line, Ctrl+F/Ctrl+B by page. PageUp/PageDown and Meta+key
+  -- chords get eaten by the terminal, so we use the less/vim-style control keys instead.
+  V.EvKey (V.KChar 'y') [V.MCtrl] -> True <$ vScrollBy (viewportScroll LogSplitContent) (-1)
+  V.EvKey (V.KChar 'e') [V.MCtrl] -> True <$ vScrollBy (viewportScroll LogSplitContent) 1
+  V.EvKey (V.KChar 'b') [V.MCtrl] -> True <$ vScrollPage (viewportScroll LogSplitContent) Up
+  V.EvKey (V.KChar 'f') [V.MCtrl] -> True <$ vScrollPage (viewportScroll LogSplitContent) Down
 
   V.EvKey (V.KChar c) [] | c `elem` ['d', 'i', 'w', 'e'] ->
     True <$ handleLogLevelFilteringForSplit e LogSplitContent
