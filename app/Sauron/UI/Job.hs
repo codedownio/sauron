@@ -111,7 +111,8 @@ brightnessInterpolatedDuration (Just d) _ = str $ timeDiff d
 brightnessInterpolatedDuration Nothing _ = emptyWidget
 
 jobLogGroupLine :: Int -> Bool -> JobLogGroup -> Widget n
-jobLogGroupLine _animationCounter _toggled' (JobLogLines {jobLogLinesLines = contents}) = vBox [padRight Max $ hBox $ str "  " : parseAnsiText c | c <- contents]
+jobLogGroupLine _animationCounter _toggled' (JobLogLines {jobLogLinesLines = contents}) =
+  vBox [padRight Max $ padLeft (Pad 2) $ txtWrap (if T.null c then " " else c) | c <- contents]
 jobLogGroupLine animationCounter toggled' (JobLogGroup {jobLogGroupTitle = title, jobLogGroupStatus = status, jobLogGroupDuration = duration, jobLogGroupMaxSiblingDuration = maxSibDuration}) = hBox $ catMaybes [
   Just $ padRight Max $ hBox $ catMaybes [
     Just $ withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] "),
