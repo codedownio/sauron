@@ -28,16 +28,37 @@ fetchNotifications :: (
   ) => Node Variable PaginatedNotificationsT -> m ()
 fetchNotifications (PaginatedNotificationsNode (EntityData {..})) = do
   bc <- ask
-  fetchPaginatedWithState (getNotificationsR optionsAll) _state $ \case
-    Left err -> do
-      (s, p, _) <- readTVar _state
-      writeTVar _state (s, p, Errored err)
-      writeTVar _children []
-    Right (notifications, newPageInfo) -> do
-      (s, _, _) <- readTVar _state
-      writeTVar _state (s, newPageInfo, Fetched (V.length notifications))
-      (writeTVar _children =<<) $ forM (V.toList notifications) $ \notification ->
-        SingleNotificationNode <$> makeEmptyElemWithState bc notification (NotificationState NotFetched Nothing True) "" (_depth + 1)
+
+  (_, PageInfo {pageInfoCurrentPage=requestedPage}, _) <- readTVarIO _state
+
+  -- The notifications endpoint has no total-count field, so we fetch the whole list (FetchAll
+  -- follows every page) to get an accurate count. We keep every notification in _children (so the
+  -- heading's unread-dot reflects all pages, not just the visible one) and let Sauron.Expanding
+  -- slice out the current page at display time; here we just derive the page info from the total.
+  bracketOnError_ (atomically $ modifyTVar' _state $ \(s, p, f) -> (s, p, Fetching (fetchableCurrent f)))
+                  (atomically $ modifyTVar' _state $ \(s, p, _) -> (s, p, Errored "Fetch failed with exception.")) $
+    withGithubApiSemaphore (githubWithLogging (getNotificationsR optionsAll FetchAll)) >>= \case
+      Left err -> atomically $ do
+        (s, p, _) <- readTVar _state
+        writeTVar _state (s, p, Errored (show err))
+        writeTVar _children []
+      Right notifications -> do
+        let count = V.length notifications
+        let totalPages = max 1 ((count + notificationPageSize - 1) `div` notificationPageSize)
+        let currentPage = min (max 1 requestedPage) totalPages
+        let pageInfo = PageInfo {
+              pageInfoCurrentPage = currentPage
+              , pageInfoFirstPage = if currentPage > 1 then Just 1 else Nothing
+              , pageInfoPrevPage = if currentPage > 1 then Just (currentPage - 1) else Nothing
+              , pageInfoNextPage = if currentPage < totalPages then Just (currentPage + 1) else Nothing
+              , pageInfoLastPage = if currentPage < totalPages then Just totalPages else Nothing
+              }
+        children' <- atomically $ forM (V.toList notifications) $ \notification ->
+          SingleNotificationNode <$> makeEmptyElemWithState bc notification (NotificationState NotFetched Nothing True) "" (_depth + 1)
+        atomically $ do
+          (s, _, _) <- readTVar _state
+          writeTVar _state (s, pageInfo, Fetched count)
+          writeTVar _children children'
 
   -- Batch-fetch subject states (open/closed/merged/draft) via a single GraphQL query
   notifChildren <- readTVarIO _children

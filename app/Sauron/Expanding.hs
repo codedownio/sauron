@@ -30,7 +30,7 @@ getExpandedList now = V.fromList . concatMap expandNodes . V.toList
           PaginatedYourBranchesNode (EntityData {..}) -> expandTyped _children
           PaginatedActiveBranchesNode (EntityData {..}) -> expandTyped _children
           PaginatedStaleBranchesNode (EntityData {..}) -> expandTyped _children
-          PaginatedNotificationsNode (EntityData {..}) -> expandTyped _children
+          PaginatedNotificationsNode (EntityData {_state=(_, PageInfo {pageInfoCurrentPage}, _), ..}) -> expandTyped (paginateNotifications pageInfoCurrentPage _children)
           SingleIssueNode (EntityData {..}) -> expandChildless _children
           SinglePullNode (EntityData {..}) -> expandChildless _children
           SingleWorkflowNode (EntityData {..}) ->

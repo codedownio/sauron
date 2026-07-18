@@ -498,6 +498,16 @@ data WorkflowNodeState = WorkflowNodeState {
 workflowJobPageSize :: Int
 workflowJobPageSize = 20
 
+notificationPageSize :: Int
+notificationPageSize = 10
+
+-- | Take just the notifications shown on the given page. Kept here so the expanded-list
+-- flattening and the nthChild traversal paginate notifications identically.
+paginateNotifications :: Int -> [a] -> [a]
+paginateNotifications page xs
+  | length xs <= notificationPageSize = xs
+  | otherwise = take notificationPageSize $ drop ((page - 1) * notificationPageSize) xs
+
 data HealthCheckResult =
   HealthCheckWorkflowResult WorkflowStatus
   | HealthCheckNoData

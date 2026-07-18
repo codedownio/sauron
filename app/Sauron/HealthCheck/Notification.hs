@@ -44,7 +44,7 @@ newNotificationHealthCheckThread baseContext stateVar = async $ do
 
     liftIO $ flip runReaderT baseContext $ do
       -- Make the API request with Last-Modified header if we have one
-      let request = getNotificationsR optionsAll (FetchAtLeast 1)  -- TODO: Need to add If-Modified-Since header support
+      let request = getNotificationsR optionsAll FetchAll  -- FetchAll follows every page so the count isn't capped at GitHub's default page size
 
       withGithubApiSemaphore (githubWithLoggingResponse request) >>= \case
         Left err -> do
