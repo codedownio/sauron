@@ -140,6 +140,10 @@ getExistentialChildrenWrappedPaginated now (SingleWorkflowNode ed) = do
   sorted <- sortWorkflowJobsSTM (workflowNodeStateJobSortBy state') now children'
   let paginated = paginateJobs (workflowNodeStateJobPage state') sorted
   return (fmap SomeNode paginated)
+getExistentialChildrenWrappedPaginated _now (PaginatedNotificationsNode ed) = do
+  children' <- readTVar (_children ed)
+  (_, PageInfo {pageInfoCurrentPage}, _) <- readTVar (_state ed)
+  return (fmap SomeNode (paginateNotifications pageInfoCurrentPage children'))
 getExistentialChildrenWrappedPaginated _now node = getExistentialChildrenWrapped node
 
 -- * Computing nth child in the presence of expanding
