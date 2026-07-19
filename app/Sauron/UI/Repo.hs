@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Sauron.UI.Repo (
@@ -39,7 +40,7 @@ renderRepoLine isToggled (owner, name) fetchableRepo fetchableHealthCheck animat
     attr = repoAttr fetchableRepo
 
 healthIndicator :: Fetchable HealthCheckResult -> Int -> Maybe (Widget n)
-healthIndicator (Fetched (HealthCheckWorkflowResult ws)) animationCounter = Just (padLeft (Pad 1) (statusToIconAnimated animationCounter ws))
+healthIndicator (fetchableCurrent -> Just (HealthCheckWorkflowResult ws)) animationCounter = Just (padLeft (Pad 1) (statusToIconAnimated animationCounter ws))
 healthIndicator _ _ = Nothing
 
 repoAttr :: Fetchable Repo -> AttrName

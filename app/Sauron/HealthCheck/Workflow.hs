@@ -17,6 +17,7 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Job
 import Sauron.HealthCheck.Job (isJobCompleted)
+import Sauron.HealthCheck.Repo (runRepoHealthCheck)
 import Sauron.Logging
 import Sauron.Types
 import Sauron.UI.Statuses
@@ -43,8 +44,8 @@ startWorkflowHealthCheckIfNeeded ::
   -> IO (Maybe (Async ()))
 startWorkflowHealthCheckIfNeeded baseContext node parents =
   case (findRepoParent parents, findWorkflowsParent parents) of
-    (Just (RepoNode (EntityData {_static=(owner, name)})), Just (PaginatedWorkflowsNode (EntityData {_children=workflowsChildren}))) ->
-      startWorkflowHealthCheckForNode baseContext owner name workflowsChildren node
+    (Just (RepoNode (EntityData {_static=(owner, name), _state=repoState, _healthCheck=repoHealthCheck})), Just (PaginatedWorkflowsNode (EntityData {_children=workflowsChildren}))) ->
+      startWorkflowHealthCheckForNode baseContext owner name workflowsChildren (runRepoHealthCheck baseContext (owner, name) repoState repoHealthCheck) node
     _ -> return Nothing
 
 -- | Start a health check thread for a single workflow node, if it's still running and doesn't
@@ -55,9 +56,10 @@ startWorkflowHealthCheckForNode ::
   -> Name Owner
   -> Name Repo
   -> TVar [Node Variable 'SingleWorkflowT]
+  -> IO ()  -- ^ Refresh the parent repo's health check, run when the workflow finishes.
   -> Node Variable 'SingleWorkflowT
   -> IO (Maybe (Async ()))
-startWorkflowHealthCheckForNode baseContext owner name workflowsChildren node@(SingleWorkflowNode (EntityData {_static=workflowRun, _ident=nodeIdent, ..}))
+startWorkflowHealthCheckForNode baseContext owner name workflowsChildren refreshRepoHealth node@(SingleWorkflowNode (EntityData {_static=workflowRun, _ident=nodeIdent, ..}))
   | isRunningWorkflow workflowRun =
       readTVarIO _healthCheckThread >>= \case
         Nothing -> do
@@ -89,13 +91,17 @@ startWorkflowHealthCheckForNode baseContext owner name workflowsChildren node@(S
         Left err -> warn' bc [i|(#{untagName owner}/#{untagName name}) Couldn't fetch workflow run #{workflowRunId}: #{err}|]
         Right workflowRun'
           | isRunningWorkflow workflowRun' -> threadDelay workflowHealthCheckPeriodUs >> loop
-          | otherwise -> liftIO $ atomically $ do
-              -- Update the parent's _children, replacing our node with updated _static
-              modifyTVar' workflowsChildren $ map $ \child@(SingleWorkflowNode childEd) ->
-                if _ident childEd == nodeIdent'
-                then SingleWorkflowNode (childEd { _static = workflowRun' })
-                else child
-              writeTVar _healthCheckThread Nothing
+          | otherwise -> do
+              liftIO $ atomically $ do
+                -- Update the parent's _children, replacing our node with updated _static
+                modifyTVar' workflowsChildren $ map $ \child@(SingleWorkflowNode childEd) ->
+                  if _ident childEd == nodeIdent'
+                  then SingleWorkflowNode (childEd { _static = workflowRun' })
+                  else child
+                writeTVar _healthCheckThread Nothing
+              -- The workflow just finished, so re-poll the repo's overall health right away instead
+              -- of waiting up to the full repo health-check period for the icon to go green/red.
+              liftIO refreshRepoHealth
 
     isRunningWorkflow :: WorkflowRun -> Bool
     isRunningWorkflow wr = not $ isWorkflowCompleted $ fromMaybe (workflowRunStatus wr) (workflowRunConclusion wr)

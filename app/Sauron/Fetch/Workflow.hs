@@ -19,8 +19,8 @@ import Sauron.Types
 
 fetchWorkflows :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => Name Owner -> Name Repo -> Node Variable PaginatedWorkflowsT -> m ()
-fetchWorkflows owner name (PaginatedWorkflowsNode (EntityData {..})) = do
+  ) => Name Owner -> Name Repo -> IO () -> Node Variable PaginatedWorkflowsT -> m ()
+fetchWorkflows owner name refreshRepoHealth (PaginatedWorkflowsNode (EntityData {..})) = do
   bc <- ask
 
   -- Swap in the new page of workflows, stopping the health checks of any that dropped out of the
@@ -55,4 +55,4 @@ fetchWorkflows owner name (PaginatedWorkflowsNode (EntityData {..})) = do
   -- Ensure every running/queued workflow has a health check thread, whether or not its node is
   -- expanded. This runs on every fetch (initial open and periodic refresh), so newly-appeared or
   -- newly-running workflows start getting polled too.
-  readTVarIO _children >>= mapM_ (liftIO . void . startWorkflowHealthCheckForNode bc owner name _children)
+  readTVarIO _children >>= mapM_ (liftIO . void . startWorkflowHealthCheckForNode bc owner name _children refreshRepoHealth)

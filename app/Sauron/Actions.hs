@@ -57,8 +57,8 @@ refreshLine bc item@(PaginatedPullsNode _) parents =
       liftIO $ async $ liftIO $ runReaderT (fetchPulls owner name item) bc
     Nothing ->
       liftIO $ async $ liftIO $ runReaderT (fetchMyPulls item) bc
-refreshLine bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
-  liftIO $ async $ liftIO $ runReaderT (fetchWorkflows owner name item) bc
+refreshLine bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state=repoState, _healthCheck=repoHealthCheck}))) =
+  liftIO $ async $ liftIO $ runReaderT (fetchWorkflows owner name (runRepoHealthCheck bc (owner, name) repoState repoHealthCheck) item) bc
 refreshLine bc item@(PaginatedBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ async $ liftIO $ runReaderT (fetchBranches owner name item) bc
 refreshLine bc item@(PaginatedYourBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) = do
@@ -145,8 +145,8 @@ fetchOnOpen bc item@(PaginatedPullsNode _) parents =
       liftIO $ async $ liftIO $ runReaderT (fetchPulls owner name item) bc
     Nothing ->
       liftIO $ async $ liftIO $ runReaderT (fetchMyPulls item) bc
-fetchOnOpen bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
-  liftIO $ async $ liftIO $ runReaderT (fetchWorkflows owner name item) bc
+fetchOnOpen bc item@(PaginatedWorkflowsNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state=repoState, _healthCheck=repoHealthCheck}))) =
+  liftIO $ async $ liftIO $ runReaderT (fetchWorkflows owner name (runRepoHealthCheck bc (owner, name) repoState repoHealthCheck) item) bc
 fetchOnOpen bc item@(PaginatedBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ async $ liftIO $ runReaderT (fetchBranches owner name item) bc
 fetchOnOpen bc item@(PaginatedYourBranchesNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name), _state}))) =
