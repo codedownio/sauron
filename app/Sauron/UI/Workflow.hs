@@ -86,7 +86,9 @@ workflowLine animationCounter currentTime toggled' (WorkflowRun {..}) fetchableS
     runTime = diffUTCTime workflowRunUpdatedAt workflowRunStartedAt
     timeSinceStart = diffUTCTime currentTime workflowRunStartedAt
 
-    hasPagination = totalJobs > workflowJobPageSize
+    -- Only show the job pagination once the workflow is toggled open; when it's collapsed the
+    -- jobs aren't visible, so the page keys fall through to the outer workflows list instead.
+    hasPagination = toggled' && totalJobs > workflowJobPageSize
     pageInfo = computeJobPageInfo (workflowNodeStateJobPage wfState) totalJobs
 
     timingWidget = hBox [
@@ -167,17 +169,18 @@ modifyWorkflowState s f = do
 
 -- | Handle a job-pagination key (next/prev/first/last page) by paging the parent workflow's
 -- jobs. Works from a selected job or log group, so the key doesn't fall through to the outer
--- workflows list. Returns False (letting the key fall through) when the workflow has only a
--- single page of jobs, matching how the workflow node itself handles these keys.
+-- workflows list. Returns False (letting the key fall through) when the workflow is collapsed
+-- or has only a single page of jobs, so the key bubbles up to the outer workflows list instead.
 handleWorkflowJobPageKey :: AppState -> V.Key -> EventM ClickableName AppState Bool
 handleWorkflowJobPageKey s key
   | key `notElem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = return False
   | otherwise = getFixedElemAndParents s >>= \case
       Just (_, _, parents)
-        | Just (SingleWorkflowNode (EntityData {_state=stateVar, _children=childrenVar, _ident=wfIdent})) <- findWorkflowParent parents -> do
+        | Just (SingleWorkflowNode (EntityData {_state=stateVar, _children=childrenVar, _ident=wfIdent, _toggled=toggledVar})) <- findWorkflowParent parents -> do
             didPage <- liftIO $ atomically $ do
+              wfToggled <- readTVar toggledVar
               jobChildren <- readTVar childrenVar
-              if length jobChildren > workflowJobPageSize
+              if wfToggled && length jobChildren > workflowJobPageSize
                 then modifyTVar' stateVar (navigateJobPage key (length jobChildren)) >> return True
                 else return False
             -- Move the selection up to the workflow node, matching how paging other nodes
