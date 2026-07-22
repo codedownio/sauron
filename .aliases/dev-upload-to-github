@@ -32,7 +32,9 @@ echo "Got version: $VERSION"
 IFS=$'\n'
 ARTIFACTS=$(find "$BUILT" -name "*.tar.gz")
 unset IFS
-echo "Saw artifacts:\n$ARTIFACTS"
+echo "Saw artifacts:"
+echo ""
+echo "$ARTIFACTS"
 
 # Smoke check
 # FIRST_EXECUTABLE=$(find "$BUILT" -type f -executable | head -n 1)
