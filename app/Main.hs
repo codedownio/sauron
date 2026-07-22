@@ -110,7 +110,7 @@ runApp (CliArgs {cliRebuildCharacterWidths=True}) =
   buildAndSaveWidthTable EmojiOnly
 runApp (CliArgs {cliRebuildCharacterWidthsFull=True}) =
   buildAndSaveWidthTable FullUnicode
-runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitLogs}) = do
+runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode}) = do
   unlessM loadWidthTable $ do
     buildAndSaveWidthTable EmojiOnly
     void loadWidthTable
@@ -186,7 +186,7 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode, cliSplitL
 
           , _appCliColorMode = Nothing
           , _appActualColorMode = V.FullColor
-          , _appSplitLogs = cliSplitLogs
+          , _appSplitLogs = False
 
           , _appLogs = mempty
 
