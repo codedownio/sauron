@@ -28,7 +28,7 @@ import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
 import Sauron.HealthCheck.Repo (runRepoHealthCheck)
-import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded)
+import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded, restartWorkflowHealthCheckIfJobsRunning)
 import Sauron.Types
 import Sauron.UI.Util (isFetchingOrFetched)
 import UnliftIO.Async
@@ -163,7 +163,9 @@ fetchOnOpen bc item@(PaginatedReposNode _) _parents =
 -- Nodes that fetch their children when opened
 fetchOnOpen bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) parents@(findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) = do
   liftIO $ async $ liftIO $ flip runReaderT bc $ do
-    void $ fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item
+    fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item >>= \case
+      Left _err -> return ()
+      Right jobs -> liftIO $ restartWorkflowHealthCheckIfJobsRunning bc item parents jobs
     liftIO $ void $ startWorkflowHealthCheckIfNeeded bc item parents
 fetchOnOpen bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc

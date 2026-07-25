@@ -6,12 +6,14 @@
 module Sauron.HealthCheck.Workflow (
   startWorkflowHealthCheckIfNeeded,
   startWorkflowHealthCheckForNode,
+  restartWorkflowHealthCheckIfJobsRunning,
   workflowHealthCheckPeriodUs
   ) where
 
 import Control.Exception.Safe (handleAny)
 import Control.Monad.Logger
 import Data.String.Interpolate
+import qualified Data.Vector as V
 import GitHub
 import Relude
 import Sauron.Actions.Util
@@ -103,5 +105,31 @@ startWorkflowHealthCheckForNode baseContext owner name workflowsChildren refresh
               -- of waiting up to the full repo health-check period for the icon to go green/red.
               liftIO refreshRepoHealth
 
-    isRunningWorkflow :: WorkflowRun -> Bool
-    isRunningWorkflow wr = not $ isWorkflowCompleted $ fromMaybe (workflowRunStatus wr) (workflowRunConclusion wr)
+restartWorkflowHealthCheckIfJobsRunning ::
+  BaseContext
+  -> Node Variable 'SingleWorkflowT
+  -> NonEmpty (SomeNode Variable)
+  -> V.Vector Job
+  -> IO ()
+restartWorkflowHealthCheckIfJobsRunning baseContext (SingleWorkflowNode entityData@(EntityData {_static=workflowRun, _ident=nodeIdent})) parents jobs
+  | isRunningWorkflow workflowRun = return ()
+  | all isJobCompleted jobs = return ()
+  | otherwise = case (findRepoParent parents, findWorkflowsParent parents) of
+      (Just (RepoNode (EntityData {_static=(owner, name), _state=repoState, _healthCheck=repoHealthCheck})), Just (PaginatedWorkflowsNode (EntityData {_children=workflowsChildren}))) -> do
+        runReaderT (withGithubApiSemaphore (githubWithLogging (workflowRunR owner name (workflowRunWorkflowRunId workflowRun)))) baseContext >>= \case
+          Left err -> warn' baseContext [i|(#{untagName owner}/#{untagName name}) Couldn't fetch workflow run #{workflowRunWorkflowRunId workflowRun}: #{err}|]
+          Right workflowRun' -> do
+            log baseContext LevelInfo [i|Workflow #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun} has jobs running again; picking up its new status|] Nothing
+            atomically $ modifyTVar' workflowsChildren $ map $ \child@(SingleWorkflowNode childEd) ->
+              if _ident childEd == nodeIdent
+              then SingleWorkflowNode (childEd { _static = workflowRun' })
+              else child
+            let refreshRepoHealth = runRepoHealthCheck baseContext (owner, name) repoState repoHealthCheck
+            void $ startWorkflowHealthCheckForNode baseContext owner name workflowsChildren refreshRepoHealth (SingleWorkflowNode (entityData { _static = workflowRun' }))
+            -- Same reasoning as when a workflow finishes: get the repo icon back to running now
+            -- rather than after the full repo health-check period.
+            refreshRepoHealth
+      _ -> return ()
+
+isRunningWorkflow :: WorkflowRun -> Bool
+isRunningWorkflow wr = not $ isWorkflowCompleted $ fromMaybe (workflowRunStatus wr) (workflowRunConclusion wr)
