@@ -27,7 +27,7 @@ import Sauron.Actions (refreshLine)
 import Sauron.Actions.Util (findRepoParent, findWorkflowsParent, findWorkflowParent)
 import Sauron.Event.Helpers (withFixedElemAndParents, getFixedElemAndParents)
 import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
-import Sauron.Mutations.Workflow (cancelWorkflowRun)
+import Sauron.Mutations.Workflow (cancelWorkflowRun, rerunWorkflowRun, rerunFailedJobs)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Keys
@@ -52,31 +52,62 @@ instance ListDrawable Fixed 'SingleWorkflowT where
       else if workflowIsInProgress wf then workflowJobSummary _children else Nothing
 
   getExtraTopBoxWidgets _app (EntityData {_static=wf, _state}) = concat [
-    if isNothing (workflowRunConclusion wf)
-    then [hBox [str "["
-              , withAttr hotkeyAttr $ str $ showKey cancelWorkflowKey
-              , str "] "
-              , withAttr hotkeyMessageAttr $ str "Cancel workflow"
-              ]
-         ]
-    else []
+    [workflowHotkeyWidget cancelWorkflowKey "Cancel workflow" | isNothing (workflowRunConclusion wf)]
+    , [retryJobsWidget wf | isJust (workflowRunConclusion wf)]
     , [sortJobsByWidget _state]
     ]
 
   handleHotkey s key (EntityData {_static=wf})
-    | key == cancelWorkflowKey && isNothing (workflowRunConclusion wf) = do
-        liftIO $ void $ async $ do
-          withFixedElemAndParents s $ \_ _ parents -> do
-            case findRepoParent parents of
-              Just (RepoNode (EntityData {_static=(owner, name)})) -> do
-                runReaderT (cancelWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)) (s ^. appBaseContext)
-                whenJust (findWorkflowsParent parents) $ \workflowsNode ->
-                  liftIO $ void $ refreshLine (s ^. appBaseContext) workflowsNode parents
-              _ -> return ()
-        return True
+    | key == cancelWorkflowKey && isNothing (workflowRunConclusion wf) =
+        runWorkflowMutation s $ \owner name -> cancelWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
+    | key == rerunWorkflowKey && isJust (workflowRunConclusion wf) =
+        runWorkflowMutation s $ \owner name -> rerunWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
+    | key == rerunFailedJobsKey && canRerunFailedJobs wf =
+        runWorkflowMutation s $ \owner name -> rerunFailedJobs owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
   handleHotkey _ _ _ = return False
+
+workflowHotkeyWidget :: V.Key -> String -> Widget n
+workflowHotkeyWidget key msg = hBox [
+  str "["
+  , withAttr hotkeyAttr $ str $ showKey key
+  , str "] "
+  , withAttr hotkeyMessageAttr $ str msg
+  ]
+
+-- | The "[e/E] Retry failed/all jobs" row. The "failed" half is dimmed when the run has no
+-- failures to retry.
+retryJobsWidget :: WorkflowRun -> Widget n
+retryJobsWidget wf = hBox [
+  str "["
+  , withAttr (if canRerunFailedJobs wf then hotkeyAttr else disabledHotkeyAttr) $ str $ showKey rerunFailedJobsKey
+  , withAttr hotkeyMessageAttr $ str "/"
+  , withAttr hotkeyAttr $ str $ showKey rerunWorkflowKey
+  , str "] "
+  , withAttr hotkeyMessageAttr $ str "Retry "
+  , withAttr (if canRerunFailedJobs wf then hotkeyMessageAttr else disabledHotkeyMessageAttr) $ str "failed"
+  , withAttr hotkeyMessageAttr $ str "/all jobs"
+  ]
+
+-- | The conclusions where GitHub's "re-run failed jobs" has something to do. A skipped or
+-- neutral run has no failures, and the API rejects the request for those.
+canRerunFailedJobs :: WorkflowRun -> Bool
+canRerunFailedJobs wf = workflowRunConclusion wf `elem` [Just "failure", Just "timed_out", Just "cancelled"]
+
+-- | Run a mutation against the selected workflow's repo in the background, then refresh the
+-- workflows list so the new status shows up.
+runWorkflowMutation :: AppState -> (Name Owner -> Name Repo -> ReaderT BaseContext IO ()) -> EventM ClickableName AppState Bool
+runWorkflowMutation s action = do
+  liftIO $ void $ async $
+    withFixedElemAndParents s $ \_ _ parents ->
+      case findRepoParent parents of
+        Just (RepoNode (EntityData {_static=(owner, name)})) -> do
+          runReaderT (action owner name) (s ^. appBaseContext)
+          whenJust (findWorkflowsParent parents) $ \workflowsNode ->
+            void $ refreshLine (s ^. appBaseContext) workflowsNode parents
+        _ -> return ()
+  return True
 
 -- WorkflowRun {workflowRunWorkflowRunId = Id 7403805672, workflowRunName = N "ci", workflowRunHeadBranch = migrate-debug, workflowRunHeadSha = "1367fa30fc409d198e18afa95bda04d26387925e", workflowRunPath = ".github/workflows/ci.yml", workflowRunDisplayTitle = More database stuff noci, workflowRunRunNumber = 2208, workflowRunEvent = "push", workflowRunStatus = "completed", workflowRunConclusion = Just skipped, workflowRunWorkflowId = 6848152, workflowRunUrl = URL https://api.github.com/repos/codedownio/codedown/actions/runs/7403805672, workflowRunHtmlUrl = URL https://github.com/codedownio/codedown/actions/runs/7403805672, workflowRunCreatedAt = 2024-01-04 00:10:06 UTC, workflowRunUpdatedAt = 2024-01-04 00:10:10 UTC, workflowRunActor = SimpleUser simpleUserId = Id 1634990, simpleUserLogin = N thomasjm, simpleUserAvatarUrl = URL "https://avatars.githubusercontent.com/u/1634990?v=4", simpleUserUrl = URL "https://api.github.com/users/thomasjm", workflowRunAttempt = 1, workflowRunStartedAt = 2024-01-04 00:10:06 UTC}
 
