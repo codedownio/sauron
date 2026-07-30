@@ -41,6 +41,7 @@ executable sauron
       Sauron.Event.Search
       Sauron.Event.Util
       Sauron.Expanding
+      Sauron.Fetch.ArtifactFile
       Sauron.Fetch.Branch
       Sauron.Fetch.Core
       Sauron.Fetch.Issue
@@ -137,6 +138,7 @@ executable sauron
     , aeson
     , ansi-terminal
     , base >=4.7 && <5
+    , binary
     , brick
     , brick-skylighting
     , bytestring
@@ -177,6 +179,7 @@ executable sauron
     , vty-crossplatform
     , yaml
     , zip-archive
+    , zlib
   default-language: Haskell2010
 
 test-suite test
