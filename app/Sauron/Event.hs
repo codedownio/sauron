@@ -35,6 +35,8 @@ import Sauron.UI.Keys
 import Sauron.UI.LogPane (autoScrollLogsToBottom)
 import Sauron.UI.Notification () -- Import for ListDrawable instance
 import Sauron.UI.Toast (showToast, showToastWidget)
+import Sauron.UI.Workflow (openSpeedScopeFromArtifact)
+import UnliftIO.Async (async)
 import qualified WEditorBrick.WrappingEditor as WEditorBrick
 
 
@@ -68,6 +70,9 @@ appEvent _s (AppEvent (TimeUpdated newTime)) = do
 appEvent _s (AppEvent (ToastFired level msg)) = showToast level msg
 
 appEvent _s (AppEvent (ToastWidgetFired level content)) = showToastWidget level content
+
+appEvent _s (AppEvent (SpeedScopePickerFired owner name title arts)) =
+  modify (appModal ?~ SpeedScopePickerModalState (list SpeedScopePickerList (Vec.fromList (sortOn artifactName arts)) 1) owner name title)
 
 appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
   -- Add log entry to the logs sequence, limiting to maxLogEntries to prevent unbounded growth
@@ -119,6 +124,19 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
       _ -> whenM (handleModalScrolling ZoomModalContent ev) $ clearAutoScrollTarget s
+    SpeedScopePickerModalState {} -> case ev of
+      (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') []) -> closeModal s
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+      (V.EvKey V.KEnter []) -> case listSelectedElement (_speedScopePickerList modalState) of
+        Just (_, artifact) -> do
+          closeModal s
+          liftIO $ void $ async $
+            openSpeedScopeFromArtifact s (_speedScopePickerOwner modalState) (_speedScopePickerName modalState) artifact (_speedScopePickerTitle modalState)
+        Nothing -> return ()
+      (V.EvKey V.KUp []) -> modify (appModal . _Just . speedScopePickerList %~ listMoveUp)
+      (V.EvKey V.KDown []) -> modify (appModal . _Just . speedScopePickerList %~ listMoveDown)
+      _ -> zoom (appModal . _Just . speedScopePickerList) $ handleListEvent ev
     HelpModalState -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') []) -> closeModal s

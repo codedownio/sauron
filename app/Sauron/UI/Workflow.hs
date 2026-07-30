@@ -10,9 +10,13 @@ module Sauron.UI.Workflow (
   , sortJobsByWidget
   , handleWorkflowSortKey
   , handleWorkflowJobPageKey
+  , handleOpenSpeedScope
+  , openSpeedScopeFromArtifact
+  , openSpeedScopeWidget
   ) where
 
 import Brick
+import Brick.BChan (writeBChan)
 import Brick.Widgets.Center (hCenter)
 import Brick.Widgets.List (listElements, listMoveTo)
 import Control.Monad
@@ -26,17 +30,21 @@ import Relude
 import Sauron.Actions (refreshLine)
 import Sauron.Actions.Util (findRepoParent, findWorkflowsParent, findWorkflowParent)
 import Sauron.Event.Helpers (withFixedElemAndParents, getFixedElemAndParents)
+import Sauron.Fetch.ArtifactFile (scanArtifactsForFile, fetchFileFromArtifact)
 import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
 import Sauron.Mutations.Workflow (cancelWorkflowRun, rerunWorkflowRun, rerunFailedJobs)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Keys
 import Sauron.UI.Pagination (paginationInfo)
+import Sauron.UI.SpeedScope (openSpeedScope)
+import Sauron.UI.Toast (showToast)
 import Sauron.UI.Statuses
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 import Sauron.Workflow.Sorting (computeJobPageInfo)
 import UnliftIO.Async (Async, async)
+import UnliftIO.Exception (try)
 
 
 instance ListDrawable Fixed 'SingleWorkflowT where
@@ -54,6 +62,7 @@ instance ListDrawable Fixed 'SingleWorkflowT where
   getExtraTopBoxWidgets _app (EntityData {_static=wf, _state}) = concat [
     [workflowHotkeyWidget cancelWorkflowKey "Cancel workflow" | isNothing (workflowRunConclusion wf)]
     , [retryJobsWidget wf | isJust (workflowRunConclusion wf)]
+    , [openSpeedScopeWidget]
     , [sortJobsByWidget _state]
     ]
 
@@ -64,9 +73,58 @@ instance ListDrawable Fixed 'SingleWorkflowT where
         runWorkflowMutation s $ \owner name -> rerunWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
     | key == rerunFailedJobsKey && canRerunFailedJobs wf =
         runWorkflowMutation s $ \owner name -> rerunFailedJobs owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
+    | key == openSpeedScopeKey = handleOpenSpeedScope s
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
   handleHotkey _ _ _ = return False
+
+-- | The "[S] Open Speedscope" top-box row, shown on a workflow and its jobs.
+openSpeedScopeWidget :: Widget n
+openSpeedScopeWidget = workflowHotkeyWidget openSpeedScopeKey "Open Speedscope"
+
+-- | The artifact entry we look for and open in speedscope.
+speedscopeFileName :: Text
+speedscopeFileName = "speedscope.json"
+
+-- | Scan the selected workflow run's artifacts for a speedscope profile (via range requests,
+-- without downloading whole artifacts) and open it. Works from the workflow node or any of its
+-- jobs / log groups, walking up to the workflow. If exactly one artifact has a profile it opens
+-- directly; if several do, it raises the picker; if none, it toasts. Runs in the background.
+handleOpenSpeedScope :: AppState -> EventM ClickableName AppState Bool
+handleOpenSpeedScope s = do
+  showToast ToastDefault "Scanning run artifacts for a speedscope profile..."
+  liftIO $ void $ async $
+    withFixedElemAndParents s $ \_ _ parents ->
+      case (findRepoParent parents, findWorkflowParent parents) of
+        (Just (RepoNode (EntityData {_static=(owner, name)})), Just (SingleWorkflowNode (EntityData {_static=wf}))) -> do
+          let title = untagName name <> " #" <> show (workflowRunRunNumber wf)
+          runReaderT (scanArtifactsForFile owner name (workflowRunWorkflowRunId wf) speedscopeFileName) bc >>= \case
+            Left err -> toast ToastError [i|Couldn't open speedscope: #{err}|]
+            Right [] -> toast ToastWarn "No speedscope profile found in this run's artifacts."
+            Right [only] -> openSpeedScopeFromArtifact s owner name only title
+            Right many -> writeBChan (eventChan bc) (SpeedScopePickerFired owner name title many)
+        _ -> return ()
+  return True
+  where
+    bc = s ^. appBaseContext
+    toast level msg = writeBChan (eventChan bc) (ToastFired level msg)
+
+-- | Fetch the speedscope profile from a specific artifact and open it, reporting the outcome
+-- as a toast. Runs synchronously; callers wrap it in 'async'. Shared by the single-match path
+-- and the picker's selection.
+openSpeedScopeFromArtifact :: AppState -> Name Owner -> Name Repo -> Artifact -> Text -> IO ()
+openSpeedScopeFromArtifact s owner name artifact runTitle =
+  runReaderT (fetchFileFromArtifact owner name artifact speedscopeFileName) bc >>= \case
+    Left err -> toast ToastError [i|Couldn't open speedscope: #{err}|]
+    Right profileBytes ->
+      try (openSpeedScope bc (s ^. appSpeedScopeServer) profileId title profileBytes) >>= \case
+        Left (e :: SomeException) -> toast ToastError [i|Couldn't open speedscope: #{e}|]
+        Right () -> toast ToastDefault [i|Opening speedscope for #{title}|]
+  where
+    bc = s ^. appBaseContext
+    profileId = show (untagId (artifactId artifact))
+    title = [i|#{runTitle} — #{artifactName artifact}|]
+    toast level msg = writeBChan (eventChan bc) (ToastFired level msg)
 
 workflowHotkeyWidget :: V.Key -> String -> Widget n
 workflowHotkeyWidget key msg = hBox [

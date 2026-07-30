@@ -40,6 +40,7 @@ fixModal (ZoomModalState sn parents) = do
   fixedNode <- fixSomeNode sn
   fixedParents <- mapM fixSomeNode parents
   return $ ZoomModalState fixedNode fixedParents
+fixModal (SpeedScopePickerModalState l o n t) = return $ SpeedScopePickerModalState l o n t
 fixModal HelpModalState = return HelpModalState
 
 fixSomeNode :: SomeNode Variable -> STM (SomeNode Fixed)

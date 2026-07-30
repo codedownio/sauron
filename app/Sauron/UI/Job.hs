@@ -26,7 +26,7 @@ import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
 import Sauron.UI.Keys
 import Sauron.UI.Statuses (statusToIconAnimated, chooseWorkflowStatus, fetchableQuarterCircleSpinner)
-import Sauron.UI.Workflow (handleWorkflowSortKey, handleWorkflowJobPageKey)
+import Sauron.UI.Workflow (handleWorkflowSortKey, handleWorkflowJobPageKey, handleOpenSpeedScope, openSpeedScopeWidget)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 import UnliftIO.Async (Async)
@@ -57,6 +57,7 @@ instance ListDrawable Fixed 'SingleJobT where
           , str "] "
           , withAttr hotkeyMessageAttr $ str "Zoom"
           ]
+    , openSpeedScopeWidget
     ]
 
   handleHotkey s key (EntityData {})
@@ -65,6 +66,7 @@ instance ListDrawable Fixed 'SingleJobT where
           refreshOnZoom (s ^. appBaseContext) variableEl parents
           liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
         return True
+    | key == openSpeedScopeKey = handleOpenSpeedScope s
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
   handleHotkey _ _ _ = return False
@@ -86,6 +88,7 @@ instance ListDrawable Fixed 'JobLogGroupT where
           , str "] "
           , withAttr hotkeyMessageAttr $ str "Zoom"
           ]
+    , openSpeedScopeWidget
     ]
 
   handleHotkey s key (EntityData {})
@@ -94,6 +97,7 @@ instance ListDrawable Fixed 'JobLogGroupT where
           refreshOnZoom (s ^. appBaseContext) variableEl parents
           liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
         return True
+    | key == openSpeedScopeKey = handleOpenSpeedScope s
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
   handleHotkey _ _ _ = return False

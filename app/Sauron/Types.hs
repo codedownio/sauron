@@ -34,6 +34,7 @@ import qualified Graphics.Vty as V
 import Lens.Micro
 import Lens.Micro.TH
 import Network.HTTP.Client (Manager)
+import Network.Socket (PortNumber)
 import Relude
 import qualified Text.Show
 import UnliftIO.Async
@@ -423,6 +424,18 @@ data BaseContext = BaseContext {
   , currentUser :: Maybe User
   }
 
+-- | A running localhost server that hosts the speedscope bundle and serves profile
+-- JSONs (one per workflow run) fetched from artifacts. Started lazily on first use and
+-- kept alive for the app's lifetime; profiles accumulate in the map keyed by run id.
+data SpeedScopeServer = SpeedScopeServer {
+  speedScopeServerPort :: PortNumber
+  -- | The unpacked speedscope bundle directory, or Nothing if it couldn't be fetched
+  -- (in which case we fall back to serving the profile to speedscope.app).
+  , speedScopeServerBundleDir :: Maybe FilePath
+  , speedScopeServerProfiles :: TVar (Map Text LByteString)
+  , speedScopeServerAsync :: Async ()
+  }
+
 data ClickableName =
   MainUI
   | ListRow Int
@@ -438,6 +451,7 @@ data ClickableName =
   | NewIssueTitleEditor
   | NewIssueBodyEditor
   | ScrollbarClick ClickableScrollbarElement ClickableName
+  | SpeedScopePickerList
   deriving (Show, Ord, Eq)
 
 data Variable (x :: Type)
@@ -558,6 +572,9 @@ data AppEvent =
   | LogEntryAdded LogEntry
   | ToastFired ToastLevel Text
   | ToastWidgetFired ToastLevel (Widget ClickableName)
+  -- | Open the speedscope artifact picker for a run: owner, repo, run title, and the
+  -- artifacts (already confirmed to contain a speedscope profile) to choose among.
+  | SpeedScopePickerFired (Name Owner) (Name Repo) Text [Artifact]
 
 data ScrollTarget =
   ScrollToBeginning
@@ -605,6 +622,12 @@ data ModalState f =
       , _newIssueSubmissionState :: SubmissionState
       , _newIssueFocusTitle :: Bool -- True = title focused, False = body focused
       }
+  | SpeedScopePickerModalState {
+      _speedScopePickerList :: L.List ClickableName Artifact
+      , _speedScopePickerOwner :: Name Owner
+      , _speedScopePickerName :: Name Repo
+      , _speedScopePickerTitle :: Text
+      }
   | HelpModalState
 
 instance Eq (ModalState Fixed) where
@@ -615,6 +638,8 @@ instance Eq (ModalState Fixed) where
   (ZoomModalState node1 parents1) == (ZoomModalState node2 parents2) = node1 == node2 && parents1 == parents2
   (NewIssueModalState _t1 _b1 o1 n1 s1 _f1) == (NewIssueModalState _t2 _b2 o2 n2 s2 _f2) =
     o1 == o2 && n1 == n2 && s1 == s2
+  (SpeedScopePickerModalState l1 o1 n1 t1) == (SpeedScopePickerModalState l2 o2 n2 t2) =
+    o1 == o2 && n1 == n2 && t1 == t2 && L.listElements l1 == L.listElements l2 && L.listSelected l1 == L.listSelected l2
   HelpModalState == HelpModalState = True
   _ == _ = False
 
@@ -652,6 +677,9 @@ data AppState = AppState {
   , _appDetailsExpanded :: DetailsExpanded
 
   , _appToasts :: [(ToastLevel, Widget ClickableName, Int)]
+
+  -- | The speedscope server, started lazily the first time a profile is opened.
+  , _appSpeedScopeServer :: MVar (Maybe SpeedScopeServer)
   }
 
 data DetailsExpanded = DetailsCollapsed | DetailsExpanded

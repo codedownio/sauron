@@ -99,12 +99,14 @@ executable sauron
       Sauron.UI.Modals.CommentModal
       Sauron.UI.Modals.HelpModal
       Sauron.UI.Modals.NewIssueModal
+      Sauron.UI.Modals.SpeedScopePickerModal
       Sauron.UI.Modals.ZoomModal
       Sauron.UI.Notification
       Sauron.UI.Pagination
       Sauron.UI.Pull
       Sauron.UI.Repo
       Sauron.UI.Search
+      Sauron.UI.SpeedScope
       Sauron.UI.Statuses
       Sauron.UI.TimelineBorder
       Sauron.UI.Toast
@@ -160,6 +162,7 @@ executable sauron
     , monad-logger
     , morpheus-graphql-client
     , mtl
+    , network
     , network-uri
     , optparse-applicative
     , pandoc-types

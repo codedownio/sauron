@@ -99,6 +99,7 @@ executables:
     - lens
     - lens-regex-pcre
     - microlens-th
+    - network
     - optparse-applicative
     - safe-exceptions
     - temporary

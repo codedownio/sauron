@@ -45,6 +45,7 @@ import Sauron.UI.Modals.CommentModal (renderModal)
 import Sauron.UI.Modals.HelpModal (renderHelpModal)
 import Sauron.UI.LogPane (renderLogPane)
 import Sauron.UI.Modals.NewIssueModal (renderNewIssueModal)
+import Sauron.UI.Modals.SpeedScopePickerModal (renderSpeedScopePickerModal)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TopBox (topBox)
 import Sauron.UnicodeWidthTable (WidthTableMode(..), buildAndSaveWidthTable, loadWidthTable)
@@ -79,6 +80,7 @@ drawUI app = maybe id (:) (renderToasts app) $ case _appModal app of
     CommentModalState {} -> [renderModal app modalState, dimmedUi]
     NewIssueModalState {} -> [renderNewIssueModal app modalState, dimmedUi]
     ZoomModalState {} -> [renderZoomModal app modalState, dimmedUi]
+    SpeedScopePickerModalState {} -> [renderSpeedScopePickerModal app modalState, dimmedUi]
     HelpModalState -> [renderHelpModal app, dimmedUi]
   where
     colorMode = fromMaybe (_appActualColorMode app) (_appCliColorMode app)
@@ -163,6 +165,8 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode}) = do
   modalVariableTVar <- newTVarIO (Nothing :: Maybe (ModalState Variable))
   let modalFixed :: Maybe (ModalState Fixed) = Nothing
 
+  speedScopeServerVar <- Relude.newMVar Nothing
+
   let initialState =
         AppState {
           _appUser = currentUser
@@ -196,6 +200,8 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode}) = do
           , _appDetailsExpanded = DetailsCollapsed
 
           , _appToasts = []
+
+          , _appSpeedScopeServer = speedScopeServerVar
         }
 
 
