@@ -14,6 +14,7 @@ module Sauron.Actions.Util (
   , githubWithLoggingUnit
 
   , openBrowserToUrl
+  , copyToClipboard
 
   , findRepoParent
   , findJobParent
@@ -29,13 +30,15 @@ module Sauron.Actions.Util (
 
 import Brick.BChan
 import Control.Concurrent.QSem
-import Control.Exception.Safe (bracket_)
+import Control.Exception.Safe (bracket_, handleAny, try)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson (FromJSON)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base64 as B64
 import Data.ByteString.Builder (intDec, toLazyByteString)
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.List as L
 import Data.String.Interpolate
@@ -46,6 +49,8 @@ import Network.HTTP.Client (Response, responseBody, responseHeaders)
 import Network.HTTP.Types (EscapeItem(..))
 import Network.HTTP.Types.Header (hContentLength)
 import Relude
+import System.Exit (ExitCode(..))
+import qualified System.IO as SIO
 import Sauron.Logging
 import Sauron.Types
 import UnliftIO.Process
@@ -59,15 +64,79 @@ openBrowserToUrl url = do
   findExecutable "explorer.exe" >>= \case
     Just p -> void $ readCreateProcessWithExitCode (proc p [url]) ""
     Nothing -> return ()
+
+-- | Copy text to the clipboard, falling back to an OSC 52 escape sequence (option 2) if the
+-- native clipboard tool is missing or errors. Returns True if some method reported success.
+copyToClipboard :: MonadIO m => String -> m Bool
+copyToClipboard text = liftIO $ do
+  r <- try (readCreateProcessWithExitCode (proc "clip" []) text)
+  case r of
+    Right (ExitSuccess, _, _) -> return True
+    (_ :: Either SomeException (ExitCode, String, String)) -> copyViaOsc52 SIO.stdout text
 #elif darwin_HOST_OS
 openBrowserToUrl :: MonadIO m => String -> m ()
 openBrowserToUrl url =
   void $ readCreateProcessWithExitCode (proc "open" [url]) ""
+
+-- | See the Linux definition below; on macOS the native tool is pbcopy, with the same OSC 52
+-- fallback.
+copyToClipboard :: MonadIO m => String -> m Bool
+copyToClipboard text = liftIO $ do
+  r <- try (readCreateProcessWithExitCode (proc "pbcopy" []) text)
+  case r of
+    Right (ExitSuccess, _, _) -> return True
+    (_ :: Either SomeException (ExitCode, String, String)) -> copyViaTtyOsc52 text
 #else
 openBrowserToUrl :: MonadIO m => String -> m ()
 openBrowserToUrl url =
   void $ readCreateProcessWithExitCode (proc "xdg-open" [url]) ""
+
+-- | Copy text to the clipboard. First tries the native clipboard tools (option 1): Wayland's
+-- wl-copy, then X11's xclip and xsel. If none exist or they all error, falls back to an OSC 52
+-- escape sequence (option 2), which asks the terminal itself to copy and so works over SSH with
+-- no external tool. Returns True once some method reports success.
+--
+-- The native tools fork a background process to hold the selection, which inherits the child's
+-- stdout/stderr; reading those to EOF (as readCreateProcessWithExitCode does) would hang forever.
+-- So we point the tool's output at /dev/null and wait only on the parent, which exits as soon as
+-- it has forked.
+copyToClipboard :: MonadIO m => String -> m Bool
+copyToClipboard text = liftIO $ go [("wl-copy", []), ("xclip", ["-selection", "clipboard"]), ("xsel", ["--clipboard", "--input"])]
+  where
+    go :: [(String, [String])] -> IO Bool
+    go [] = copyViaTtyOsc52 text
+    go ((cmd, cmdArgs):rest) =
+      try (runClipboardTool cmd cmdArgs) >>= \case
+        Right ExitSuccess -> return True
+        (_ :: Either SomeException ExitCode) -> go rest
+
+    runClipboardTool :: String -> [String] -> IO ExitCode
+    runClipboardTool cmd cmdArgs =
+      SIO.withFile "/dev/null" SIO.WriteMode $ \devNull ->
+        withCreateProcess (proc cmd cmdArgs) { std_in = CreatePipe, std_out = UseHandle devNull, std_err = UseHandle devNull } $
+          \mstdin _ _ ph -> do
+            whenJust mstdin $ \h -> SIO.hPutStr h text >> SIO.hClose h
+            waitForProcess ph
 #endif
+
+-- | Copy via an OSC 52 escape sequence written to the controlling terminal (/dev/tty). Opening
+-- /dev/tty rather than stdout means it works even if stdout is redirected, and keeps the sequence
+-- out of vty's own output buffer. We can't tell whether the terminal honored it (OSC 52 is
+-- fire-and-forget, and terminals may disable it), so this reports success as long as the sequence
+-- was written.
+copyViaTtyOsc52 :: String -> IO Bool
+copyViaTtyOsc52 text =
+  handleAny (\_ -> return False) $
+    SIO.withFile "/dev/tty" SIO.WriteMode $ \h -> copyViaOsc52 h text
+
+-- | Write an OSC 52 "set clipboard" escape sequence (ESC ] 52 ; c ; <base64> BEL) to the given
+-- handle. Returns True if the write succeeded.
+copyViaOsc52 :: SIO.Handle -> String -> IO Bool
+copyViaOsc52 h text =
+  handleAny (\_ -> return False) $ do
+    BS.hPutStr h (BC.pack "\ESC]52;c;" <> B64.encode (encodeUtf8 text) <> BC.pack "\a")
+    SIO.hFlush h
+    return True
 
 withGithubApiSemaphore :: (HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m) => (HasCallStack => m a) -> m a
 withGithubApiSemaphore action = do

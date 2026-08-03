@@ -3,8 +3,10 @@
 
 module Sauron.Event.Open (
   openNode
+  , copyNode
   ) where
 
+import Brick.BChan (writeBChan)
 import Control.Monad.IO.Unlift
 import Data.Char (isDigit)
 import Data.Function
@@ -12,24 +14,38 @@ import GitHub
 import Network.URI (parseURI, uriPath)
 import Relude hiding (Down, pi)
 import Sauron.Actions
+import Sauron.Actions.Util (copyToClipboard)
 import Sauron.Fetch.Notification (fetchNotificationContent)
 import Sauron.Logging
 import Sauron.Types
 import UnliftIO.Async (async)
 
 
+-- | Open the selected node's web URL in a browser.
 openNode :: (MonadIO m) => BaseContext -> SomeNode Variable -> NonEmpty (SomeNode Variable) -> Node Fixed a -> m ()
-openNode bc (SomeNode (SingleNotificationNode (EntityData {_static=notification, _state=stateVar}))) _ _ =
-  -- Resolve the notification's web URL in the background, fetching its content first if needed
-  -- (the same fetch that runs when the notification is opened) so 'o' always lands on the right
-  -- page, whether or not the notification has been opened yet.
+openNode bc = withNodeUrl bc openBrowserToUrl
+
+-- | Copy the selected node's web URL to the clipboard, raising a toast that names what was
+-- copied (or an error toast if no clipboard tool is available / the copy failed).
+copyNode :: (MonadIO m) => BaseContext -> SomeNode Variable -> NonEmpty (SomeNode Variable) -> Node Fixed a -> m ()
+copyNode bc = withNodeUrl bc $ \url ->
+  copyToClipboard url >>= \case
+    True -> writeBChan (eventChan bc) (ToastFired ToastDefault ("Copied to clipboard: " <> toText url))
+    False -> writeBChan (eventChan bc) (ToastFired ToastError "Couldn't copy to clipboard (no clipboard tool and no OSC 52 terminal support)")
+
+-- | Resolve the selected node's web URL and hand it to the given action. Notifications resolve
+-- their URL in the background, fetching content first if needed (the same fetch that runs when
+-- the notification is opened) so the action always lands on the right page, whether or not the
+-- notification has been opened yet. Everything else is synchronous.
+withNodeUrl :: (MonadIO m) => BaseContext -> (String -> IO ()) -> SomeNode Variable -> NonEmpty (SomeNode Variable) -> Node Fixed a -> m ()
+withNodeUrl bc action (SomeNode (SingleNotificationNode (EntityData {_static=notification, _state=stateVar}))) _ _ =
   void $ liftIO $ async $ flip runReaderT bc $ do
     (notificationStateContent <$> readTVarIO stateVar) >>= \case
       Fetched _ -> pure ()
       _ -> fetchNotificationContent notification stateVar
-    openBrowserToUrl . notificationWebUrl notification =<< readTVarIO stateVar
-openNode bc _ elems el = case getNodeUrl el (toList elems) of
-  Just url -> openBrowserToUrl url
+    liftIO . action . notificationWebUrl notification =<< readTVarIO stateVar
+withNodeUrl bc action _ elems el = case getNodeUrl el (toList elems) of
+  Just url -> liftIO (action url)
   Nothing -> warn' bc [i|(#{el}) Couldn't find URL to open node|]
 
 -- | Resolve a notification's web URL. Releases are referenced only by API id in the notification,

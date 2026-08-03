@@ -94,8 +94,10 @@ topBox app = hBox [columnPadding column1
                                    ]
                             , hBox [str "["
                                    , highlightKeyIfPredicate someRepoSelected app (str $ showKey openSelectedKey)
+                                   , str "/"
+                                   , highlightKeyIfPredicate someRepoSelected app (str $ showKey copySelectedKey)
                                    , str "] "
-                                   , withAttr hotkeyMessageAttr $ str "Open "
+                                   , withAttr hotkeyMessageAttr $ str "Open/copy "
                                    , highlightMessageIfPredicate someRepoSelected app (str "selected")
                                    ]
                             ]

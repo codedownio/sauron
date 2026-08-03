@@ -23,7 +23,7 @@ import Sauron.Actions.Util (findRepoParent)
 import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
 import Sauron.Event.NewIssueModal
-import Sauron.Event.Open (openNode)
+import Sauron.Event.Open (openNode, copyNode)
 import Sauron.Event.Paging
 import Sauron.Event.Search
 import Sauron.Event.Util
@@ -297,6 +297,9 @@ handleMainPaneEvents' s e = case e of
   V.EvKey c [] | c == openSelectedKey -> do
     withFixedElemAndParents s $ \(SomeNode el) variableEl elems -> do
       openNode (s ^. appBaseContext) variableEl elems el
+  V.EvKey c [] | c == copySelectedKey -> do
+    withFixedElemAndParents s $ \(SomeNode el) variableEl elems -> do
+      copyNode (s ^. appBaseContext) variableEl elems el
 
   -- Column 3
   V.EvKey c [] | c == nextPageKey -> tryNavigatePage s goNextPage

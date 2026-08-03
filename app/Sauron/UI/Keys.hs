@@ -28,6 +28,7 @@ refreshAllKey = V.KChar 'r'  -- matched with Ctrl (Ctrl+R), so 'R' is free for m
 refreshSelectedKey = V.KChar 'r'
 
 openSelectedKey = V.KChar 'o'
+copySelectedKey = V.KChar 'O'
 
 sortJobsByFailuresKey = V.KChar 'X'
 sortJobsByNameKey = V.KChar 'M'
