@@ -32,7 +32,7 @@ import Sauron.UI.Notification ()
 import Sauron.UI.Pagination ()
 import Sauron.UI.Pull ()
 import Sauron.UI.Repo ()
-import Sauron.UI.Workflow (sortJobsByWidget)
+import Sauron.UI.Workflow (sortJobsByWidget, workflowControlWidgets)
 
 
 topBox app = hBox [columnPadding column1
@@ -123,20 +123,29 @@ getExtraTopBoxWidgetsForSomeNode s (SomeNode node) = case node of
   SingleIssueNode ed -> getExtraTopBoxWidgets s ed
   SinglePullNode ed -> getExtraTopBoxWidgets s ed
   SingleWorkflowNode ed -> getExtraTopBoxWidgets s ed
-  -- Jobs and their log groups also show the parent workflow's "Sort by" row so it stays
-  -- visible (and the sort hotkeys keep working) while navigating inside a workflow.
-  SingleJobNode ed -> getExtraTopBoxWidgets s ed <> ancestorWorkflowSortWidget s
+  -- Jobs and their log groups also show the parent workflow's control (cancel/retry) and
+  -- "Sort by" rows so they stay visible (and their hotkeys keep working) while navigating
+  -- inside a workflow.
+  SingleJobNode ed -> getExtraTopBoxWidgets s ed <> ancestorWorkflowControlWidgets s <> ancestorWorkflowSortWidget s
   SingleBranchNode ed -> getExtraTopBoxWidgets s ed
   SingleBranchWithInfoNode ed -> getExtraTopBoxWidgets s ed
   SingleCommitNode ed -> getExtraTopBoxWidgets s ed
   SingleNotificationNode ed -> getExtraTopBoxWidgets s ed
-  JobLogGroupNode ed -> getExtraTopBoxWidgets s ed <> ancestorWorkflowSortWidget s
+  JobLogGroupNode ed -> getExtraTopBoxWidgets s ed <> ancestorWorkflowControlWidgets s <> ancestorWorkflowSortWidget s
 
 -- | The parent workflow's "Sort by" widget, for showing under a selected job / log group.
 ancestorWorkflowSortWidget :: AppState -> [Widget ClickableName]
 ancestorWorkflowSortWidget s =
   case [_state ed | SomeNode (SingleWorkflowNode ed) <- selectedWithAncestors s] of
     (wfState : _) -> [sortJobsByWidget wfState]
+    [] -> []
+
+-- | The parent workflow's control (cancel / retry) rows, for showing under a selected
+-- job / log group.
+ancestorWorkflowControlWidgets :: AppState -> [Widget ClickableName]
+ancestorWorkflowControlWidgets s =
+  case [_static ed | SomeNode (SingleWorkflowNode ed) <- selectedWithAncestors s] of
+    (wf : _) -> workflowControlWidgets wf
     [] -> []
 
 hasNextPageKey :: AppState -> Bool

@@ -10,9 +10,11 @@ module Sauron.UI.Workflow (
   , sortJobsByWidget
   , handleWorkflowSortKey
   , handleWorkflowJobPageKey
+  , handleWorkflowControlKey
   , handleOpenSpeedScope
   , openSpeedScopeFromArtifact
   , openSpeedScopeWidget
+  , workflowControlWidgets
   ) where
 
 import Brick
@@ -60,19 +62,13 @@ instance ListDrawable Fixed 'SingleWorkflowT where
       else if workflowIsInProgress wf then workflowJobSummary _children else Nothing
 
   getExtraTopBoxWidgets _app (EntityData {_static=wf, _state}) = concat [
-    [workflowHotkeyWidget cancelWorkflowKey "Cancel workflow" | isNothing (workflowRunConclusion wf)]
-    , [retryJobsWidget wf | isJust (workflowRunConclusion wf)]
+    workflowControlWidgets wf
     , [openSpeedScopeWidget]
     , [sortJobsByWidget _state]
     ]
 
-  handleHotkey s key (EntityData {_static=wf})
-    | key == cancelWorkflowKey && isNothing (workflowRunConclusion wf) =
-        runWorkflowMutation s $ \owner name -> cancelWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
-    | key == rerunWorkflowKey && isJust (workflowRunConclusion wf) =
-        runWorkflowMutation s $ \owner name -> rerunWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
-    | key == rerunFailedJobsKey && canRerunFailedJobs wf =
-        runWorkflowMutation s $ \owner name -> rerunFailedJobs owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
+  handleHotkey s key (EntityData {})
+    | key `elem` [cancelWorkflowKey, rerunWorkflowKey, rerunFailedJobsKey] = handleWorkflowControlKey s key
     | key == openSpeedScopeKey = handleOpenSpeedScope s
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
@@ -134,6 +130,15 @@ workflowHotkeyWidget key msg = hBox [
   , withAttr hotkeyMessageAttr $ str msg
   ]
 
+-- | The workflow's control rows: "Cancel workflow" while it's still running, or the
+-- "[e/E] Retry failed/all jobs" row once it has concluded. Shown on the workflow node and,
+-- via the top box, on its jobs / log groups so the controls stay reachable there too.
+workflowControlWidgets :: WorkflowRun -> [Widget ClickableName]
+workflowControlWidgets wf = concat [
+  [workflowHotkeyWidget cancelWorkflowKey "Cancel workflow" | isNothing (workflowRunConclusion wf)]
+  , [retryJobsWidget wf | isJust (workflowRunConclusion wf)]
+  ]
+
 -- | The "[e/E] Retry failed/all jobs" row. The "failed" half is dimmed when the run has no
 -- failures to retry.
 retryJobsWidget :: WorkflowRun -> Widget n
@@ -166,6 +171,25 @@ runWorkflowMutation s action = do
             void $ refreshLine (s ^. appBaseContext) workflowsNode parents
         _ -> return ()
   return True
+
+-- | Handle a workflow control hotkey (cancel / rerun all / rerun failed) by acting on the
+-- ancestor workflow. Works from the workflow node itself or from one of its jobs / log groups,
+-- since it locates the workflow up the ancestor chain. Returns False (letting the key fall
+-- through) when the pressed key doesn't apply to the workflow's current state.
+handleWorkflowControlKey :: AppState -> V.Key -> EventM ClickableName AppState Bool
+handleWorkflowControlKey s key = getFixedElemAndParents s >>= \case
+  Just (_, _, parents)
+    | Just (SingleWorkflowNode (EntityData {_static=wf})) <- findWorkflowParent parents -> dispatch wf
+  _ -> return False
+  where
+    dispatch wf
+      | key == cancelWorkflowKey && isNothing (workflowRunConclusion wf) =
+          runWorkflowMutation s $ \owner name -> cancelWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
+      | key == rerunWorkflowKey && isJust (workflowRunConclusion wf) =
+          runWorkflowMutation s $ \owner name -> rerunWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
+      | key == rerunFailedJobsKey && canRerunFailedJobs wf =
+          runWorkflowMutation s $ \owner name -> rerunFailedJobs owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
+      | otherwise = return False
 
 -- WorkflowRun {workflowRunWorkflowRunId = Id 7403805672, workflowRunName = N "ci", workflowRunHeadBranch = migrate-debug, workflowRunHeadSha = "1367fa30fc409d198e18afa95bda04d26387925e", workflowRunPath = ".github/workflows/ci.yml", workflowRunDisplayTitle = More database stuff noci, workflowRunRunNumber = 2208, workflowRunEvent = "push", workflowRunStatus = "completed", workflowRunConclusion = Just skipped, workflowRunWorkflowId = 6848152, workflowRunUrl = URL https://api.github.com/repos/codedownio/codedown/actions/runs/7403805672, workflowRunHtmlUrl = URL https://github.com/codedownio/codedown/actions/runs/7403805672, workflowRunCreatedAt = 2024-01-04 00:10:06 UTC, workflowRunUpdatedAt = 2024-01-04 00:10:10 UTC, workflowRunActor = SimpleUser simpleUserId = Id 1634990, simpleUserLogin = N thomasjm, simpleUserAvatarUrl = URL "https://avatars.githubusercontent.com/u/1634990?v=4", simpleUserUrl = URL "https://api.github.com/users/thomasjm", workflowRunAttempt = 1, workflowRunStartedAt = 2024-01-04 00:10:06 UTC}
 

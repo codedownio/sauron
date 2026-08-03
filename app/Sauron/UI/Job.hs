@@ -26,7 +26,7 @@ import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
 import Sauron.UI.Keys
 import Sauron.UI.Statuses (statusToIconAnimated, chooseWorkflowStatus, fetchableQuarterCircleSpinner)
-import Sauron.UI.Workflow (handleWorkflowSortKey, handleWorkflowJobPageKey, handleOpenSpeedScope, openSpeedScopeWidget)
+import Sauron.UI.Workflow (handleWorkflowSortKey, handleWorkflowJobPageKey, handleWorkflowControlKey, handleOpenSpeedScope, openSpeedScopeWidget)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 import UnliftIO.Async (Async)
@@ -66,6 +66,7 @@ instance ListDrawable Fixed 'SingleJobT where
           refreshOnZoom (s ^. appBaseContext) variableEl parents
           liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
         return True
+    | key `elem` [cancelWorkflowKey, rerunWorkflowKey, rerunFailedJobsKey] = handleWorkflowControlKey s key
     | key == openSpeedScopeKey = handleOpenSpeedScope s
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
@@ -97,6 +98,7 @@ instance ListDrawable Fixed 'JobLogGroupT where
           refreshOnZoom (s ^. appBaseContext) variableEl parents
           liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
         return True
+    | key `elem` [cancelWorkflowKey, rerunWorkflowKey, rerunFailedJobsKey] = handleWorkflowControlKey s key
     | key == openSpeedScopeKey = handleOpenSpeedScope s
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
