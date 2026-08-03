@@ -99,9 +99,9 @@ gatherAndClearHealthCheckThread someNode@(SomeNode node) = do
       _ -> return "Unknown"
 
 healthCheckIndicatorWidget :: Maybe (Async (), Int) -> Widget n
-healthCheckIndicatorWidget healthCheckThreadData =
-  case healthCheckThreadData of
-    Just (_, periodMicroseconds) ->
-      let diffTime = fromIntegral periodMicroseconds / 1_000_000 :: NominalDiffTime
-      in str (" ⭮[" <> show diffTime <> "]")
-    Nothing -> str ""
+healthCheckIndicatorWidget Nothing = str ""
+healthCheckIndicatorWidget (Just (_, periodMicroseconds)) =
+  -- Reserve a fixed 2-cell slot for the refresh glyph. Common terminal fonts
+  -- draw ↻ wider than 1 cell (not reflected in our Unicode width table).
+  hBox [str " ", hLimit 2 (padRight Max (str "↻")), str [i|[#{diffTime}]|]]
+  where diffTime = fromIntegral periodMicroseconds / 1_000_000 :: NominalDiffTime
