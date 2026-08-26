@@ -21,7 +21,8 @@
 
         src = gitignore.lib.gitignoreSource ./.;
 
-        compilerNixName = "ghc9122";
+        compilerNixVersion = "9124";
+        compilerNixName = "ghc" + compilerNixVersion;
 
         flake = (pkgs.haskell-nix.hix.project {
           inherit src;
@@ -85,14 +86,16 @@
           devShells = {
             default = pkgs.mkShell {
               buildInputs = with pkgs; [
+                haskellPackages.stack
+
                 gmp
                 ncurses
                 pcre
                 pkg-config
                 zlib
 
-                pkgs.haskell.compiler.ghc9122
-                (pkgs.haskell-language-server.override { supportedGhcVersions = ["9122"]; })
+                pkgs.haskell.compiler.${compilerNixName}
+                (pkgs.haskell-language-server.override { supportedGhcVersions = [compilerNixVersion]; })
 
                 (pkgs.vhs.overrideAttrs (old: {
                   patches = (old.patches or []) ++ [
