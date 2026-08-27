@@ -72,6 +72,15 @@
 
         version = flake.packages."sauron:exe:sauron".version;
 
+        # GHC 9.12.4 panics (lookupIdSubst) building ghcide's profiling objects, so
+        # build HLS and the packages above it without library profiling.
+        hlsPackages = pkgs.haskell.packages.${compilerNixName}.override {
+          overrides = _hfinal: hprev:
+            pkgs.lib.genAttrs
+              ["ghcide" "hls-test-utils" "haskell-language-server"]
+              (name: pkgs.haskell.lib.disableLibraryProfiling hprev.${name});
+        };
+
         mkGithubArtifacts = binary: system: exeSuffix:
           with pkgs; runCommand "github-artifacts-${system}-${version}" {} ''
           mkdir $out
@@ -95,7 +104,7 @@
                 zlib
 
                 pkgs.haskell.compiler.${compilerNixName}
-                (pkgs.haskell-language-server.override { supportedGhcVersions = [compilerNixVersion]; })
+                hlsPackages.haskell-language-server
 
                 (pkgs.vhs.overrideAttrs (old: {
                   patches = (old.patches or []) ++ [
