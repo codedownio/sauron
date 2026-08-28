@@ -1,0 +1,26 @@
+Let the linker accept a duplicate ghc_unique_counter64 when building GHC.
+
+Linking stage0's haddock fails because the symbol is defined both in the boot
+compiler's RTS and in the in-tree ghc library:
+
+  ld.gold: error: .../libHSrts-1.0.2_thr.a(Globals.thr_o):
+    multiple definition of 'ghc_unique_counter64'
+  ld.gold: .../libHSghc-9.12.4-inplace.a(genSym.o): previous definition here
+
+The boot compiler's settings hardcode ld.gold, so useLdGold = false doesn't
+help. This has to be a patch rather than an overlay: haskell.nix reaches the
+compiler through .override, which discards anything attached with overrideAttrs
+or // -- including cachedDeps, whose loss makes every package that depends only
+on boot libs fail to configure.
+
+--- a/compiler/ghc/default.nix
++++ b/compiler/ghc/default.nix
+@@ -605,7 +605,7 @@
+         export LLC="${llvmPackages.llvm}/bin/llc"
+         export OPT="${llvmPackages.llvm}/bin/opt"
+     '' + lib.optionalString (!stdenv.isDarwin) ''
+-        export NIX_LDFLAGS+=" -rpath $out/lib/${targetPrefix}ghc-${ghc-version}"
++        export NIX_LDFLAGS+=" -rpath $out/lib/${targetPrefix}ghc-${ghc-version} --allow-multiple-definition"
+     '' + lib.optionalString stdenv.isDarwin ''
+         export NIX_LDFLAGS+=" -no_dtrace_dof"
+     '' +

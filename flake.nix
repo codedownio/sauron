@@ -5,15 +5,40 @@
     inputs.nixpkgs.follows = "nixpkgs";
   };
   inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
-  inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
+  # 26.05 rather than unstable: it's the last release supporting x86_64-darwin, and
+  # still has haskellPackages.stack 3.9.3, ghc9124 and HLS 2.13.0.0.
+  inputs.nixpkgs.follows = "haskellNix/nixpkgs-2605";
 
   outputs = { self, flake-utils, gitignore, haskellNix, nixpkgs }:
     flake-utils.lib.eachDefaultSystem (system:
       let
+        pkgsNoOverlays = import nixpkgs { inherit system; };
+
+        patchedHaskellNix = pkgsNoOverlays.applyPatches {
+          name = "haskell-nix-patched";
+          src = haskellNix;
+          patches = [
+            ./nix/haskell-nix-patches/ghc-allow-multiple-definition.patch
+            ./nix/haskell-nix-patches/windows-crypton-x509-system-patch-path.patch
+          ];
+        };
+
+        # hackage.nix has a package whose Cabal flag is literally named "3d", which
+        # it emits unquoted, so importing it is a Nix syntax error.
+        haskellNixOverlay = (import (patchedHaskellNix + "/overlays") {
+          sources = haskellNix.inputs // {
+            hackage-for-stackage = pkgsNoOverlays.applyPatches {
+              name = "hackage-for-stackage-hgg-3d-flag";
+              src = haskellNix.inputs.hackage-for-stackage;
+              patches = [ ./nix/haskell-nix-patches/fix-hgg-3d-flag.patch ];
+            };
+          };
+        }).combined;
+
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
-            haskellNix.overlay
+            haskellNixOverlay
             (import ./nix/fix-ghc-pkgs-overlay.nix)
           ];
           inherit (haskellNix) config;
@@ -21,6 +46,9 @@
 
         src = gitignore.lib.gitignoreSource ./.;
 
+        # Must match the GHC the stack.yaml resolver targets, or haskell.nix tries to
+        # rebuild the compiler's own boot libs and configure fails with
+        # "Encountered missing or private dependencies".
         compilerNixVersion = "9124";
         compilerNixName = "ghc" + compilerNixVersion;
 
@@ -65,6 +93,7 @@
           compiler-nix-name = compilerNixName;
           projectFileName = "stack.yaml";
           modules = [
+            (import ./nix/fix-ghc-pkgs-module.nix)
             (import ./nix/os-string-module.nix)
             (import ./nix/module-windows.nix {})
           ];
@@ -72,13 +101,16 @@
 
         version = flake.packages."sauron:exe:sauron".version;
 
-        # GHC 9.12.4 panics (lookupIdSubst) building ghcide's profiling objects, so
-        # build HLS and the packages above it without library profiling.
+        # We only want the HLS binary, so skip two things that make it painful to
+        # build: GHC 9.12.4 panics (lookupIdSubst) on ghcide's profiling objects,
+        # and haddock deadlocks under the -j nixpkgs passes it.
         hlsPackages = pkgs.haskell.packages.${compilerNixName}.override {
-          overrides = _hfinal: hprev:
-            pkgs.lib.genAttrs
-              ["ghcide" "hls-test-utils" "haskell-language-server"]
-              (name: pkgs.haskell.lib.disableLibraryProfiling hprev.${name});
+          overrides = _hfinal: hprev: {
+            mkDerivation = args: hprev.mkDerivation (args // {
+              enableLibraryProfiling = false;
+              doHaddock = false;
+            });
+          };
         };
 
         mkGithubArtifacts = binary: system: exeSuffix:
