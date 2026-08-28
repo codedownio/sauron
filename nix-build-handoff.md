@@ -3,10 +3,12 @@
 Context for continuing the `nix build .#grandCombinedGithubArtifacts` work on
 another machine. Written 2026-08-28.
 
-Base commit: `fbec463` ("Another update") on branch `add-stack-to-dev-shell`.
-All work below is **uncommitted** in the working tree (three new files are
-`git add`ed but not committed — flakes can't see untracked files, so anything
-new must be at least staged).
+All work below is committed as `c2ad2ac` ("noci") on branch
+`add-stack-to-dev-shell`, pushed to `codedownio`. The commit before it,
+`fbec463`, is the last state without any of these fixes.
+
+Note for anything added later: flakes can't see untracked files, so new files
+must be at least `git add`ed before they take effect.
 
 ## Goal
 
