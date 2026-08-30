@@ -64,7 +64,13 @@
           ];
         }).flake {};
 
-        flakeStatic = (pkgs.pkgsCross.musl64.haskell-nix.hix.project {
+        # pkgsStatic rather than pkgsCross.musl64: haskell.nix derives the compiler's
+        # enableShared from `!isCrossTarget && !targetPlatform.isStatic`, and only
+        # pkgsStatic sets isStatic, so only here does it build the static by default
+        # GHC that a static executable needs. Under plain musl64 it builds a dynamic
+        # GHC, Cabal adds -dynamic-too for TemplateHaskell, and that shared link
+        # cannot take the -optl=-static haskell.nix passes for musl executables.
+        flakeStatic = (pkgs.pkgsStatic.haskell-nix.hix.project {
           inherit src;
           evalSystem = "x86_64-linux";
           compiler-nix-name = compilerNixName;
@@ -72,7 +78,7 @@
           modules = [
             (import ./nix/fix-ghc-pkgs-module.nix)
             (import ./nix/os-string-module.nix)
-            (import ./nix/module-static.nix { inherit (pkgs) pkgsCross; })
+            (import ./nix/module-static.nix { inherit (pkgs) pkgsStatic; })
           ];
         }).flake {};
 

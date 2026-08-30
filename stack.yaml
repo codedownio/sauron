@@ -10,7 +10,12 @@ nix:
 system-ghc: true
 
 extra-deps:
-- vty-windows-0.2.0.3
+# 0.2.0.3 has an open "Win32 >= 2.8.5.0" bound, predating the record types Win32
+# 2.14.2 added, so it fails to build against the Win32-2.14.2.1 GHC 9.12.4 ships:
+# its own KeyEventRecord/MouseEventRecord fields clash with KEY_EVENT_RECORD's.
+# 0.2.0.4 fixed that by using Win32's readConsoleInput; 0.3.0.0 is the release
+# that also matches the vty-6.6 the snapshot pins.
+- vty-windows-0.3.0.0
 - brick-skylighting-1.0@sha256:64764b6be36c05261959f68ed38b9cb37e1acb6180a3bde5dd98255f62ea7e3b,1812
 
 # - /home/tom/tools/github

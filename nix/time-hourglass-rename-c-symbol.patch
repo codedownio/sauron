@@ -1,0 +1,38 @@
+time-hourglass is a fork of hourglass that renamed its Haskell modules but kept
+the C symbol prefix, so both packages export hourglass_clock_calendar. sauron's
+plan contains both -- time-hourglass via crypton-asn1-types, and hourglass via
+authenticate-oauth -> RSA -> crypto-pubkey-types -> asn1-types (which is stuck
+on hourglass; 0.3.4 is the newest asn1-types and nothing newer exists).
+
+A dynamic GHC never notices, but the static-by-default GHC a musl static build
+needs loads real object files for TemplateHaskell splices, and its runtime
+linker rejects the duplicate:
+
+  GHC runtime linker: fatal error: I found a duplicate definition for symbol
+     hourglass_clock_calendar
+
+Renaming time-hourglass's copy is the smallest fix; it is one C definition and
+one foreign import. Note both files use CRLF, so this patch does too.
+
+--- a/cbits/unix.c
++++ b/cbits/unix.c
+@@ -13,7 +13,7 @@
+  * we ignore errors as it's very very unlikely considering the hardcoded ID
+  * and the fact that haskell should call this code.
+  */
+-void hourglass_clock_calendar(struct timespec *timespec)
++void time_hourglass_clock_calendar(struct timespec *timespec)
+ {
+ #if defined __MACH__ && !defined __GNU__
+ 	clock_serv_t cclock;
+--- a/src/unix/Time/Internal.hs
++++ b/src/unix/Time/Internal.hs
+@@ -74,7 +74,7 @@
+   toElapsed :: CTime -> Elapsed
+   toElapsed (CTime sec) = Elapsed $ Seconds (fromIntegral sec)
+ 
+-foreign import ccall unsafe "hourglass_clock_calendar"
++foreign import ccall unsafe "time_hourglass_clock_calendar"
+   c_clock_get :: Ptr CLong -> IO ()
+ 
+ foreign import ccall unsafe "gmtime_r"
