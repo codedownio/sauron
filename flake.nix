@@ -6,8 +6,12 @@
   };
   inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
   inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
+  # Just for a recent stack in the dev shell. Deliberately does not follow nixpkgs:
+  # haskellNix pins nixpkgs for the build, and moving that pin to get a newer stack
+  # drags the whole toolchain along with it.
+  inputs.nixpkgsMaster.url = "github:NixOS/nixpkgs/master";
 
-  outputs = { self, flake-utils, gitignore, haskellNix, nixpkgs }:
+  outputs = { self, flake-utils, gitignore, haskellNix, nixpkgs, nixpkgsMaster }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -18,6 +22,8 @@
           ];
           inherit (haskellNix) config;
         };
+
+        pkgsMaster = import nixpkgsMaster { inherit system; };
 
         src = gitignore.lib.gitignoreSource ./.;
 
@@ -85,6 +91,8 @@
           devShells = {
             default = pkgs.mkShell {
               buildInputs = with pkgs; [
+                pkgsMaster.stack
+
                 gmp
                 ncurses
                 pcre
