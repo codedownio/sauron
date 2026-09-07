@@ -32,6 +32,7 @@ Most Git TUIs (`lazygit`, `gitui`) focus on local operations — staging, commit
 | Browse/search issues and PRs | :white_check_mark: | list only | :white_check_mark: | :x: | :x: |
 | Comment on issues/PRs | :white_check_mark: | :white_check_mark: | :white_check_mark: | :x: | :x: |
 | Close/reopen issues/PRs | :white_check_mark: | :white_check_mark: | :white_check_mark: | :x: | :x: |
+| Merge PRs (merge/squash/rebase) | :white_check_mark: | :white_check_mark: | :white_check_mark: | :x: | :x: |
 | Create issues | :white_check_mark: | :white_check_mark: | :x: | :x: | :x: |
 | Syntax highlighting | :white_check_mark: | :x: | :x: | :white_check_mark: | :white_check_mark: |
 | Monitor workflow runs | :white_check_mark: | :x: | :x: | :x: | :x: |

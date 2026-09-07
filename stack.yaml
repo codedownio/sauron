@@ -13,8 +13,8 @@ extra-deps:
 - vty-windows-0.2.0.3
 - brick-skylighting-1.0@sha256:64764b6be36c05261959f68ed38b9cb37e1acb6180a3bde5dd98255f62ea7e3b,1812
 
-# - /home/tom/tools/github
-- git: https://github.com/codedownio/github.git
+- /home/tom/tools/github
+# - git: https://github.com/codedownio/github.git
   # sauron-sep18-2025 branch, which has some changes from upstream:
   # - fixes for search query escaping
   # - fix Job type to make some fields optional
@@ -34,7 +34,8 @@ extra-deps:
   # - Parse issue event message
   # - GitHub.Data.Issues: auto-derive JSON instances
   # - Add issueDraft field
-  commit: 263f22125e1974fce8614787b563fd0cd1b930a0
+  # - Add merge method support (mergePullRequestWithOptionsR)
+  # commit: 263f22125e1974fce8614787b563fd0cd1b930a0
 
 - git: https://github.com/dogonthehorizon/git-config.git
   commit: 8f3fab100e4c8d82b5c6fe7c0cc09510249e98cf

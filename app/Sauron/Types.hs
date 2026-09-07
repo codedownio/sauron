@@ -437,6 +437,8 @@ data ClickableName =
   | LogSplitContent
   | NewIssueTitleEditor
   | NewIssueBodyEditor
+  | MergeCommitTitleEditor
+  | MergeCommitMessageEditor
   | ScrollbarClick ClickableScrollbarElement ClickableName
   deriving (Show, Ord, Eq)
 
@@ -555,6 +557,7 @@ data AppEvent =
   | TimeUpdated UTCTime
   | CommentModalEvent CommentModalEvent
   | NewIssueModalEvent NewIssueModalEvent
+  | MergeModalEvent MergeModalEvent
   | LogEntryAdded LogEntry
   | ToastFired ToastLevel Text
   | ToastWidgetFired ToastLevel (Widget ClickableName)
@@ -574,11 +577,20 @@ data CommentModalEvent =
 data NewIssueModalEvent =
   NewIssueCreated (Either Error Issue)
 
+-- | The merge either went through (carrying GitHub's confirmation message) or
+-- was rejected (carrying GitHub's explanation, e.g. "Pull Request is not mergeable").
+data MergeModalEvent =
+  MergeFinished (Either Text Text)
+
 data SubmissionState =
   NotSubmitting
   | SubmittingComment
   | SubmittingCloseWithComment
   | SubmittingNewIssue
+  | SubmittingMerge
+  deriving (Show, Eq)
+
+data MergeFocus = MergeFocusMethods | MergeFocusTitle | MergeFocusBody
   deriving (Show, Eq)
 
 -- TODO: break these into individual types
@@ -605,6 +617,18 @@ data ModalState f =
       , _newIssueSubmissionState :: SubmissionState
       , _newIssueFocusTitle :: Bool -- True = title focused, False = body focused
       }
+  | MergeModalState {
+      _mergeIssue :: Issue
+      , _mergeRepoOwner :: Name Owner
+      , _mergeRepoName :: Name Repo
+      , _mergeMethod :: MergeMethod
+      -- | Commit title/message for the squash commit; empty means GitHub's default.
+      -- Only shown for squash merges.
+      , _mergeCommitTitleEditor :: Editor Text ClickableName
+      , _mergeCommitMessageEditor :: Editor Text ClickableName
+      , _mergeFocus :: MergeFocus
+      , _mergeSubmissionState :: SubmissionState
+      }
   | HelpModalState
 
 instance Eq (ModalState Fixed) where
@@ -615,6 +639,8 @@ instance Eq (ModalState Fixed) where
   (ZoomModalState node1 parents1) == (ZoomModalState node2 parents2) = node1 == node2 && parents1 == parents2
   (NewIssueModalState _t1 _b1 o1 n1 s1 _f1) == (NewIssueModalState _t2 _b2 o2 n2 s2 _f2) =
     o1 == o2 && n1 == n2 && s1 == s2
+  (MergeModalState issue1 owner1 name1 method1 _t1 _m1 _f1 submission1) == (MergeModalState issue2 owner2 name2 method2 _t2 _m2 _f2 submission2) =
+    issue1 == issue2 && owner1 == owner2 && name1 == name2 && method1 == method2 && submission1 == submission2
   HelpModalState == HelpModalState = True
   _ == _ = False
 

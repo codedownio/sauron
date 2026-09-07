@@ -16,7 +16,7 @@ import Sauron.Types
 import Sauron.UI
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
-import Sauron.UI.Keys (commentKey, showKey)
+import Sauron.UI.Keys (commentKey, mergeKey, showKey)
 import Sauron.UI.Modals.CommentModal (modalHeightPercent, modalWidth)
 
 
@@ -50,7 +50,9 @@ getZoomModalHotkeys (SomeNode node) = nodeSpecificHotkeys ++ commonHotkeys
 
     nodeSpecificHotkeys = case node of
       SingleIssueNode {} -> [hotkeyWidget (showKey commentKey) "Comment"]
-      SinglePullNode {} -> [hotkeyWidget (showKey commentKey) "Comment"]
+      SinglePullNode (EntityData {_static=issue}) ->
+        [hotkeyWidget (showKey commentKey) "Comment"]
+        <> [hotkeyWidget (showKey mergeKey) "Merge" | issueState issue == StateOpen]
       SingleNotificationNode (EntityData {_static=notification}) ->
         if subjectType (notificationSubject notification) `elem` ["Issue", "PullRequest"]
         then [hotkeyWidget (showKey commentKey) "Comment"]

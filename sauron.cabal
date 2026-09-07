@@ -35,6 +35,7 @@ executable sauron
       Sauron.Event
       Sauron.Event.CommentModal
       Sauron.Event.Helpers
+      Sauron.Event.MergeModal
       Sauron.Event.NewIssueModal
       Sauron.Event.Open
       Sauron.Event.Paging
@@ -98,6 +99,7 @@ executable sauron
       Sauron.UI.Markdown.Wrapping
       Sauron.UI.Modals.CommentModal
       Sauron.UI.Modals.HelpModal
+      Sauron.UI.Modals.MergeModal
       Sauron.UI.Modals.NewIssueModal
       Sauron.UI.Modals.ZoomModal
       Sauron.UI.Notification

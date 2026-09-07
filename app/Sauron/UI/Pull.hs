@@ -23,6 +23,7 @@ import Sauron.Actions (refreshOnZoom)
 import Sauron.Actions.Util (findRepoParent, findPullsParent)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers (withFixedElemAndParents)
+import Sauron.Event.MergeModal (openMergeModal)
 import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Fetch.Pull (fetchPullComments)
 import Sauron.Types
@@ -55,17 +56,16 @@ instance ListDrawable Fixed 'SinglePullT where
           , str "] "
           , withAttr hotkeyMessageAttr $ str "Zoom"
           ]
-    , hBox [str "["
-          , withAttr hotkeyAttr $ str $ showKey commentKey
-          , str "/"
-          , withAttr hotkeyAttr $ str $ showKey closeReopenKey
-          , str "] "
-          , withAttr hotkeyMessageAttr $ str "Comment"
-          , str "/"
-          , withAttr hotkeyMessageAttr $ str (if issueState issue == StateOpen then "Close" else "Reopen")
-          ]
+    , hBox $ [str "["]
+             <> intersperse (str "/") [withAttr hotkeyAttr $ str $ showKey key | key <- keys]
+             <> [str "] "]
+             <> intersperse (str "/") [withAttr hotkeyMessageAttr $ str label | label <- labels]
     , detailsToggleWidget app
     ]
+    where
+      isOpen = issueState issue == StateOpen
+      keys = [commentKey] <> [mergeKey | isOpen] <> [closeReopenKey]
+      labels = ["Comment"] <> ["Merge" | isOpen] <> [if isOpen then "Close" else "Reopen"]
 
   handleHotkey s key (EntityData {_static=issue})
     | key == editSearchKey = do
@@ -87,6 +87,11 @@ instance ListDrawable Fixed 'SinglePullT where
             (Just (RepoNode (EntityData {_static=(owner, name)})), SinglePullNode (EntityData {_state=stateVar})) ->
               fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar True owner name
             _ -> return ()
+        return True
+    | key == mergeKey, issueState issue == StateOpen = do
+        withFixedElemAndParents s $ \_ _ parents ->
+          whenJust (findRepoParent parents) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
+            openMergeModal issue owner name
         return True
     | key == closeReopenKey = do
         liftIO $ void $ async $ do

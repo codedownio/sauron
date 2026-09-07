@@ -22,6 +22,7 @@ import Sauron.Actions
 import Sauron.Actions.Util (findRepoParent)
 import Sauron.Event.CommentModal
 import Sauron.Event.Helpers
+import Sauron.Event.MergeModal
 import Sauron.Event.NewIssueModal
 import Sauron.Event.Open (openNode)
 import Sauron.Event.Paging
@@ -60,6 +61,8 @@ appEvent _ (AppEvent AnimationTick) = do
 appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModalEvent s commentModalEvent
 
 appEvent s (AppEvent (NewIssueModalEvent newIssueEvent)) = handleNewIssueModalEvent s newIssueEvent
+
+appEvent s (AppEvent (MergeModalEvent mergeEvent)) = handleMergeModalEvent s mergeEvent
 
 appEvent _s (AppEvent (TimeUpdated newTime)) = do
   -- Update the current time for accurate timestamps
@@ -113,11 +116,19 @@ appEvent s@(_appModal -> Just modalState) e = case e of
           let bodyEd = _newIssueBodyEditor modalState
           bodyEd' <- WEditorBrick.handleEditor bodyEd ev
           modify (appModal . _Just . newIssueBodyEditor .~ bodyEd')
+    MergeModalState {} -> case ev of
+      -- Match Esc with any modifiers: some terminals tag it (and a modifier-tagged
+      -- Esc falling through to the title editor would type stray characters)
+      (V.EvKey V.KEsc _) -> closeModal s
+      (V.EvKey (V.KChar 'q') []) | _mergeFocus modalState == MergeFocusMethods -> closeModal s
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+      _ -> handleMergeModalVtyEvent s modalState ev
     ZoomModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
+      (V.EvKey (V.KChar 'm') []) -> handleZoomModalMerge s
       _ -> whenM (handleModalScrolling ZoomModalContent ev) $ clearAutoScrollTarget s
     HelpModalState -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
@@ -387,6 +398,18 @@ handleZoomModalComment s = do
     dummyNonEmpty :: [a] -> NonEmpty a
     dummyNonEmpty [] = error "handleZoomModalComment: empty parents"
     dummyNonEmpty (x:xs) = x :| xs
+
+-- | Handle 'm' in the zoom modal: open the merge modal for a zoomed open PR
+handleZoomModalMerge :: AppState -> EventM ClickableName AppState ()
+handleZoomModalMerge s = do
+  maybeVarModal <- liftIO $ readTVarIO (_appModalVariable s)
+  case maybeVarModal of
+    Just (ZoomModalState (SomeNode (SinglePullNode (EntityData {_static=issue}))) parents)
+      | issueState issue == StateOpen ->
+        case nonEmpty parents >>= findRepoParent of
+          Just (RepoNode (EntityData {_static=(owner, name)})) -> openMergeModal issue owner name
+          Nothing -> return ()
+    _ -> return ()
 
 handleModalScrolling :: ClickableName -> V.Event -> EventM ClickableName AppState Bool
 handleModalScrolling viewportName ev = case ev of

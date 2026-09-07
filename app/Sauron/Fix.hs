@@ -36,6 +36,16 @@ fixModal (NewIssueModalState {..}) = return $ NewIssueModalState {
   , _newIssueSubmissionState = _newIssueSubmissionState
   , _newIssueFocusTitle = _newIssueFocusTitle
   }
+fixModal (MergeModalState {..}) = return $ MergeModalState {
+  _mergeIssue = _mergeIssue
+  , _mergeRepoOwner = _mergeRepoOwner
+  , _mergeRepoName = _mergeRepoName
+  , _mergeMethod = _mergeMethod
+  , _mergeCommitTitleEditor = _mergeCommitTitleEditor
+  , _mergeCommitMessageEditor = _mergeCommitMessageEditor
+  , _mergeFocus = _mergeFocus
+  , _mergeSubmissionState = _mergeSubmissionState
+  }
 fixModal (ZoomModalState sn parents) = do
   fixedNode <- fixSomeNode sn
   fixedParents <- mapM fixSomeNode parents

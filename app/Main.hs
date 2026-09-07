@@ -44,6 +44,7 @@ import Sauron.UI.Toast (renderToasts)
 import Sauron.UI.Modals.CommentModal (renderModal)
 import Sauron.UI.Modals.HelpModal (renderHelpModal)
 import Sauron.UI.LogPane (renderLogPane)
+import Sauron.UI.Modals.MergeModal (renderMergeModal)
 import Sauron.UI.Modals.NewIssueModal (renderNewIssueModal)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TopBox (topBox)
@@ -78,6 +79,7 @@ drawUI app = maybe id (:) (renderToasts app) $ case _appModal app of
   Just modalState -> case modalState of
     CommentModalState {} -> [renderModal app modalState, dimmedUi]
     NewIssueModalState {} -> [renderNewIssueModal app modalState, dimmedUi]
+    MergeModalState {} -> [renderMergeModal app modalState, dimmedUi]
     ZoomModalState {} -> [renderZoomModal app modalState, dimmedUi]
     HelpModalState -> [renderHelpModal app, dimmedUi]
   where
