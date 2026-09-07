@@ -434,6 +434,7 @@ data ClickableName =
   | CommentModalContent
   | CommentEditor
   | ZoomModalContent
+  | PRReviewModalContent
   | LogSplitContent
   | NewIssueTitleEditor
   | NewIssueBodyEditor
@@ -558,6 +559,7 @@ data AppEvent =
   | CommentModalEvent CommentModalEvent
   | NewIssueModalEvent NewIssueModalEvent
   | MergeModalEvent MergeModalEvent
+  | PRReviewModalEvent PRReviewModalEvent
   | LogEntryAdded LogEntry
   | ToastFired ToastLevel Text
   | ToastWidgetFired ToastLevel (Widget ClickableName)
@@ -581,6 +583,19 @@ data NewIssueModalEvent =
 -- was rejected (carrying GitHub's explanation, e.g. "Pull Request is not mergeable").
 data MergeModalEvent =
   MergeFinished (Either Text Text)
+
+-- | The web UI's per-file "viewed" checkbox state. Dismissed means the file was
+-- viewed but new changes were pushed since.
+data FileViewedState = FileViewed | FileUnviewed | FileDismissed
+  deriving (Show, Eq, Ord)
+
+data PRReviewModalEvent =
+  -- | Both fetches (REST files and GraphQL viewed states) finished; open the modal.
+  PRReviewModalReady Issue (Name Owner) (Name Repo) Text (V.Vector File) (Map Text FileViewedState)
+  | PRReviewModalFetchFailed Text
+  -- | A mark/unmark mutation failed; carries the error, the file path, and the state
+  -- to revert to (the local state was updated optimistically).
+  | FileViewedMarkFailed Text Text FileViewedState
 
 data SubmissionState =
   NotSubmitting
@@ -629,6 +644,16 @@ data ModalState f =
       , _mergeFocus :: MergeFocus
       , _mergeSubmissionState :: SubmissionState
       }
+  | PRReviewModalState {
+      _reviewIssue :: Issue
+      , _reviewRepoOwner :: Name Owner
+      , _reviewRepoName :: Name Repo
+      -- | The PR's GraphQL node id, needed by the mark/unmark viewed mutations
+      , _reviewPullRequestId :: Text
+      , _reviewFiles :: V.Vector File
+      , _reviewViewedStates :: Map Text FileViewedState
+      , _reviewCurrentFile :: Int
+      }
   | HelpModalState
 
 instance Eq (ModalState Fixed) where
@@ -641,6 +666,9 @@ instance Eq (ModalState Fixed) where
     o1 == o2 && n1 == n2 && s1 == s2
   (MergeModalState issue1 owner1 name1 method1 _t1 _m1 _f1 submission1) == (MergeModalState issue2 owner2 name2 method2 _t2 _m2 _f2 submission2) =
     issue1 == issue2 && owner1 == owner2 && name1 == name2 && method1 == method2 && submission1 == submission2
+  (PRReviewModalState issue1 owner1 name1 prId1 files1 states1 current1) == (PRReviewModalState issue2 owner2 name2 prId2 files2 states2 current2) =
+    issue1 == issue2 && owner1 == owner2 && name1 == name2 && prId1 == prId2 &&
+    files1 == files2 && states1 == states2 && current1 == current2
   HelpModalState == HelpModalState = True
   _ == _ = False
 

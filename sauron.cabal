@@ -39,6 +39,7 @@ executable sauron
       Sauron.Event.NewIssueModal
       Sauron.Event.Open
       Sauron.Event.Paging
+      Sauron.Event.PRReviewModal
       Sauron.Event.Search
       Sauron.Event.Util
       Sauron.Expanding
@@ -56,6 +57,7 @@ executable sauron
       Sauron.Filter
       Sauron.Fix
       Sauron.GraphQL
+      Sauron.GraphQL.PullRequestFiles
       Sauron.HealthCheck.Common
       Sauron.HealthCheck.Job
       Sauron.HealthCheck.Notification
@@ -101,6 +103,7 @@ executable sauron
       Sauron.UI.Modals.HelpModal
       Sauron.UI.Modals.MergeModal
       Sauron.UI.Modals.NewIssueModal
+      Sauron.UI.Modals.PRReviewModal
       Sauron.UI.Modals.ZoomModal
       Sauron.UI.Notification
       Sauron.UI.Pagination

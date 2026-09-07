@@ -46,6 +46,15 @@ fixModal (MergeModalState {..}) = return $ MergeModalState {
   , _mergeFocus = _mergeFocus
   , _mergeSubmissionState = _mergeSubmissionState
   }
+fixModal (PRReviewModalState {..}) = return $ PRReviewModalState {
+  _reviewIssue = _reviewIssue
+  , _reviewRepoOwner = _reviewRepoOwner
+  , _reviewRepoName = _reviewRepoName
+  , _reviewPullRequestId = _reviewPullRequestId
+  , _reviewFiles = _reviewFiles
+  , _reviewViewedStates = _reviewViewedStates
+  , _reviewCurrentFile = _reviewCurrentFile
+  }
 fixModal (ZoomModalState sn parents) = do
   fixedNode <- fixSomeNode sn
   fixedParents <- mapM fixSomeNode parents

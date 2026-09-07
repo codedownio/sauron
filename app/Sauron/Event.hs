@@ -25,6 +25,7 @@ import Sauron.Event.Helpers
 import Sauron.Event.MergeModal
 import Sauron.Event.NewIssueModal
 import Sauron.Event.Open (openNode)
+import Sauron.Event.PRReviewModal
 import Sauron.Event.Paging
 import Sauron.Event.Search
 import Sauron.Event.Util
@@ -63,6 +64,8 @@ appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModal
 appEvent s (AppEvent (NewIssueModalEvent newIssueEvent)) = handleNewIssueModalEvent s newIssueEvent
 
 appEvent s (AppEvent (MergeModalEvent mergeEvent)) = handleMergeModalEvent s mergeEvent
+
+appEvent s (AppEvent (PRReviewModalEvent reviewEvent)) = handlePRReviewModalEvent s reviewEvent
 
 appEvent _s (AppEvent (TimeUpdated newTime)) = do
   -- Update the current time for accurate timestamps
@@ -123,6 +126,14 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'q') []) | _mergeFocus modalState == MergeFocusMethods -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       _ -> handleMergeModalVtyEvent s modalState ev
+    PRReviewModalState {} -> case ev of
+      (V.EvKey V.KEsc []) -> closeModal s
+      (V.EvKey (V.KChar 'q') []) -> closeModal s
+      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+      (V.EvKey key []) ->
+        unlessM (handlePRReviewModalKey s modalState key) $
+          void $ handleModalScrolling PRReviewModalContent ev
+      _ -> void $ handleModalScrolling PRReviewModalContent ev
     ZoomModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') []) -> closeModal s

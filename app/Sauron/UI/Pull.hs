@@ -24,6 +24,7 @@ import Sauron.Actions.Util (findRepoParent, findPullsParent)
 import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
 import Sauron.Event.Helpers (withFixedElemAndParents)
 import Sauron.Event.MergeModal (openMergeModal)
+import Sauron.Event.PRReviewModal (openPRReviewModal)
 import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Fetch.Pull (fetchPullComments)
 import Sauron.Types
@@ -53,8 +54,12 @@ instance ListDrawable Fixed 'SinglePullT where
           ]
     , hBox [str "["
           , withAttr hotkeyAttr $ str $ showKey zoomModalKey
+          , str "/"
+          , withAttr hotkeyAttr $ str $ showKey reviewKey
           , str "] "
           , withAttr hotkeyMessageAttr $ str "Zoom"
+          , str "/"
+          , withAttr hotkeyMessageAttr $ str "Review"
           ]
     , hBox $ [str "["]
              <> intersperse (str "/") [withAttr hotkeyAttr $ str $ showKey key | key <- keys]
@@ -87,6 +92,11 @@ instance ListDrawable Fixed 'SinglePullT where
             (Just (RepoNode (EntityData {_static=(owner, name)})), SinglePullNode (EntityData {_state=stateVar})) ->
               fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar True owner name
             _ -> return ()
+        return True
+    | key == reviewKey = do
+        withFixedElemAndParents s $ \_ _ parents ->
+          whenJust (findRepoParent parents) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
+            openPRReviewModal (s ^. appBaseContext) issue owner name
         return True
     | key == mergeKey, issueState issue == StateOpen = do
         withFixedElemAndParents s $ \_ _ parents ->
