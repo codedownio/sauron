@@ -23,9 +23,9 @@ import GitHub
 import qualified Graphics.Vty as V
 import Lens.Micro
 import Relude
-import Sauron.Actions (refreshLine)
+import Sauron.Actions (openBrowserToUrl, refreshLine)
 import Sauron.Actions.Util (findRepoParent, findWorkflowsParent, findWorkflowParent)
-import Sauron.Event.Helpers (withFixedElemAndParents, getFixedElemAndParents)
+import Sauron.Event.Helpers (withFixedElemAndParents, getFixedElemAndParents, withRepoParent)
 import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
 import Sauron.Mutations.Workflow (cancelWorkflowRun, rerunWorkflowRun, rerunFailedJobs)
 import Sauron.Types
@@ -54,6 +54,7 @@ instance ListDrawable Fixed 'SingleWorkflowT where
   getExtraTopBoxWidgets _app (EntityData {_static=wf, _state}) = concat [
     [workflowHotkeyWidget cancelWorkflowKey "Cancel workflow" | isNothing (workflowRunConclusion wf)]
     , [retryJobsWidget wf | isJust (workflowRunConclusion wf)]
+    , [workflowHotkeyWidget openPullKey "Open PR" | not (Vec.null (workflowRunPullRequests wf))]
     , [sortJobsByWidget _state]
     ]
 
@@ -64,6 +65,10 @@ instance ListDrawable Fixed 'SingleWorkflowT where
         runWorkflowMutation s $ \owner name -> rerunWorkflowRun owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
     | key == rerunFailedJobsKey && canRerunFailedJobs wf =
         runWorkflowMutation s $ \owner name -> rerunFailedJobs owner name (workflowRunWorkflowRunId wf) (workflowRunRunNumber wf)
+    | key == openPullKey, (pr:_) <- toList (workflowRunPullRequests wf) = do
+        withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) ->
+          openBrowserToUrl (toString url <> "/pull/" <> show (workflowRunPullRequestNumber pr))
+        return True
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
   handleHotkey _ _ _ = return False
@@ -149,9 +154,17 @@ workflowLine animationCounter currentTime toggled' (WorkflowRun {..}) fetchableS
       , withAttr hashAttr $ str $ take 7 $ toString workflowRunHeadSha
       , str " on "
       , withAttr branchAttr $ str $ toString workflowRunHeadBranch
-      , str " • Pushed by "
+      ] <> prPart <> [
+      str " • Pushed by "
       , withAttr usernameAttr $ str $ toString $ untagName $ simpleUserLogin workflowRunActor
       ] <> (if workflowRunAttempt > 1 then [str [i| • Attempt #{workflowRunAttempt}|]] else [])
+
+    prPart = case toList workflowRunPullRequests of
+      [] -> []
+      prs -> str " • PR: " : intersperse (str ", ") [
+        hBox [withAttr hashAttr $ str "#", withAttr hashNumberAttr $ str $ show $ workflowRunPullRequestNumber pr]
+        | pr <- prs
+        ]
 
 -- | The "Sort by failures/name/runtime" top-box row for a workflow. Shown both when the
 -- workflow is selected and when one of its jobs is, so the current sort stays visible.
