@@ -82,6 +82,7 @@ executable sauron
       Sauron.UI.Branch
       Sauron.UI.BranchWithInfo
       Sauron.UI.Commit
+      Sauron.UI.Diff
       Sauron.UI.Event
       Sauron.UI.Issue
       Sauron.UI.Issue.Events
