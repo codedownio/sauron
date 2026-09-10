@@ -74,7 +74,18 @@ attrToColor colorMode = ([
   , (openMarkerAttr, fg (select midGray))
   , (openStateMarkerAttr, fg (select solarizedGreen))
   , (closedStateMarkerAttr, fg (select solarizedViolet))
+  , (closedPrMarkerAttr, fg (select prClosedRed))
   , (draftMarkerAttr, fg (select brightGray))
+
+  -- Bottom action buttons (GitHub style: white on gray/green)
+  , (buttonGrayAttr, select brightWhite `on` select buttonGrayBg)
+  , (buttonGreenAttr, select brightWhite `on` select buttonGreenBg)
+  , (buttonGreenDisabledAttr, select brightGray `on` select buttonGreenDisabledBg)
+  , (buttonGrayRedIconAttr, select prClosedRed `on` select buttonGrayBg)
+
+  -- The pull request modal's selected tab
+  , (selectedTabAttr, (select brightWhite `on` select buttonGrayBg)
+                        & flip V.withStyle V.bold & flip V.withStyle V.underline)
   , (releaseMarkerAttr, fg (select solarizedBlue))
 
 
@@ -228,14 +239,20 @@ toggleMarkerAttr = mkAttrName "toggleMarker"
 openMarkerAttr = mkAttrName "openMarker"
 openStateMarkerAttr = mkAttrName "openStateMarker"
 closedStateMarkerAttr = mkAttrName "closedStateMarker"
+closedPrMarkerAttr = mkAttrName "closedPrMarker"
 draftMarkerAttr = mkAttrName "draftMarker"
+buttonGrayAttr = mkAttrName "buttonGray"
+buttonGreenAttr = mkAttrName "buttonGreen"
+buttonGreenDisabledAttr = mkAttrName "buttonGreenDisabled"
+buttonGrayRedIconAttr = mkAttrName "buttonGrayRedIcon"
+selectedTabAttr = mkAttrName "selectedTab"
 releaseMarkerAttr = mkAttrName "releaseMarker"
 
 subjectStateIcon :: SubjectState -> (String, AttrName)
 subjectStateIcon IssueOpen = ("⊙", openStateMarkerAttr)
 subjectStateIcon IssueClosed = ("☑", closedStateMarkerAttr)
 subjectStateIcon PullOpen = ("⎇", openStateMarkerAttr)
-subjectStateIcon PullClosed = ("⎇", closedStateMarkerAttr)
+subjectStateIcon PullClosed = ("⊘", closedPrMarkerAttr)
 subjectStateIcon PullMerged = ("⎇", closedStateMarkerAttr)
 subjectStateIcon PullDraft = ("◌", draftMarkerAttr)
 
@@ -360,6 +377,22 @@ solarizedMagenta = (V.rgbColor 0xd3 0x36 0x82, V.Color240 125, V.brightMagenta, 
 
 solarizedViolet :: ColorFallback
 solarizedViolet = (V.rgbColor 0x6c 0x71 0xc4, V.Color240 61, V.brightBlue, V.blue, V.white)
+
+-- | GitHub's closed-PR red (linearColor so it isn't quantized to the 240 palette)
+prClosedRed :: ColorFallback
+prClosedRed = (V.linearColor (0xf8 :: Int) 0x51 0x49, V.Color240 187, V.brightRed, V.red, V.white)
+
+-- | GitHub-style button backgrounds
+buttonGrayBg :: ColorFallback
+buttonGrayBg = (V.linearColor (0x30 :: Int) 0x36 0x3d, V.Color240 221, V.brightBlack, V.black, V.black)
+
+-- | GitHub's primary button green (Primer btn-primary, #2da44e)
+buttonGreenBg :: ColorFallback
+buttonGreenBg = (V.linearColor (0x2d :: Int) 0xa4 0x4e, V.Color240 55, V.green, V.green, V.black)
+
+-- | The same green muted, for a primary button with nothing to submit
+buttonGreenDisabledBg :: ColorFallback
+buttonGreenDisabledBg = (V.linearColor (0x1a :: Int) 0x4d 0x2c, V.Color240 22, V.green, V.green, V.black)
 
 solarizedBlue :: ColorFallback
 solarizedBlue = (V.rgbColor 0x26 0x8b 0xd2, V.Color240 33, V.brightBlue, V.blue, V.white)

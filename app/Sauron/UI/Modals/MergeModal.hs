@@ -12,7 +12,7 @@ import GitHub
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Modals.CommentModal (modalWidth)
+import Sauron.UI.Modals.Common (modalWidth)
 
 
 renderMergeModal :: AppState -> ModalState Fixed -> Widget ClickableName
@@ -32,9 +32,9 @@ renderMergeModal app (MergeModalState {_mergeIssue=(Issue {issueNumber=(IssueNum
         _ -> hBox $ intersperse (str "  ") $ [
           keyHint "↑/↓" "Select"
           ]
-          <> [keyHint "Tab" "Commit title/message" | _mergeMethod == MergeMethodSquash]
+          <> [keyHint "Tab" "Commit title/message" | _mergeMethod /= MergeMethodRebase]
           <> [
-          keyHint (if _mergeFocus == MergeFocusBody then "Alt+Enter" else "Enter") "Merge"
+          keyHint "Alt+Enter" "Merge"
           , keyHint "Esc/q" "Cancel"
           ]
   ]
@@ -58,7 +58,8 @@ renderMergeModal app (MergeModalState {_mergeIssue=(Issue {issueNumber=(IssueNum
         isSelected = method == _mergeMethod
 
     titleSection = case _mergeMethod of
-      MergeMethodSquash -> [
+      MergeMethodRebase -> []
+      _ -> [
         str " "
         , editorLabel MergeFocusTitle "Commit title"
         , border $ vLimit 1 $ withAttr normalAttr $
@@ -68,7 +69,6 @@ renderMergeModal app (MergeModalState {_mergeIssue=(Issue {issueNumber=(IssueNum
         , border $ vLimit 6 $ withAttr normalAttr $
             renderEditor (txt . T.unlines) (_mergeFocus == MergeFocusBody) _mergeCommitMessageEditor
         ]
-      _ -> []
 
     editorLabel focus label = hBox [
       withAttr (if _mergeFocus == focus then boldText else italicText) $ str label

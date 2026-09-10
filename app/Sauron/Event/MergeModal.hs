@@ -30,7 +30,8 @@ openMergeModal issue owner name =
   modify (appModal ?~ MergeModalState issue owner name MergeMethodMerge
     (titleEditorFor issue MergeMethodMerge) emptyMessageEditor MergeFocusMethods NotSubmitting)
 
--- | The commit title the squash editor starts with, matching the web UI's default.
+-- | The commit title the editor starts with, matching the web UI's squash default.
+-- For a merge commit it's empty, meaning GitHub's own default title.
 defaultCommitTitle :: Issue -> MergeMethod -> Text
 defaultCommitTitle (Issue {issueNumber=(IssueNumber number), issueTitle}) MergeMethodSquash = [i|#{issueTitle} (\##{number})|]
 defaultCommitTitle _ _ = ""
@@ -56,15 +57,14 @@ handleMergeModalEvent s (MergeFinished result) = do
     Left err -> showToast ToastError ("Merge failed: " <> err)
 
 -- | Handle an event while the merge modal is up (Esc and Ctrl+q close it upstream).
--- Tab cycles focus between the method list and, for squash, the commit title and
--- message editors. Enter merges except in the message editor, where it inserts a
--- newline (Alt+Enter merges from anywhere).
+-- Tab cycles focus between the method list and (for merge/squash) the commit title
+-- and message editors. Alt+Enter merges from anywhere; plain Enter only inserts a
+-- newline in the message editor.
 handleMergeModalVtyEvent :: AppState -> ModalState Fixed -> V.Event -> EventM ClickableName AppState ()
 handleMergeModalVtyEvent s modalState@(MergeModalState {_mergeIssue, _mergeMethod, _mergeFocus, _mergeSubmissionState}) ev
   | _mergeSubmissionState == SubmittingMerge = return ()
   | otherwise = case ev of
       V.EvKey V.KEnter [V.MMeta] -> submit
-      V.EvKey V.KEnter [] | _mergeFocus /= MergeFocusBody -> submit
       V.EvKey (V.KChar '\t') [] -> setFocus (cycleFocus _mergeFocus)
       V.EvKey V.KBackTab [] -> setFocus (cycleFocusBack _mergeFocus)
       V.EvKey V.KUp [] | _mergeFocus == MergeFocusMethods -> moveMethod (-1)
@@ -87,12 +87,13 @@ handleMergeModalVtyEvent s modalState@(MergeModalState {_mergeIssue, _mergeMetho
       modify (appModal . _Just . mergeSubmissionState .~ SubmittingMerge)
       liftIO $ submitMerge s modalState
 
-    -- The editors only exist for squash; otherwise focus stays on the method list
-    cycleFocus MergeFocusMethods | _mergeMethod == MergeMethodSquash = MergeFocusTitle
+    -- The editors don't exist for rebase (it creates no commit), so focus stays on
+    -- the method list there
+    cycleFocus MergeFocusMethods | _mergeMethod /= MergeMethodRebase = MergeFocusTitle
     cycleFocus MergeFocusTitle = MergeFocusBody
     cycleFocus _ = MergeFocusMethods
 
-    cycleFocusBack MergeFocusMethods | _mergeMethod == MergeMethodSquash = MergeFocusBody
+    cycleFocusBack MergeFocusMethods | _mergeMethod /= MergeMethodRebase = MergeFocusBody
     cycleFocusBack MergeFocusBody = MergeFocusTitle
     cycleFocusBack _ = MergeFocusMethods
 
@@ -116,7 +117,7 @@ handleMergeModalVtyEvent s modalState@(MergeModalState {_mergeIssue, _mergeMetho
       modify (appModal . _Just . mergeMethod .~ method)
       modify (appModal . _Just . mergeCommitTitleEditor .~ titleEditorFor _mergeIssue method)
       modify (appModal . _Just . mergeCommitMessageEditor .~ emptyMessageEditor)
-      when (method /= MergeMethodSquash) $ setFocus MergeFocusMethods
+      when (method == MergeMethodRebase) $ setFocus MergeFocusMethods
 handleMergeModalVtyEvent _ _ _ = return ()
 
 submitMerge :: AppState -> ModalState Fixed -> IO ()
@@ -128,7 +129,7 @@ submitMerge s (MergeModalState {_mergeIssue=(Issue {issueNumber}), ..}) =
     baseContext = s ^. appBaseContext
 
     editorContents editor = T.strip $ T.unlines $ getEditContents editor
-    forSquash text = if _mergeMethod == MergeMethodSquash && not (T.null text) then Just text else Nothing
-    commitTitle = forSquash $ editorContents _mergeCommitTitleEditor
-    commitMessage = forSquash $ editorContents _mergeCommitMessageEditor
+    forCommitCreatingMethod text = if _mergeMethod /= MergeMethodRebase && not (T.null text) then Just text else Nothing
+    commitTitle = forCommitCreatingMethod $ editorContents _mergeCommitTitleEditor
+    commitMessage = forCommitCreatingMethod $ editorContents _mergeCommitMessageEditor
 submitMerge _ _ = return ()

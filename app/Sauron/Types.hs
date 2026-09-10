@@ -197,7 +197,7 @@ type family NodeState a where
   NodeState PaginatedStaleBranchesT = (Search, PageInfo, Fetchable TotalCount)
   NodeState PaginatedNotificationsT = (Search, PageInfo, Fetchable TotalCount)
   NodeState SingleIssueT = Fetchable (V.Vector TimelineEvent)
-  NodeState SinglePullT = Fetchable (V.Vector TimelineEvent)
+  NodeState SinglePullT = PullNodeState
   NodeState SingleWorkflowT = WorkflowNodeState
   NodeState SingleJobT = JobNodeState
   NodeState SingleBranchT = Fetchable (V.Vector Commit)
@@ -430,11 +430,8 @@ data ClickableName =
   | InnerViewport Text
   | InfoBar
   | TextForm
-  | CommentModal
-  | CommentModalContent
   | CommentEditor
   | ZoomModalContent
-  | PRReviewModalContent
   | LogSplitContent
   | NewIssueTitleEditor
   | NewIssueBodyEditor
@@ -491,6 +488,33 @@ data WorkflowJobSortBy =
   | SortJobsByName
   | SortJobsByRuntime
   deriving (Show, Eq)
+
+-- | The state of an opened pull request node: everything the PR modal's tabs show.
+-- The commits, files and viewed states are fetched lazily when their tab is opened.
+data PullNodeState = PullNodeState {
+  pullNodeStateTimeline :: Fetchable (V.Vector TimelineEvent)
+  , pullNodeStateDetails :: Fetchable PullRequest
+  , pullNodeStateChecks :: Fetchable (V.Vector CheckRun)
+  , pullNodeStateCommits :: Fetchable (V.Vector Commit)
+  -- | Full details (including patches) of commits expanded in the Commits tab, by sha
+  , pullNodeStateCommitDetails :: Map Text (Fetchable Commit)
+  , pullNodeStateFiles :: Fetchable (V.Vector File)
+  , pullNodeStateViewedStates :: Map Text FileViewedState
+  -- | The PR's GraphQL node id, needed by the mark/unmark viewed mutations
+  , pullNodeStatePullRequestId :: Maybe Text
+  } deriving (Show, Eq)
+
+emptyPullNodeState :: PullNodeState
+emptyPullNodeState = PullNodeState {
+  pullNodeStateTimeline = NotFetched
+  , pullNodeStateDetails = NotFetched
+  , pullNodeStateChecks = NotFetched
+  , pullNodeStateCommits = NotFetched
+  , pullNodeStateCommitDetails = mempty
+  , pullNodeStateFiles = NotFetched
+  , pullNodeStateViewedStates = mempty
+  , pullNodeStatePullRequestId = Nothing
+  }
 
 data WorkflowNodeState = WorkflowNodeState {
   workflowNodeStateFetchable :: Fetchable TotalCount
@@ -559,7 +583,6 @@ data AppEvent =
   | CommentModalEvent CommentModalEvent
   | NewIssueModalEvent NewIssueModalEvent
   | MergeModalEvent MergeModalEvent
-  | PRReviewModalEvent PRReviewModalEvent
   | LogEntryAdded LogEntry
   | ToastFired ToastLevel Text
   | ToastWidgetFired ToastLevel (Widget ClickableName)
@@ -573,8 +596,9 @@ data ScrollTarget =
 data CommentModalEvent =
   CommentSubmitted (Either Error Comment)
   | IssueClosedWithComment (Either Error Issue)
-  | CommentsRefreshed (V.Vector TimelineEvent)
-  | OpenCommentModal Issue (V.Vector TimelineEvent) (TVar (Fetchable (V.Vector TimelineEvent))) Bool (Name Owner) (Name Repo)
+  -- | Turn on the zoom modal's comment editor for this issue/PR (fired from a
+  -- background thread once the issue behind a notification has been fetched)
+  | EnterCommentMode Issue Bool (Name Owner) (Name Repo)
 
 data NewIssueModalEvent =
   NewIssueCreated (Either Error Issue)
@@ -589,14 +613,6 @@ data MergeModalEvent =
 data FileViewedState = FileViewed | FileUnviewed | FileDismissed
   deriving (Show, Eq, Ord)
 
-data PRReviewModalEvent =
-  -- | Both fetches (REST files and GraphQL viewed states) finished; open the modal.
-  PRReviewModalReady Issue (Name Owner) (Name Repo) Text (V.Vector File) (Map Text FileViewedState)
-  | PRReviewModalFetchFailed Text
-  -- | A mark/unmark mutation failed; carries the error, the file path, and the state
-  -- to revert to (the local state was updated optimistically).
-  | FileViewedMarkFailed Text Text FileViewedState
-
 data SubmissionState =
   NotSubmitting
   | SubmittingComment
@@ -608,21 +624,43 @@ data SubmissionState =
 data MergeFocus = MergeFocusMethods | MergeFocusTitle | MergeFocusBody
   deriving (Show, Eq)
 
+-- | The tabs of the pull request modal, mirroring the web UI
+data PullModalTab = TabConversation | TabCommits | TabChecks | TabReview
+  deriving (Show, Eq, Enum, Bounded)
+
+tabTitle :: PullModalTab -> String
+tabTitle TabConversation = "Conversation"
+tabTitle TabCommits = "Commits"
+tabTitle TabChecks = "Checks"
+tabTitle TabReview = "Review"
+
+-- | State of the comment editor shown at the bottom of the zoom modal
+data CommentMode = CommentMode {
+  _commentModeEditor :: WrappingEditor Char ClickableName
+  , _commentModeIssue :: Issue
+  , _commentModeIsPR :: Bool
+  , _commentModeOwner :: Name Owner
+  , _commentModeName :: Name Repo
+  , _commentModeSubmission :: SubmissionState
+  }
+
 -- TODO: break these into individual types
 data ModalState f =
-  CommentModalState {
-    _commentEditor :: WrappingEditor Char ClickableName
-    , _commentIssue :: Issue
-    , _commentIssueComments :: V.Vector TimelineEvent
-    , _commentNodeState :: TVar (Fetchable (V.Vector TimelineEvent))
-    , _issueIsPR :: Bool
-    , _commentRepoOwner :: Name Owner
-    , _commentRepoName :: Name Repo
-    , _submissionState :: SubmissionState
-  }
-  | ZoomModalState {
+  ZoomModalState {
       _zoomModalSomeNode :: SomeNode f
       , _zoomModalParents :: [SomeNode f]
+      -- | The inline comment editor, when comment mode is on
+      , _zoomModalCommentMode :: Maybe CommentMode
+      }
+  | PullRequestModalState {
+      _pullModalNode :: Node f 'SinglePullT
+      , _pullModalParents :: [SomeNode f]
+      -- | The inline comment editor on the Conversation tab, when it's focused
+      , _pullModalCommentMode :: Maybe CommentMode
+      , _pullModalTab :: PullModalTab
+      , _pullModalCurrentFile :: Int
+      , _pullModalSelectedCommit :: Int
+      , _pullModalExpandedCommits :: Set Text
       }
   | NewIssueModalState {
       _newIssueTitleEditor :: Editor Text ClickableName
@@ -644,33 +682,51 @@ data ModalState f =
       , _mergeFocus :: MergeFocus
       , _mergeSubmissionState :: SubmissionState
       }
-  | PRReviewModalState {
-      _reviewIssue :: Issue
-      , _reviewRepoOwner :: Name Owner
-      , _reviewRepoName :: Name Repo
-      -- | The PR's GraphQL node id, needed by the mark/unmark viewed mutations
-      , _reviewPullRequestId :: Text
-      , _reviewFiles :: V.Vector File
-      , _reviewViewedStates :: Map Text FileViewedState
-      , _reviewCurrentFile :: Int
-      }
   | HelpModalState
 
 instance Eq (ModalState Fixed) where
-  (CommentModalState _editor1 issue1 comments1 _nodeState1 isPR1 owner1 name1 submission1) ==
-    (CommentModalState _editor2 issue2 comments2 _nodeState2 isPR2 owner2 name2 submission2) =
-    issue1 == issue2 && comments1 == comments2 && isPR1 == isPR2 &&
-    owner1 == owner2 && name1 == name2 && submission1 == submission2
-  (ZoomModalState node1 parents1) == (ZoomModalState node2 parents2) = node1 == node2 && parents1 == parents2
+  (ZoomModalState node1 parents1 comment1) == (ZoomModalState node2 parents2 comment2) =
+    node1 == node2 && parents1 == parents2 && sameCommentMode comment1 comment2
+  (PullRequestModalState node1 parents1 comment1 tab1 file1 commit1 expanded1) ==
+    (PullRequestModalState node2 parents2 comment2 tab2 file2 commit2 expanded2) =
+    node1 == node2 && parents1 == parents2 && sameCommentMode comment1 comment2
+    && tab1 == tab2 && file1 == file2 && commit1 == commit2 && expanded1 == expanded2
   (NewIssueModalState _t1 _b1 o1 n1 s1 _f1) == (NewIssueModalState _t2 _b2 o2 n2 s2 _f2) =
     o1 == o2 && n1 == n2 && s1 == s2
   (MergeModalState issue1 owner1 name1 method1 _t1 _m1 _f1 submission1) == (MergeModalState issue2 owner2 name2 method2 _t2 _m2 _f2 submission2) =
     issue1 == issue2 && owner1 == owner2 && name1 == name2 && method1 == method2 && submission1 == submission2
-  (PRReviewModalState issue1 owner1 name1 prId1 files1 states1 current1) == (PRReviewModalState issue2 owner2 name2 prId2 files2 states2 current2) =
-    issue1 == issue2 && owner1 == owner2 && name1 == name2 && prId1 == prId2 &&
-    files1 == files2 && states1 == states2 && current1 == current2
   HelpModalState == HelpModalState = True
   _ == _ = False
+
+-- | Comment modes are compared by what they're commenting on rather than by editor
+-- contents (editors have no Eq, and the modal fixer only needs to notice a change of
+-- target, not every keystroke).
+sameCommentMode :: Maybe CommentMode -> Maybe CommentMode -> Bool
+sameCommentMode Nothing Nothing = True
+sameCommentMode (Just a) (Just b) =
+  issueId (_commentModeIssue a) == issueId (_commentModeIssue b)
+  && _commentModeSubmission a == _commentModeSubmission b
+sameCommentMode _ _ = False
+
+-- | A zoom modal freshly opened on a node
+newZoomModalState :: SomeNode f -> [SomeNode f] -> ModalState f
+newZoomModalState node parents = ZoomModalState node parents Nothing
+
+-- | A pull request modal freshly opened on the given tab
+newPullRequestModalState :: PullModalTab -> Node f 'SinglePullT -> [SomeNode f] -> ModalState f
+newPullRequestModalState tab node parents = PullRequestModalState node parents Nothing tab 0 0 mempty
+
+-- | The inline comment editor of whichever modal owns one
+modalCommentMode :: ModalState f -> Maybe CommentMode
+modalCommentMode (ZoomModalState {_zoomModalCommentMode}) = _zoomModalCommentMode
+modalCommentMode (PullRequestModalState {_pullModalCommentMode}) = _pullModalCommentMode
+modalCommentMode _ = Nothing
+
+-- | Update the inline comment editor of whichever modal owns one
+overModalCommentMode :: (Maybe CommentMode -> Maybe CommentMode) -> ModalState f -> ModalState f
+overModalCommentMode f m@(ZoomModalState {}) = m { _zoomModalCommentMode = f (_zoomModalCommentMode m) }
+overModalCommentMode f m@(PullRequestModalState {}) = m { _pullModalCommentMode = f (_pullModalCommentMode m) }
+overModalCommentMode _ m = m
 
 data AppState = AppState {
   _appUser :: User
@@ -714,5 +770,6 @@ data DetailsExpanded = DetailsCollapsed | DetailsExpanded
 
 makeLenses ''EntityData
 makeLenses ''ModalState
+makeLenses ''CommentMode
 makeLenses ''LogEntry
 makeLenses ''AppState

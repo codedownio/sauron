@@ -41,12 +41,11 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Border (borderWithCounts)
 import Sauron.UI.BottomBar
 import Sauron.UI.Toast (renderToasts)
-import Sauron.UI.Modals.CommentModal (renderModal)
 import Sauron.UI.Modals.HelpModal (renderHelpModal)
 import Sauron.UI.LogPane (renderLogPane)
 import Sauron.UI.Modals.MergeModal (renderMergeModal)
 import Sauron.UI.Modals.NewIssueModal (renderNewIssueModal)
-import Sauron.UI.Modals.PRReviewModal (renderPRReviewModal)
+import Sauron.UI.Modals.PullModal (renderPullRequestModal)
 import Sauron.UI.Modals.ZoomModal (renderZoomModal)
 import Sauron.UI.TopBox (topBox)
 import Sauron.UnicodeWidthTable (WidthTableMode(..), buildAndSaveWidthTable, loadWidthTable)
@@ -78,11 +77,10 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = maybe id (:) (renderToasts app) $ case _appModal app of
   Nothing -> [ui]
   Just modalState -> case modalState of
-    CommentModalState {} -> [renderModal app modalState, dimmedUi]
     NewIssueModalState {} -> [renderNewIssueModal app modalState, dimmedUi]
     MergeModalState {} -> [renderMergeModal app modalState, dimmedUi]
-    PRReviewModalState {} -> [renderPRReviewModal app modalState, dimmedUi]
     ZoomModalState {} -> [renderZoomModal app modalState, dimmedUi]
+    PullRequestModalState {} -> [renderPullRequestModal app modalState, dimmedUi]
     HelpModalState -> [renderHelpModal app, dimmedUi]
   where
     colorMode = fromMaybe (_appActualColorMode app) (_appCliColorMode app)
@@ -178,6 +176,7 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode}) = do
           , _appModal = modalFixed
 
           , _appForm = Nothing
+
 
           , _appMainListVariable = listElems
           , _appMainList = list MainList (getExpandedList now listElemsFixed) 1

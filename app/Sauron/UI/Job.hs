@@ -63,7 +63,7 @@ instance ListDrawable Fixed 'SingleJobT where
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (s ^. appBaseContext) variableEl parents
-          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (newZoomModalState (SomeNode variableEl) (toList parents)))
         return True
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
@@ -92,7 +92,7 @@ instance ListDrawable Fixed 'JobLogGroupT where
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (s ^. appBaseContext) variableEl parents
-          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (newZoomModalState (SomeNode variableEl) (toList parents)))
         return True
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key

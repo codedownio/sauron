@@ -3,6 +3,9 @@
 module Sauron.UI.Modals.ZoomModal (
   renderZoomModal
   , generateModalTitle
+  , commentSection
+  , commentModeHotkeys
+  , hotkeyWidget
   ) where
 
 import Brick
@@ -13,89 +16,95 @@ import GitHub
 import Lens.Micro
 import Relude
 import Sauron.Types
-import Sauron.UI
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
-import Sauron.UI.Keys (commentKey, mergeKey, showKey)
-import Sauron.UI.Modals.CommentModal (modalHeightPercent, modalWidth)
+import Sauron.UI.Keys (commentKey, openSelectedKey, showKey)
+import Sauron.UI.Modals.Common (modalHeightPercent, modalWidth, renderBodyEditor)
+import Sauron.UI.Modals.NodeContent (renderNodeContent)
+import WEditorBrick.WrappingEditor (dumpEditor)
 
 
 renderZoomModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModalParents=_parents}) =
-  vBox [
-    hCenter $ withAttr boldText $ str modalTitle
+renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModalCommentMode=commentMode}) =
+  vBox ([
+    hCenter $ withAttr boldText $ str (generateModalTitle someNode)
     , hBorder
     -- Scrollable content area with node content
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport ZoomModalContent Vertical $
       hCenter $ hLimit maxCommentWidth $ vBox [
         renderNodeContent appState someNode
       ]
-    , hBorder
-    , hCenter $ hBox $ intersperse (str "  ") $ getZoomModalHotkeys someNode
-  ]
+    ]
+    <> commentSection appState commentMode
+    <> [
+    hBorder
+    , hCenter $ hBox $ intersperse (str "  ") footerHotkeys
+  ])
   & border
   & withDefAttr normalAttr
   & hLimit (modalWidth appState)
   & vLimitPercent modalHeightPercent
   & centerLayer
   where
-    modalTitle = generateModalTitle someNode
+    footerHotkeys = case commentMode of
+      Just cm -> commentModeHotkeys cm
+      Nothing -> getZoomModalHotkeys someNode
 renderZoomModal _ _ = str "Invalid modal state" -- This should never happen
+
+-- | The comment editor, when comment mode is on. Issue and pull request content
+-- renders its own comment box above the action buttons, so this is only for nodes
+-- (like notifications) whose content has nowhere to put one.
+commentSection :: AppState -> Maybe CommentMode -> [Widget ClickableName]
+commentSection appState = \case
+  Just (CommentMode {_commentModeEditor, _commentModeIssue}) | not (contentHasBox _commentModeIssue) -> [
+    hBorder
+    , renderBodyEditor appState True (modalWidth appState) (editorLines _commentModeEditor) _commentModeEditor
+    ]
+  _ -> []
+  where
+    editorLines editor = max 5 (min (length (dumpEditor editor)) 20)
+
+    contentHasBox commentIssue = case _appModal appState of
+      Just (ZoomModalState {_zoomModalSomeNode=SomeNode (SingleIssueNode (EntityData {_static=issue}))}) ->
+        issueId issue == issueId commentIssue
+      Just (PullRequestModalState {}) -> True
+      _ -> False
+
+-- | Footer hotkeys while the comment editor is focused
+commentModeHotkeys :: CommentMode -> [Widget ClickableName]
+commentModeHotkeys (CommentMode {_commentModeSubmission, _commentModeIssue}) = [
+  hotkeyWidget "Alt+Enter" (if _commentModeSubmission == SubmittingComment then "Submitting..." else "Submit comment")
+  , hotkeyWidget "Alt+Shift+Enter" closeWithCommentLabel
+  , hotkeyWidget "Esc" "Cancel comment"
+  ]
+  where
+    closeWithCommentLabel
+      | _commentModeSubmission == SubmittingCloseWithComment = "Closing..."
+      | issueState _commentModeIssue == StateOpen = "Close with comment"
+      | otherwise = "Reopen with comment"
 
 -- | Generate hotkey widgets for the zoom modal footer based on the node type
 getZoomModalHotkeys :: SomeNode Fixed -> [Widget ClickableName]
 getZoomModalHotkeys (SomeNode node) = nodeSpecificHotkeys ++ commonHotkeys
   where
-    commonHotkeys = [hotkeyWidget "q" "Close"]
+    commonHotkeys = [hotkeyWidget (showKey openSelectedKey) "Open", hotkeyWidget "q" "Close modal"]
 
     nodeSpecificHotkeys = case node of
-      SingleIssueNode {} -> [hotkeyWidget (showKey commentKey) "Comment"]
-      SinglePullNode (EntityData {_static=issue}) ->
-        [hotkeyWidget (showKey commentKey) "Comment"]
-        <> [hotkeyWidget (showKey mergeKey) "Merge" | issueState issue == StateOpen]
+      -- Issues have a comment button of their own at the bottom of the conversation
+      SingleIssueNode {} -> []
       SingleNotificationNode (EntityData {_static=notification}) ->
         if subjectType (notificationSubject notification) `elem` ["Issue", "PullRequest"]
         then [hotkeyWidget (showKey commentKey) "Comment"]
         else []
       _ -> []
 
-    hotkeyWidget :: String -> String -> Widget ClickableName
-    hotkeyWidget key msg = hBox [
-      str "["
-      , withAttr hotkeyAttr $ str key
-      , str "] "
-      , withAttr hotkeyMessageAttr $ str msg
-      ]
-
-renderNodeContent :: AppState -> SomeNode Fixed -> Widget ClickableName
-renderNodeContent appState (SomeNode inner) = vBox $ catMaybes [
-  if skipLine then Nothing else Just $ drawNodeLine appState inner'
-  , fmap (padLeft (Pad paddingAmount)) innerContent
-  , if isNothing innerContent then loadingWidget else Nothing
+hotkeyWidget :: String -> String -> Widget ClickableName
+hotkeyWidget key msg = hBox [
+  str "["
+  , withAttr hotkeyAttr $ str key
+  , str "] "
+  , withAttr hotkeyMessageAttr $ str msg
   ]
-  where
-    inner' = over entityDataL transformEntityData inner
-    innerContent = drawNodeInner appState inner'
-
-    loadingWidget = case inner of
-      SingleIssueNode {} -> Just $ str "Loading..."
-      SinglePullNode {} -> Just $ str "Loading..."
-      SingleCommitNode {} -> Just $ str "Loading..."
-      SingleJobNode {} -> Just $ str "Loading..."
-      _ -> Nothing
-
-    transformEntityData :: EntityData Fixed a -> EntityData Fixed a
-    transformEntityData = set toggled True
-                        . over ident (\x -> -x) -- Flip the sign so the viewport doesn't collide with one in the main UI
-
-    -- For issues and PRs, skip the list heading line and show content directly
-    skipLine = case inner of
-      SingleIssueNode {} -> True
-      SinglePullNode {} -> True
-      _ -> False
-
-    paddingAmount = if skipLine then 0 else 1
-
 
 -- | Generate a nice title for the zoom modal based on node type
 generateModalTitle :: SomeNode Fixed -> String

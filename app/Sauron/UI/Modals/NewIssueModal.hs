@@ -1,6 +1,5 @@
 module Sauron.UI.Modals.NewIssueModal (
   renderNewIssueModal
-  , renderBodyEditor
   ) where
 
 import Brick
@@ -13,8 +12,8 @@ import GitHub.Data.Name
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (maxCommentWidth)
-import Sauron.UI.Markdown (markdownToWidgetsWithWidth)
+import Sauron.UI.Issue.Events (maxCommentWidth)
+import Sauron.UI.Modals.Common (renderBodyEditor)
 import WEditorBrick.WrappingEditor (WrappingEditor, dumpEditor)
 import qualified WEditorBrick.WrappingEditor as WEditorBrick
 
@@ -54,34 +53,6 @@ renderNewIssueModal app (NewIssueModalState {..}) =
     bodyLineCount = length (dumpEditor _newIssueBodyEditor)
     editorLines = max 10 (min bodyLineCount 30)
 renderNewIssueModal _ _ = str "Invalid modal state for NewIssueModal"
-
-renderBodyEditor :: AppState -> Bool -> Int -> Int -> WrappingEditor Char ClickableName -> Widget ClickableName
-renderBodyEditor (AppState {_appDetailsExpanded}) focused modalWidth editorHeight editor =
-  vLimit (editorHeight + 3) $ hBox [
-    -- Left: Editor
-    vBox [
-      withAttr (if focused then boldText else italicText) $ str "Write"
-      , padAll 1 $
-          vLimit editorHeight $
-          hLimit sectionWidth $
-          withAttr normalAttr $
-          WEditorBrick.renderEditor focused editor
-    ]
-    , vBorder
-    -- Right: Preview
-    , vBox [
-      withAttr (if focused then boldText else italicText) $ str "Preview"
-      , border $ padRight Max $ padBottom Max $
-          vLimit editorHeight $
-          case text of
-            "" -> withAttr italicText $ strWrap [i|(preview will appear here)|]
-            t -> markdownToWidgetsWithWidth _appDetailsExpanded (sectionWidth - 4) t
-    ]
-  ]
-  where
-    sectionWidth = (modalWidth - 4) `div` 2
-
-    text = T.intercalate "\n" $ map toText $ dumpEditor editor
 
 newIssueButtonSection :: Editor Text ClickableName -> SubmissionState -> Widget ClickableName
 newIssueButtonSection titleEditor submissionState' =

@@ -35,6 +35,9 @@ extra-deps:
   # - GitHub.Data.Issues: auto-derive JSON instances
   # - Add issueDraft field
   # - Add merge method support (mergePullRequestWithOptionsR)
+  # - Add pull_requests to WorkflowRun
+  # - PullRequestReference: add merged_at
+  # - Add checkRunsPageForR
   # commit: 263f22125e1974fce8614787b563fd0cd1b930a0
 
 - git: https://github.com/dogonthehorizon/git-config.git

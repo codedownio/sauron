@@ -45,7 +45,7 @@ instance ListDrawable Fixed 'SingleCommitT where
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (s ^. appBaseContext) variableEl parents
-          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (newZoomModalState (SomeNode variableEl) (toList parents)))
         return True
   handleHotkey _ _ _ = return False
 

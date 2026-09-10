@@ -39,7 +39,7 @@ executable sauron
       Sauron.Event.NewIssueModal
       Sauron.Event.Open
       Sauron.Event.Paging
-      Sauron.Event.PRReviewModal
+      Sauron.Event.PullModal
       Sauron.Event.Search
       Sauron.Event.Util
       Sauron.Expanding
@@ -61,6 +61,7 @@ executable sauron
       Sauron.HealthCheck.Common
       Sauron.HealthCheck.Job
       Sauron.HealthCheck.Notification
+      Sauron.HealthCheck.Pull
       Sauron.HealthCheck.Repo
       Sauron.HealthCheck.Stop
       Sauron.HealthCheck.Workflow
@@ -99,11 +100,12 @@ executable sauron
       Sauron.UI.Markdown.Html
       Sauron.UI.Markdown.Table
       Sauron.UI.Markdown.Wrapping
-      Sauron.UI.Modals.CommentModal
+      Sauron.UI.Modals.Common
       Sauron.UI.Modals.HelpModal
       Sauron.UI.Modals.MergeModal
       Sauron.UI.Modals.NewIssueModal
-      Sauron.UI.Modals.PRReviewModal
+      Sauron.UI.Modals.NodeContent
+      Sauron.UI.Modals.PullModal
       Sauron.UI.Modals.ZoomModal
       Sauron.UI.Notification
       Sauron.UI.Pagination

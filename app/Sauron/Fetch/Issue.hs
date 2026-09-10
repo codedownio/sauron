@@ -83,24 +83,25 @@ fetchIssueComments owner name issueNumber inner = do
       Right merged -> atomically $ writeTVar inner (Fetched merged)
 
 -- | Fetch comments for an issue/PR using only its API URL (no owner/repo needed).
--- Constructs pagedQuery paths from the URL path segments.
+-- Constructs pagedQuery paths from the URL path segments. Takes a modify function for
+-- the timeline state, since issues and PRs store it differently.
 fetchIssueCommentsByUrl :: (
   HasCallStack, MonadReader BaseContext m, MonadIO m, MonadMask m
-  ) => URL -> TVar (Fetchable (V.Vector TimelineEvent)) -> m ()
-fetchIssueCommentsByUrl issueApiUrl inner = do
+  ) => URL -> ((Fetchable (V.Vector TimelineEvent) -> Fetchable (V.Vector TimelineEvent)) -> STM ()) -> m ()
+fetchIssueCommentsByUrl issueApiUrl modifyTimeline = do
   let urlText = getUrl issueApiUrl
   case parseURI (toString urlText) of
-    Nothing -> atomically $ writeTVar inner (Errored [i|Failed to parse issue URL: #{urlText}|])
+    Nothing -> atomically $ modifyTimeline (const (Errored [i|Failed to parse issue URL: #{urlText}|]))
     Just uri -> do
       let segments = filter (not . T.null) $ T.splitOn "/" $ toText (uriPath uri)
       ctx <- ask
       let timelineReq = pagedQuery (segments <> ["timeline"]) [] FetchAll
-      bracketOnError_ (atomically $ markFetching inner)
-                      (atomically $ writeTVar inner (Errored "Issue comments and events fetch failed with exception.")) $ do
+      bracketOnError_ (atomically $ modifyTimeline (Fetching . fetchableCurrent))
+                      (atomically $ modifyTimeline (const (Errored "Issue comments and events fetch failed with exception."))) $ do
         liftIO (withGithubApiSemaphore' (requestSemaphore ctx) (githubWithLogging' ctx timelineReq)) >>= \case
           Right timeline ->
-            atomically $ writeTVar inner (Fetched timeline)
-          Left err -> atomically $ writeTVar inner (Errored (show err))
+            atomically $ modifyTimeline (const (Fetched timeline))
+          Left err -> atomically $ modifyTimeline (const (Errored (show err)))
 
 fetchIssueCommentsAndEvents :: (HasCallStack) => BaseContext -> Name Owner -> Name Repo -> Int -> IO (Either Error (V.Vector TimelineEvent))
 fetchIssueCommentsAndEvents baseContext owner name issueNumber =

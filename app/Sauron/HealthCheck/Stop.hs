@@ -89,6 +89,8 @@ gatherAndClearHealthCheckThread someNode@(SomeNode node) = do
         return [i|Job #{untagName (jobName job)}|]
       SingleWorkflowNode (EntityData {_static=workflowRun}) ->
         return [i|Workflow #{untagName $ workflowRunName workflowRun} \##{workflowRunRunNumber workflowRun}|]
+      SinglePullNode (EntityData {_static=pull}) ->
+        return [i|PR \##{unIssueNumber (issueNumber pull)}|]
       RepoNode (EntityData {_static=(owner, name)}) ->
         return [i|Repo #{untagName owner}/#{untagName name}|]
       PaginatedIssuesNode _ -> return "Issues"

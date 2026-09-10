@@ -4,7 +4,9 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Sauron.Event.Helpers (
-  getFixedElemAndParents
+  modifyPullModal
+  , modifyModalCommentMode
+  ,  getFixedElemAndParents
   , withFixedElemAndParents
   , withNthChildAndPaginationParent
   , withRepoParent
@@ -16,6 +18,7 @@ module Sauron.Event.Helpers (
   , isPaginationNode
   ) where
 
+import Brick (EventM)
 import Brick.Widgets.List
 import Control.Monad
 import Control.Monad.IO.Unlift
@@ -174,3 +177,18 @@ nthChild isToggled gecf n el@(SomeNode item@(getEntityData -> (EntityData {..}))
     wrappedChildren <- gecf item
     fmap ((el :|) . toList) <$> nthChildList isToggled gecf (n - 1) wrappedChildren
   False -> pure $ Left (n - 1)
+
+-- | Update a fixer-managed modal's own UI state (comment editor, tab, cursors). The
+-- change goes to the visible state so it takes effect immediately, and to the variable
+-- the modal fixer projects from so the next tick doesn't revert it.
+modifyPullModal :: AppState -> (forall f. ModalState f -> ModalState f) -> EventM ClickableName AppState ()
+modifyPullModal s f = do
+  modify (appModal . _Just %~ (\m -> case m of { p@PullRequestModalState {} -> f p; other -> other }))
+  liftIO $ atomically $ modifyTVar' (_appModalVariable s)
+    (fmap (\m -> case m of { p@PullRequestModalState {} -> f p; other -> other }))
+
+-- | Update the inline comment editor of whichever modal owns one
+modifyModalCommentMode :: AppState -> (Maybe CommentMode -> Maybe CommentMode) -> EventM ClickableName AppState ()
+modifyModalCommentMode s f = do
+  modify (appModal . _Just %~ overModalCommentMode f)
+  liftIO $ atomically $ modifyTVar' (_appModalVariable s) (fmap (overModalCommentMode f))

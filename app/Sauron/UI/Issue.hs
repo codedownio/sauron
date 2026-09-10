@@ -23,15 +23,22 @@ module Sauron.UI.Issue (
   -- Close/reopen
   , closeReopenAndRefresh
 
+  -- Bottom action buttons and comment box
+  , nodeButtonsWidget
+  , actionButtonWidget
+  , activeCommentMode
+
   -- Details toggle widget
   , detailsToggleWidget
   ) where
 
 import Brick
 import Brick.Forms
+import Brick.Widgets.Border (border)
 import Control.Lens
 import Control.Monad
 import Data.String.Interpolate
+import qualified Data.Text as T
 import Data.Time
 import qualified Data.Vector as V
 import GitHub
@@ -39,7 +46,7 @@ import GitHub.Data.Name
 import Relude
 import Sauron.Actions
 import Sauron.Actions.Util (findRepoParent, findIssuesParent)
-import Sauron.Event.CommentModal (fetchCommentsAndOpenModal)
+import Sauron.Event.CommentModal (openZoomAndComment)
 import Sauron.Event.Helpers
 import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Fetch.Issue (fetchIssueComments)
@@ -50,11 +57,13 @@ import Sauron.UI.Issue.Events
 import Sauron.UI.Issue.Events.ReviewRequests (renderReviewRequestGroup)
 import Sauron.UI.Keys
 import Sauron.UI.Markdown
+import Sauron.UI.Modals.Common (renderBodyEditor)
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner)
 import Sauron.UI.TimelineBorder
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 import UnliftIO.Async (async)
+import WEditorBrick.WrappingEditor (dumpEditor)
 
 
 instance ListDrawable Fixed 'SingleIssueT where
@@ -64,7 +73,10 @@ instance ListDrawable Fixed 'SingleIssueT where
   drawInner appState (EntityData {_static=issue, _state, _ident, ..}) = do
     guard _toggled
     guardFetchedOrHasPrevious _state $ \comments ->
-      return $ issueInner (_appDetailsExpanded appState) (_appNow appState) issue comments
+      return $ vBox [
+        issueInner (_appDetailsExpanded appState) (_appNow appState) issue comments
+        , nodeButtonsWidget appState _ident False issue
+        ]
 
   getExtraTopBoxWidgets app (EntityData {_static=issue}) =
     [hBox [str "["
@@ -78,13 +90,13 @@ instance ListDrawable Fixed 'SingleIssueT where
           , withAttr hotkeyMessageAttr $ str "Zoom"
           ]
     , hBox [str "["
-          , withAttr hotkeyAttr $ str $ showKey commentKey
-          , str "/"
           , withAttr hotkeyAttr $ str $ showKey closeReopenKey
-          , str "] "
-          , withAttr hotkeyMessageAttr $ str "Comment"
           , str "/"
+          , withAttr hotkeyAttr $ str $ showKey commentKey
+          , str "] "
           , withAttr hotkeyMessageAttr $ str (if issueState issue == StateOpen then "Close" else "Reopen")
+          , str "/"
+          , withAttr hotkeyMessageAttr $ str "Comment"
           ]
     , detailsToggleWidget app
     ]
@@ -101,14 +113,12 @@ instance ListDrawable Fixed 'SingleIssueT where
     | key == zoomModalKey = do
         withFixedElemAndParents s $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (s ^. appBaseContext) variableEl parents
-          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
+          liftIO $ atomically $ writeTVar (_appModalVariable s) (Just (newZoomModalState (SomeNode variableEl) (toList parents)))
         return True
     | key == commentKey = do
-        withFixedElemAndParents s $ \_ (SomeNode variableEl) parents -> do
-          case (findRepoParent parents, variableEl) of
-            (Just (RepoNode (EntityData {_static=(owner, name)})), SingleIssueNode (EntityData {_state=stateVar})) ->
-              fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar False owner name
-            _ -> return ()
+        withFixedElemAndParents s $ \_ _ parents ->
+          whenJust (findRepoParent parents) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
+            openZoomAndComment s issue False owner name
         return True
     | key == closeReopenKey = do
         liftIO $ void $ async $ do
@@ -209,9 +219,9 @@ closeReopenAndRefresh ::
   (MonadIO m)
   => BaseContext -> Name Owner -> Name Repo -> Issue
   -> TVar [child]
-  -> (child -> (Issue, TVar (Fetchable (V.Vector TimelineEvent))))
+  -> (child -> (Issue, st))
   -> (child -> Issue -> child)
-  -> (Name Owner -> Name Repo -> IssueNumber -> TVar (Fetchable (V.Vector TimelineEvent)) -> ReaderT BaseContext IO ())
+  -> (Name Owner -> Name Repo -> IssueNumber -> st -> ReaderT BaseContext IO ())
   -> m ()
 closeReopenAndRefresh bc owner name issue childrenVar getInfo setIssue fetchComments = do
   let action = if issueState issue == StateOpen then closeIssue else reopenIssue
@@ -227,6 +237,71 @@ closeReopenAndRefresh bc owner name issue childrenVar getInfo setIssue fetchComm
       whenJust mStateVar $ \stateVar ->
         liftIO $ runReaderT (fetchComments owner name targetNum stateVar) bc
     Left _err -> return ()
+
+-- * Bottom action buttons
+
+-- | The comment mode targeting this particular issue/PR, if any
+activeCommentMode :: AppState -> Issue -> Maybe CommentMode
+activeCommentMode app issue = case _appModal app >>= modalCommentMode of
+  Just commentMode | issueId (_commentModeIssue commentMode) == issueId issue -> Just commentMode
+  _ -> Nothing
+
+-- | The comment box above the action buttons, like the web UI. It's a placeholder
+-- until comment mode focuses it, at which point it becomes a live editor.
+--
+-- The live editor renders only in the modal, since the editor's widget name is baked
+-- into its state and brick requires names to be unique across everything on screen
+-- (the modal draws over the main list, which draws the same node). The modal render
+-- is the one with a negated ident, per 'renderNodeContent'.
+commentBoxWidget :: AppState -> Int -> Issue -> Widget ClickableName
+commentBoxWidget app nodeIdent issue = case activeCommentMode app issue of
+  Just (CommentMode {_commentModeEditor}) | nodeIdent < 0 ->
+    -- Keep the editor in view in the modal's viewport while typing
+    visible $ adaptiveWidth $ \w ->
+      renderBodyEditor app True w (max 5 (min (length (dumpEditor _commentModeEditor)) 20)) _commentModeEditor
+  _ -> adaptiveWidth $ \_ ->
+    border $ padRight Max $ withAttr italicText $ str [i|Leave a comment [#{showKey commentKey}]|]
+
+-- | Web-UI-style buttons at the bottom of an open issue/PR (display only — the
+-- hotkey shown on each button performs the action). Once something is typed in the
+-- comment box the buttons switch to their submit forms, like the web UI.
+nodeButtonsWidget :: AppState -> Int -> Bool -> Issue -> Widget ClickableName
+nodeButtonsWidget app nodeIdent isPR issue = vBox [
+  commentBoxWidget app nodeIdent issue
+  , hBox [closeButton, str "  ", commentButton]
+  ]
+  where
+    commentText = case activeCommentMode app issue of
+      Just (CommentMode {_commentModeEditor}) ->
+        T.strip $ T.intercalate "\n" $ map toText $ dumpEditor _commentModeEditor
+      Nothing -> ""
+    hasComment = not (T.null commentText)
+
+    closeButton = actionButtonWidget buttonGrayAttr $ closeIcon <> [str closeText]
+      where
+        closeText | hasComment = [i|#{closeLabel} with comment [Alt+Shift+Enter]|]
+                  | otherwise = [i|#{closeLabel} #{closeTarget} [#{showKey closeReopenKey}]|]
+
+    -- Closing an open PR gets the red closed-PR icon, like the web UI's close button
+    closeIcon = [withAttr buttonGrayRedIconAttr (str (fst (subjectStateIcon PullClosed) <> " "))
+                | isPR && issueState issue == StateOpen]
+
+    commentButton
+      | hasComment = actionButtonWidget buttonGreenAttr [str "Comment [Alt+Enter]"]
+      -- Nothing to submit yet, so the button is inert and shows how to focus the box
+      | otherwise = actionButtonWidget buttonGreenDisabledAttr [str [i|Comment [#{showKey commentKey}]|]]
+
+    closeLabel :: String
+    closeLabel = if issueState issue == StateOpen then "Close" else "Reopen"
+
+    closeTarget :: String
+    closeTarget = if isPR then "pull request" else "issue"
+
+-- | A filled action button, styled like Brick.Widgets.Dialog's buttons: a flat
+-- single-row fill with two spaces of padding on each side.
+actionButtonWidget :: AttrName -> [Widget n] -> Widget n
+actionButtonWidget fillAttr content =
+  withAttr fillAttr $ hBox ([str "  "] <> content <> [str "  "])
 
 -- * Details toggle
 

@@ -27,6 +27,7 @@ import Sauron.Fetch.Pull
 import Sauron.Fetch.Repo
 import Sauron.Fetch.Workflow
 import Sauron.HealthCheck.Job (startJobHealthCheckIfNeeded)
+import Sauron.HealthCheck.Pull (startPullChecksHealthCheckIfNeeded)
 import Sauron.HealthCheck.Repo (runRepoHealthCheck)
 import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckIfNeeded, restartWorkflowHealthCheckIfJobsRunning)
 import Sauron.Types
@@ -178,13 +179,16 @@ fetchOnOpen bc (SingleIssueNode (EntityData {_static=issue, _state})) parents =
     Just (RepoNode (EntityData {_static=(owner, name)})) ->
       liftIO $ async $ liftIO $ runReaderT (fetchIssueComments owner name (issueNumber issue) _state) bc
     Nothing ->
-      liftIO $ async $ liftIO $ runReaderT (fetchIssueCommentsByUrl (issueUrl issue) _state) bc
-fetchOnOpen bc (SinglePullNode (EntityData {_static=pull, _state})) parents =
+      liftIO $ async $ liftIO $ runReaderT (fetchIssueCommentsByUrl (issueUrl issue) (modifyTVar' _state)) bc
+fetchOnOpen bc node@(SinglePullNode (EntityData {_static=pull, _state})) parents =
   case findRepoParent parents of
     Just (RepoNode (EntityData {_static=(owner, name)})) ->
-      liftIO $ async $ liftIO $ runReaderT (fetchPullComments owner name (issueNumber pull) _state) bc
+      liftIO $ async $ liftIO $ flip runReaderT bc $ do
+        void $ concurrently (fetchPullComments owner name (issueNumber pull) _state)
+                            (fetchPullDetailsAndChecks owner name (issueNumber pull) _state)
+        liftIO $ startPullChecksHealthCheckIfNeeded bc node parents
     Nothing ->
-      liftIO $ async $ liftIO $ runReaderT (fetchIssueCommentsByUrl (issueUrl pull) _state) bc
+      liftIO $ async $ liftIO $ runReaderT (fetchIssueCommentsByUrl (issueUrl pull) (setPullTimeline _state)) bc
 fetchOnOpen bc (SingleCommitNode (EntityData {_static=commit, _state})) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ async $ liftIO $ runReaderT (fetchCommitDetails owner name (commitSha commit) _state) bc
 
@@ -222,7 +226,7 @@ shouldFetchOnExpand (PaginatedActiveBranchesNode (EntityData {_state})) = not . 
 shouldFetchOnExpand (PaginatedStaleBranchesNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
 shouldFetchOnExpand (PaginatedNotificationsNode (EntityData {_state})) = not . isFetchingOrFetched . thd <$> readTVarIO _state
 shouldFetchOnExpand (SingleIssueNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
-shouldFetchOnExpand (SinglePullNode (EntityData {_state})) = not . isFetchingOrFetched <$> readTVarIO _state
+shouldFetchOnExpand (SinglePullNode (EntityData {_state})) = not . isFetchingOrFetched . pullNodeStateTimeline <$> readTVarIO _state
 shouldFetchOnExpand (SingleWorkflowNode (EntityData {_state})) = not . isFetchingOrFetched . workflowNodeStateFetchable <$> readTVarIO _state
 shouldFetchOnExpand (SingleJobNode (EntityData {_state})) = do
   JobNodeState {jnsJob=jobFetchable, jnsLogs=logsFetchable} <- readTVarIO _state

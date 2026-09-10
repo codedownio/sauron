@@ -59,10 +59,10 @@ instance ListDrawable Fixed 'SingleBranchWithInfoT where
                 liftIO $ void $ async $ flip runReaderT (s ^. appBaseContext) $ do
                   withGithubApiSemaphore (githubWithLogging (issueR owner name (IssueNumber num))) >>= \case
                     Right issue -> do
-                      ed <- atomically $ makeEmptyElemWithState (s ^. appBaseContext) issue NotFetched ("/pull/" <> show num) 0
+                      ed <- atomically $ makeEmptyElemWithState (s ^. appBaseContext) issue emptyPullNodeState ("/pull/" <> show num) 0
                       fetchPullComments owner name (IssueNumber num) (_state ed)
                       liftIO $ atomically $ writeTVar (_appModalVariable s)
-                        (Just (ZoomModalState (SomeNode (SinglePullNode ed)) (toList parents)))
+                        (Just (newPullRequestModalState TabConversation (SinglePullNode ed) (toList parents)))
                     Left _err -> return ()
             _ -> return ()
         return True

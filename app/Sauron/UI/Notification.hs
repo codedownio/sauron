@@ -74,14 +74,17 @@ instance ListDrawable Fixed 'SingleNotificationT where
     | key == zoomModalKey = do
         withFixedElemAndParents appState $ \(SomeNode _) (SomeNode variableEl) parents -> do
           refreshOnZoom (appState ^. appBaseContext) variableEl parents
-          liftIO $ atomically $ writeTVar (_appModalVariable appState) (Just (ZoomModalState (SomeNode variableEl) (toList parents)))
+          liftIO $ atomically $ writeTVar (_appModalVariable appState) (Just (newZoomModalState (SomeNode variableEl) (toList parents)))
         return True
     | key == commentKey = do
-        withFixedElemAndParents appState $ \_ (SomeNode variableEl) _parents ->
+        withFixedElemAndParents appState $ \_ (SomeNode variableEl) parents ->
           case variableEl of
             SingleNotificationNode (EntityData {_state=notifStateVar}) -> do
+              refreshOnZoom (appState ^. appBaseContext) variableEl parents
+              liftIO $ atomically $ writeTVar (_appModalVariable appState)
+                (Just (newZoomModalState (SomeNode variableEl) (toList parents)))
               notifState <- liftIO $ readTVarIO notifStateVar
-              openCommentForNotification (appState ^. appBaseContext) notification notifState
+              openCommentForNotification appState notification notifState
             _ -> return ()
         return True
     | key == markNotificationDoneKey = do

@@ -18,16 +18,6 @@ import Sauron.Types
 
 
 fixModal :: ModalState Variable -> STM (ModalState Fixed)
-fixModal (CommentModalState {..}) = return $ CommentModalState {
-  _commentEditor = _commentEditor
-  , _commentIssue = _commentIssue
-  , _commentIssueComments = _commentIssueComments
-  , _commentNodeState = _commentNodeState
-  , _issueIsPR = _issueIsPR
-  , _commentRepoOwner = _commentRepoOwner
-  , _commentRepoName = _commentRepoName
-  , _submissionState = _submissionState
-  }
 fixModal (NewIssueModalState {..}) = return $ NewIssueModalState {
   _newIssueTitleEditor = _newIssueTitleEditor
   , _newIssueBodyEditor = _newIssueBodyEditor
@@ -46,19 +36,15 @@ fixModal (MergeModalState {..}) = return $ MergeModalState {
   , _mergeFocus = _mergeFocus
   , _mergeSubmissionState = _mergeSubmissionState
   }
-fixModal (PRReviewModalState {..}) = return $ PRReviewModalState {
-  _reviewIssue = _reviewIssue
-  , _reviewRepoOwner = _reviewRepoOwner
-  , _reviewRepoName = _reviewRepoName
-  , _reviewPullRequestId = _reviewPullRequestId
-  , _reviewFiles = _reviewFiles
-  , _reviewViewedStates = _reviewViewedStates
-  , _reviewCurrentFile = _reviewCurrentFile
-  }
-fixModal (ZoomModalState sn parents) = do
+fixModal (ZoomModalState sn parents commentMode) = do
   fixedNode <- fixSomeNode sn
   fixedParents <- mapM fixSomeNode parents
-  return $ ZoomModalState fixedNode fixedParents
+  -- The comment editor isn't derived from the node tree; it carries across as-is
+  return $ ZoomModalState fixedNode fixedParents commentMode
+fixModal (PullRequestModalState node parents commentMode tab file commit expanded) = do
+  fixedNode <- fixNode node
+  fixedParents <- mapM fixSomeNode parents
+  return $ PullRequestModalState fixedNode fixedParents commentMode tab file commit expanded
 fixModal HelpModalState = return HelpModalState
 
 fixSomeNode :: SomeNode Variable -> STM (SomeNode Fixed)

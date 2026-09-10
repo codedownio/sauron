@@ -25,7 +25,7 @@ import Sauron.Event.Helpers
 import Sauron.Event.MergeModal
 import Sauron.Event.NewIssueModal
 import Sauron.Event.Open (openNode)
-import Sauron.Event.PRReviewModal
+import Sauron.Event.PullModal
 import Sauron.Event.Paging
 import Sauron.Event.Search
 import Sauron.Event.Util
@@ -45,7 +45,16 @@ appEvent s (AppEvent (ListUpdate sortNow l')) = do
   modify (appMainList %~ listReplace l' (listSelected $ s ^. appMainList))
   modify (appSortNow .~ sortNow)
 
-appEvent _ (AppEvent (ModalUpdate newModal)) = modify (appModal .~ newModal)
+appEvent s (AppEvent (ModalUpdate newModal)) = case (newModal, _appModal s) of
+  -- The modal variable (and thus the fixer) only ever carries the zoom modal. A
+  -- Nothing update means the variable was cleared, which must not close a
+  -- directly-managed modal (comment/merge/review/...) that has opened since.
+  (Nothing, Just currentModal) | not (isFixerManaged currentModal) -> return ()
+  _ -> modify (appModal .~ newModal)
+  where
+    isFixerManaged (ZoomModalState {}) = True
+    isFixerManaged (PullRequestModalState {}) = True
+    isFixerManaged _ = False
 
 appEvent _ (AppEvent AnimationTick) = do
   -- Use strict evaluation to avoid thunk buildup
@@ -64,8 +73,6 @@ appEvent s (AppEvent (CommentModalEvent commentModalEvent)) = handleCommentModal
 appEvent s (AppEvent (NewIssueModalEvent newIssueEvent)) = handleNewIssueModalEvent s newIssueEvent
 
 appEvent s (AppEvent (MergeModalEvent mergeEvent)) = handleMergeModalEvent s mergeEvent
-
-appEvent s (AppEvent (PRReviewModalEvent reviewEvent)) = handlePRReviewModalEvent s reviewEvent
 
 appEvent _s (AppEvent (TimeUpdated newTime)) = do
   -- Update the current time for accurate timestamps
@@ -88,20 +95,6 @@ appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
 -- Modal events
 appEvent s@(_appModal -> Just modalState) e = case e of
   VtyEvent ev -> case modalState of
-    CommentModalState {} -> case ev of
-      (V.EvKey V.KEsc []) -> closeModal s
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
-      (V.EvKey V.KEnter [V.MMeta]) -> do
-        modify (appModal . _Just . submissionState .~ SubmittingComment)
-        liftIO $ submitComment s modalState
-      (V.EvKey V.KEnter [V.MMeta, V.MShift]) -> do
-        modify (appModal . _Just . submissionState .~ SubmittingCloseWithComment)
-        liftIO $ closeWithComment s modalState
-      _ -> do
-        unlessM (handleModalScrolling CommentModalContent ev) $ do
-          let ed = _commentEditor modalState
-          ed' <- WEditorBrick.handleEditor ed ev
-          modify (appModal . _Just . commentEditor .~ ed')
     NewIssueModalState {} -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
@@ -126,21 +119,42 @@ appEvent s@(_appModal -> Just modalState) e = case e of
       (V.EvKey (V.KChar 'q') []) | _mergeFocus modalState == MergeFocusMethods -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       _ -> handleMergeModalVtyEvent s modalState ev
-    PRReviewModalState {} -> case ev of
-      (V.EvKey V.KEsc []) -> closeModal s
-      (V.EvKey (V.KChar 'q') []) -> closeModal s
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
-      (V.EvKey key []) ->
-        unlessM (handlePRReviewModalKey s modalState key) $
-          void $ handleModalScrolling PRReviewModalContent ev
-      _ -> void $ handleModalScrolling PRReviewModalContent ev
-    ZoomModalState {} -> case ev of
-      (V.EvKey V.KEsc []) -> closeModal s
-      (V.EvKey (V.KChar 'q') []) -> closeModal s
-      (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
-      (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
-      (V.EvKey (V.KChar 'm') []) -> handleZoomModalMerge s
-      _ -> whenM (handleModalScrolling ZoomModalContent ev) $ clearAutoScrollTarget s
+    ZoomModalState {_zoomModalCommentMode} -> case _zoomModalCommentMode of
+      -- Comment mode owns the keyboard while it's on, apart from closing the modal
+      Just commentMode -> case ev of
+        (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+        _ -> unlessM (handleModalScrolling ZoomModalContent ev) $
+               void $ handleCommentModeEvent s commentMode ev
+      Nothing -> case ev of
+        (V.EvKey V.KEsc []) -> closeModal s
+        (V.EvKey (V.KChar 'q') []) -> closeModal s
+        (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+        (V.EvKey (V.KChar 'c') []) -> handleZoomModalComment s
+        (V.EvKey c []) | c == openSelectedKey ->
+          withFixedElemAndParents s $ \(SomeNode el) variableEl elems ->
+            openNode (s ^. appBaseContext) variableEl elems el
+        _ -> whenM (handleModalScrollingFull ZoomModalContent ev) $ clearAutoScrollTarget s
+    PullRequestModalState {_pullModalCommentMode, _pullModalNode=SinglePullNode (EntityData {_static=pullIssue})} ->
+      case _pullModalCommentMode of
+        Just commentMode -> case ev of
+          (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+          _ -> unlessM (handleModalScrolling ZoomModalContent ev) $
+                 void $ handleCommentModeEvent s commentMode ev
+        Nothing -> case ev of
+          (V.EvKey V.KEsc []) -> closeModal s
+          (V.EvKey (V.KChar 'q') []) -> closeModal s
+          (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
+          (V.EvKey c []) | c == openSelectedKey ->
+            withFixedElemAndParents s $ \(SomeNode el) variableEl elems ->
+              openNode (s ^. appBaseContext) variableEl elems el
+          (V.EvKey key []) -> unlessM (handlePullModalKey s modalState key) $ case key of
+            (V.KChar 'c') -> withRepoOfPull s $ \owner name -> enterCommentMode s pullIssue True owner name
+            (V.KChar 'm') | issueState pullIssue == StateOpen ->
+              withRepoOfPull s $ \owner name -> do
+                leaveZoomModalForDirectModal s
+                openMergeModal pullIssue owner name
+            _ -> whenM (handleModalScrollingFull ZoomModalContent ev) $ clearAutoScrollTarget s
+          _ -> whenM (handleModalScrollingFull ZoomModalContent ev) $ clearAutoScrollTarget s
     HelpModalState -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') []) -> closeModal s
@@ -383,44 +397,49 @@ modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode it
 closeModal :: AppState -> EventM ClickableName AppState ()
 closeModal s = do
   modify (appModal .~ Nothing)
+
   liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
 
--- | Handle 'c' key press in zoom modal to switch to comment modal for issues/PRs
+-- | Handle 'c' key press in zoom modal to switch to comment mode for issues/notifications
 handleZoomModalComment :: AppState -> EventM ClickableName AppState ()
 handleZoomModalComment s = do
   maybeVarModal <- liftIO $ readTVarIO (_appModalVariable s)
   case maybeVarModal of
-    Just (ZoomModalState (SomeNode (SingleIssueNode (EntityData {_static=issue, _state=stateVar}))) parents) ->
-      case findRepoParent (dummyNonEmpty parents) of
-        Just (RepoNode (EntityData {_static=(owner, name)})) ->
-          fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar False owner name
-        Nothing -> return ()
-    Just (ZoomModalState (SomeNode (SinglePullNode (EntityData {_static=issue, _state=stateVar}))) parents) ->
-      case findRepoParent (dummyNonEmpty parents) of
-        Just (RepoNode (EntityData {_static=(owner, name)})) ->
-          fetchCommentsAndOpenModal (s ^. appBaseContext) issue stateVar True owner name
-        Nothing -> return ()
-    Just (ZoomModalState (SomeNode (SingleNotificationNode (EntityData {_static=notification, _state=notifStateVar}))) _parents) -> do
+    Just (ZoomModalState {_zoomModalSomeNode=SomeNode (SingleIssueNode (EntityData {_static=issue})), _zoomModalParents=parents}) ->
+      whenJust (nonEmpty parents >>= findRepoParent) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
+        enterCommentMode s issue False owner name
+    Just (ZoomModalState {_zoomModalSomeNode=SomeNode (SingleNotificationNode (EntityData {_static=notification, _state=notifStateVar}))}) -> do
       notifState <- liftIO $ readTVarIO notifStateVar
-      openCommentForNotification (s ^. appBaseContext) notification notifState
+      openCommentForNotification s notification notifState
     _ -> return ()
-  where
-    -- findRepoParent expects NonEmpty, but we have a list. Create a dummy NonEmpty.
-    dummyNonEmpty :: [a] -> NonEmpty a
-    dummyNonEmpty [] = error "handleZoomModalComment: empty parents"
-    dummyNonEmpty (x:xs) = x :| xs
 
--- | Handle 'm' in the zoom modal: open the merge modal for a zoomed open PR
-handleZoomModalMerge :: AppState -> EventM ClickableName AppState ()
-handleZoomModalMerge s = do
+-- | Clear the modal variable when switching from a fixer-managed modal to a directly
+-- managed one. A stale state left in the variable would get re-projected by the modal
+-- fixer whenever the node's state changes, clobbering the new modal.
+leaveZoomModalForDirectModal :: AppState -> EventM ClickableName AppState ()
+leaveZoomModalForDirectModal s = liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
+
+-- | Run an action with the repo the zoomed pull request belongs to
+withRepoOfPull :: AppState -> (Name Owner -> Name Repo -> EventM ClickableName AppState ()) -> EventM ClickableName AppState ()
+withRepoOfPull s cb = do
   maybeVarModal <- liftIO $ readTVarIO (_appModalVariable s)
   case maybeVarModal of
-    Just (ZoomModalState (SomeNode (SinglePullNode (EntityData {_static=issue}))) parents)
-      | issueState issue == StateOpen ->
-        case nonEmpty parents >>= findRepoParent of
-          Just (RepoNode (EntityData {_static=(owner, name)})) -> openMergeModal issue owner name
-          Nothing -> return ()
+    Just (PullRequestModalState {_pullModalParents=parents}) ->
+      whenJust (nonEmpty parents >>= findRepoParent) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
+        cb owner name
     _ -> return ()
+
+handleModalScrollingFull :: ClickableName -> V.Event -> EventM ClickableName AppState Bool
+handleModalScrollingFull viewportName ev = case ev of
+  (V.EvKey V.KUp []) -> vScrollBy vp (-1) >> return True
+  (V.EvKey V.KDown []) -> vScrollBy vp 1 >> return True
+  (V.EvKey V.KPageUp []) -> vScrollPage vp Up >> return True
+  (V.EvKey V.KPageDown []) -> vScrollPage vp Down >> return True
+  (V.EvKey V.KHome []) -> vScrollToBeginning vp >> return True
+  (V.EvKey V.KEnd []) -> vScrollToEnd vp >> return True
+  _ -> handleModalScrolling viewportName ev
+  where
+    vp = viewportScroll viewportName
 
 handleModalScrolling :: ClickableName -> V.Event -> EventM ClickableName AppState Bool
 handleModalScrolling viewportName ev = case ev of
