@@ -45,12 +45,22 @@ appEvent s (AppEvent (ListUpdate sortNow l')) = do
   modify (appMainList %~ listReplace l' (listSelected $ s ^. appMainList))
   modify (appSortNow .~ sortNow)
 
-appEvent s (AppEvent (ModalUpdate newModal)) = case (newModal, _appModal s) of
-  -- The modal variable (and thus the fixer) only ever carries the zoom modal. A
-  -- Nothing update means the variable was cleared, which must not close a
-  -- directly-managed modal (comment/merge/review/...) that has opened since.
-  (Nothing, Just currentModal) | not (isFixerManaged currentModal) -> return ()
-  _ -> modify (appModal .~ newModal)
+-- A modal update is a snapshot the fixer took at some earlier point, so it can be
+-- stale by the time it arrives: it may predate the modal being opened, closed, or
+-- having its own UI state changed by a keypress. The modal variable is the source of
+-- truth for whether a fixer-managed modal is open, and the visible state is the
+-- source of truth for the modal's own UI fields, so reconcile against both.
+appEvent s (AppEvent (ModalUpdate newModal)) = do
+  variableIsOpen <- liftIO $ isJust <$> readTVarIO (_appModalVariable s)
+  case newModal of
+    Just projected | variableIsOpen ->
+      modify (appModal %~ \current -> Just (maybe projected (`preserveModalUi` projected) current))
+    Nothing | not variableIsOpen ->
+      -- A cleared variable must not close a directly-managed modal (merge, new
+      -- issue, ...) that has opened since
+      unless (maybe False (not . isFixerManaged) (_appModal s)) $ modify (appModal .~ Nothing)
+    -- Anything else is a snapshot from before the modal was opened or closed
+    _ -> return ()
   where
     isFixerManaged (ZoomModalState {}) = True
     isFixerManaged (PullRequestModalState {}) = True
@@ -232,6 +242,21 @@ appEvent _ (MouseDown (ScrollbarClick _ _) _ _ _) = return ()
 
 -- Catch-all
 appEvent _ _ = return ()
+
+-- | Carry the modal's own UI state (comment editor, tab, cursors) across a fixer
+-- projection, which only owns the node data.
+preserveModalUi :: ModalState Fixed -> ModalState Fixed -> ModalState Fixed
+preserveModalUi (ZoomModalState {_zoomModalCommentMode=commentMode}) projected@(ZoomModalState {}) =
+  projected { _zoomModalCommentMode = commentMode }
+preserveModalUi current@(PullRequestModalState {}) projected@(PullRequestModalState {}) =
+  projected {
+    _pullModalCommentMode = _pullModalCommentMode current
+    , _pullModalTab = _pullModalTab current
+    , _pullModalCurrentFile = _pullModalCurrentFile current
+    , _pullModalSelectedCommit = _pullModalSelectedCommit current
+    , _pullModalExpandedCommits = _pullModalExpandedCommits current
+    }
+preserveModalUi _ projected = projected
 
 -- Try to handle a hotkey with the selected node's custom handler
 tryHandleHotkeyWithSelected :: AppState -> V.Key -> EventM ClickableName AppState Bool
