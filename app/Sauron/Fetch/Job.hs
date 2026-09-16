@@ -31,7 +31,6 @@ import Sauron.Fetch.ParseWorkflowRunLogs
 import Sauron.HealthCheck.Stop (cancelGatheredHealthCheckThreads, swapChildrenClearingRemoved)
 import Sauron.Logging
 import Sauron.Types
-import System.IO.Temp (emptySystemTempFile)
 
 
 fetchWorkflowJobs :: (
@@ -166,10 +165,6 @@ fetchJobLogsPerJob owner name (Job {jobId, jobSteps}) (SingleJobNode (EntityData
             Right logs -> do
               info' bc [i|fetchJobLogsPerJob: downloaded #{BL.length logs} bytes|]
 
-              tempFile <- liftIO $ emptySystemTempFile "sauron-job-logs-.txt"
-              liftIO $ writeFileLBS tempFile logs
-              info' bc [i|fetchJobLogsPerJob: wrote raw logs to #{tempFile}|]
-
               let parsedLogs = parseJobLogs (T.splitOn "\n" (decodeUtf8 logs))
               let stepsList = V.toList jobSteps
                   stepsWithNextStart = zipWith (\step nextStep -> (step, jobStepStartedAt nextStep))
@@ -227,10 +222,6 @@ fetchJobLogsFromWorkflowRun owner name (Job {jobRunId, jobName}) (SingleJobNode 
           info' bc [i|fetchJobLogsFromWorkflowRun: got redirect URL, downloading zip...|]
           zipBytes <- simpleHttp (URI.uriToString id (responseBody response) "")
           info' bc [i|fetchJobLogsFromWorkflowRun: downloaded zip (#{BL.length zipBytes} bytes)|]
-
-          tempFile <- liftIO $ emptySystemTempFile "sauron-workflow-run-logs-.zip"
-          liftIO $ BL.writeFile tempFile zipBytes
-          info' bc [i|fetchJobLogsFromWorkflowRun: wrote zip to #{tempFile}|]
 
           let entryPaths = listZipEntryPaths zipBytes
           let entryPathsStr = T.intercalate ", " (map toText entryPaths)
