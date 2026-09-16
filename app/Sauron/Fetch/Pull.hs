@@ -26,6 +26,7 @@ import Sauron.Actions.Util (withGithubApiSemaphore, githubWithLogging)
 import Sauron.Fetch.Core
 import Sauron.GraphQL.PullRequestFiles (queryPullRequestViewedStates)
 import Sauron.Fetch.Issue (fetchIssueCommentsAndEvents)
+import Sauron.HealthCheck.Stop (cancelGatheredHealthCheckThreads, swapChildrenClearingRemoved)
 import Sauron.Logging
 import Sauron.Types
 
@@ -56,16 +57,20 @@ fetchPulls' :: (
 fetchPulls' fullQuery _state _children _depth = do
   bc <- ask
 
-  fetchPaginatedWithState (searchIssuesR fullQuery) _state $ \case
+  -- A pull node can have a checks health check thread polling it, so the nodes this fetch
+  -- replaces have to have theirs cancelled rather than just being dropped on the floor.
+  removedThreads <- fetchPaginatedWithState (searchIssuesR fullQuery) _state $ \case
     Left err -> do
       (s, p, _) <- readTVar _state
       writeTVar _state (s, p, Errored err)
-      writeTVar _children []
+      swapChildrenClearingRemoved _children []
     Right (SearchResult totalCount results, newPageInfo) -> do
       (s, _, _) <- readTVar _state
       writeTVar _state (s, newPageInfo, Fetched totalCount)
-      (writeTVar _children =<<) $ forM (V.toList results) $ \issue@(Issue {..}) ->
+      (swapChildrenClearingRemoved _children =<<) $ forM (V.toList results) $ \issue@(Issue {..}) ->
         SinglePullNode <$> makeEmptyElemWithState bc issue emptyPullNodeState ("/pull/" <> show issueNumber) (_depth + 1)
+
+  cancelGatheredHealthCheckThreads bc removedThreads
 
 -- | Apply a function to the timeline part of a pull node's state
 setPullTimeline :: TVar PullNodeState -> (Fetchable (V.Vector TimelineEvent) -> Fetchable (V.Vector TimelineEvent)) -> STM ()

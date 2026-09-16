@@ -16,6 +16,7 @@ import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Core
 import Sauron.HealthCheck.Repo (newRepoHealthCheckThread)
+import Sauron.HealthCheck.Stop (cancelGatheredHealthCheckThreads, swapChildrenClearingRemoved)
 import Sauron.Options (PeriodSpec(..), defaultHealthCheckPeriodUs)
 import Sauron.Setup.Common (newRepoNode)
 import Sauron.Types
@@ -43,15 +44,17 @@ fetchRepos (PaginatedReposNode (EntityData {..})) = do
   bc <- ask
   -- Use a TVar to pass results out of the STM callback
   resultsVar <- newTVarIO Nothing
-  fetchPaginatedWithState (searchReposR fullQuery) _state $ \case
+  removedThreads <- fetchPaginatedWithState (searchReposR fullQuery) _state $ \case
     Left err -> do
       (s, p, _) <- readTVar _state
       writeTVar _state (s, p, Errored err)
-      writeTVar _children []
+      swapChildrenClearingRemoved _children []
     Right (SearchResult totalCount results, newPageInfo) -> do
       (s, _, _) <- readTVar _state
       writeTVar _state (s, newPageInfo, Fetched totalCount)
       writeTVar resultsVar (Just results)
+      return []
+  cancelGatheredHealthCheckThreads bc removedThreads
 
   -- Create proper repo nodes with children (in IO, outside STM)
   readTVarIO resultsVar >>= \case
@@ -64,4 +67,7 @@ fetchRepos (PaginatedReposNode (EntityData {..})) = do
         let ps@(PeriodSpec period) = defaultHealthCheckPeriodUs
         hcThread <- liftIO $ newRepoHealthCheckThread bc nsName repoVar healthCheckVar ps
         newRepoNode nsName repoVar healthCheckVar (Just (hcThread, period)) (_depth + 1) (getIdentifier bc)
-      atomically $ writeTVar _children repoNodes
+      -- Each fetch builds brand new repo nodes with brand new health check threads, so the
+      -- nodes we're replacing must have their threads cancelled. Otherwise every refresh,
+      -- search and page of this list would leave another set of them polling forever.
+      atomically (swapChildrenClearingRemoved _children repoNodes) >>= cancelGatheredHealthCheckThreads bc
