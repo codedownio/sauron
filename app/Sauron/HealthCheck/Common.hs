@@ -1,15 +1,19 @@
 module Sauron.HealthCheck.Common (
-  stopHealthCheckThread
+  clearOwnHealthCheckThread
   ) where
 
 import Relude
 import UnliftIO.Async
+import UnliftIO.Concurrent (myThreadId)
 
-stopHealthCheckThread :: TVar (Maybe (Async ())) -> IO ()
-stopHealthCheckThread threadVar = do
-  maybeThread <- readTVarIO threadVar
-  case maybeThread of
-    Nothing -> return ()
-    Just thread -> do
-      cancel thread
-      atomically $ writeTVar threadVar Nothing
+
+-- | Clear a node's health check thread handle when the loop exits, so a dead thread can't
+-- block a future check from starting. Only clears the handle if it still points at the
+-- calling thread, so a thread that's being cancelled and replaced can't clear its
+-- replacement's handle.
+clearOwnHealthCheckThread :: MonadIO m => TVar (Maybe (Async (), Int)) -> m ()
+clearOwnHealthCheckThread threadVar = do
+  tid <- myThreadId
+  atomically $ readTVar threadVar >>= \case
+    Just (asy, _) | asyncThreadId asy == tid -> writeTVar threadVar Nothing
+    _ -> return ()

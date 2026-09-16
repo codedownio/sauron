@@ -6,7 +6,7 @@ module Sauron.HealthCheck.Pull (
   , pullChecksHealthCheckPeriodUs
   ) where
 
-import Control.Exception.Safe (handleAny)
+import Control.Exception.Safe (finally, handleAny)
 import Control.Monad.Logger
 import Data.String.Interpolate
 import qualified Data.Vector as V
@@ -14,6 +14,7 @@ import GitHub
 import Relude
 import Sauron.Actions.Util (findRepoParent)
 import Sauron.Fetch.Pull (fetchPullDetailsAndChecks)
+import Sauron.HealthCheck.Common (clearOwnHealthCheckThread)
 import Sauron.Logging
 import Sauron.Types
 import UnliftIO.Async
@@ -43,15 +44,14 @@ startPullChecksHealthCheckIfNeeded baseContext (SinglePullNode (EntityData {_sta
     Nothing -> return ()
   where
     runLoop owner name =
+      flip finally (clearOwnHealthCheckThread _healthCheckThread) $
       flip runReaderT baseContext $
       handleAny (\e -> putStrLn [i|PR checks health check thread crashed: #{e}|]) $
       fix $ \loop -> do
         threadDelay pullChecksHealthCheckPeriodUs
         fetchPullDetailsAndChecks owner name (issueNumber pull) _state
         stillPending <- checksStillPending . pullNodeStateChecks <$> readTVarIO _state
-        if stillPending
-          then loop
-          else atomically $ writeTVar _healthCheckThread Nothing
+        when stillPending loop
 
 checksStillPending :: Fetchable (V.Vector CheckRun) -> Bool
 checksStillPending fetchable = case fetchableCurrent fetchable of

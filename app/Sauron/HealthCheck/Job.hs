@@ -9,14 +9,14 @@ module Sauron.HealthCheck.Job (
   , isJobCompleted
   ) where
 
-import Control.Exception.Safe (handleAny)
-import Control.Monad.IO.Class
+import Control.Exception.Safe (finally, handleAny)
 import Control.Monad.Logger
 import Data.String.Interpolate
 import GitHub
 import Relude
 import Sauron.Actions.Util (findRepoParent)
-import Sauron.Fetch.Job (fetchJobLogs)
+import Sauron.Fetch.Job (fetchJob, fetchJobLogs)
+import Sauron.HealthCheck.Common (clearOwnHealthCheckThread)
 import Sauron.Logging (log)
 import Sauron.Types
 import Sauron.UI.Statuses
@@ -43,33 +43,32 @@ startJobHealthCheckIfNeeded ::
   -> Node Variable 'SingleJobT
   -> NonEmpty (SomeNode Variable)
   -> IO (Maybe (Async ()))
-startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_state, _static=(Job {jobId}), ..})) parents = do
+startJobHealthCheckIfNeeded baseContext node@(SingleJobNode (EntityData {_static=(Job {jobId}), ..})) parents = do
   case findRepoParent parents of
     Just (RepoNode (EntityData {_static=(owner, name)})) ->
       readTVarIO _healthCheckThread >>= \case
         Nothing -> do
           log baseContext LevelInfo [i|Starting health check thread for job: #{jobId} (period: #{jobHealthCheckPeriodUs}us)|] Nothing
-          newThread <- async $ runJobHealthCheckLoop baseContext owner name node parents
+          newThread <- async $ runJobHealthCheckLoop baseContext owner name node
           atomically $ writeTVar _healthCheckThread (Just (newThread, jobHealthCheckPeriodUs))
           return (Just newThread)
         Just (thread, _) -> return (Just thread)
     _ -> return Nothing
   where
-    runJobHealthCheckLoop :: BaseContext -> Name Owner -> Name Repo -> Node Variable 'SingleJobT -> NonEmpty (SomeNode Variable) -> IO ()
-    runJobHealthCheckLoop bc owner name jobNode@(SingleJobNode (EntityData {_state, _static=job, ..})) _pars =
+    runJobHealthCheckLoop :: BaseContext -> Name Owner -> Name Repo -> Node Variable 'SingleJobT -> IO ()
+    runJobHealthCheckLoop bc owner name jobNode@(SingleJobNode (EntityData {_state, _healthCheckThread=threadVar})) =
+      flip finally (clearOwnHealthCheckThread threadVar) $
       handleAny (\e -> putStrLn [i|Job health check thread crashed: #{e}|]) $
-      forever $ do
-        JobNodeState {jnsJob=jobFetchable} <- readTVarIO _state
-        case jobFetchable of
-          Fetched currentJob | hasRunningJob currentJob -> do
-            -- Fetch job logs to keep them updated
-            liftIO $ flip runReaderT bc $
-              fetchJobLogs owner name job jobNode Nothing
+      fix $ \loop ->
+        (fetchableCurrent . jnsJob) <$> readTVarIO _state >>= \case
+          Just currentJob | not (isJobCompleted currentJob) -> do
+            -- Keep the logs and the job's own status up to date. Refetching the job here is what
+            -- lets this loop notice that the job finished and exit; without it we'd depend on the
+            -- parent workflow's health check still running to update our state.
+            flip runReaderT bc $ do
+              fetchJobLogs owner name currentJob jobNode Nothing
+              fetchJob owner name jobId jobNode
             threadDelay jobHealthCheckPeriodUs
-          _ -> do
-            -- Job is completed, clear the thread reference and stop
-            atomically $ writeTVar _healthCheckThread Nothing
-            return ()
-
-    hasRunningJob :: Job -> Bool
-    hasRunningJob j = not $ isJobCompleted j
+            loop
+          -- The job finished (or we never got it), so stop; the finally clears our handle
+          _ -> return ()

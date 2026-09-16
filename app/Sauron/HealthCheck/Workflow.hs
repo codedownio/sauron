@@ -10,7 +10,7 @@ module Sauron.HealthCheck.Workflow (
   workflowHealthCheckPeriodUs
   ) where
 
-import Control.Exception.Safe (handleAny)
+import Control.Exception.Safe (finally, handleAny)
 import Control.Monad.Logger
 import Data.String.Interpolate
 import qualified Data.Vector as V
@@ -18,6 +18,7 @@ import GitHub
 import Relude
 import Sauron.Actions.Util
 import Sauron.Fetch.Job
+import Sauron.HealthCheck.Common (clearOwnHealthCheckThread)
 import Sauron.HealthCheck.Job (isJobCompleted)
 import Sauron.HealthCheck.Repo (runRepoHealthCheck)
 import Sauron.Logging
@@ -74,6 +75,7 @@ startWorkflowHealthCheckForNode baseContext owner name workflowsChildren refresh
   where
     runWorkflowHealthCheckLoop :: BaseContext -> Name Owner -> Name Repo -> Node Variable 'SingleWorkflowT -> TVar [Node Variable 'SingleWorkflowT] -> Int -> IO ()
     runWorkflowHealthCheckLoop bc owner name (SingleWorkflowNode (EntityData {_static=staticWorkflowRun})) workflowsChildren nodeIdent' =
+      flip finally (clearOwnHealthCheckThread _healthCheckThread) $
       flip runReaderT bc $
       handleAny (\e -> putStrLn [i|Workflow health check thread crashed: #{e}|]) $
       fix $ \loop ->
