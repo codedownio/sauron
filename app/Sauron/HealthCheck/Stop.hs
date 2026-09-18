@@ -6,13 +6,10 @@ module Sauron.HealthCheck.Stop (
   , stopHealthCheckThreadsForChildren
   , swapChildrenClearingRemoved
   , cancelGatheredHealthCheckThreads
-  , healthCheckIndicatorWidget
   ) where
 
-import Brick
 import Control.Monad.IO.Class
 import Data.String.Interpolate
-import Data.Time (NominalDiffTime)
 import GitHub
 import Relude
 import Sauron.Logging
@@ -99,11 +96,3 @@ gatherAndClearHealthCheckThread someNode@(SomeNode node) = do
       PaginatedBranchesNode _ -> return "Branches"
       PaginatedNotificationsNode _ -> return "Notifications"
       _ -> return "Unknown"
-
-healthCheckIndicatorWidget :: Maybe (Async (), Int) -> Widget n
-healthCheckIndicatorWidget healthCheckThreadData =
-  case healthCheckThreadData of
-    Just (_, periodMicroseconds) ->
-      let diffTime = fromIntegral periodMicroseconds / 1_000_000 :: NominalDiffTime
-      in str (" ⭮[" <> show diffTime <> "]")
-    Nothing -> str ""

@@ -20,12 +20,11 @@ import qualified Graphics.Vty as V
 import Relude
 import Sauron.Actions
 import Sauron.Event.Helpers
-import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
 import Sauron.Types
 import Sauron.UI.AnsiUtil
 import Sauron.UI.AttrMap
 import Sauron.UI.Keys
-import Sauron.UI.Statuses (statusToIconAnimated, chooseWorkflowStatus, fetchableQuarterCircleSpinner)
+import Sauron.UI.Statuses (statusToIconAnimated, chooseWorkflowStatus, activitySpinnerWidget)
 import Sauron.UI.Workflow (handleWorkflowSortKey, handleWorkflowJobPageKey)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
@@ -164,8 +163,7 @@ jobLine animationCounter now toggled' (Job {..}) fetchableState maxSibDuration h
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString $ untagName jobName
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe jobStatus jobConclusion
-      , fetchableQuarterCircleSpinner animationCounter fetchableState
-      , healthCheckIndicatorWidget healthCheckThreadData
+      , activitySpinnerWidget animationCounter (isFetching fetchableState) healthCheckThreadData
       , padLeft Max durationWidget
       ]
 

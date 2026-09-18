@@ -97,6 +97,7 @@ attrToColor colorMode = ([
 
   -- Spinner
   , (circleSpinnerAttr, fg (select brightGray))
+  , (idleCircleSpinnerAttr, fg (select midGray) & flip V.withStyle V.dim)
 
   -- General UI
   , (branchAttr, fg (select solarizedBlue))
@@ -185,6 +186,7 @@ hotkeyMessageAttr = mkAttrName "hotkeyMessage"
 disabledHotkeyMessageAttr = mkAttrName "disabledHotkeyMessage"
 
 circleSpinnerAttr = mkAttrName "circleSpinner"
+idleCircleSpinnerAttr = mkAttrName "idleCircleSpinner"
 
 -- | The solarized colour used for a toast's border, by level.
 toastBorderAttr :: ToastLevel -> AttrName

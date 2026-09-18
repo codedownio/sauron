@@ -60,6 +60,10 @@ guardFetchedOrHasPrevious fetchable fn = do
     Just x -> fn x
     _ -> error "impossible"
 
+isFetching :: Fetchable a -> Bool
+isFetching (Fetching _) = True
+isFetching _ = False
+
 isFetched :: Fetchable a -> Bool
 isFetched (Fetched _) = True
 isFetched _ = False

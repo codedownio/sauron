@@ -3,14 +3,18 @@
 module Sauron.UI.Statuses (
   statusToIconAnimated
   , getQuarterCircleSpinner
+  , getIdleQuarterCircle
+  , activitySpinnerWidget
   , fetchableQuarterCircleSpinner
   , chooseWorkflowStatus
   ) where
 
 import Brick
+import Data.Time (NominalDiffTime)
 import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
+import UnliftIO.Async (Async)
 
 quarterCircleSpinners :: [String]
 quarterCircleSpinners = ["◐", "◓", "◑", "◒"]
@@ -25,6 +29,26 @@ getQuarterCircleSpinner counter =
         (x:_) -> x
         [] -> "◐"  -- fallback
   in withAttr circleSpinnerAttr (str icon)
+
+-- | The spinner glyph held still and dimmed, for something that's being watched but isn't
+-- fetching right now.
+getIdleQuarterCircle :: Widget n
+getIdleQuarterCircle = withAttr idleCircleSpinnerAttr (str (fromMaybe "◐" (listToMaybe quarterCircleSpinners)))
+
+-- | The one spinner a node line gets. It sits still and dimmed while the node is just being
+-- watched, spins while a fetch is actually in flight, and goes back to sitting still afterwards;
+-- a health check also puts its polling period next to it. A node with neither gets nothing.
+activitySpinnerWidget :: Int -> Bool -> Maybe (Async (), Int) -> Widget n
+activitySpinnerWidget animationCounter fetching healthCheckThreadData =
+  case (fetching, healthCheckThreadData) of
+    (False, Nothing) -> emptyWidget
+    (_, Nothing) -> spinner
+    (_, Just (_, periodMicroseconds)) ->
+      let period = fromIntegral periodMicroseconds / 1_000_000 :: NominalDiffTime
+      in hBox [spinner, padLeft (Pad 1) $ withAttr idleCircleSpinnerAttr $ str ("[" <> show period <> "]")]
+  where
+    spinner = padLeft (Pad 1) $
+      if fetching then getQuarterCircleSpinner animationCounter else getIdleQuarterCircle
 
 fetchableQuarterCircleSpinner :: Int -> Fetchable a -> Widget n
 fetchableQuarterCircleSpinner animationCounter fetchableState =

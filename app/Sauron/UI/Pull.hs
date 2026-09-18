@@ -30,13 +30,12 @@ import Sauron.Event.MergeModal (openMergeModal)
 import Sauron.Event.PullModal (openPullModalOnTab)
 import Sauron.Event.Search (ensureNonEmptySearch)
 import Sauron.Fetch.Pull (fetchPullComments)
-import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (issueInner, renderTimelineItem, closeReopenAndRefresh, consolidateEvents, detailsToggleWidget, nodeButtonsWidget, actionButtonWidget, subjectTimeAgoWidget)
 import Sauron.UI.Issue.Events (adaptiveWidth)
 import Sauron.UI.Keys
-import Sauron.UI.Statuses (fetchableQuarterCircleSpinner, statusToIconAnimated)
+import Sauron.UI.Statuses (activitySpinnerWidget, fetchableQuarterCircleSpinner, statusToIconAnimated)
 import Sauron.UI.Util
 import Sauron.UI.Util.TimeDiff
 import UnliftIO.Async (Async, async)
@@ -128,15 +127,15 @@ checksWidget :: Int -> Maybe (Async (), Int) -> Fetchable (V.Vector CheckRun) ->
 checksWidget animationCounter healthCheckThreadData = \case
   NotFetched -> Nothing
   Fetching Nothing -> Just $ withAttr italicText $ str "Fetching checks..."
-  Fetching (Just runs) -> renderChecks animationCounter healthCheckThreadData runs
-  Fetched runs -> renderChecks animationCounter healthCheckThreadData runs
+  Fetching (Just runs) -> renderChecks animationCounter True healthCheckThreadData runs
+  Fetched runs -> renderChecks animationCounter False healthCheckThreadData runs
   Errored err -> Just $ withAttr erroredAttr $ strWrap [i|Failed to fetch checks: #{err}|]
 
-renderChecks :: Int -> Maybe (Async (), Int) -> V.Vector CheckRun -> Maybe (Widget ClickableName)
-renderChecks animationCounter healthCheckThreadData runs
+renderChecks :: Int -> Bool -> Maybe (Async (), Int) -> V.Vector CheckRun -> Maybe (Widget ClickableName)
+renderChecks animationCounter polling healthCheckThreadData runs
   | V.null runs = Nothing
   | otherwise = Just $ adaptiveWidth $ \w -> border $ vBox $
-      [padLeftRight 1 $ hBox [summaryWidget, padLeft Max (healthCheckIndicatorWidget healthCheckThreadData)]
+      [padLeftRight 1 $ hBox [summaryWidget, padLeft Max (activitySpinnerWidget animationCounter polling healthCheckThreadData)]
       , padLeftRight 1 (statusBar (max 10 (w - 4)))
       , hBorder]
       <> map (padLeftRight 1 . checkRow) sortedRuns

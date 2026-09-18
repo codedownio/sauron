@@ -26,7 +26,6 @@ import Relude
 import Sauron.Actions (openBrowserToUrl, refreshLine)
 import Sauron.Actions.Util (findRepoParent, findWorkflowsParent, findWorkflowParent)
 import Sauron.Event.Helpers (withFixedElemAndParents, getFixedElemAndParents, withRepoParent)
-import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
 import Sauron.Mutations.Workflow (cancelWorkflowRun, rerunWorkflowRun, rerunFailedJobs)
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -137,8 +136,7 @@ workflowLine animationCounter currentTime toggled' (WorkflowRun {..}) fetchableS
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString workflowRunDisplayTitle
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe workflowRunStatus workflowRunConclusion
-      , fetchableQuarterCircleSpinner animationCounter fetchableState
-      , healthCheckIndicatorWidget healthCheckThreadData
+      , activitySpinnerWidget animationCounter (isFetching fetchableState) healthCheckThreadData
       ]
 
     line1
