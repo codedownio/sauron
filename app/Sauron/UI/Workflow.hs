@@ -136,7 +136,7 @@ workflowLine animationCounter currentTime toggled' (WorkflowRun {..}) fetchableS
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString workflowRunDisplayTitle
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe workflowRunStatus workflowRunConclusion
-      , activitySpinnerWidget animationCounter (isFetching fetchableState) healthCheckThreadData
+      , activitySpinnerWidget animationCounter (workflowNodeStatePolling wfState || isFetching fetchableState) healthCheckThreadData
       ]
 
     line1

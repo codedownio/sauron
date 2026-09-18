@@ -8,17 +8,20 @@ module Sauron.GraphQL (
   , filterBranchesByActivity
   , filterBranchesByInactivity
   , githubGraphQLEndpoint
+  , runGraphQL
   , GraphQLError(..)
   ) where
 
 import Control.Exception.Safe (try)
 import Data.Aeson
+import Data.Aeson.Types (Parser, parseEither)
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime)
 import Data.Time.Format (parseTimeM, defaultTimeLocale)
 import Network.HTTP.Conduit (responseTimeoutMicro)
 import Network.HTTP.Simple
+import GitHub.Auth (Auth(..))
 import Relude
 import Sauron.Types hiding (PageInfo)
 import System.IO.Unsafe (unsafePerformIO)
@@ -345,3 +348,36 @@ filterBranchesByInactivity daysCutoff branches = unsafePerformIO $ do
             Just commitTime ->
               let cutoffTime = addUTCTime (fromIntegral (-days * 24 * 60 * 60)) currentTime
               in commitTime <= cutoffTime
+
+
+-- | Run a GraphQL query/mutation against GitHub and return the "data" value.
+runGraphQL :: MonadIO m => BaseContext -> Text -> Value -> m (Either Text Value)
+runGraphQL bc queryText variables = liftIO $ case auth bc of
+  OAuth token -> do
+    result <- try $ do
+      initialRequest <- parseRequest githubGraphQLEndpoint
+      let httpRequest = initialRequest
+                      & setRequestBodyJSON (object ["query" .= queryText, "variables" .= variables])
+                      & setRequestResponseTimeout (responseTimeoutMicro (30 * 1000000))
+                      & setRequestHeader "User-Agent" ["sauron-app"]
+                      & setRequestHeader "Content-Type" ["application/json"]
+                      & setRequestHeader "Authorization" ["Bearer " <> token]
+                      & setRequestMethod "POST"
+      getResponseBody <$> httpJSON httpRequest
+    return $ case result of
+      Left (ex :: SomeException) -> Left [i|GraphQL request failed: #{ex}|]
+      Right body -> case parseEither parseResponse body of
+        Left err -> Left $ toText err
+        Right x -> x
+  _ -> return $ Left "GraphQL requires an OAuth token"
+  where
+    parseResponse :: Value -> Parser (Either Text Value)
+    parseResponse = withObject "response" $ \o -> do
+      maybeErrors <- o .:? "errors"
+      maybeData <- o .:? "data"
+      case (maybeErrors :: Maybe [Object], maybeData) of
+        (Just errs@(_:_), _) -> do
+          messages <- forM errs (.: "message")
+          return $ Left $ unwords messages
+        (_, Just d) -> return $ Right d
+        _ -> return $ Left "No data returned from GitHub"

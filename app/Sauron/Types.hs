@@ -520,6 +520,9 @@ data WorkflowNodeState = WorkflowNodeState {
   workflowNodeStateFetchable :: Fetchable TotalCount
   , workflowNodeStateJobPage :: Int
   , workflowNodeStateJobSortBy :: WorkflowJobSortBy
+  -- | Set while the repo's run poller is refreshing this workflow. Its status comes from a batch
+  -- query rather than a fetch of its own, so this is what tells the UI it's being refreshed.
+  , workflowNodeStatePolling :: Bool
   } deriving (Show, Eq)
 
 workflowJobPageSize :: Int

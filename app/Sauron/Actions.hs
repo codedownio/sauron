@@ -118,10 +118,9 @@ fetchOnOpenIfNecessary bc node parents = do
 
 onBecameVisible :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
 onBecameVisible bc item@(SingleWorkflowNode (EntityData {_children})) parents = do
-  -- After fetching, start health checks for any running workflows
-  liftIO (startWorkflowHealthCheckIfNeeded bc item (SomeNode item :| toList parents)) >>= \case
-    Just x -> pure x
-    Nothing -> liftIO $ async (return ())
+  -- After fetching, make sure the repo's workflow run poller is watching any running workflows
+  liftIO $ startWorkflowHealthCheckIfNeeded bc item (SomeNode item :| toList parents)
+  liftIO $ async (return ())
 onBecameVisible _ _ _ = liftIO $ async (return ())
 
 fetchOnOpen :: (MonadIO m) => BaseContext -> Node Variable a -> NonEmpty (SomeNode Variable) -> m (Async ())
@@ -167,7 +166,7 @@ fetchOnOpen bc item@(SingleWorkflowNode (EntityData {_static=workflowRun})) pare
     fetchWorkflowJobs owner name (workflowRunWorkflowRunId workflowRun) item >>= \case
       Left _err -> return ()
       Right jobs -> liftIO $ restartWorkflowHealthCheckIfJobsRunning bc item parents jobs
-    liftIO $ void $ startWorkflowHealthCheckIfNeeded bc item parents
+    liftIO $ startWorkflowHealthCheckIfNeeded bc item parents
 fetchOnOpen bc item@(SingleBranchNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =
   liftIO $ async $ liftIO $ runReaderT (fetchBranchCommits owner name item) bc
 fetchOnOpen bc item@(SingleBranchWithInfoNode _) (findRepoParent -> Just (RepoNode (EntityData {_static=(owner, name)}))) =

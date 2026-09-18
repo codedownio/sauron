@@ -14,7 +14,7 @@ import GitHub
 import Relude
 import Sauron.Fetch.Core
 import Sauron.HealthCheck.Stop (cancelGatheredHealthCheckThreads, swapChildrenClearingRemoved)
-import Sauron.HealthCheck.Workflow (startWorkflowHealthCheckForNode)
+import Sauron.HealthCheck.Workflow (ensureWorkflowRunPoller)
 import Sauron.Types
 
 fetchWorkflows :: (
@@ -46,13 +46,13 @@ fetchWorkflows owner name refreshRepoHealth (PaginatedWorkflowsNode (EntityData 
           Just (SingleWorkflowNode existingEd) ->
             return $ SingleWorkflowNode (existingEd { _static = workflow })
           Nothing ->
-            SingleWorkflowNode <$> makeEmptyElemWithState bc workflow (WorkflowNodeState NotFetched 1 SortJobsByFailures) "" (_depth + 1)
+            SingleWorkflowNode <$> makeEmptyElemWithState bc workflow (WorkflowNodeState NotFetched 1 SortJobsByFailures False) "" (_depth + 1)
 
       swapChildrenClearingRemoved _children newChildren
 
   cancelGatheredHealthCheckThreads bc removedThreads
 
-  -- Ensure every running/queued workflow has a health check thread, whether or not its node is
-  -- expanded. This runs on every fetch (initial open and periodic refresh), so newly-appeared or
-  -- newly-running workflows start getting polled too.
-  readTVarIO _children >>= mapM_ (liftIO . void . startWorkflowHealthCheckForNode bc owner name _children refreshRepoHealth)
+  -- Make sure the repo's run poller is going if anything in the list is running or queued, whether
+  -- or not its node is expanded. This runs on every fetch (initial open and periodic refresh), so a
+  -- newly-appeared or newly-running workflow gets picked up too.
+  liftIO $ ensureWorkflowRunPoller bc owner name _healthCheckThread _children refreshRepoHealth

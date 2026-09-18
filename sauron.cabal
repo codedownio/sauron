@@ -58,6 +58,7 @@ executable sauron
       Sauron.Fix
       Sauron.GraphQL
       Sauron.GraphQL.PullRequestFiles
+      Sauron.GraphQL.WorkflowRuns
       Sauron.HealthCheck.Common
       Sauron.HealthCheck.Job
       Sauron.HealthCheck.Notification
