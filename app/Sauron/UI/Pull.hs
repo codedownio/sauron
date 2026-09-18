@@ -33,7 +33,7 @@ import Sauron.Fetch.Pull (fetchPullComments)
 import Sauron.HealthCheck.Stop (healthCheckIndicatorWidget)
 import Sauron.Types
 import Sauron.UI.AttrMap
-import Sauron.UI.Issue (issueInner, renderTimelineItem, closeReopenAndRefresh, consolidateEvents, detailsToggleWidget, nodeButtonsWidget, actionButtonWidget)
+import Sauron.UI.Issue (issueInner, renderTimelineItem, closeReopenAndRefresh, consolidateEvents, detailsToggleWidget, nodeButtonsWidget, actionButtonWidget, subjectTimeAgoWidget)
 import Sauron.UI.Issue.Events (adaptiveWidth)
 import Sauron.UI.Keys
 import Sauron.UI.Statuses (fetchableQuarterCircleSpinner, statusToIconAnimated)
@@ -45,6 +45,7 @@ import UnliftIO.Async (Async, async)
 instance ListDrawable Fixed 'SinglePullT where
   drawLine appState (EntityData {_static=issue, ..}) =
     pullLine (_appNow appState) _toggled issue (_appAnimationCounter appState) (pullNodeStateTimeline _state)
+      (pullHeadBranch (pullNodeStateDetails _state))
 
   drawInner appState (EntityData {_static=issue, _state, _ident, ..}) = do
     guard _toggled
@@ -245,8 +246,13 @@ checkRunWorkflowStatus (CheckRun {checkRunStatus, checkRunConclusion}) = case ch
     Just CheckRunStale -> WorkflowNeutral
     Nothing -> WorkflowUnknown
 
-pullLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable a -> Widget n
-pullLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
+-- | The head branch of a PR, which is only known once its details have been fetched.
+pullHeadBranch :: Fetchable PullRequest -> Maybe Text
+pullHeadBranch = fmap (pullRequestCommitRef . pullRequestHead) . fetchableCurrent
+
+pullLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable a -> Maybe Text -> Widget n
+pullLine now toggled' issue@(Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState maybeBranch =
+  twoLineNodeWithTrailer titleLine emptyWidget detailLine (subjectTimeAgoWidget now issue)
   where
     pullSubjectState
       | issueState == StateOpen && issueDraft == Just True = PullDraft
@@ -254,20 +260,24 @@ pullLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCo
       | isJust (issuePullRequest >>= pullRequestReferenceMergedAt) = PullMerged
       | otherwise = PullClosed
     (icon, markerAttr) = subjectStateIcon pullSubjectState
-    line1 = hBox [
+
+    titleLine = hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr markerAttr $ str (icon <> "  ")
       , withAttr normalAttr $ str $ toString issueTitle
       , fetchableQuarterCircleSpinner animationCounter fetchableState
-      , padLeft Max $ str "" -- (if pullComments > 0 then [i|🗨  #{pullComments}|] else "")
       ]
 
-    line2 = padRight Max $ padLeft (Pad 4) $ hBox [
+    detailLine = padLeft (Pad 4) $ hBox $ [
       withAttr hashAttr $ str "#"
       , withAttr hashNumberAttr $ str $ show number
-      , str [i| opened #{timeFromNow (diffUTCTime now issueCreatedAt)} by |]
+      , str " by "
       , withAttr usernameAttr $ str $ [i|#{untagName $ simpleUserLogin issueUser}|]
-      ]
+      ] <> branchPart
+
+    branchPart = case maybeBranch of
+      Nothing -> []
+      Just branch -> [str " on ", withAttr branchAttr $ str $ toString branch]
 
 pullInner :: DetailsExpanded -> UTCTime -> Issue -> Text -> Fetchable (V.Vector TimelineEvent) -> Widget n
 pullInner detailsExpanded now (Issue {..}) body inner =

@@ -71,3 +71,33 @@ isFetchingOrFetched :: Fetchable a -> Bool
 isFetchingOrFetched (Fetched _) = True
 isFetchingOrFetched (Fetching _) = True
 isFetchingOrFetched _ = False
+
+
+-- | Draw one of the two-line node rows, with @trailer@ (a time-ago widget) floating at the
+-- right edge of the title line when it fits there alongside @titleRight@, and dropping down
+-- to the right edge of the detail line when the title is too long to share its line.
+twoLineNodeWithTrailer :: Widget n -> Widget n -> Widget n -> Widget n -> Widget n
+twoLineNodeWithTrailer title titleRight details trailer = Widget Greedy Fixed $ do
+  ctx <- getContext
+
+  titleResult <- render title
+  titleRightResult <- render titleRight
+  trailerResult <- render trailer
+
+  let widthOf = imageWidth . image
+      -- Reuse the measured images rather than rendering the widgets a second time
+      reuse result = Widget Fixed Fixed (return result)
+
+      -- No separator when there's nothing on the right of the title line to separate from
+      innerGap = if widthOf titleRightResult == 0 then 0 else 2
+      rightGroupWidth = widthOf titleRightResult + innerGap + widthOf trailerResult
+      fitsOnTitleLine = widthOf titleResult + 2 + rightGroupWidth <= ctx ^. availWidthL
+
+      rightGroup = hBox [reuse titleRightResult, padLeft (Pad innerGap) (reuse trailerResult)]
+
+  render $ vBox [
+    hBox [reuse titleResult, padLeft Max (if fitsOnTitleLine then rightGroup else reuse titleRightResult)]
+    , if fitsOnTitleLine
+        then padRight Max details
+        else hBox [details, padLeft Max (reuse trailerResult)]
+    ]

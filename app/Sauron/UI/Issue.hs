@@ -30,6 +30,9 @@ module Sauron.UI.Issue (
 
   -- Details toggle widget
   , detailsToggleWidget
+
+  -- Time-ago trailer shared with Pull.hs
+  , subjectTimeAgoWidget
   ) where
 
 import Brick
@@ -133,23 +136,39 @@ instance ListDrawable Fixed 'SingleIssueT where
   handleHotkey _ _ _ = return False
 
 issueLine :: UTCTime -> Bool -> Issue -> Int -> Fetchable (V.Vector TimelineEvent) -> Widget n
-issueLine now toggled' (Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState = vBox [line1, line2]
+issueLine now toggled' issue@(Issue {issueNumber=(IssueNumber number), ..}) animationCounter fetchableState =
+  twoLineNodeWithTrailer titleLine commentsWidget detailLine (subjectTimeAgoWidget now issue)
   where
     (icon, markerAttr) = subjectStateIcon (if issueState == StateOpen then IssueOpen else IssueClosed)
-    line1 = hBox [
+
+    titleLine = hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr markerAttr $ str (icon <> "  ")
       , withAttr normalAttr $ str $ toString issueTitle
       , fetchableQuarterCircleSpinner animationCounter fetchableState
-      , padLeft Max $ str (if issueComments > 0 then [i|🗨  #{issueComments}|] else "")
       ]
 
-    line2 = padRight Max $ padLeft (Pad 4) $ hBox [
+    commentsWidget
+      | issueComments > 0 = str [i|🗨  #{issueComments}|]
+      | otherwise = emptyWidget
+
+    detailLine = padLeft (Pad 4) $ hBox [
       withAttr hashAttr $ str "#"
       , withAttr hashNumberAttr $ str $ show number
-      , str [i| opened #{timeFromNow (diffUTCTime now issueCreatedAt)} by |]
+      , str " by "
       , withAttr usernameAttr $ str [i|#{untagName $ simpleUserLogin issueUser}|]
       ]
+
+-- | The time-ago trailer for an issue or PR row. Like the web UI, this reports whichever
+-- moment the subject is currently at: when it was merged, when it was closed, or, for
+-- something still open, when it was opened.
+subjectTimeAgoWidget :: UTCTime -> Issue -> Widget n
+subjectTimeAgoWidget now (Issue {..})
+  | Just mergedAt <- issuePullRequest >>= pullRequestReferenceMergedAt = ago "merged" mergedAt
+  | issueState == StateClosed = ago "closed" (fromMaybe issueUpdatedAt issueClosedAt)
+  | otherwise = ago "opened" issueCreatedAt
+  where
+    ago verb t = str [i|#{verb :: Text} #{timeFromNow (diffUTCTime now t)}|]
 
 issueInner :: DetailsExpanded -> UTCTime -> Issue -> V.Vector TimelineEvent -> Widget n
 -- issueInner detailsExpanded now issue body cs = vBox [strWrap (show issue), strWrap (show body), strWrap (show cs)]
