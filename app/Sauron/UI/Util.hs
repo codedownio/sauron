@@ -100,8 +100,8 @@ twoLineNodeWithTrailer title titleRight details trailer = Widget Greedy Fixed $ 
       rightGroup = hBox [reuse titleRightResult, padLeft (Pad innerGap) (reuse trailerResult)]
 
   render $ vBox [
-    hBox [reuse titleResult, padLeft Max (if fitsOnTitleLine then rightGroup else reuse titleRightResult)]
-    , if fitsOnTitleLine
-        then padRight Max details
+    padRight Max $ hBox [reuse titleResult, padLeft Max (if fitsOnTitleLine then rightGroup else reuse titleRightResult)]
+    , padRight Max $ if fitsOnTitleLine
+        then details
         else hBox [details, padLeft Max (reuse trailerResult)]
     ]

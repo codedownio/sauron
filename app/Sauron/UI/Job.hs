@@ -159,7 +159,10 @@ jobLogGroupInner scrollTarget logGroups = vBox $ applyVisible $ concatMap render
 jobLine :: Int -> UTCTime -> Bool -> Job -> Fetchable a -> Maybe NominalDiffTime -> Maybe (Async (), Int) -> Widget n
 jobLine animationCounter now toggled' (Job {..}) fetchableState maxSibDuration healthCheckThreadData = vBox [line1, line2]
   where
-    line1 = hBox [
+    -- padRight Max rather than relying on the duration to push out to the edge: a queued job has
+    -- no duration, and padding against a zero-height widget leaves the row short of the right
+    -- margin, which shows up as a selection box that doesn't reach the end of the line.
+    line1 = padRight Max $ hBox [
       withAttr openMarkerAttr $ str (if toggled' then "[-] " else "[+] ")
       , withAttr normalAttr $ str $ toString $ untagName jobName
       , padLeft (Pad 1) $ statusToIconAnimated animationCounter $ chooseWorkflowStatus $ fromMaybe jobStatus jobConclusion
