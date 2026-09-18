@@ -126,7 +126,7 @@ ensureWorkflowRunPoller baseContext owner name pollerVar workflowsChildren refre
 
       statuses <- case auth baseContext of
         -- Without an OAuth token there's no GraphQL, so every run falls through to REST below
-        OAuth _ -> queryWorkflowRunStatuses baseContext owner name [workflowRunHeadSha wf | SingleWorkflowNode (EntityData {_static=wf}) <- runningNodes] >>= \case
+        OAuth _ -> queryWorkflowRunStatuses baseContext owner name [(untagId (workflowRunWorkflowRunId wf), workflowRunHeadSha wf) | SingleWorkflowNode (EntityData {_static=wf}) <- runningNodes] >>= \case
           Right statuses -> return statuses
           Left err -> do
             warn' baseContext [i|(#{untagName owner}/#{untagName name}) Couldn't fetch workflow run statuses: #{err}|]

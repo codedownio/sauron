@@ -17,12 +17,13 @@ import Data.Aeson
 import Data.Aeson.Types (Parser, parseEither)
 import Data.String.Interpolate
 import qualified Data.Text as T
-import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime)
+import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (parseTimeM, defaultTimeLocale)
 import Network.HTTP.Conduit (responseTimeoutMicro)
 import Network.HTTP.Simple
 import GitHub.Auth (Auth(..))
 import Relude
+import Sauron.Logging
 import Sauron.Types hiding (PageInfo)
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -221,9 +222,10 @@ instance ToJSON GraphQLRequest
 
 
 queryBranchesWithInfos :: (
-  MonadIO m
-  ) => (Text -> IO ()) -> Text -> Text -> Text -> Maybe Text -> Int -> m (Either Text [BranchWithInfo])
-queryBranchesWithInfos debugFn authToken owner' repoName repoDefaultBranch first' = liftIO $ do
+  HasCallStack, MonadIO m
+  ) => BaseContext -> Text -> Text -> Text -> Maybe Text -> Int -> m (Either Text [BranchWithInfo])
+queryBranchesWithInfos bc authToken owner' repoName repoDefaultBranch first' = liftIO $ do
+  let debugFn = debug' bc
   debugFn $ "GraphQL query for " <> owner' <> "/" <> repoName <> " (first " <> show first' <> ")"
 
   let defaultBranch = fromMaybe "main" repoDefaultBranch
@@ -232,6 +234,7 @@ queryBranchesWithInfos debugFn authToken owner' repoName repoDefaultBranch first
         , variables = BranchVariables owner' repoName first' defaultBranch
         }
 
+  startTime <- getCurrentTime
   result :: Either SomeException BranchResponse <- try $ do
     initialRequest <- parseRequest githubGraphQLEndpoint
     let httpRequest = initialRequest
@@ -243,6 +246,13 @@ queryBranchesWithInfos debugFn authToken owner' repoName repoDefaultBranch first
                     & setRequestMethod "POST"
 
     getResponseBody <$> httpJSON httpRequest
+  endTime <- getCurrentTime
+
+  -- Same log line the other GraphQL queries get, so the pane shows this one too
+  let logged = case result of
+        Left (ex :: SomeException) -> Left (show ex)
+        Right _ -> Right ()
+  logGraphQLResult bc [i|#{owner'}/#{repoName}|] getBranchesQuery logged (diffUTCTime endTime startTime)
 
   case result of
     Left (ex :: SomeException) -> do
@@ -351,9 +361,10 @@ filterBranchesByInactivity daysCutoff branches = unsafePerformIO $ do
 
 
 -- | Run a GraphQL query/mutation against GitHub and return the "data" value.
-runGraphQL :: MonadIO m => BaseContext -> Text -> Value -> m (Either Text Value)
-runGraphQL bc queryText variables = liftIO $ case auth bc of
+runGraphQL :: (HasCallStack, MonadIO m) => BaseContext -> Text -> Text -> Value -> m (Either Text Value)
+runGraphQL bc detail queryText variables = liftIO $ case auth bc of
   OAuth token -> do
+    startTime <- getCurrentTime
     result <- try $ do
       initialRequest <- parseRequest githubGraphQLEndpoint
       let httpRequest = initialRequest
@@ -364,11 +375,16 @@ runGraphQL bc queryText variables = liftIO $ case auth bc of
                       & setRequestHeader "Authorization" ["Bearer " <> token]
                       & setRequestMethod "POST"
       getResponseBody <$> httpJSON httpRequest
-    return $ case result of
-      Left (ex :: SomeException) -> Left [i|GraphQL request failed: #{ex}|]
-      Right body -> case parseEither parseResponse body of
-        Left err -> Left $ toText err
-        Right x -> x
+    endTime <- getCurrentTime
+
+    let outcome = case result of
+          Left (ex :: SomeException) -> Left [i|GraphQL request failed: #{ex}|]
+          Right body -> case parseEither parseResponse body of
+            Left err -> Left $ toText err
+            Right x -> x
+
+    logGraphQLResult bc detail queryText outcome (diffUTCTime endTime startTime)
+    return outcome
   _ -> return $ Left "GraphQL requires an OAuth token"
   where
     parseResponse :: Value -> Parser (Either Text Value)
@@ -381,3 +397,20 @@ runGraphQL bc queryText variables = liftIO $ case auth bc of
           return $ Left $ unwords messages
         (_, Just d) -> return $ Right d
         _ -> return $ Left "No data returned from GitHub"
+
+-- | Put a GraphQL request in the log pane alongside the REST ones, which are logged from
+-- 'Sauron.Actions.Util.githubWithLogging'.
+logGraphQLResult :: (HasCallStack, MonadIO m) => BaseContext -> Text -> Text -> Either Text a -> NominalDiffTime -> m ()
+logGraphQLResult bc detail queryText outcome duration = log bc level msg (Just duration)
+  where
+    operation = "/graphql " <> graphQLOperationName queryText <> (if T.null detail then "" else " " <> detail)
+    (level, msg) = case outcome of
+      Left err -> (LevelError, "Failed: " <> operation <> " - " <> err)
+      Right _ -> (LevelInfo, operation)
+
+-- | The operation name out of a query document, so log lines say which query ran:
+-- @query WorkflowRunStatuses($owner: String!, ...)@ becomes @WorkflowRunStatuses@.
+graphQLOperationName :: Text -> Text
+graphQLOperationName queryText = case T.words (T.map (\c -> if c `elem` ("({" :: String) then ' ' else c) queryText) of
+  (keyword:name:_) | keyword `elem` ["query", "mutation", "subscription"] -> name
+  _ -> "query"

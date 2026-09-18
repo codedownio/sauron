@@ -47,7 +47,7 @@ queryPullRequestViewedStates :: (
 queryPullRequestViewedStates bc owner name number = go Nothing mempty
   where
     go cursor acc =
-      runGraphQL bc viewedStatesQuery (object [
+      runGraphQL bc [i|\##{number}|] viewedStatesQuery (object [
         "owner" .= toPathPart owner
         , "name" .= toPathPart name
         , "number" .= number
@@ -89,7 +89,7 @@ setFileViewedState :: (
   MonadIO m
   ) => BaseContext -> Text -> Text -> Bool -> m (Either Text ())
 setFileViewedState bc prId path viewed =
-  fmap void $ runGraphQL bc mutation $ object ["prId" .= prId, "path" .= path]
+  fmap void $ runGraphQL bc path mutation $ object ["prId" .= prId, "path" .= path]
   where
     mutationField :: Text
     mutationField = if viewed then "markFileAsViewed" else "unmarkFileAsViewed"

@@ -48,16 +48,25 @@ data JobStatus = JobStatus {
 -- not "finished" -- the caller falls back to REST for those.
 queryWorkflowRunStatuses :: (
   MonadIO m
-  ) => BaseContext -> Name Owner -> Name Repo -> [Text] -> m (Either Text (Map Int RunStatus))
-queryWorkflowRunStatuses bc owner name shas = case mapMaybe sanitizeSha (ordNub shas) of
+  ) => BaseContext -> Name Owner -> Name Repo -> [(Int, Text)] -> m (Either Text (Map Int RunStatus))
+queryWorkflowRunStatuses bc owner name runs = case mapMaybe sanitizeSha (ordNub (map snd runs)) of
   [] -> return (Right mempty)
   validShas ->
-    runGraphQL bc (statusesQuery validShas) (object [
+    runGraphQL bc (describeRuns (map fst runs)) (statusesQuery validShas) (object [
       "owner" .= toPathPart owner
       , "name" .= toPathPart name
       ]) >>= \case
       Left err -> return (Left err)
       Right value -> return $ first toText $ parseEither parseRunStatuses value
+
+-- | The runs a batch query covered, for its line in the log pane. One query stands in for what
+-- used to be a request per run, so the line says which ones -- capped, since there can be a lot.
+describeRuns :: [Int] -> Text
+describeRuns runIds = "runs " <> T.intercalate ", " (map show shown) <> (if null rest then "" else ", ...")
+  where (shown, rest) = splitAt maxRunIdsLogged runIds
+
+maxRunIdsLogged :: Int
+maxRunIdsLogged = 10
 
 -- | Commit ids go into the query text rather than into variables, since GraphQL aliases can't be
 -- parameterized. Only hex passes, so nothing from the API can escape the string it's spliced into.

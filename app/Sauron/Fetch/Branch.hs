@@ -85,7 +85,7 @@ fetchBranchesWithFilter owner name repoDefaultBranch stateVar childrenVar depth'
 
           -- Fetch branches with commit info using GraphQL
           result <- withLogToModal bc LevelInfo (logPrefix <> ": Querying GraphQL for " <> toPathPart owner <> "/" <> toPathPart name) $
-            GraphQL.queryBranchesWithInfos (debug' bc) authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
+            GraphQL.queryBranchesWithInfos bc authToken (toPathPart owner) (toPathPart name) repoDefaultBranch branchesToFetch
           case result of
             Left err -> atomically $ do
               (s, p, _) <- readTVar stateVar
