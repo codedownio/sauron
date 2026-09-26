@@ -114,6 +114,7 @@ executable sauron
       Sauron.UI.Repo
       Sauron.UI.Search
       Sauron.UI.Statuses
+      Sauron.UI.Syntax
       Sauron.UI.TimelineBorder
       Sauron.UI.Toast
       Sauron.UI.TopBox

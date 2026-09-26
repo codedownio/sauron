@@ -18,7 +18,7 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Markdown.Html (preprocessHtml)
 import Sauron.UI.Markdown.Table
 import Sauron.UI.Markdown.Wrapping (FootnoteM, renderWrappedParagraphM)
-import qualified Skylighting as Sky
+import Sauron.UI.Syntax
 import qualified Skylighting.Core as SkyCore
 import qualified Text.Pandoc.Builder as B
 
@@ -181,7 +181,7 @@ renderHighlightedCodeBlock _width classes codeContent = fromMaybe (withAttr code
   lang <- case classes of
     [] -> Nothing
     (x:_) -> Just x
-  syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap
-  case SkyCore.tokenize (SkyCore.TokenizerConfig Sky.defaultSyntaxMap False) syntax codeContent of
+  syntax <- syntaxForLanguage lang
+  case SkyCore.tokenize (SkyCore.TokenizerConfig syntaxMap False) syntax codeContent of
     Left _ -> Nothing
     Right xs -> Just $ renderRawSource txt xs

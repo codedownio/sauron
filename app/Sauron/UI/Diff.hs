@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import GitHub
 import Relude
 import Sauron.UI.AttrMap
-import qualified Skylighting as Sky
+import Sauron.UI.Syntax
 import qualified Skylighting.Core as SkyCore
 
 
@@ -73,9 +73,9 @@ renderPatch filename patch = vBox $ map renderPatchLine (T.lines patch)
 
 renderSyntaxHighlightedLine :: Text -> Text -> Widget n
 renderSyntaxHighlightedLine filename lineContent =
-  case listToMaybe $ Sky.syntaxesByFilename Sky.defaultSyntaxMap (toString filename) of
+  case syntaxForFilename filename of
     Nothing -> str $ toString lineContent
     Just syntax ->
-      case SkyCore.tokenize (SkyCore.TokenizerConfig Sky.defaultSyntaxMap False) syntax lineContent of
+      case SkyCore.tokenize (SkyCore.TokenizerConfig syntaxMap False) syntax lineContent of
         Left _ -> str $ toString lineContent
         Right tokens -> renderRawSource txt tokens
