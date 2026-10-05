@@ -26,6 +26,7 @@ import Relude
 import Sauron.Actions (openBrowserToUrl, refreshLine)
 import Sauron.Actions.Util (findRepoParent, findWorkflowsParent, findWorkflowParent)
 import Sauron.Event.Helpers (withFixedElemAndParents, getFixedElemAndParents, withRepoParent)
+import Sauron.Event.PullModal (openPullModalForNumber)
 import Sauron.Mutations.Workflow (cancelWorkflowRun, rerunWorkflowRun, rerunFailedJobs)
 import Sauron.Types
 import Sauron.UI.AttrMap
@@ -53,7 +54,7 @@ instance ListDrawable Fixed 'SingleWorkflowT where
   getExtraTopBoxWidgets _app (EntityData {_static=wf, _state}) = concat [
     [workflowHotkeyWidget cancelWorkflowKey "Cancel workflow" | isNothing (workflowRunConclusion wf)]
     , [retryJobsWidget wf | isJust (workflowRunConclusion wf)]
-    , [workflowHotkeyWidget openPullKey "Open PR" | not (Vec.null (workflowRunPullRequests wf))]
+    , [pullRequestHotkeyWidget | not (Vec.null (workflowRunPullRequests wf))]
     , [sortJobsByWidget _state]
     ]
 
@@ -68,6 +69,12 @@ instance ListDrawable Fixed 'SingleWorkflowT where
         withRepoParent s $ \(Repo {repoHtmlUrl=(URL url)}) ->
           openBrowserToUrl (toString url <> "/pull/" <> show (workflowRunPullRequestNumber pr))
         return True
+    | key `elem` [zoomModalKey, reviewKey], (pr:_) <- toList (workflowRunPullRequests wf) = do
+        withFixedElemAndParents s $ \_ _ parents ->
+          whenJust (findRepoParent parents) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
+            openPullModalForNumber s (if key == reviewKey then TabReview else TabConversation)
+              (toList parents) owner name (IssueNumber (workflowRunPullRequestNumber pr))
+        return True
     | key `elem` [sortJobsByNameKey, sortJobsByRuntimeKey, sortJobsByFailuresKey] = handleWorkflowSortKey s key
     | key `elem` [nextPageKey, prevPageKey, firstPageKey, lastPageKey] = handleWorkflowJobPageKey s key
   handleHotkey _ _ _ = return False
@@ -79,6 +86,15 @@ workflowHotkeyWidget key msg = hBox [
   , str "] "
   , withAttr hotkeyMessageAttr $ str msg
   ]
+
+-- | The "[O/z/v] Open/Zoom/Review PR" row, giving a workflow run's PR the same options the PR
+-- node itself has.
+pullRequestHotkeyWidget :: Widget n
+pullRequestHotkeyWidget = hBox $ [str "["]
+  <> intersperse (str "/") [withAttr hotkeyAttr $ str $ showKey key | key <- [openPullKey, zoomModalKey, reviewKey]]
+  <> [str "] "]
+  <> intersperse (str "/") [withAttr hotkeyMessageAttr $ str label | label <- ["Open", "Zoom", "Review"]]
+  <> [withAttr hotkeyMessageAttr $ str " PR"]
 
 -- | The "[e/E] Retry failed/all jobs" row. The "failed" half is dimmed when the run has no
 -- failures to retry.

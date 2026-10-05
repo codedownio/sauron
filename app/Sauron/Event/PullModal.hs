@@ -5,6 +5,7 @@
 module Sauron.Event.PullModal (
   handlePullModalKey
   , openPullModalOnTab
+  , openPullModalForNumber
   , switchPullModalTab
   , fileViewedState
   , zoomedPullNode
@@ -20,9 +21,10 @@ import qualified Graphics.Vty as Vty
 import Lens.Micro
 import Relude hiding (Down)
 import Sauron.Actions (refreshOnZoom)
-import Sauron.Actions.Util (findRepoParent)
+import Sauron.Actions.Util (findRepoParent, githubWithLogging, withGithubApiSemaphore)
 import Sauron.Event.Helpers (modifyPullModal, withFixedElemAndParents)
-import Sauron.Fetch.Pull (fetchPullCommitDetail, fetchPullCommits, fetchPullFiles)
+import Sauron.Fetch.Core (makeEmptyElemWithState)
+import Sauron.Fetch.Pull (fetchPullCommitDetail, fetchPullComments, fetchPullCommits, fetchPullDetailsAndChecks, fetchPullFiles)
 import Sauron.GraphQL.PullRequestFiles (setFileViewedState)
 import Sauron.Types
 import Sauron.UI.Toast (showToast)
@@ -54,6 +56,21 @@ openPullModalOnTab s tab = do
     _ -> return ()
   startTabFetch s tab
 
+-- | Open the modal on a pull request that isn't itself a node in the tree -- the PR attached to
+-- a workflow run, or to a branch. Fetches the issue in the background and builds a node for it.
+openPullModalForNumber :: MonadIO m => AppState -> PullModalTab -> [SomeNode Variable] -> Name Owner -> Name Repo -> IssueNumber -> m ()
+openPullModalForNumber s tab parents owner name number@(IssueNumber n) =
+  liftIO $ void $ async $ flip runReaderT (s ^. appBaseContext) $
+    withGithubApiSemaphore (githubWithLogging (issueR owner name number)) >>= \case
+      Left _err -> return ()
+      Right issue -> do
+        ed <- atomically $ makeEmptyElemWithState (s ^. appBaseContext) issue emptyPullNodeState ("/pull/" <> show n) 0
+        atomically $ writeTVar (_appModalVariable s) $
+          Just (newPullRequestModalState tab (SinglePullNode ed) parents)
+        startTabFetch s tab
+        void $ concurrently (fetchPullComments owner name number (_state ed))
+                            (fetchPullDetailsAndChecks owner name number (_state ed))
+
 -- | Show a tab, kicking off its fetch the first time it's opened
 switchPullModalTab :: AppState -> PullModalTab -> EventM ClickableName AppState ()
 switchPullModalTab s tab = do
@@ -62,7 +79,7 @@ switchPullModalTab s tab = do
   startTabFetch s tab
 
 -- | Kick off a tab's fetch if it hasn't been fetched yet
-startTabFetch :: AppState -> PullModalTab -> EventM ClickableName AppState ()
+startTabFetch :: MonadIO m => AppState -> PullModalTab -> m ()
 startTabFetch s tab =
   liftIO (zoomedPullNode s) >>= \case
     Nothing -> return ()
