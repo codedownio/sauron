@@ -12,7 +12,6 @@ import Data.Aeson.Types (Parser, parseEither)
 import qualified Data.Map as M
 import Data.String.Interpolate
 import GitHub (Name, Owner, Repo, toPathPart)
-import GitHub.Auth (Auth(..))
 import Relude
 import Sauron.GraphQL (runGraphQL)
 import Sauron.Types

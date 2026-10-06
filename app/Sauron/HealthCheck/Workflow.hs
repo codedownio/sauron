@@ -194,8 +194,8 @@ ensureWorkflowRunPoller baseContext owner name pollerVar workflowsChildren refre
           return Nothing
 
     clearWatchedMarkers self = atomically $ do
-      children <- readTVar workflowsChildren
-      forM_ (pollerVar : [v | SingleWorkflowNode (EntityData {_healthCheckThread=v}) <- children]) $ \var ->
+      workflowNodes <- readTVar workflowsChildren
+      forM_ (pollerVar : [v | SingleWorkflowNode (EntityData {_healthCheckThread=v}) <- workflowNodes]) $ \var ->
         readTVar var >>= \case
           Just (thread, _) | asyncThreadId thread == asyncThreadId self -> writeTVar var Nothing
           _ -> return ()

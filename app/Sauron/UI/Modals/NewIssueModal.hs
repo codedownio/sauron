@@ -14,8 +14,7 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue.Events (maxCommentWidth)
 import Sauron.UI.Modals.Common (renderBodyEditor)
-import WEditorBrick.WrappingEditor (WrappingEditor, dumpEditor)
-import qualified WEditorBrick.WrappingEditor as WEditorBrick
+import WEditorBrick.WrappingEditor (dumpEditor)
 
 
 renderNewIssueModal :: AppState -> ModalState Fixed -> Widget ClickableName

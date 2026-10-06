@@ -22,7 +22,6 @@ import GitHub
 import GitHub.Data.Name
 import Lens.Micro
 import Relude
-import Sauron.Actions (refreshOnZoom)
 import Sauron.Actions.Util (findRepoParent, findPullsParent)
 import Sauron.Event.CommentModal (openZoomAndComment)
 import Sauron.Event.Helpers (withFixedElemAndParents)
