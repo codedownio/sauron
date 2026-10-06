@@ -15,8 +15,8 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Modals.Common (modalWidth)
 
 
-renderMergeModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderMergeModal app (MergeModalState {_mergeIssue=(Issue {issueNumber=(IssueNumber number), issueTitle}), ..}) =
+renderMergeModal :: AppState -> MergeModal -> Widget ClickableName
+renderMergeModal app (MergeModal {_mergeIssue=(Issue {issueNumber=(IssueNumber number), issueTitle}), ..}) =
   vBox [
     hCenter $ withAttr boldText $ str headerText
     , hCenter $ withAttr italicText $ txt issueTitle
@@ -74,7 +74,6 @@ renderMergeModal app (MergeModalState {_mergeIssue=(Issue {issueNumber=(IssueNum
       withAttr (if _mergeFocus == focus then boldText else italicText) $ str label
       , withAttr italicText $ str "  (empty uses GitHub's default)"
       ]
-renderMergeModal _ _ = str "Invalid modal state for MergeModal"
 
 methodName :: MergeMethod -> String
 methodName MergeMethodMerge = "Create a merge commit"

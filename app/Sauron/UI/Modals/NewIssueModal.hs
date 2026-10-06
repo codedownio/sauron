@@ -17,8 +17,8 @@ import Sauron.UI.Modals.Common (renderBodyEditor)
 import WEditorBrick.WrappingEditor (dumpEditor)
 
 
-renderNewIssueModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderNewIssueModal app (NewIssueModalState {..}) =
+renderNewIssueModal :: AppState -> NewIssueModal -> Widget ClickableName
+renderNewIssueModal app (NewIssueModal {..}) =
   vBox [
     hCenter $ withAttr boldText $ str [i|New Issue on #{untagName _newIssueRepoOwner}/#{untagName _newIssueRepoName}|]
 
@@ -51,7 +51,6 @@ renderNewIssueModal app (NewIssueModalState {..}) =
 
     bodyLineCount = length (dumpEditor _newIssueBodyEditor)
     editorLines = max 10 (min bodyLineCount 30)
-renderNewIssueModal _ _ = str "Invalid modal state for NewIssueModal"
 
 newIssueButtonSection :: Editor Text ClickableName -> SubmissionState -> Widget ClickableName
 newIssueButtonSection titleEditor submissionState' =

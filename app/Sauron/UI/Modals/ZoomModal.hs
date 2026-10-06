@@ -24,8 +24,8 @@ import Sauron.UI.Modals.NodeContent (renderNodeContent)
 import WEditorBrick.WrappingEditor (dumpEditor)
 
 
-renderZoomModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModalCommentMode=commentMode}) =
+renderZoomModal :: AppState -> ZoomModal Fixed -> Widget ClickableName
+renderZoomModal appState (ZoomModal {_zoomModalSomeNode=someNode, _zoomModalCommentMode=commentMode}) =
   vBox ([
     hCenter $ withAttr boldText $ str (generateModalTitle someNode)
     , hBorder
@@ -49,7 +49,6 @@ renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModa
     footerHotkeys = case commentMode of
       Just cm -> commentModeHotkeys cm
       Nothing -> getZoomModalHotkeys someNode
-renderZoomModal _ _ = str "Invalid modal state" -- This should never happen
 
 -- | The comment editor, when comment mode is on. Issue and pull request content
 -- renders its own comment box above the action buttons, so this is only for nodes
@@ -65,7 +64,7 @@ commentSection appState = \case
     editorLines editor = max 5 (min (length (dumpEditor editor)) 20)
 
     contentHasBox commentIssue = case _appModal appState of
-      Just (ZoomModalState {_zoomModalSomeNode=SomeNode (SingleIssueNode (EntityData {_static=issue}))}) ->
+      Just (ZoomModalState (ZoomModal {_zoomModalSomeNode=SomeNode (SingleIssueNode (EntityData {_static=issue}))})) ->
         issueId issue == issueId commentIssue
       Just (PullRequestModalState {}) -> True
       _ -> False

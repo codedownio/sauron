@@ -32,10 +32,10 @@ handleNewIssueModalEvent s (NewIssueCreated result) = case result of
       void $ refreshSelected (s ^. appBaseContext) el parents
   Left _err -> do
     -- Reset submission state on error
-    modify (appModal . _Just . newIssueSubmissionState .~ NotSubmitting)
+    modify (appModal . _Just . newIssueModal . newIssueSubmissionState .~ NotSubmitting)
 
-submitNewIssue :: AppState -> ModalState Fixed -> IO ()
-submitNewIssue s (NewIssueModalState {..}) = do
+submitNewIssue :: AppState -> NewIssueModal -> IO ()
+submitNewIssue s (NewIssueModal {..}) = do
   let titleText = T.strip $ T.unlines $ getEditContents _newIssueTitleEditor
   unless (T.null titleText) $ do
     let bodyText = T.unlines $ map toText $ dumpEditor _newIssueBodyEditor
@@ -43,11 +43,10 @@ submitNewIssue s (NewIssueModalState {..}) = do
     void $ async $ do
       result <- Issue.createNewIssue baseContext _newIssueRepoOwner _newIssueRepoName titleText bodyText
       writeBChan (eventChan baseContext) (NewIssueModalEvent (NewIssueCreated result))
-submitNewIssue _ _ = return ()
 
 openNewIssueModal :: Name Owner -> Name Repo -> EventM ClickableName AppState ()
 openNewIssueModal owner name =
-  modify (appModal ?~ NewIssueModalState titleEditor bodyEditor owner name NotSubmitting True)
+  modify (appModal ?~ NewIssueModalState (NewIssueModal titleEditor bodyEditor owner name NotSubmitting True))
    where
      titleEditor = editorText NewIssueTitleEditor (Just 1) ""
      bodyEditor = newEditor (breakWords noHyphen) NewIssueBodyEditor []

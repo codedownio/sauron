@@ -18,33 +18,19 @@ import Sauron.Types
 
 
 fixModal :: ModalState Variable -> STM (ModalState Fixed)
-fixModal (NewIssueModalState {..}) = return $ NewIssueModalState {
-  _newIssueTitleEditor = _newIssueTitleEditor
-  , _newIssueBodyEditor = _newIssueBodyEditor
-  , _newIssueRepoOwner = _newIssueRepoOwner
-  , _newIssueRepoName = _newIssueRepoName
-  , _newIssueSubmissionState = _newIssueSubmissionState
-  , _newIssueFocusTitle = _newIssueFocusTitle
-  }
-fixModal (MergeModalState {..}) = return $ MergeModalState {
-  _mergeIssue = _mergeIssue
-  , _mergeRepoOwner = _mergeRepoOwner
-  , _mergeRepoName = _mergeRepoName
-  , _mergeMethod = _mergeMethod
-  , _mergeCommitTitleEditor = _mergeCommitTitleEditor
-  , _mergeCommitMessageEditor = _mergeCommitMessageEditor
-  , _mergeFocus = _mergeFocus
-  , _mergeSubmissionState = _mergeSubmissionState
-  }
-fixModal (ZoomModalState sn parents commentMode) = do
+-- These two hold no node-tree data, so there's nothing to project: the payload types
+-- aren't phase-parameterized and carry straight across
+fixModal (NewIssueModalState newIssue) = return $ NewIssueModalState newIssue
+fixModal (MergeModalState merge) = return $ MergeModalState merge
+fixModal (ZoomModalState (ZoomModal sn parents commentMode)) = do
   fixedNode <- fixSomeNode sn
   fixedParents <- mapM fixSomeNode parents
   -- The comment editor isn't derived from the node tree; it carries across as-is
-  return $ ZoomModalState fixedNode fixedParents commentMode
-fixModal (PullRequestModalState node parents commentMode tab file commit expanded) = do
+  return $ ZoomModalState (ZoomModal fixedNode fixedParents commentMode)
+fixModal (PullRequestModalState (PullModal node parents commentMode tab file commit expanded)) = do
   fixedNode <- fixNode node
   fixedParents <- mapM fixSomeNode parents
-  return $ PullRequestModalState fixedNode fixedParents commentMode tab file commit expanded
+  return $ PullRequestModalState (PullModal fixedNode fixedParents commentMode tab file commit expanded)
 fixModal HelpModalState = return HelpModalState
 
 fixSomeNode :: SomeNode Variable -> STM (SomeNode Fixed)

@@ -39,7 +39,7 @@ fileViewedState states file = fromMaybe FileUnviewed $ M.lookup (fileFilename fi
 zoomedPullNode :: AppState -> IO (Maybe (Node Variable 'SinglePullT, Name Owner, Name Repo))
 zoomedPullNode s =
   readTVarIO (_appModalVariable s) >>= \case
-    Just (PullRequestModalState {_pullModalNode=node, _pullModalParents=parents}) ->
+    Just (PullRequestModalState (PullModal {_pullModalNode=node, _pullModalParents=parents})) ->
       return $ case nonEmpty parents >>= findRepoParent of
         Just (RepoNode (EntityData {_static=(owner, name)})) -> Just (node, owner, name)
         Nothing -> Nothing
@@ -98,13 +98,13 @@ startTabFetch s tab =
         _ -> return ()
 
 -- | Handle a key in the pull request modal. Returns True if the key was consumed.
-handlePullModalKey :: AppState -> ModalState Fixed -> Vty.Key -> EventM ClickableName AppState Bool
-handlePullModalKey s modalState@(PullRequestModalState {_pullModalNode=SinglePullNode (EntityData {_state=nodeState})}) key
+handlePullModalKey :: AppState -> PullModal Fixed -> Vty.Key -> EventM ClickableName AppState Bool
+handlePullModalKey s pullState@(PullModal {_pullModalNode=SinglePullNode (EntityData {_state=nodeState})}) key
   -- Tab switching works from any tab
   | Just tab <- keyToTab key = True <$ switchPullModalTab s tab
   | key == Vty.KChar '\t' = True <$ switchPullModalTab s (cycleTab 1)
   | key == Vty.KBackTab = True <$ switchPullModalTab s (cycleTab (-1))
-  | otherwise = case _pullModalTab modalState of
+  | otherwise = case _pullModalTab pullState of
       TabReview -> handleReviewKey
       TabCommits -> handleCommitsKey
       _ -> return False
@@ -117,13 +117,13 @@ handlePullModalKey s modalState@(PullRequestModalState {_pullModalNode=SinglePul
 
     cycleTab delta =
       let tabs = [minBound .. maxBound]
-      in fromMaybe TabConversation $ tabs !!? ((fromEnum (_pullModalTab modalState) + delta) `mod` length tabs)
+      in fromMaybe TabConversation $ tabs !!? ((fromEnum (_pullModalTab pullState) + delta) `mod` length tabs)
 
     -- * Review tab
 
     files = fromMaybe mempty $ fetchableCurrent (pullNodeStateFiles nodeState)
     viewedStates = pullNodeStateViewedStates nodeState
-    currentFile = _pullModalCurrentFile modalState
+    currentFile = _pullModalCurrentFile pullState
     fileCount = V.length files
 
     handleReviewKey
@@ -179,7 +179,7 @@ handlePullModalKey s modalState@(PullRequestModalState {_pullModalNode=SinglePul
     -- * Commits tab
 
     commits = fromMaybe mempty $ fetchableCurrent (pullNodeStateCommits nodeState)
-    selectedCommit = _pullModalSelectedCommit modalState
+    selectedCommit = _pullModalSelectedCommit pullState
 
     handleCommitsKey
       | key == Vty.KUp = True <$ moveCommit (-1)
@@ -193,7 +193,7 @@ handlePullModalKey s modalState@(PullRequestModalState {_pullModalNode=SinglePul
     toggleSelectedCommit =
       whenJust (commits V.!? selectedCommit) $ \commit -> do
         let sha = untagName (commitSha commit)
-        if Set.member sha (_pullModalExpandedCommits modalState)
+        if Set.member sha (_pullModalExpandedCommits pullState)
           then modifyPullModal s (\m -> m { _pullModalExpandedCommits = Set.delete sha (_pullModalExpandedCommits m) })
           else do
             modifyPullModal s (\m -> m { _pullModalExpandedCommits = Set.insert sha (_pullModalExpandedCommits m) })
@@ -203,7 +203,6 @@ handlePullModalKey s modalState@(PullRequestModalState {_pullModalNode=SinglePul
                 | not (M.member sha (pullNodeStateCommitDetails nodeState)) ->
                     liftIO $ void $ async $ runReaderT (fetchPullCommitDetail owner name (commitSha commit) stateVar) (s ^. appBaseContext)
               _ -> return ()
-handlePullModalKey _ _ _ = return False
 
 warnToast :: BaseContext -> Text -> IO ()
 warnToast bc msg = writeBChan (eventChan bc) (ToastFired ToastError msg)

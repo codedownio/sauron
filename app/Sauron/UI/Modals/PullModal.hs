@@ -32,8 +32,8 @@ import Sauron.UI.Pull (checksWidget)
 
 -- | The whole pull request modal: title, tab bar, the selected tab's content, the
 -- comment editor when it's focused, and the footer.
-renderPullRequestModal :: AppState -> ModalState Fixed -> Widget ClickableName
-renderPullRequestModal appState modalState@(PullRequestModalState {
+renderPullRequestModal :: AppState -> PullModal Fixed -> Widget ClickableName
+renderPullRequestModal appState pullState@(PullModal {
   _pullModalNode=pullNode@(SinglePullNode (EntityData {_static=issue}))
   , _pullModalCommentMode=commentMode
   , _pullModalTab=currentTab
@@ -65,12 +65,11 @@ renderPullRequestModal appState modalState@(PullRequestModalState {
       TabConversation -> hCenter . hLimit maxCommentWidth
       _ -> padRight Max
 
-    tabContent = renderTab appState modalState pullNode (renderNodeContent appState (SomeNode pullNode))
+    tabContent = renderTab appState pullState pullNode (renderNodeContent appState (SomeNode pullNode))
 
     footerHotkeys = case commentMode of
       Just cm -> commentModeHotkeys cm
       Nothing -> [hotkeyWidget k m | (k, m) <- footerHotkeyPairs currentTab]
-renderPullRequestModal _ _ = str "Invalid modal state for PullModal"
 
 -- | The tab bar shown under the modal title
 renderTabBar :: PullModalTab -> Widget ClickableName
@@ -89,9 +88,9 @@ renderTabBar currentTab =
 
 -- | The content of the selected tab. The conversation tab's content comes from the
 -- node's own rendering, so it's passed in.
-renderTab :: AppState -> ModalState Fixed -> Node Fixed 'SinglePullT -> Widget ClickableName -> Widget ClickableName
-renderTab appState ui (SinglePullNode (EntityData {_state=nodeState, _healthCheckThread})) conversationContent =
-  case _pullModalTab ui of
+renderTab :: AppState -> PullModal Fixed -> Node Fixed 'SinglePullT -> Widget ClickableName -> Widget ClickableName
+renderTab appState pullState (SinglePullNode (EntityData {_state=nodeState, _healthCheckThread})) conversationContent =
+  case _pullModalTab pullState of
     TabConversation -> conversationContent
     TabChecks -> fromMaybe (str "No checks for this pull request.") $
       checksWidget (_appAnimationCounter appState) _healthCheckThread (pullNodeStateChecks nodeState)
@@ -117,9 +116,9 @@ renderTab appState ui (SinglePullNode (EntityData {_state=nodeState, _healthChec
         padRight Max $ commitLine (_appNow appState) isExpanded commit
       ] <> [padLeft (Pad 4) (padRight Max expandedContent) | isExpanded]
       where
-        isSelected = index == _pullModalSelectedCommit ui
+        isSelected = index == _pullModalSelectedCommit pullState
         sha = untagName (commitSha commit)
-        isExpanded = Set.member sha (_pullModalExpandedCommits ui)
+        isExpanded = Set.member sha (_pullModalExpandedCommits pullState)
         expandedContent = case M.lookup sha (pullNodeStateCommitDetails nodeState) of
           Just (Fetched detailed) -> commitInner detailed
           Just (Errored err) -> withAttr erroredAttr $ strWrap [i|Failed to fetch commit: #{err}|]
@@ -147,7 +146,7 @@ renderTab appState ui (SinglePullNode (EntityData {_state=nodeState, _healthChec
                 Nothing -> withAttr italicText $ str "No diff available for this file"
           ]
 
-    currentFile = _pullModalCurrentFile ui
+    currentFile = _pullModalCurrentFile pullState
     viewedStates = pullNodeStateViewedStates nodeState
 
     -- One dot per file, on a single line. The current file's dot is bracketed and

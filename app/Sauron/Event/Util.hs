@@ -64,7 +64,7 @@ clearAutoScrollTarget s = do
       modify (appMainList %~ listModify (const (SomeNode (JobLogGroupNode (ed { _state = Nothing })))))
     _ -> return ()
   -- Update the modal's Fixed snapshot too (for zoom modal scrolling)
-  modify (appModal . _Just . zoomModalSomeNode %~ clearAutoScrollInSomeNode)
+  modify (appModal . _Just . zoomModal . zoomModalSomeNode %~ clearAutoScrollInSomeNode)
 
 clearAutoScrollInSomeNode :: SomeNode Fixed -> SomeNode Fixed
 clearAutoScrollInSomeNode (SomeNode (SingleNotificationNode ed)) =

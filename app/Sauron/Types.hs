@@ -12,6 +12,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-missing-export-lists #-}
+-- For JobLogGroup, whose two constructors carry different fields. The modal states
+-- used to need this too, before each got its own type.
 {-# OPTIONS_GHC -Wno-partial-fields #-}
 
 module Sauron.Types where
@@ -647,57 +649,86 @@ data CommentMode = CommentMode {
   , _commentModeSubmission :: SubmissionState
   }
 
--- TODO: break these into individual types
+-- | Each modal's state is its own type rather than a clutch of fields on
+-- 'ModalState', so that code which only makes sense for one modal -- its renderer,
+-- its key handler -- can say which one in its type and read the fields totally.
+-- 'ModalState' just says which of them is open.
+
+data ZoomModal f = ZoomModal {
+  _zoomModalSomeNode :: SomeNode f
+  , _zoomModalParents :: [SomeNode f]
+  -- | The inline comment editor, when comment mode is on
+  , _zoomModalCommentMode :: Maybe CommentMode
+  }
+
+data PullModal f = PullModal {
+  _pullModalNode :: Node f 'SinglePullT
+  , _pullModalParents :: [SomeNode f]
+  -- | The inline comment editor on the Conversation tab, when it's focused
+  , _pullModalCommentMode :: Maybe CommentMode
+  , _pullModalTab :: PullModalTab
+  , _pullModalCurrentFile :: Int
+  , _pullModalSelectedCommit :: Int
+  , _pullModalExpandedCommits :: Set Text
+  }
+
+-- | Unparameterized: this modal holds no node-tree data, so the fixer passes it
+-- through untouched.
+data NewIssueModal = NewIssueModal {
+  _newIssueTitleEditor :: Editor Text ClickableName
+  , _newIssueBodyEditor :: WrappingEditor Char ClickableName
+  , _newIssueRepoOwner :: Name Owner
+  , _newIssueRepoName :: Name Repo
+  , _newIssueSubmissionState :: SubmissionState
+  , _newIssueFocusTitle :: Bool -- True = title focused, False = body focused
+  }
+
+-- | Unparameterized, for the same reason as 'NewIssueModal'.
+data MergeModal = MergeModal {
+  _mergeIssue :: Issue
+  , _mergeRepoOwner :: Name Owner
+  , _mergeRepoName :: Name Repo
+  , _mergeMethod :: MergeMethod
+  -- | Commit title/message for the squash commit; empty means GitHub's default.
+  -- Only shown for squash merges.
+  , _mergeCommitTitleEditor :: Editor Text ClickableName
+  , _mergeCommitMessageEditor :: Editor Text ClickableName
+  , _mergeFocus :: MergeFocus
+  , _mergeSubmissionState :: SubmissionState
+  }
+
+-- | Which modal is open, if any.
 data ModalState f =
-  ZoomModalState {
-      _zoomModalSomeNode :: SomeNode f
-      , _zoomModalParents :: [SomeNode f]
-      -- | The inline comment editor, when comment mode is on
-      , _zoomModalCommentMode :: Maybe CommentMode
-      }
-  | PullRequestModalState {
-      _pullModalNode :: Node f 'SinglePullT
-      , _pullModalParents :: [SomeNode f]
-      -- | The inline comment editor on the Conversation tab, when it's focused
-      , _pullModalCommentMode :: Maybe CommentMode
-      , _pullModalTab :: PullModalTab
-      , _pullModalCurrentFile :: Int
-      , _pullModalSelectedCommit :: Int
-      , _pullModalExpandedCommits :: Set Text
-      }
-  | NewIssueModalState {
-      _newIssueTitleEditor :: Editor Text ClickableName
-      , _newIssueBodyEditor :: WrappingEditor Char ClickableName
-      , _newIssueRepoOwner :: Name Owner
-      , _newIssueRepoName :: Name Repo
-      , _newIssueSubmissionState :: SubmissionState
-      , _newIssueFocusTitle :: Bool -- True = title focused, False = body focused
-      }
-  | MergeModalState {
-      _mergeIssue :: Issue
-      , _mergeRepoOwner :: Name Owner
-      , _mergeRepoName :: Name Repo
-      , _mergeMethod :: MergeMethod
-      -- | Commit title/message for the squash commit; empty means GitHub's default.
-      -- Only shown for squash merges.
-      , _mergeCommitTitleEditor :: Editor Text ClickableName
-      , _mergeCommitMessageEditor :: Editor Text ClickableName
-      , _mergeFocus :: MergeFocus
-      , _mergeSubmissionState :: SubmissionState
-      }
+  ZoomModalState (ZoomModal f)
+  | PullRequestModalState (PullModal f)
+  | NewIssueModalState NewIssueModal
+  | MergeModalState MergeModal
   | HelpModalState
 
-instance Eq (ModalState Fixed) where
-  (ZoomModalState node1 parents1 comment1) == (ZoomModalState node2 parents2 comment2) =
+instance Eq (ZoomModal Fixed) where
+  (ZoomModal node1 parents1 comment1) == (ZoomModal node2 parents2 comment2) =
     node1 == node2 && parents1 == parents2 && sameCommentMode comment1 comment2
-  (PullRequestModalState node1 parents1 comment1 tab1 file1 commit1 expanded1) ==
-    (PullRequestModalState node2 parents2 comment2 tab2 file2 commit2 expanded2) =
+
+instance Eq (PullModal Fixed) where
+  (PullModal node1 parents1 comment1 tab1 file1 commit1 expanded1) ==
+    (PullModal node2 parents2 comment2 tab2 file2 commit2 expanded2) =
     node1 == node2 && parents1 == parents2 && sameCommentMode comment1 comment2
     && tab1 == tab2 && file1 == file2 && commit1 == commit2 && expanded1 == expanded2
-  (NewIssueModalState _t1 _b1 o1 n1 s1 _f1) == (NewIssueModalState _t2 _b2 o2 n2 s2 _f2) =
+
+-- | Editors have no Eq, so they're compared by the issue they're about
+instance Eq NewIssueModal where
+  (NewIssueModal _t1 _b1 o1 n1 s1 _f1) == (NewIssueModal _t2 _b2 o2 n2 s2 _f2) =
     o1 == o2 && n1 == n2 && s1 == s2
-  (MergeModalState issue1 owner1 name1 method1 _t1 _m1 _f1 submission1) == (MergeModalState issue2 owner2 name2 method2 _t2 _m2 _f2 submission2) =
+
+instance Eq MergeModal where
+  (MergeModal issue1 owner1 name1 method1 _t1 _m1 _f1 submission1) == (MergeModal issue2 owner2 name2 method2 _t2 _m2 _f2 submission2) =
     issue1 == issue2 && owner1 == owner2 && name1 == name2 && method1 == method2 && submission1 == submission2
+
+instance Eq (ModalState Fixed) where
+  (ZoomModalState zoom1) == (ZoomModalState zoom2) = zoom1 == zoom2
+  (PullRequestModalState pull1) == (PullRequestModalState pull2) = pull1 == pull2
+  (NewIssueModalState newIssue1) == (NewIssueModalState newIssue2) = newIssue1 == newIssue2
+  (MergeModalState merge1) == (MergeModalState merge2) = merge1 == merge2
   HelpModalState == HelpModalState = True
   _ == _ = False
 
@@ -713,23 +744,49 @@ sameCommentMode _ _ = False
 
 -- | A zoom modal freshly opened on a node
 newZoomModalState :: SomeNode f -> [SomeNode f] -> ModalState f
-newZoomModalState node parents = ZoomModalState node parents Nothing
+newZoomModalState node parents = ZoomModalState (ZoomModal node parents Nothing)
 
 -- | A pull request modal freshly opened on the given tab
 newPullRequestModalState :: PullModalTab -> Node f 'SinglePullT -> [SomeNode f] -> ModalState f
-newPullRequestModalState tab node parents = PullRequestModalState node parents Nothing tab 0 0 mempty
+newPullRequestModalState tab node parents =
+  PullRequestModalState (PullModal node parents Nothing tab 0 0 mempty)
+
+-- * Focusing one modal's state
+--
+-- Each of these has at most one target: it fires when that modal is the one open,
+-- and does nothing otherwise. Compose with the field lenses to reach into the modal
+-- that's up without having to say what to do about the ones that aren't, e.g.
+-- @appModal . _Just . mergeModal . mergeFocus .~ MergeFocusTitle@.
+
+zoomModal :: Traversal' (ModalState f) (ZoomModal f)
+zoomModal g (ZoomModalState st) = ZoomModalState <$> g st
+zoomModal _ m = pure m
+
+pullModal :: Traversal' (ModalState f) (PullModal f)
+pullModal g (PullRequestModalState st) = PullRequestModalState <$> g st
+pullModal _ m = pure m
+
+newIssueModal :: Traversal' (ModalState f) NewIssueModal
+newIssueModal g (NewIssueModalState st) = NewIssueModalState <$> g st
+newIssueModal _ m = pure m
+
+mergeModal :: Traversal' (ModalState f) MergeModal
+mergeModal g (MergeModalState st) = MergeModalState <$> g st
+mergeModal _ m = pure m
 
 -- | The inline comment editor of whichever modal owns one
 modalCommentMode :: ModalState f -> Maybe CommentMode
-modalCommentMode (ZoomModalState {_zoomModalCommentMode}) = _zoomModalCommentMode
-modalCommentMode (PullRequestModalState {_pullModalCommentMode}) = _pullModalCommentMode
+modalCommentMode (ZoomModalState (ZoomModal {_zoomModalCommentMode})) = _zoomModalCommentMode
+modalCommentMode (PullRequestModalState (PullModal {_pullModalCommentMode})) = _pullModalCommentMode
 modalCommentMode _ = Nothing
 
--- | Update the inline comment editor of whichever modal owns one
+-- | Update the inline comment editor of whichever modal owns one. Each traversal
+-- fires only for its own modal, so running both is the same as dispatching on which
+-- one is open.
 overModalCommentMode :: (Maybe CommentMode -> Maybe CommentMode) -> ModalState f -> ModalState f
-overModalCommentMode f m@(ZoomModalState {}) = m { _zoomModalCommentMode = f (_zoomModalCommentMode m) }
-overModalCommentMode f m@(PullRequestModalState {}) = m { _pullModalCommentMode = f (_pullModalCommentMode m) }
-overModalCommentMode _ m = m
+overModalCommentMode f =
+  (zoomModal %~ \z -> z { _zoomModalCommentMode = f (_zoomModalCommentMode z) })
+  . (pullModal %~ \p -> p { _pullModalCommentMode = f (_pullModalCommentMode p) })
 
 data AppState = AppState {
   _appUser :: User
@@ -772,7 +829,10 @@ data DetailsExpanded = DetailsCollapsed | DetailsExpanded
 
 
 makeLenses ''EntityData
-makeLenses ''ModalState
+makeLenses ''ZoomModal
+makeLenses ''PullModal
+makeLenses ''NewIssueModal
+makeLenses ''MergeModal
 makeLenses ''CommentMode
 makeLenses ''LogEntry
 makeLenses ''AppState

@@ -27,8 +27,8 @@ import UnliftIO.Async
 
 openMergeModal :: Issue -> Name Owner -> Name Repo -> EventM ClickableName AppState ()
 openMergeModal issue owner name =
-  modify (appModal ?~ MergeModalState issue owner name MergeMethodMerge
-    (titleEditorFor issue MergeMethodMerge) emptyMessageEditor MergeFocusMethods NotSubmitting)
+  modify (appModal ?~ MergeModalState (MergeModal issue owner name MergeMethodMerge
+    (titleEditorFor issue MergeMethodMerge) emptyMessageEditor MergeFocusMethods NotSubmitting))
 
 -- | The commit title the editor starts with, matching the web UI's squash default.
 -- For a merge commit it's empty, meaning GitHub's own default title.
@@ -60,8 +60,8 @@ handleMergeModalEvent s (MergeFinished result) = do
 -- Tab cycles focus between the method list and (for merge/squash) the commit title
 -- and message editors. Alt+Enter merges from anywhere; plain Enter only inserts a
 -- newline in the message editor.
-handleMergeModalVtyEvent :: AppState -> ModalState Fixed -> V.Event -> EventM ClickableName AppState ()
-handleMergeModalVtyEvent s modalState@(MergeModalState {_mergeIssue, _mergeMethod, _mergeFocus, _mergeSubmissionState}) ev
+handleMergeModalVtyEvent :: AppState -> MergeModal -> V.Event -> EventM ClickableName AppState ()
+handleMergeModalVtyEvent s mergeState@(MergeModal {_mergeIssue, _mergeMethod, _mergeFocus, _mergeSubmissionState}) ev
   | _mergeSubmissionState == SubmittingMerge = return ()
   | otherwise = case ev of
       V.EvKey V.KEnter [V.MMeta] -> submit
@@ -73,9 +73,9 @@ handleMergeModalVtyEvent s modalState@(MergeModalState {_mergeIssue, _mergeMetho
       -- (Meta chords, stray escape-sequence fragments, mouse events) is dropped so
       -- it can't type garbage into them.
       _ | _mergeFocus == MergeFocusTitle -> when (isEditorInput False ev) $
-            zoom (appModal . _Just . mergeCommitTitleEditor) $ handleEditorEvent (VtyEvent ev)
+            zoom (appModal . _Just . mergeModal . mergeCommitTitleEditor) $ handleEditorEvent (VtyEvent ev)
       _ | _mergeFocus == MergeFocusBody -> when (isEditorInput True ev) $
-            zoom (appModal . _Just . mergeCommitMessageEditor) $ handleEditorEvent (VtyEvent ev)
+            zoom (appModal . _Just . mergeModal . mergeCommitMessageEditor) $ handleEditorEvent (VtyEvent ev)
       V.EvKey (V.KChar 'p') [] -> moveMethod (-1)
       V.EvKey (V.KChar 'n') [] -> moveMethod 1
       V.EvKey (V.KChar '1') [] -> setMethod MergeMethodMerge
@@ -84,8 +84,8 @@ handleMergeModalVtyEvent s modalState@(MergeModalState {_mergeIssue, _mergeMetho
       _ -> return ()
   where
     submit = do
-      modify (appModal . _Just . mergeSubmissionState .~ SubmittingMerge)
-      liftIO $ submitMerge s modalState
+      modify (appModal . _Just . mergeModal . mergeSubmissionState .~ SubmittingMerge)
+      liftIO $ submitMerge s mergeState
 
     -- The editors don't exist for rebase (it creates no commit), so focus stays on
     -- the method list there
@@ -97,7 +97,7 @@ handleMergeModalVtyEvent s modalState@(MergeModalState {_mergeIssue, _mergeMetho
     cycleFocusBack MergeFocusBody = MergeFocusTitle
     cycleFocusBack _ = MergeFocusMethods
 
-    setFocus focus = modify (appModal . _Just . mergeFocus .~ focus)
+    setFocus focus = modify (appModal . _Just . mergeModal . mergeFocus .~ focus)
 
     isEditorInput _ (V.EvPaste _) = True
     isEditorInput _ (V.EvKey (V.KChar _) mods) = mods `elem` [[], [V.MShift], [V.MCtrl]]
@@ -114,14 +114,13 @@ handleMergeModalVtyEvent s modalState@(MergeModalState {_mergeIssue, _mergeMetho
     -- Selecting a method re-prefills the commit title/message with that method's
     -- defaults, like the web UI does when switching merge methods.
     setMethod method = when (method /= _mergeMethod) $ do
-      modify (appModal . _Just . mergeMethod .~ method)
-      modify (appModal . _Just . mergeCommitTitleEditor .~ titleEditorFor _mergeIssue method)
-      modify (appModal . _Just . mergeCommitMessageEditor .~ emptyMessageEditor)
+      modify (appModal . _Just . mergeModal . mergeMethod .~ method)
+      modify (appModal . _Just . mergeModal . mergeCommitTitleEditor .~ titleEditorFor _mergeIssue method)
+      modify (appModal . _Just . mergeModal . mergeCommitMessageEditor .~ emptyMessageEditor)
       when (method == MergeMethodRebase) $ setFocus MergeFocusMethods
-handleMergeModalVtyEvent _ _ _ = return ()
 
-submitMerge :: AppState -> ModalState Fixed -> IO ()
-submitMerge s (MergeModalState {_mergeIssue=(Issue {issueNumber}), ..}) =
+submitMerge :: AppState -> MergeModal -> IO ()
+submitMerge s (MergeModal {_mergeIssue=(Issue {issueNumber}), ..}) =
   void $ async $ do
     result <- Pull.mergePull baseContext _mergeRepoOwner _mergeRepoName issueNumber _mergeMethod commitTitle commitMessage
     writeBChan (eventChan baseContext) (MergeModalEvent (MergeFinished result))
@@ -132,4 +131,3 @@ submitMerge s (MergeModalState {_mergeIssue=(Issue {issueNumber}), ..}) =
     forCommitCreatingMethod text = if _mergeMethod /= MergeMethodRebase && not (T.null text) then Just text else Nothing
     commitTitle = forCommitCreatingMethod $ editorContents _mergeCommitTitleEditor
     commitMessage = forCommitCreatingMethod $ editorContents _mergeCommitMessageEditor
-submitMerge _ _ = return ()

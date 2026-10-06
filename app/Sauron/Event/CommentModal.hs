@@ -93,10 +93,10 @@ refreshZoomedNode :: AppState -> EventM ClickableName AppState ()
 refreshZoomedNode s = do
   maybeVarModal <- liftIO $ readTVarIO (_appModalVariable s)
   case maybeVarModal of
-    Just (ZoomModalState {_zoomModalSomeNode=SomeNode node, _zoomModalParents=parents}) ->
+    Just (ZoomModalState (ZoomModal {_zoomModalSomeNode=SomeNode node, _zoomModalParents=parents})) ->
       whenJust (nonEmpty parents) $ \parents' ->
         void $ refreshSelected (s ^. appBaseContext) node parents'
-    Just (PullRequestModalState {_pullModalNode=node, _pullModalParents=parents}) ->
+    Just (PullRequestModalState (PullModal {_pullModalNode=node, _pullModalParents=parents})) ->
       whenJust (nonEmpty parents) $ \parents' ->
         void $ refreshSelected (s ^. appBaseContext) node parents'
     _ -> return ()

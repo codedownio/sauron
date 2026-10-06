@@ -62,8 +62,8 @@ appEvent s (AppEvent (ModalUpdate newModal)) = do
     -- Anything else is a snapshot from before the modal was opened or closed
     _ -> return ()
   where
-    isFixerManaged (ZoomModalState {}) = True
-    isFixerManaged (PullRequestModalState {}) = True
+    isFixerManaged (ZoomModalState _) = True
+    isFixerManaged (PullRequestModalState _) = True
     isFixerManaged _ = False
 
 appEvent _ (AppEvent AnimationTick) = do
@@ -105,31 +105,29 @@ appEvent _s (AppEvent (LogEntryAdded logEntry)) = do
 -- Modal events
 appEvent s@(_appModal -> Just modalState) e = case e of
   VtyEvent ev -> case modalState of
-    NewIssueModalState {} -> case ev of
+    NewIssueModalState newIssueState -> case ev of
       (V.EvKey V.KEsc []) -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
       (V.EvKey V.KEnter [V.MMeta]) -> do
-        modify (appModal . _Just . newIssueSubmissionState .~ SubmittingNewIssue)
-        liftIO $ submitNewIssue s modalState
+        modify (appModal . _Just . newIssueModal . newIssueSubmissionState .~ SubmittingNewIssue)
+        liftIO $ submitNewIssue s newIssueState
       (V.EvKey (V.KChar '\t') []) ->
-        modify (appModal . _Just . newIssueFocusTitle %~ not)
+        modify (appModal . _Just . newIssueModal . newIssueFocusTitle %~ not)
       (V.EvKey V.KBackTab []) ->
-        modify (appModal . _Just . newIssueFocusTitle %~ not)
-      _ -> case modalState of
-        NewIssueModalState {_newIssueFocusTitle=True} ->
-          zoom (appModal . _Just . newIssueTitleEditor) $ handleEditorEvent (VtyEvent ev)
-        _ -> do
-          let bodyEd = _newIssueBodyEditor modalState
-          bodyEd' <- WEditorBrick.handleEditor bodyEd ev
-          modify (appModal . _Just . newIssueBodyEditor .~ bodyEd')
-    MergeModalState {} -> case ev of
+        modify (appModal . _Just . newIssueModal . newIssueFocusTitle %~ not)
+      _ | _newIssueFocusTitle newIssueState ->
+            zoom (appModal . _Just . newIssueModal . newIssueTitleEditor) $ handleEditorEvent (VtyEvent ev)
+        | otherwise -> do
+            bodyEd' <- WEditorBrick.handleEditor (_newIssueBodyEditor newIssueState) ev
+            modify (appModal . _Just . newIssueModal . newIssueBodyEditor .~ bodyEd')
+    MergeModalState mergeState -> case ev of
       -- Match Esc with any modifiers: some terminals tag it (and a modifier-tagged
       -- Esc falling through to the title editor would type stray characters)
       (V.EvKey V.KEsc _) -> closeModal s
-      (V.EvKey (V.KChar 'q') []) | _mergeFocus modalState == MergeFocusMethods -> closeModal s
+      (V.EvKey (V.KChar 'q') []) | _mergeFocus mergeState == MergeFocusMethods -> closeModal s
       (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
-      _ -> handleMergeModalVtyEvent s modalState ev
-    ZoomModalState {_zoomModalCommentMode} -> case _zoomModalCommentMode of
+      _ -> handleMergeModalVtyEvent s mergeState ev
+    ZoomModalState (ZoomModal {_zoomModalCommentMode}) -> case _zoomModalCommentMode of
       -- Comment mode owns the keyboard while it's on, apart from closing the modal
       Just commentMode -> case ev of
         (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
@@ -144,7 +142,7 @@ appEvent s@(_appModal -> Just modalState) e = case e of
           withFixedElemAndParents s $ \(SomeNode el) variableEl elems ->
             openNode (s ^. appBaseContext) variableEl elems el
         _ -> whenM (handleModalScrollingFull ZoomModalContent ev) $ clearAutoScrollTarget s
-    PullRequestModalState {_pullModalCommentMode, _pullModalNode=SinglePullNode (EntityData {_static=pullIssue})} ->
+    PullRequestModalState pullState@(PullModal {_pullModalCommentMode, _pullModalNode=SinglePullNode (EntityData {_static=pullIssue})}) ->
       case _pullModalCommentMode of
         Just commentMode -> case ev of
           (V.EvKey (V.KChar 'q') [V.MCtrl]) -> closeModal s
@@ -157,7 +155,7 @@ appEvent s@(_appModal -> Just modalState) e = case e of
           (V.EvKey c []) | c == openSelectedKey ->
             withFixedElemAndParents s $ \(SomeNode el) variableEl elems ->
               openNode (s ^. appBaseContext) variableEl elems el
-          (V.EvKey key []) -> unlessM (handlePullModalKey s modalState key) $ case key of
+          (V.EvKey key []) -> unlessM (handlePullModalKey s pullState key) $ case key of
             (V.KChar 'c') -> withRepoOfPull s $ \owner name -> enterCommentMode s pullIssue True owner name
             (V.KChar 'm') | issueState pullIssue == StateOpen ->
               withRepoOfPull s $ \owner name -> do
@@ -246,10 +244,10 @@ appEvent _ _ = return ()
 -- | Carry the modal's own UI state (comment editor, tab, cursors) across a fixer
 -- projection, which only owns the node data.
 preserveModalUi :: ModalState Fixed -> ModalState Fixed -> ModalState Fixed
-preserveModalUi (ZoomModalState {_zoomModalCommentMode=commentMode}) projected@(ZoomModalState {}) =
-  projected { _zoomModalCommentMode = commentMode }
-preserveModalUi current@(PullRequestModalState {}) projected@(PullRequestModalState {}) =
-  projected {
+preserveModalUi (ZoomModalState current) (ZoomModalState projected) =
+  ZoomModalState projected { _zoomModalCommentMode = _zoomModalCommentMode current }
+preserveModalUi (PullRequestModalState current) (PullRequestModalState projected) =
+  PullRequestModalState projected {
     _pullModalCommentMode = _pullModalCommentMode current
     , _pullModalTab = _pullModalTab current
     , _pullModalCurrentFile = _pullModalCurrentFile current
@@ -430,10 +428,10 @@ handleZoomModalComment :: AppState -> EventM ClickableName AppState ()
 handleZoomModalComment s = do
   maybeVarModal <- liftIO $ readTVarIO (_appModalVariable s)
   case maybeVarModal of
-    Just (ZoomModalState {_zoomModalSomeNode=SomeNode (SingleIssueNode (EntityData {_static=issue})), _zoomModalParents=parents}) ->
+    Just (ZoomModalState (ZoomModal {_zoomModalSomeNode=SomeNode (SingleIssueNode (EntityData {_static=issue})), _zoomModalParents=parents})) ->
       whenJust (nonEmpty parents >>= findRepoParent) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
         enterCommentMode s issue False owner name
-    Just (ZoomModalState {_zoomModalSomeNode=SomeNode (SingleNotificationNode (EntityData {_static=notification, _state=notifStateVar}))}) -> do
+    Just (ZoomModalState (ZoomModal {_zoomModalSomeNode=SomeNode (SingleNotificationNode (EntityData {_static=notification, _state=notifStateVar}))})) -> do
       notifState <- liftIO $ readTVarIO notifStateVar
       openCommentForNotification s notification notifState
     _ -> return ()
@@ -449,7 +447,7 @@ withRepoOfPull :: AppState -> (Name Owner -> Name Repo -> EventM ClickableName A
 withRepoOfPull s cb = do
   maybeVarModal <- liftIO $ readTVarIO (_appModalVariable s)
   case maybeVarModal of
-    Just (PullRequestModalState {_pullModalParents=parents}) ->
+    Just (PullRequestModalState (PullModal {_pullModalParents=parents})) ->
       whenJust (nonEmpty parents >>= findRepoParent) $ \(RepoNode (EntityData {_static=(owner, name)})) ->
         cb owner name
     _ -> return ()

@@ -178,14 +178,16 @@ nthChild isToggled gecf n el@(SomeNode item@(getEntityData -> (EntityData {..}))
     fmap ((el :|) . toList) <$> nthChildList isToggled gecf (n - 1) wrappedChildren
   False -> pure $ Left (n - 1)
 
--- | Update a fixer-managed modal's own UI state (comment editor, tab, cursors). The
--- change goes to the visible state so it takes effect immediately, and to the variable
--- the modal fixer projects from so the next tick doesn't revert it.
-modifyPullModal :: AppState -> (forall f. ModalState f -> ModalState f) -> EventM ClickableName AppState ()
+-- | Update the pull request modal's own UI state (comment editor, tab, cursors), if
+-- that's the modal that's open. Both writes are needed: the visible state so the change
+-- takes effect immediately, and the variable because opening a fixer-managed modal only
+-- writes the variable -- until its first projection arrives there is no visible modal
+-- for the first write to land in. ('preserveModalUi' is what stops later projections
+-- from reverting it.)
+modifyPullModal :: AppState -> (forall f. PullModal f -> PullModal f) -> EventM ClickableName AppState ()
 modifyPullModal s f = do
-  modify (appModal . _Just %~ (\m -> case m of { p@PullRequestModalState {} -> f p; other -> other }))
-  liftIO $ atomically $ modifyTVar' (_appModalVariable s)
-    (fmap (\m -> case m of { p@PullRequestModalState {} -> f p; other -> other }))
+  modify (appModal . _Just . pullModal %~ f)
+  liftIO $ atomically $ modifyTVar' (_appModalVariable s) (fmap (pullModal %~ f))
 
 -- | Update the inline comment editor of whichever modal owns one
 modifyModalCommentMode :: AppState -> (Maybe CommentMode -> Maybe CommentMode) -> EventM ClickableName AppState ()

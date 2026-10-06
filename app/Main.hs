@@ -77,10 +77,10 @@ drawUI :: AppState -> [Widget ClickableName]
 drawUI app = maybe id (:) (renderToasts app) $ case _appModal app of
   Nothing -> [ui]
   Just modalState -> case modalState of
-    NewIssueModalState {} -> [renderNewIssueModal app modalState, dimmedUi]
-    MergeModalState {} -> [renderMergeModal app modalState, dimmedUi]
-    ZoomModalState {} -> [renderZoomModal app modalState, dimmedUi]
-    PullRequestModalState {} -> [renderPullRequestModal app modalState, dimmedUi]
+    NewIssueModalState newIssueState -> [renderNewIssueModal app newIssueState, dimmedUi]
+    MergeModalState mergeState -> [renderMergeModal app mergeState, dimmedUi]
+    ZoomModalState zoomState -> [renderZoomModal app zoomState, dimmedUi]
+    PullRequestModalState pullState -> [renderPullRequestModal app pullState, dimmedUi]
     HelpModalState -> [renderHelpModal app, dimmedUi]
   where
     colorMode = fromMaybe (_appActualColorMode app) (_appCliColorMode app)
