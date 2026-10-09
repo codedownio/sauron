@@ -44,14 +44,15 @@ renderFileStats additions deletions = hBox [
 -- | A unified-diff patch, with the code normally syntax-highlighted (using the
 -- filename to pick the syntax). Added/removed lines get a two-character gutter: the
 -- +/- sign, then a green/red bar that reads as a vertical line along changed sections.
--- Each removed line is word-diffed against the added line that replaced it, so the
--- words that changed get a red/green background behind them.
+-- A changed line is tinted with a faint red/green across its whole width, and is
+-- word-diffed against the line that replaced it so the words that actually changed get a
+-- stronger shade of the same colour.
 renderPatch :: Text -> Text -> Widget n
 renderPatch filename patch = vBox $ concatMap renderGroup $ patchGroups $ T.lines patch
   where
     renderGroup (ChangeBlock removed added) =
-      zipWith (changedLine redXAttr "-┃" diffRemovedBgAttr) removed (segmentsFor fst)
-      <> zipWith (changedLine greenCheckAttr "+┃" diffAddedBgAttr) added (segmentsFor snd)
+      zipWith removedLine removed (segmentsFor fst)
+      <> zipWith addedLine added (segmentsFor snd)
       where
         wordDiffs = zipWith wordDiffSegments removed added
         segmentsFor side = map (fmap side) wordDiffs <> repeat Nothing
@@ -60,10 +61,17 @@ renderPatch filename patch = vBox $ concatMap renderGroup $ patchGroups $ T.line
       | T.isPrefixOf " " line = [hBox [str "  ", renderCodeLine filename Nothing (T.drop 1 line)]]
       | otherwise = [hBox [str "  ", withAttr normalAttr $ str $ toString line]]
 
-    changedLine gutterAttr gutter changedAttr content segments = hBox [
-      withAttr gutterAttr $ str gutter
-      , renderCodeLine filename ((changedAttr,) <$> segments) content
-      ]
+    removedLine = changedLine diffRemovedGutterAttr "-┃" diffRemovedLineBgAttr diffRemovedBgAttr
+    addedLine = changedLine diffAddedGutterAttr "+┃" diffAddedLineBgAttr diffAddedBgAttr
+
+    -- The line's tint goes behind everything in the row, including the empty space to the
+    -- right of the code, which is what the trailing fill is for.
+    changedLine gutterAttr gutter lineBgAttr wordBgAttr content segments =
+      withBackgroundOf lineBgAttr $ hBox [
+        withAttr gutterAttr $ str gutter
+        , renderCodeLine filename ((wordBgAttr,) <$> segments) content
+        , withAttr lineBgAttr $ vLimit 1 $ fill ' '
+        ]
 
 -- | A run of removed lines together with the added lines that follow it: the pairs of
 -- lines a word diff can be run on. The +/- signs are stripped from them.

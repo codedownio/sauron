@@ -118,14 +118,18 @@ attrToColor colorMode = ([
   -- Command lines inside job logs
   , (commandAttr, fg (select solarizedBlue) & flip V.withStyle V.bold)
 
-  -- Diff line backgrounds
-  , (diffAddedAttr, select brightWhite `on` select diffAddedBg)
-  , (diffRemovedAttr, select brightWhite `on` select diffRemovedBg)
-  , (diffContextAttr, fg (select brightWhite))
-
-  -- Background-only diff attributes for syntax highlighting
+  -- Diff backgrounds: a faint tint behind a whole added/removed line, and a stronger
+  -- shade of the same hue behind the words that changed within it
+  , (diffAddedLineBgAttr, bg (select diffAddedLineBg))
+  , (diffRemovedLineBgAttr, bg (select diffRemovedLineBg))
   , (diffAddedBgAttr, bg (select diffAddedBg))
   , (diffRemovedBgAttr, bg (select diffRemovedBg))
+
+  -- The +/- gutter of a changed line. These set a background of their own rather than
+  -- just a foreground, because an attribute whose background is Default would clear the
+  -- line's faint tint where the gutter sits.
+  , (diffAddedGutterAttr, V.green `on` select diffAddedLineBg)
+  , (diffRemovedGutterAttr, V.red `on` select diffRemovedLineBg)
 
   -- Toast borders (solarized, by level)
   , (toastBorderAttr ToastDefault, fg (select solarizedBlue))
@@ -279,15 +283,14 @@ codeBlockText = mkAttrName "code-block-text"
 horizontalRuleAttr = mkAttrName "horizontal-rule"
 commandAttr = mkAttrName "command"
 
--- * Diff line backgrounds
+-- * Diff backgrounds
 
-diffAddedAttr = mkAttrName "diff-added"
-diffRemovedAttr = mkAttrName "diff-removed"
-diffContextAttr = mkAttrName "diff-context"
-
--- Background-only diff attributes for syntax highlighting
+diffAddedLineBgAttr = mkAttrName "diff-added-line-bg"
+diffRemovedLineBgAttr = mkAttrName "diff-removed-line-bg"
 diffAddedBgAttr = mkAttrName "diff-added-bg"
 diffRemovedBgAttr = mkAttrName "diff-removed-bg"
+diffAddedGutterAttr = mkAttrName "diff-added-gutter"
+diffRemovedGutterAttr = mkAttrName "diff-removed-gutter"
 
 -- * Event colors
 
@@ -426,15 +429,26 @@ brightWhite = (grayAtRGB 200, V.Color240 253, V.brightWhite, V.white, V.white)
 unreadNotificationBg :: ColorFallback
 unreadNotificationBg = (V.rgbColor 0x1a 0x2f 0x3a, V.Color240 236, V.brightBlack, V.black, V.black)
 
--- Backgrounds for the changed words within a diff line. Dark enough that the syntax
--- colors on top of them stay readable, like GitHub's boxes around changed words.
+-- A faint tint behind a whole added/removed line. Faint enough to read as a wash over
+-- the terminal's background rather than as a block of colour, and well below the
+-- word-level shades below so the two are easy to tell apart.
 -- (linearColor so they aren't quantized to the 240 palette; Color240 n is palette entry
--- 16 + n, so the fallbacks are 22 and 52: dark green and dark red.)
+-- 16 + n, so the fallbacks are 22 and 52, the colour cube's darkest green and red. The
+-- 16- and 8-color palettes have nothing dim enough, so there they fall back to black.)
+diffAddedLineBg :: ColorFallback
+diffAddedLineBg = (V.linearColor (0x16 :: Int) 0x2f 0x1f, V.Color240 6, V.black, V.black, V.black)
+
+diffRemovedLineBg :: ColorFallback
+diffRemovedLineBg = (V.linearColor (0x36 :: Int) 0x1c 0x1e, V.Color240 36, V.black, V.black, V.black)
+
+-- Backgrounds for the changed words within a diff line: the same hues at roughly twice
+-- the strength, still dark enough that the syntax colors on top stay readable, like
+-- GitHub's boxes around changed words. (28 and 88 in the 240 palette.)
 diffAddedBg :: ColorFallback
-diffAddedBg = (V.linearColor (0x1d :: Int) 0x4f 0x2b, V.Color240 6, V.green, V.green, V.black)
+diffAddedBg = (V.linearColor (0x1d :: Int) 0x4f 0x2b, V.Color240 12, V.green, V.green, V.black)
 
 diffRemovedBg :: ColorFallback
-diffRemovedBg = (V.linearColor (0x60 :: Int) 0x29 0x2b, V.Color240 36, V.red, V.red, V.black)
+diffRemovedBg = (V.linearColor (0x60 :: Int) 0x29 0x2b, V.Color240 72, V.red, V.red, V.black)
 
 grayAtRGB :: Word8 -> V.Color
 grayAtRGB level = V.rgbColor level level level
