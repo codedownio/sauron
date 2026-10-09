@@ -426,21 +426,25 @@ brightWhite = (grayAtRGB 200, V.Color240 253, V.brightWhite, V.white, V.white)
 unreadNotificationBg :: ColorFallback
 unreadNotificationBg = (V.rgbColor 0x1a 0x2f 0x3a, V.Color240 236, V.brightBlack, V.black, V.black)
 
--- Diff background colors (distinct and vibrant for visibility)
+-- Backgrounds for the changed words within a diff line. Dark enough that the syntax
+-- colors on top of them stay readable, like GitHub's boxes around changed words.
+-- (linearColor so they aren't quantized to the 240 palette; Color240 n is palette entry
+-- 16 + n, so the fallbacks are 22 and 52: dark green and dark red.)
 diffAddedBg :: ColorFallback
-diffAddedBg = (V.rgbColor 0x00 0x80 0x00, V.Color240 34, V.green, V.green, V.black)
+diffAddedBg = (V.linearColor (0x1d :: Int) 0x4f 0x2b, V.Color240 6, V.green, V.green, V.black)
 
 diffRemovedBg :: ColorFallback
-diffRemovedBg = (V.rgbColor 0x80 0x00 0x00, V.Color240 124, V.red, V.red, V.black)
+diffRemovedBg = (V.linearColor (0x60 :: Int) 0x29 0x2b, V.Color240 36, V.red, V.red, V.black)
 
 grayAtRGB :: Word8 -> V.Color
 grayAtRGB level = V.rgbColor level level level
 
--- | Create attribute mappings from a skylighting style, but strip all background colors
--- to avoid conflicts with our diff backgrounds
+-- | Create attribute mappings from a skylighting style, but have them contribute no
+-- background color of their own, so that a background painted underneath (like the
+-- word-diff highlight) shows through the syntax colors.
 attrMappingsForStyleNoBg :: SkyTypes.Style -> [(AttrName, V.Attr)]
 attrMappingsForStyleNoBg colorStyle =
-  map stripBackground (attrMappingsForStyle colorStyle)
+  map keepBackground (attrMappingsForStyle colorStyle)
   where
-    stripBackground :: (AttrName, V.Attr) -> (AttrName, V.Attr)
-    stripBackground (name, attr) = (name, attr { V.attrBackColor = V.Default })
+    keepBackground :: (AttrName, V.Attr) -> (AttrName, V.Attr)
+    keepBackground (name, attr) = (name, attr { V.attrBackColor = V.KeepCurrent })
