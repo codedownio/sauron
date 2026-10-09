@@ -23,8 +23,8 @@ import Sauron.UI.AttrMap
 import Sauron.UI.Commit (commitInner, commitLine)
 import Sauron.UI.Diff (renderFileStats, renderPatch)
 import Sauron.UI.Issue (maxCommentWidth)
-import Sauron.UI.Keys (openSelectedKey, showKey)
-import Sauron.UI.Modals.Common (modalHeightPercent, modalWidth)
+import Sauron.UI.Keys (openSelectedKey, refreshSelectedKey, showKey)
+import Sauron.UI.Modals.Common (modalHeightPercent, modalTitle, modalWidth)
 import Sauron.UI.Modals.NodeContent (renderNodeContent)
 import Sauron.UI.Modals.ZoomModal (commentModeHotkeys, commentSection, hotkeyWidget)
 import Sauron.UI.Pull (checksWidget)
@@ -39,7 +39,7 @@ renderPullRequestModal appState modalState@(PullRequestModalState {
   , _pullModalTab=currentTab
   }) =
   vBox ([
-    hCenter $ withAttr boldText $ str title
+    modalTitle appState title
     , renderTabBar currentTab
     , hBorder
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport ZoomModalContent Vertical $
@@ -206,4 +206,8 @@ footerHotkeyPairs currentTab = tabSpecific <> common
       TabChecks -> []
       TabReview -> [("←/→", "File"), ("v", "Toggle viewed"), ("V", "Viewed & next"), ("u", "Next unviewed")]
 
-    common = [(showKey openSelectedKey, "Open PR"), ("q", "Close modal")]
+    common = [
+      (showKey openSelectedKey, "Open PR")
+      , (showKey refreshSelectedKey, "Refresh")
+      , ("q", "Close modal")
+      ]

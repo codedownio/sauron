@@ -174,6 +174,7 @@ runApp cliArgs@(CliArgs {cliConfigFile, cliShowAllRepos, cliColorMode}) = do
 
           , _appModalVariable = modalVariableTVar
           , _appModal = modalFixed
+          , _appModalRefreshing = False
 
           , _appForm = Nothing
 

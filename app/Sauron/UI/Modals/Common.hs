@@ -1,11 +1,13 @@
 module Sauron.UI.Modals.Common (
   modalWidth
   , modalHeightPercent
+  , modalTitle
   , renderBodyEditor
   ) where
 
 import Brick
 import Brick.Widgets.Border
+import Brick.Widgets.Center
 import Data.String.Interpolate
 import qualified Data.Text as T
 import Relude
@@ -13,6 +15,7 @@ import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue.Events (maxCommentWidth)
 import Sauron.UI.Markdown (markdownToWidgetsWithWidth)
+import Sauron.UI.Statuses (getQuarterCircleSpinner)
 import WEditorBrick.WrappingEditor (WrappingEditor, dumpEditor)
 import qualified WEditorBrick.WrappingEditor as WEditorBrick
 
@@ -26,6 +29,17 @@ modalWidth appState = case _appMainUiExtent appState of
 -- | Modal height as percentage of screen height
 modalHeightPercent :: Int
 modalHeightPercent = 95
+
+-- | A modal's centered title, with a spinner beside it while a refresh is in flight. The
+-- spinner's space is held open either way, so the title doesn't shift as it comes and goes.
+modalTitle :: AppState -> String -> Widget n
+modalTitle appState title = hCenter $ hBox [
+  withAttr boldText $ str title
+  , padLeft (Pad 1) $
+      if _appModalRefreshing appState
+      then getQuarterCircleSpinner (_appAnimationCounter appState)
+      else str " "
+  ]
 
 -- | A markdown body editor with a live preview beside it
 renderBodyEditor :: AppState -> Bool -> Int -> Int -> WrappingEditor Char ClickableName -> Widget ClickableName

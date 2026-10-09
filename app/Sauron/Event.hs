@@ -27,6 +27,7 @@ import Sauron.Event.NewIssueModal
 import Sauron.Event.Open (openNode)
 import Sauron.Event.PullModal
 import Sauron.Event.Paging
+import Sauron.Event.Refresh (refreshModal)
 import Sauron.Event.Search
 import Sauron.Event.Util
 import Sauron.HealthCheck.Stop (stopHealthCheckThreadsForChildren)
@@ -65,6 +66,8 @@ appEvent s (AppEvent (ModalUpdate newModal)) = do
     isFixerManaged (ZoomModalState {}) = True
     isFixerManaged (PullRequestModalState {}) = True
     isFixerManaged _ = False
+
+appEvent _ (AppEvent ModalRefreshFinished) = modify (appModalRefreshing .~ False)
 
 appEvent _ (AppEvent AnimationTick) = do
   -- Use strict evaluation to avoid thunk buildup
@@ -143,6 +146,7 @@ appEvent s@(_appModal -> Just modalState) e = case e of
         (V.EvKey c []) | c == openSelectedKey ->
           withFixedElemAndParents s $ \(SomeNode el) variableEl elems ->
             openNode (s ^. appBaseContext) variableEl elems el
+        (V.EvKey c []) | c == refreshSelectedKey -> refreshModal s
         _ -> whenM (handleModalScrollingFull ZoomModalContent ev) $ clearAutoScrollTarget s
     PullRequestModalState {_pullModalCommentMode, _pullModalNode=SinglePullNode (EntityData {_static=pullIssue})} ->
       case _pullModalCommentMode of
@@ -157,6 +161,8 @@ appEvent s@(_appModal -> Just modalState) e = case e of
           (V.EvKey c []) | c == openSelectedKey ->
             withFixedElemAndParents s $ \(SomeNode el) variableEl elems ->
               openNode (s ^. appBaseContext) variableEl elems el
+          -- Refresh ahead of the tab keys, so it works the same on every tab
+          (V.EvKey c []) | c == refreshSelectedKey -> refreshModal s
           (V.EvKey key []) -> unlessM (handlePullModalKey s modalState key) $ case key of
             (V.KChar 'c') -> withRepoOfPull s $ \owner name -> enterCommentMode s pullIssue True owner name
             (V.KChar 'm') | issueState pullIssue == StateOpen ->
@@ -422,6 +428,8 @@ modifyToggled s cb = withFixedElemAndParents s $ \_fixedEl someNode@(SomeNode it
 closeModal :: AppState -> EventM ClickableName AppState ()
 closeModal s = do
   modify (appModal .~ Nothing)
+  -- Don't let a refresh that's still in flight spin the title of the next modal opened
+  modify (appModalRefreshing .~ False)
 
   liftIO $ atomically $ writeTVar (_appModalVariable s) Nothing
 

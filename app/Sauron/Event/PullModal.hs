@@ -7,6 +7,7 @@ module Sauron.Event.PullModal (
   , openPullModalOnTab
   , openPullModalForNumber
   , switchPullModalTab
+  , refetchPullModalTab
   , fileViewedState
   , zoomedPullNode
   ) where
@@ -28,6 +29,7 @@ import Sauron.Fetch.Pull (fetchPullCommitDetail, fetchPullComments, fetchPullCom
 import Sauron.GraphQL.PullRequestFiles (setFileViewedState)
 import Sauron.Types
 import Sauron.UI.Toast (showToast)
+import Sauron.UI.Util (isFetchingOrFetched)
 import UnliftIO.Async
 
 
@@ -80,17 +82,23 @@ switchPullModalTab s tab = do
 
 -- | Kick off a tab's fetch if it hasn't been fetched yet
 startTabFetch :: MonadIO m => AppState -> PullModalTab -> m ()
-startTabFetch s tab =
+startTabFetch s tab = void $ tabFetch False s tab
+
+-- | Fetch a tab's data again even though it's already there (the Refresh hotkey). The
+-- Conversation and Checks tabs come from the node's own fetch, not from here.
+refetchPullModalTab :: MonadIO m => AppState -> PullModalTab -> m (Async ())
+refetchPullModalTab = tabFetch True
+
+tabFetch :: MonadIO m => Bool -> AppState -> PullModalTab -> m (Async ())
+tabFetch force s tab =
   liftIO (zoomedPullNode s) >>= \case
-    Nothing -> return ()
+    Nothing -> liftIO $ async $ return ()
     Just (SinglePullNode (EntityData {_static=issue, _state=stateVar}), owner, name) -> do
       nodeState <- liftIO $ readTVarIO stateVar
       let bc = s ^. appBaseContext
-      let needsFetch fetchable = case fetchable of
-            NotFetched -> True
-            Errored _ -> True
-            _ -> False
-      liftIO $ void $ async $ flip runReaderT bc $ case tab of
+      let needsFetch :: Fetchable a -> Bool
+          needsFetch fetchable = force || not (isFetchingOrFetched fetchable)
+      liftIO $ async $ flip runReaderT bc $ case tab of
         TabCommits | needsFetch (pullNodeStateCommits nodeState) ->
           fetchPullCommits owner name (issueNumber issue) stateVar
         TabReview | needsFetch (pullNodeStateFiles nodeState) ->

@@ -18,8 +18,8 @@ import Relude
 import Sauron.Types
 import Sauron.UI.AttrMap
 import Sauron.UI.Issue (maxCommentWidth)
-import Sauron.UI.Keys (commentKey, openSelectedKey, showKey)
-import Sauron.UI.Modals.Common (modalHeightPercent, modalWidth, renderBodyEditor)
+import Sauron.UI.Keys (commentKey, openSelectedKey, refreshSelectedKey, showKey)
+import Sauron.UI.Modals.Common (modalHeightPercent, modalTitle, modalWidth, renderBodyEditor)
 import Sauron.UI.Modals.NodeContent (renderNodeContent)
 import WEditorBrick.WrappingEditor (dumpEditor)
 
@@ -27,7 +27,7 @@ import WEditorBrick.WrappingEditor (dumpEditor)
 renderZoomModal :: AppState -> ModalState Fixed -> Widget ClickableName
 renderZoomModal appState (ZoomModalState {_zoomModalSomeNode=someNode, _zoomModalCommentMode=commentMode}) =
   vBox ([
-    hCenter $ withAttr boldText $ str (generateModalTitle someNode)
+    modalTitle appState (generateModalTitle someNode)
     , hBorder
     -- Scrollable content area with node content
     , padBottom Max $ withVScrollBars OnRight $ withVScrollBarHandles $ viewport ZoomModalContent Vertical $
@@ -87,7 +87,11 @@ commentModeHotkeys (CommentMode {_commentModeSubmission, _commentModeIssue}) = [
 getZoomModalHotkeys :: SomeNode Fixed -> [Widget ClickableName]
 getZoomModalHotkeys (SomeNode node) = nodeSpecificHotkeys ++ commonHotkeys
   where
-    commonHotkeys = [hotkeyWidget (showKey openSelectedKey) "Open", hotkeyWidget "q" "Close modal"]
+    commonHotkeys = [
+      hotkeyWidget (showKey openSelectedKey) "Open"
+      , hotkeyWidget (showKey refreshSelectedKey) "Refresh"
+      , hotkeyWidget "q" "Close modal"
+      ]
 
     nodeSpecificHotkeys = case node of
       -- Issues have a comment button of their own at the bottom of the conversation

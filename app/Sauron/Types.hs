@@ -581,6 +581,7 @@ data ToastLevel = ToastDefault | ToastSuccess | ToastWarn | ToastError
 data AppEvent =
   ListUpdate UTCTime (V.Vector (SomeNode Fixed))
   | ModalUpdate (Maybe (ModalState Fixed))
+  | ModalRefreshFinished
   | AnimationTick
   | TimeUpdated UTCTime
   | CommentModalEvent CommentModalEvent
@@ -739,6 +740,9 @@ data AppState = AppState {
 
   , _appModalVariable :: TVar (Maybe (ModalState Variable))
   , _appModal :: Maybe (ModalState Fixed)
+  -- | Whether a refresh started from the open modal is still in flight, which the modal
+  -- shows as a spinner next to its title
+  , _appModalRefreshing :: Bool
 
   , _appForm :: Maybe (Form Text AppEvent ClickableName, Int)
 

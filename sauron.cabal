@@ -40,6 +40,7 @@ executable sauron
       Sauron.Event.Open
       Sauron.Event.Paging
       Sauron.Event.PullModal
+      Sauron.Event.Refresh
       Sauron.Event.Search
       Sauron.Event.Util
       Sauron.Expanding
